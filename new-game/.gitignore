@@ -1,0 +1,9 @@
+*.rbxl
+*.rbxlx
+*.rbxl.lock
+Packages/*
+!Packages/.gitkeep
+sourcemap.json
+.env
+.dev.vars
+node_modules/

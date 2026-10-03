@@ -1,0 +1,14 @@
+[package]
+name = "janus/new-game"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+# Add packages here, then run `wally install`. Examples worth having:
+#   Promise  = "evaera/promise@4.0.0"
+#   Signal   = "sleitnick/signal@2.0.1"
+#   Trove    = "sleitnick/trove@1.1.0"
+#   Knit     = "sleitnick/knit@1.7.0"
+#   Fusion   = "elttob/fusion@0.3.0"      -- reactive UI
+#   ProfileStore (data) is a single file: https://github.com/MadStudioRoblox/ProfileStore
+[dependencies]
