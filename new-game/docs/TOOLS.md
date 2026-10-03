@@ -15,7 +15,7 @@ Grouped by job. **Bold = install first.** Check each tool's own docs for current
 
 ## 2. Connecting Claude to Studio (so it sees the live game)
 
-- **Roblox Studio MCP server**: Roblox ships an official MCP integration, and there is an open-source server (`Roblox/studio-mcp` on GitHub). It lets Claude read the DataModel, insert/edit instances, run code and read output. Add it to Claude Code with `claude mcp add` (follow the repo's README for the exact command for your OS).
+- **Roblox Studio built-in MCP server** (Studio -> Assistant -> Settings -> MCP Servers -> Quick connect -> Claude Code). Lets Claude read the DataModel, insert/edit instances, run code and read output. The older open-source `Roblox/studio-rust-mcp-server` is no longer maintained, so don't use it. Exact steps: [`SETUP.md`](SETUP.md) Part 5.
 - **Roblox Open Cloud API**: server-side HTTP API with API keys. Publish places, read/write DataStores and OrderedDataStores, MessagingService, upload assets, manage users/groups, run Luau remotely ("Luau Execution"). Create keys at Creator Hub -> Open Cloud -> API Keys; scope them minimally.
 - **Roblox Assistant** (built into Studio): good for quick in-Studio edits and asset search; use Claude Code for multi-file work.
 

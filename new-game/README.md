@@ -42,4 +42,6 @@ rojo serve             # then Studio -> Plugins -> Rojo -> Connect
 3. Studio -> Game Settings -> Security -> enable **Allow HTTP Requests**; Creator Hub -> your experience -> **Secrets** -> add `AI_PROXY_KEY` = the same `PROXY_KEY`, allowed domain = your worker domain.
 4. Set `Config.AI.ProxyUrl` to `https://<your-worker>.workers.dev/chat`.
 
+Detailed click-by-click connection guide: [`docs/SETUP.md`](docs/SETUP.md).
+
 Full tool/API list and what each is for: [`docs/TOOLS.md`](docs/TOOLS.md).
