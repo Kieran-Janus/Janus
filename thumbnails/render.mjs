@@ -73,7 +73,8 @@ const SHARED_DEFS = `
   <filter id="soft"><feGaussianBlur stdDeviation="30"/></filter>
   <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/>
     <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.07 0"/></filter>
-  ${glow("bloom", 12)}${glow("bloomBig", 28)}`;
+  ${glow("bloom", 12)}${glow("bloomBig", 28)}${glow("glowU", 0.09)}
+  <radialGradient id="pumpkinG" cx="0.45" cy="0.4" r="0.7"><stop offset="0" stop-color="#ffb347"/><stop offset="0.6" stop-color="#f07214"/><stop offset="1" stop-color="#b8480a"/></radialGradient>`;
 
 // ---------- characters ----------
 
@@ -125,6 +126,20 @@ function handR(x, y, s, rot, armR) {
   return [x + s * (lx * Math.cos(r) - ly * Math.sin(r)), y + s * (lx * Math.sin(r) + ly * Math.cos(r))];
 }
 
+// World position of a front avatar's right hand (handles flip).
+function handWorld(x, y, s, rot, flip, armR) {
+  const a = rad(armR), [px, py] = [1.5, 0.35];
+  const lx = (px + (1.52 - px) * Math.cos(a) - (2.0 - py) * Math.sin(a)) * s * flip;
+  const ly = (py + (1.52 - px) * Math.sin(a) + (2.0 - py) * Math.cos(a)) * s;
+  const r = rad(rot);
+  return [x + lx * Math.cos(r) - ly * Math.sin(r), y + lx * Math.sin(r) + ly * Math.cos(r)];
+}
+// Weapon drawn in world space from a hand, pointing at a target.
+function aimed(weapon, hand, target, s) {
+  const ang = (Math.atan2(target[0] - hand[0], -(target[1] - hand[1])) * 180) / Math.PI;
+  return `<g transform="translate(${hand[0]} ${hand[1]}) rotate(${ang}) scale(${s})">${weapon}</g>`;
+}
+
 // Close-up reaction face for the corner inset. Head is 1x1 units centred at origin.
 function face(expr, { skin = "#f2c48d", hair = "#6b3a1f" } = {}) {
   const eyes = {
@@ -146,6 +161,12 @@ function face(expr, { skin = "#f2c48d", hair = "#6b3a1f" } = {}) {
             <path d="M-0.34 -0.24 Q-0.2 -0.32 -0.08 -0.25 M0.34 -0.24 Q0.2 -0.32 0.08 -0.25" stroke="${INK}" stroke-width="0.04" fill="none" stroke-linecap="round"/>
             <path d="M-0.26 0.14 L0.26 0.14 Q0.24 0.4 0 0.41 Q-0.24 0.4 -0.26 0.14Z" fill="#3a0d12" stroke="${INK}" stroke-width="0.025"/>
             <path d="M-0.24 0.14 L0.24 0.14 L0.23 0.2 L-0.23 0.2Z" fill="#fff"/><path d="M-0.12 0.34 Q0 0.27 0.12 0.34 Q0 0.4 -0.12 0.34Z" fill="#e0475e"/>`,
+    angry: `<path d="M-0.38 -0.25 L-0.07 -0.12 M0.38 -0.25 L0.07 -0.12" stroke="${INK}" stroke-width="0.065" stroke-linecap="round"/>
+            <ellipse cx="-0.2" cy="-0.02" rx="0.1" ry="0.075" fill="#fff" stroke="${INK}" stroke-width="0.025"/>
+            <ellipse cx="0.2" cy="-0.02" rx="0.1" ry="0.075" fill="#fff" stroke="${INK}" stroke-width="0.025"/>
+            <circle cx="-0.16" cy="-0.01" r="0.045" fill="${INK}"/><circle cx="0.24" cy="-0.01" r="0.045" fill="${INK}"/>
+            <path d="M-0.2 0.15 L0.2 0.15 L0.15 0.37 Q0 0.42 -0.15 0.37Z" fill="#3a0d12" stroke="${INK}" stroke-width="0.025"/>
+            <path d="M-0.19 0.15 L0.19 0.15 L0.18 0.2 L-0.18 0.2Z" fill="#fff"/>`,
     determined: `<path d="M-0.36 -0.2 L-0.08 -0.12 M0.36 -0.2 L0.08 -0.12" stroke="${INK}" stroke-width="0.055" stroke-linecap="round"/>
                  <ellipse cx="-0.2" cy="-0.01" rx="0.1" ry="0.07" fill="#fff" stroke="${INK}" stroke-width="0.025"/>
                  <ellipse cx="0.2" cy="-0.01" rx="0.1" ry="0.07" fill="#fff" stroke="${INK}" stroke-width="0.025"/>
@@ -190,254 +211,190 @@ function reactionInset({ expr, border = "#ff1f1f", bg = ["#3a1020", "#0d0410"], 
     ${shock}`;
 }
 
+// Avatar facing the camera (fighting poses). flip=-1 mirrors it to face left.
+// itemR / itemL are drawn in hand space: origin at the hand, arm pointing +y.
+function avatarFront(x, y, s, o = {}) {
+  const { skin = "#f2c48d", shirt = "#2a2f4a", pants = "#16182a", hair = "#3a2010", expr = "angry", pose = {}, rot = 0, flip = 1, itemR = "", itemL = "", rimId, sash, shadow = true } = o;
+  const { armL = 0, armR = 0, legL = 0, legR = 0 } = pose;
+  const sleeve = (x0) => `<rect x="${x0}" y="0" width="1" height="1.1" rx="0.14" fill="${shirt}" stroke="${INK}" stroke-width="0.07"/>`;
+  const hand = (hx, item) => (item ? `<g transform="translate(${hx} 2.0)">${item}</g>` : "");
+  return `<g ${rimId ? `filter="url(#${rimId})"` : ""}><g transform="translate(${x} ${y}) rotate(${rot}) scale(${s * flip} ${s})">
+    ${shadow ? `<ellipse cx="0" cy="4.1" rx="1.9" ry="0.35" fill="#000" opacity="0.45"/>` : ""}
+    ${limb(-1, 1.95, 1, 2.05, pants, legL, -0.5, 2, "left")}
+    ${limb(0, 1.95, 1, 2.05, pants, legR, 0.5, 2, "left")}
+    ${limb(-2.02, 0, 1, 2, skin, armL, -1.5, 0.35, "left", sleeve(-2.02) + hand(-1.52, itemL))}
+    <rect x="-1" y="0" width="2" height="2.02" rx="0.1" fill="${shirt}" stroke="${INK}" stroke-width="0.07"/>
+    ${sash ? `<path d="M-1 0.2 L-0.6 0 L1 1.6 L1 2 Z" fill="${sash}" filter="url(#glowU)"/>` : ""}
+    <path d="M-0.35 0 L0 0.3 L0.35 0" fill="none" stroke="#000" stroke-opacity="0.35" stroke-width="0.07"/>
+    <rect x="-1" y="0" width="2" height="2.02" rx="0.1" fill="url(#shadeR)"/>
+    <g transform="translate(0 -0.78) scale(1.36)">${face(expr, { skin, hair })}</g>
+    ${limb(1.02, 0, 1, 2, skin, armR, 1.5, 0.35, "left", sleeve(1.02) + hand(1.52, itemR))}
+  </g></g>`;
+}
+
+// ---------- weapons (stud units, handle at origin, pointing -y) ----------
+const neonSword = (c) => `<g>
+  <rect x="-0.11" y="-0.15" width="0.22" height="0.75" rx="0.05" fill="#1a1a24" stroke="${INK}" stroke-width="0.05"/>
+  <rect x="-0.45" y="-0.32" width="0.9" height="0.18" rx="0.06" fill="#2b2b38" stroke="${c}" stroke-width="0.06"/>
+  <g filter="url(#glowU)"><path d="M-0.2 -0.32 L-0.2 -3.3 L0 -3.75 L0.2 -3.3 L0.2 -0.32Z" fill="${c}"/></g>
+  <path d="M-0.08 -0.4 L-0.08 -3.3 L0 -3.55 L0.08 -3.3 L0.08 -0.4Z" fill="#fff" opacity="0.9"/></g>`;
+
+function pumpkin(cx, cy, rx, ry, { sw = 0.05, face: f = "angry", glowId = "glowU", stem = true } = {}) {
+  const P = (u, v) => `${cx + u * rx},${cy + v * ry}`;
+  const seg = [[-0.5, 0.5, "#c94f06"], [0.5, 0.5, "#c94f06"], [-0.26, 0.56, "#e8650f"], [0.26, 0.56, "#e8650f"], [0, 0.56, "url(#pumpkinG)"]]
+    .map(([u, w, fill]) => `<ellipse cx="${cx + u * rx}" cy="${cy}" rx="${w * rx}" ry="${ry}" fill="${fill}" stroke="#4a1a00" stroke-width="${sw}"/>`).join("");
+  const poly = (pts) => `<polygon points="${pts.map(([u, v]) => P(u, v)).join(" ")}"/>`;
+  const faceSvg = f ? `<g fill="#ffe066" filter="url(#${glowId})">
+      ${poly([[-0.55, -0.32], [-0.1, -0.12], [-0.42, 0.06]])}${poly([[0.55, -0.32], [0.1, -0.12], [0.42, 0.06]])}
+      ${poly([[0, 0], [0.09, 0.14], [-0.09, 0.14]])}
+      ${poly([[-0.62, 0.2], [-0.42, 0.32], [-0.3, 0.22], [-0.15, 0.36], [0, 0.26], [0.15, 0.36], [0.3, 0.22], [0.42, 0.32], [0.62, 0.2], [0.46, 0.58], [0.22, 0.5], [0.1, 0.66], [-0.1, 0.66], [-0.22, 0.5], [-0.46, 0.58]])}</g>` : "";
+  const stemSvg = stem ? `<path d="M${P(-0.08, -0.9)} Q${P(-0.05, -1.25)} ${P(0.16, -1.3)} L${P(0.18, -1.15)} Q${P(0.06, -1.1)} ${P(0.1, -0.9)}Z" fill="#3c7a1e" stroke="#1a3a0a" stroke-width="${sw}"/>` : "";
+  return `${stemSvg}${seg}${faceSvg}`;
+}
+
+const pumpkinHammer = `<g>
+  <rect x="-0.1" y="-2.7" width="0.2" height="3.2" rx="0.06" fill="#3a2414" stroke="${INK}" stroke-width="0.05"/>
+  <g filter="url(#glowU)"><path d="M-0.1 -0.2 L0.1 -0.5 M-0.1 -0.7 L0.1 -1.0 M-0.1 -1.2 L0.1 -1.5" stroke="#b44dff" stroke-width="0.09"/></g>
+  <path d="M-0.5 -3.0 Q-0.9 -4.6 -0.1 -5.0 Q-0.4 -4.3 0 -4.1 Q0.2 -4.8 0.6 -4.9 Q0.9 -4.0 0.5 -3.0Z" fill="#b44dff" opacity="0.75" filter="url(#glowU)"/>
+  ${pumpkin(0, -3.3, 0.95, 0.78, { sw: 0.05 })}</g>`;
+
+const neonBlaster = (c) => `<g transform="rotate(90)">
+  <rect x="-0.18" y="-0.1" width="0.36" height="0.7" rx="0.06" fill="#20222e" stroke="${INK}" stroke-width="0.05" transform="rotate(-12)"/>
+  <rect x="-0.32" y="-0.35" width="1.9" height="0.5" rx="0.1" fill="#2b2e3e" stroke="${INK}" stroke-width="0.05"/>
+  <rect x="1.5" y="-0.26" width="0.45" height="0.3" fill="#3a3e52" stroke="${INK}" stroke-width="0.05"/>
+  <g filter="url(#glowU)"><rect x="-0.2" y="-0.22" width="1.6" height="0.09" fill="${c}"/><circle cx="2.05" cy="-0.11" r="0.2" fill="${c}"/></g>
+  <g filter="url(#glowU)"><rect x="2.6" y="-0.19" width="1.4" height="0.16" rx="0.08" fill="${c}"/><rect x="4.6" y="-0.19" width="1.1" height="0.16" rx="0.08" fill="${c}"/></g>
+  <rect x="2.6" y="-0.15" width="1.4" height="0.07" rx="0.04" fill="#fff"/><rect x="4.6" y="-0.15" width="1.1" height="0.07" rx="0.04" fill="#fff"/></g>`;
+
+const coinW = (x, y, k, tilt = 1) => `<g transform="translate(${x} ${y}) scale(${k * tilt} ${k})"><circle r="40" fill="#c98a00" stroke="${INK}" stroke-width="5"/><circle r="30" fill="#ffd23f" stroke="#e6a400" stroke-width="4"/><text y="13" text-anchor="middle" font-family="Luckiest" font-size="38" fill="#e6a400">$</text></g>`;
+const burst = (x, y, k, col = "#fff6b0") => `<g transform="translate(${x} ${y}) scale(${k})">
+  <circle r="70" fill="#fff" filter="url(#bloomBig)"/>
+  <g filter="url(#bloom)">${Array.from({ length: 14 }, (_, i) => { const a = (i / 14) * 6.283, L = i % 2 ? 110 : 180; return `<path d="M${Math.cos(a + 0.06) * 20} ${Math.sin(a + 0.06) * 20} L${Math.cos(a) * L} ${Math.sin(a) * L} L${Math.cos(a - 0.06) * 20} ${Math.sin(a - 0.06) * 20}Z" fill="${col}"/>`; }).join("")}</g>
+  <circle r="34" fill="#fff"/></g>`;
+const bat = (x, y, k) => `<path transform="translate(${x} ${y}) scale(${k})" d="M0 4 C-8 -6 -22 -10 -40 -4 C-32 0 -30 6 -32 10 C-24 6 -16 8 -12 14 C-8 8 -4 8 0 10 C4 8 8 8 12 14 C16 8 24 6 32 10 C30 6 32 0 40 -4 C22 -10 8 -6 0 4Z M-5 -2 L-4 -9 L-1 -4 L1 -4 L4 -9 L5 -2Z" fill="#07030c"/>`;
+
 // ---------- scenes (1920x1080 canvas) ----------
 
-function nightShift() {
-  const [x0, x1, y0, y1] = [1150, 1390, 410, 610]; // back wall
-  const wall = (k, side) => [side < 0 ? x0 - x0 * k : x1 + (1920 - x1) * k, y0 - y0 * k, y1 + (1080 - y1) * k];
-  const sideDoor = (k0, k1, side, col, lit = false) => {
-    const [a, at, ab] = wall(k0, side), [b, bt, bb] = wall(k1, side);
-    const h = (t, bot) => bot - (bot - t) * 0.74;
-    return `<path d="M${a} ${ab} L${a} ${h(at, ab)} L${b} ${h(bt, bb)} L${b} ${bb} Z" fill="${col}" stroke="#000" stroke-width="4"/>
-      ${lit ? `<path d="M${a} ${ab} L${a} ${h(at, ab)} L${a + (b - a) * 0.12} ${h(at, ab) + (h(bt, bb) - h(at, ab)) * 0.12} L${a + (b - a) * 0.12} ${ab + (bb - ab) * 0.12}Z" fill="#ff8a2a" filter="url(#bloom)"/>` : ""}`;
-  };
-  const floor = Array.from({ length: 13 }, (_, i) => {
-    const bx = -700 + i * 260, t = Math.min(1, Math.max(0, bx / 1920));
-    return `<line x1="${x0 + (x1 - x0) * t}" y1="${y1}" x2="${bx}" y2="1080"/>`;
-  }).join("") + [0.06, 0.16, 0.32, 0.56, 0.9].map((k) => `<line x1="${x0 - x0 * k}" y1="${y1 + (1080 - y1) * k}" x2="${x1 + (1920 - x1) * k}" y2="${y1 + (1080 - y1) * k}"/>`).join("");
-  const lamp = (k, on) => {
-    const y = y0 - y0 * k + 14, cx = 1270 + (960 - 1270) * k * 0.15, w = 70 + 300 * k;
-    return `<rect x="${cx - w / 2}" y="${y}" width="${w}" height="${8 + 20 * k}" fill="${on ? "#cfe6ff" : "#20262c"}" ${on ? 'filter="url(#bloom)"' : ""}/>
-      ${on ? `<path d="M${cx - w / 2} ${y} L${cx + w / 2} ${y} L${cx + w * 1.5} ${y + 250 + 650 * k} L${cx - w * 1.5} ${y + 250 + 650 * k}Z" fill="url(#coneBlue)" style="mix-blend-mode:screen"/>` : ""}`;
-  };
-  const creature = `<g transform="translate(1272 610)">
-    <path d="M-70 0 L-58 -230 Q-62 -300 0 -310 Q62 -300 58 -230 L70 0Z" fill="#070304"/>
-    <path d="M-58 -230 L-96 -40 L-80 -36 L-50 -180Z M58 -230 L96 -40 L80 -36 L50 -180Z" fill="#070304"/>
-    <rect x="-84" y="-44" width="22" height="26" fill="#d9c6b0"/>
-    <path d="M-44 -300 Q0 -350 44 -300 L48 -250 Q0 -232 -48 -250Z" fill="#050203"/>
-    <rect x="-34" y="-300" width="68" height="62" rx="12" fill="#e9dcc8"/>
-    <rect x="-34" y="-300" width="68" height="62" rx="12" fill="url(#shadeR)"/>
-    <g filter="url(#redEye)"><path d="M-24 -282 L-8 -276 L-24 -270Z M24 -282 L8 -276 L24 -270Z" fill="#ff1a1a"/></g>
-    <path d="M-24 -258 Q0 -244 24 -258" fill="none" stroke="#1a0505" stroke-width="5"/>
-    <path d="M-20 -256 l4 6 l4 -6 l4 7 l4 -7 l4 7 l4 -7 l4 6 l4 -6" fill="none" stroke="#1a0505" stroke-width="2.5"/></g>`;
-  const X = 870, Y = 690, S = 118, ROT = -3, ARM = -55;
-  const torch = `<g transform="translate(1.52 2.0)"><rect x="-0.17" y="-0.1" width="0.34" height="0.75" rx="0.06" fill="#2a2a2a" stroke="${INK}" stroke-width="0.05"/><rect x="-0.24" y="0.55" width="0.48" height="0.25" rx="0.05" fill="#444" stroke="${INK}" stroke-width="0.05"/><rect x="-0.2" y="0.78" width="0.4" height="0.07" fill="#fffbe0"/></g>`;
-  const [hx, hy] = handR(X, Y, S, ROT, ARM);
-  const beam = `<path d="M${hx} ${hy} L1140 400 L1420 520 Z" fill="url(#beam)" style="mix-blend-mode:screen"/>
-    <circle cx="${hx}" cy="${hy}" r="26" fill="#fff6d0" filter="url(#bloomBig)"/>`;
+function swordTycoon() {
+  const r = rng(21);
+  const VP = [960, 640];
+  const floorLines = (col, x0, x1) => Array.from({ length: 13 }, (_, i) => {
+    const bx = x0 + ((x1 - x0) * i) / 12;
+    return `<line x1="${VP[0] + (bx - VP[0]) * 0.08}" y1="${VP[1]}" x2="${bx}" y2="1080" stroke="${col}"/>`;
+  }).join("");
+  const hl = Array.from({ length: 8 }, (_, i) => { const y = VP[1] + (1080 - VP[1]) * Math.pow(i / 7, 2); return `<line x1="0" y1="${y}" x2="1920" y2="${y}"/>`; }).join("");
+  const base = (x, col, flip) => `<g transform="translate(${x} 0) scale(${flip} 1)">
+      <rect x="0" y="330" width="300" height="320" fill="#120c22" stroke="${col}" stroke-width="5" filter="url(#bloom)"/>
+      <rect x="40" y="210" width="140" height="130" fill="#120c22" stroke="${col}" stroke-width="5"/>
+      <path d="M30 210 L110 150 L190 210Z" fill="#120c22" stroke="${col}" stroke-width="5"/>
+      <rect x="108" y="60" width="6" height="95" fill="#ccc"/><path d="M114 62 L190 82 L114 104Z" fill="${col}" filter="url(#bloom)"/>
+      ${[0, 1, 2].map((i) => `<rect x="${40 + i * 85}" y="400" width="50" height="60" fill="${col}" opacity="0.5"/><rect x="${40 + i * 85}" y="520" width="50" height="60" fill="${col}" opacity="0.35"/>`).join("")}
+      <path d="M300 520 L520 520 L520 545 L300 545Z" fill="#2a2440" stroke="${col}" stroke-width="3"/>
+      ${[0, 1, 2, 3].map((i) => coinW(330 + i * 50, 505, 0.35)).join("")}</g>`;
+  const lights = [[200, "#ff2d55", 18], [700, "#ff7a1a", 8], [1220, "#00c8ff", -8], [1720, "#3d7bff", -18]].map(([x, c, a]) =>
+    `<path d="M${x - 30} -20 L${x + 30} -20 L${x + 260} 1000 L${x - 260} 1000Z" fill="${c}" opacity="0.18" transform="rotate(${a} ${x} 0)" style="mix-blend-mode:screen" filter="url(#dof)"/>`).join("");
+  const coinsFloat = Array.from({ length: 10 }, () => coinW(300 + r() * 1320, 120 + r() * 300, 0.4 + r() * 0.4, 0.3 + r() * 0.7)).join("");
+  const sparks = Array.from({ length: 26 }, () => { const a = r() * 6.28, d = 60 + r() * 260; return `<circle cx="${980 + Math.cos(a) * d}" cy="${420 + Math.sin(a) * d * 0.7}" r="${2 + r() * 5}" fill="${r() > 0.5 ? "#fff3a0" : "#ffffff"}" filter="url(#bloom)"/>`; }).join("");
+  const jacks = [[130, 1010, 60], [1800, 1020, 64], [560, 1050, 40]].map(([x, y, k]) => `<g>${pumpkin(x, y, k, k * 0.8, { sw: 4, glowId: "bloom" })}</g>`).join("");
   return {
-    defs: `${rimFilter("rimOrange", "#ff7a1a", -7, 3, 18)}${glow("redEye", 5, "#ff0000")}
-      <linearGradient id="wl" x1="0" x2="1"><stop offset="0" stop-color="#16314f"/><stop offset="1" stop-color="#050a16"/></linearGradient>
-      <linearGradient id="wr" x1="1" x2="0"><stop offset="0" stop-color="#1b2f48"/><stop offset="1" stop-color="#070b16"/></linearGradient>
-      <linearGradient id="fl" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#12182a"/><stop offset="1" stop-color="#05060c"/></linearGradient>
-      <linearGradient id="cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f1626"/><stop offset="1" stop-color="#03050a"/></linearGradient>
-      <linearGradient id="coneBlue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fc4ff" stop-opacity="0.35"/><stop offset="1" stop-color="#8fc4ff" stop-opacity="0"/></linearGradient>
-      <linearGradient id="beam" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#fff6d0" stop-opacity="0.75"/><stop offset="1" stop-color="#fff6d0" stop-opacity="0.05"/></linearGradient>
-      <radialGradient id="doorGlow" cx="0.5" cy="0.6" r="0.6"><stop offset="0" stop-color="#ffb347"/><stop offset="0.5" stop-color="#ff5a14"/><stop offset="1" stop-color="#7a1400"/></radialGradient>
-      <radialGradient id="spill" cx="0.5" cy="0" r="0.8"><stop offset="0" stop-color="#ff6a1a" stop-opacity="0.75"/><stop offset="1" stop-color="#ff6a1a" stop-opacity="0"/></radialGradient>
-      <radialGradient id="warmKey" cx="0.66" cy="0.48" r="0.45"><stop offset="0" stop-color="#ff7a1a" stop-opacity="0.45"/><stop offset="1" stop-color="#ff7a1a" stop-opacity="0"/></radialGradient>`,
-    body: `<rect width="1920" height="1080" fill="#000"/>
-      <g filter="url(#dof)">
-        <path d="M0 0 L1920 0 L${x1} ${y0} L${x0} ${y0}Z" fill="url(#cl)"/>
-        <path d="M0 0 L${x0} ${y0} L${x0} ${y1} L0 1080Z" fill="url(#wl)"/>
-        <path d="M1920 0 L${x1} ${y0} L${x1} ${y1} L1920 1080Z" fill="url(#wr)"/>
-        <path d="M0 1080 L${x0} ${y1} L${x1} ${y1} L1920 1080Z" fill="url(#fl)"/>
-        <g stroke="#000" stroke-width="3" opacity="0.55">${floor}</g>
-        <rect x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="#0a0d16"/>
-        <rect x="1200" y="430" width="145" height="180" fill="url(#doorGlow)" filter="url(#bloom)"/>
-        <path d="M1200 430 L1150 414 L1150 626 L1200 610Z" fill="#3a1408" stroke="#000" stroke-width="3"/>
-        ${creature}
-        
-        ${sideDoor(0.2, 0.36, -1, "#1c1310")}${sideDoor(0.55, 0.82, -1, "#22160f", true)}${sideDoor(0.26, 0.44, 1, "#1c1310")}${sideDoor(0.62, 0.95, 1, "#1a1210")}
-        ${lamp(0.08, false)}${lamp(0.45, true)}${lamp(0.8, false)}
-      </g>
-      <path d="M1100 610 L1450 610 L1700 1080 L700 1080Z" fill="url(#spill)" style="mix-blend-mode:screen"/>
-      <rect x="1235" y="640" width="70" height="420" fill="#ff7a2a" opacity="0.35" filter="url(#dof2)"/>
-      ${beam}
-      ${avatarBack(X, Y, S, { shirt: "#1d2030", pants: "#11121c", hair: "#5a2a14", rot: ROT, pose: { armL: 8, armR: ARM, legL: 3, legR: -3 }, itemR: torch, rimId: "rimOrange" })}
-      <rect width="1920" height="1080" fill="url(#warmKey)" style="mix-blend-mode:screen"/>
-      <rect width="1920" height="1080" fill="url(#vig)"/>
-      ${reactionInset({ expr: "scared", border: "#ff1f1f", bg: ["#2a1a40", "#07040e"], shirt: "#2a5bd7", hands: true })}
+    defs: `${rimFilter("rimRed", "#ff3b3b", 7, 3, 16)}${rimFilter("rimBlue", "#21d4ff", -7, 3, 16)}
+      <linearGradient id="asky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05030f"/><stop offset="0.7" stop-color="#1e0b3a"/><stop offset="1" stop-color="#3a1048"/></linearGradient>
+      <linearGradient id="afloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#140a26"/><stop offset="1" stop-color="#05030c"/></linearGradient>
+      <linearGradient id="teamSplit" x1="0" x2="1"><stop offset="0" stop-color="#ff2d55" stop-opacity="0.35"/><stop offset="0.5" stop-color="#ff2d55" stop-opacity="0"/><stop offset="0.5" stop-color="#00c8ff" stop-opacity="0"/><stop offset="1" stop-color="#00c8ff" stop-opacity="0.35"/></linearGradient>`,
+    body: `<rect width="1920" height="1080" fill="url(#asky)"/>
+      <circle cx="960" cy="190" r="120" fill="#fff4dc" opacity="0.9" filter="url(#bloomBig)"/>
+      ${bat(820, 150, 1.2)}${bat(1120, 110, 0.9)}${bat(1010, 240, 0.7)}
+      <g filter="url(#dof)">${base(40, "#ff2d55", 1)}${base(1880, "#00c8ff", -1)}</g>
+      ${lights}
+      <rect y="${VP[1]}" width="1920" height="${1080 - VP[1]}" fill="url(#afloor)"/>
+      <g stroke-width="2.5" opacity="0.6" filter="url(#bloom)">${floorLines("#ff2d55", -1400, 960)}${floorLines("#00c8ff", 960, 3320)}<g stroke="#a04dff">${hl}</g></g>
+      <rect y="${VP[1]}" width="1920" height="${1080 - VP[1]}" fill="url(#teamSplit)" style="mix-blend-mode:screen"/>
+      <line x1="960" y1="${VP[1]}" x2="960" y2="1080" stroke="#fff" stroke-width="4" opacity="0.6" filter="url(#bloom)"/>
+      ${coinsFloat}
+      ${avatarFront(230, 620, 70, { shirt: "#3a0d16", pants: "#1a0a10", hair: "#5a2410", sash: "#ff2d55", rot: -8, expr: "angry", pose: { armL: 30, armR: -165, legL: 22, legR: -10 }, itemR: `<g transform="rotate(170)">${pumpkinHammer}</g>`, rimId: "rimRed" })}
+      ${avatarFront(1730, 620, 70, { shirt: "#0d1f3a", pants: "#0a1020", hair: "#e8c45a", skin: "#e0ac7a", sash: "#00c8ff", flip: -1, rot: 6, expr: "angry", pose: { armL: 20, armR: -95, legL: 18, legR: -12 }, itemR: neonBlaster("#00e5ff"), rimId: "rimBlue" })}
+      ${avatarFront(560, 590, 92, { shirt: "#5a0f1e", pants: "#1a0a10", hair: "#1a1010", sash: "#ff2d55", rot: 8, expr: "angry", pose: { armL: 35, armR: -70, legL: 30, legR: -24 }, rimId: "rimRed" })}
+      ${avatarFront(1390, 590, 92, { shirt: "#102a5a", pants: "#0a1020", hair: "#7a3e1a", sash: "#00c8ff", flip: -1, rot: -8, expr: "angry", pose: { armL: 35, armR: -70, legL: 30, legR: -24 }, rimId: "rimBlue" })}
+      ${(() => {
+        const hb = handWorld(560, 590, 92, 8, 1, -70), hc = handWorld(1390, 590, 92, -8, -1, -70);
+        const db = [0.75, -1], dc = [-0.75, -1];
+        // intersection of the two blade lines = clash point
+        const t = ((hc[0] - hb[0]) * dc[1] - (hc[1] - hb[1]) * dc[0]) / (db[0] * dc[1] - db[1] * dc[0]);
+        const X = [hb[0] + db[0] * t, hb[1] + db[1] * t];
+        return `<g filter="url(#rimRed)">${aimed(neonSword("#ff2d3d"), hb, [hb[0] + db[0], hb[1] + db[1]], 98)}</g>
+          <g filter="url(#rimBlue)">${aimed(neonSword("#21d4ff"), hc, [hc[0] + dc[0], hc[1] + dc[1]], 98)}</g>
+          ${burst(X[0], X[1], 1.0)}`; })()}
+      ${sparks}
+      ${jacks}
+      <rect width="1920" height="1080" fill="url(#vig)" opacity="0.8"/>
       <rect width="1920" height="1080" filter="url(#grain)"/>`,
-    icon: [1015, 230, 520],
+    icon: [475, 150, 930],
   };
 }
 
-function skyObby() {
-  const r = rng(7);
-  const cloud = (cx, cy, k, top = "#ffd2e6", bot = "#5b4fa8") => `<g transform="translate(${cx} ${cy}) scale(${k})">
-      <g fill="${bot}"><circle cx="-90" cy="20" r="70"/><circle cx="0" cy="-20" r="100"/><circle cx="110" cy="10" r="80"/><circle cx="190" cy="40" r="55"/><rect x="-160" y="20" width="400" height="80" rx="40"/></g>
-      <g fill="${top}"><circle cx="-90" cy="8" r="62"/><circle cx="0" cy="-30" r="90"/><circle cx="110" cy="0" r="70"/><circle cx="185" cy="30" r="45"/></g></g>`;
-  const cloudsFar = [[200, 820, 1.6], [760, 900, 2], [1350, 860, 1.7], [1800, 900, 1.5], [1000, 980, 2.4]].map((c) => cloud(...c)).join("");
-  const plat = (x, y, w, d, top, side, glowc) => `<g>
-      <path d="M${x} ${y} L${x + d} ${y - d * 0.55} L${x + w + d} ${y - d * 0.55} L${x + w} ${y}Z" fill="${top}" stroke="${INK}" stroke-width="4"/>
-      <path d="M${x + w} ${y} L${x + w + d} ${y - d * 0.55} L${x + w + d} ${y + w * 0.12 - d * 0.55} L${x + w} ${y + w * 0.12}Z" fill="${side}" stroke="${INK}" stroke-width="4"/>
-      <rect x="${x}" y="${y}" width="${w}" height="${w * 0.12}" fill="${side}" stroke="${INK}" stroke-width="4"/>
-      <rect x="${x}" y="${y}" width="${w}" height="${w * 0.12}" fill="url(#shadeB)"/>
-      ${glowc ? `<path d="M${x + 6} ${y - 2} L${x + w - 6} ${y - 2}" stroke="${glowc}" stroke-width="5" filter="url(#bloom)"/>` : ""}</g>`;
-  const plats = [
-    [1450, 390, 110, 34, "#ff7ac0", "#a8306c"],
-    [1250, 470, 150, 44, "#ffe066", "#a8820d"],
-    [1500, 560, 190, 56, "#5df08f", "#1f7a43"],
-    [1180, 690, 260, 72, "#b98aff", "#5b2fab", "#e6d6ff"],
-  ].map((p) => plat(...p)).join("");
-  const beacon = `<g><rect x="1462" y="0" width="90" height="390" fill="url(#beamUp)" style="mix-blend-mode:screen"/>
-      <rect x="1490" y="300" width="10" height="90" fill="#eee" stroke="${INK}" stroke-width="3"/>
-      <path d="M1500 300 L1570 320 L1500 340Z" fill="#5df08f" stroke="${INK}" stroke-width="3" filter="url(#bloom)"/></g>`;
-  const spinner = `<g transform="translate(1340 655) rotate(-14)" filter="url(#redGlow)"><rect x="-230" y="-14" width="460" height="28" rx="12" fill="#ff2d3d"/>
-      <rect x="-220" y="-10" width="440" height="8" rx="4" fill="#fff" opacity="0.6"/></g>
-      <circle cx="1340" cy="655" r="22" fill="#333" stroke="${INK}" stroke-width="5"/>`;
-  const near = `<g>${plat(200, 980, 760, 150, "#3dc7ff", "#13619a")}</g>`;
-  const sparkles = Array.from({ length: 22 }, () => {
-    const x = 900 + r() * 1000, y = 60 + r() * 600, k = 0.4 + r() * 0.8;
-    return `<path transform="translate(${x} ${y}) scale(${k})" d="M0 -18 L5 -5 L18 0 L5 5 L0 18 L-5 5 L-18 0 L-5 -5Z" fill="#fff6d6" opacity="${0.4 + r() * 0.6}"/>`;
-  }).join("");
-  const speed = [0, 1, 2, 3, 4].map((i) => `<path d="M${880 - i * 20} ${660 + i * 40} l-${220 - i * 30} ${80 + i * 10}" stroke="#fff" stroke-width="${10 - i}" stroke-linecap="round" opacity="0.65"/>`).join("");
+function surviveHalloween() {
+  const r = rng(31);
+  const trees = [[90, 640, 1], [1180, 660, 0.8], [520, 600, 0.7]].map(([x, y, k]) => `<g transform="translate(${x} ${y}) scale(${k})" stroke="#0b0614" stroke-linecap="round" fill="none">
+      <path d="M0 0 L0 -260" stroke-width="30"/><path d="M0 -140 L-90 -230 L-130 -240 M-90 -230 L-100 -290" stroke-width="16"/><path d="M0 -200 L80 -280 L140 -285 M80 -280 L90 -340" stroke-width="14"/><path d="M0 -255 L-30 -330" stroke-width="10"/></g>`).join("");
+  const graves = [[300, 690], [420, 700], [980, 690], [1100, 700]].map(([x, y]) => `<path d="M${x - 30} ${y} L${x - 30} ${y - 60} Q${x} ${y - 95} ${x + 30} ${y - 60} L${x + 30} ${y}Z" fill="#1a1428"/>`).join("");
+  const bats = [[1000, 120, 1.3], [1120, 200, 0.9], [760, 90, 0.8], [1880, 470, 1], [1250, 330, 0.7], [640, 240, 0.6]].map((b) => bat(...b)).join("");
+  // obby platforms with level signs, rising from bottom-left toward the centre
+  const plat = (x, y, w, top, side, lvl) => `<g>
+      <path d="M${x} ${y} L${x + 30} ${y - 18} L${x + w + 30} ${y - 18} L${x + w} ${y}Z" fill="${top}" stroke="${INK}" stroke-width="4"/>
+      <path d="M${x + w} ${y} L${x + w + 30} ${y - 18} L${x + w + 30} ${y + 22} L${x + w} ${y + 40}Z" fill="${side}" stroke="${INK}" stroke-width="4"/>
+      <rect x="${x}" y="${y}" width="${w}" height="40" fill="${side}" stroke="${INK}" stroke-width="4"/>
+      ${lvl ? `<g transform="translate(${x + w / 2} ${y - 20})"><rect x="-4" y="-90" width="8" height="90" fill="#555"/>
+        <rect x="-62" y="-140" width="124" height="56" rx="10" fill="#140a22" stroke="${lvl[1]}" stroke-width="5" filter="url(#bloom)"/>
+        <text y="-100" text-anchor="middle" font-family="Luckiest" font-size="38" fill="#fff">LVL ${lvl[0]}</text></g>` : ""}</g>`;
+  const obby = [
+    plat(40, 930, 230, "#78ebbe", "#ff7ab8", [1, "#7dff5c"]),
+    plat(360, 840, 170, "#ff9a2e", "#c25a0a", [50, "#ffb03d"]),
+    plat(610, 760, 140, "#78ebbe", "#ff7ab8", [99, "#ff3df5"]),
+  ].join("");
+  const spinner = `<g transform="translate(480 900) rotate(-12)" filter="url(#bloom)"><rect x="-150" y="-10" width="300" height="20" rx="10" fill="#ff2d3d"/></g><circle cx="480" cy="900" r="16" fill="#333" stroke="${INK}" stroke-width="4"/>`;
+  const goo = `<path d="M0 1000 Q120 975 240 1000 T480 1000 T720 1000 T960 1000 T1200 1000 L1200 1080 L0 1080Z" fill="#6dff3a" filter="url(#bloom)"/>
+      <path d="M0 1015 Q120 995 240 1015 T480 1015 T720 1015 T960 1015 T1200 1015 L1200 1080 L0 1080Z" fill="#2fa80e"/>
+      ${Array.from({ length: 9 }, () => `<circle cx="${r() * 1150}" cy="${1010 + r() * 50}" r="${6 + r() * 12}" fill="#b6ff8a" opacity="0.8"/>`).join("")}`;
+  const fog = Array.from({ length: 7 }, (_, i) => `<ellipse cx="${i * 320}" cy="${700 + (i % 2) * 30}" rx="320" ry="60" fill="#c9b6ff" opacity="0.12" filter="url(#soft)"/>`).join("");
+  // Pumpkin King boss
+  const boss = `<g>
+      <ellipse cx="1600" cy="560" rx="420" ry="520" fill="#7a2aff" opacity="0.35" filter="url(#soft)"/>
+      <path d="M1380 560 Q1600 480 1830 560 L1980 1080 L1240 1080Z" fill="#1c0c2e" stroke="#0a0412" stroke-width="6"/>
+      <path d="M1240 1080 L1290 1020 L1330 1080 L1380 1010 L1420 1080Z M1700 1080 L1760 1000 L1800 1080 L1860 1010 L1920 1080Z" fill="#05020a"/>
+      <rect x="1330" y="800" width="560" height="70" rx="12" fill="#ffc933" stroke="#7a4a00" stroke-width="6"/>
+      <rect x="1330" y="800" width="560" height="20" rx="8" fill="#fff2a8" opacity="0.6"/>
+      <path d="M1600 790 L1650 835 L1600 880 L1550 835Z" fill="#ff2d6e" stroke="#7a0020" stroke-width="5" filter="url(#bloom)"/>
+      <path d="M1585 815 L1600 800 L1615 815Z" fill="#fff" opacity="0.8"/>
+      <ellipse cx="1405" cy="560" rx="105" ry="55" fill="#ffc933" stroke="#7a4a00" stroke-width="6"/><ellipse cx="1395" cy="545" rx="60" ry="18" fill="#fff2a8" opacity="0.6"/>
+      <ellipse cx="1800" cy="560" rx="105" ry="55" fill="#ffc933" stroke="#7a4a00" stroke-width="6"/><ellipse cx="1790" cy="545" rx="60" ry="18" fill="#fff2a8" opacity="0.6"/>
+      <g transform="rotate(-24 1380 600)"><rect x="1300" y="580" width="110" height="330" rx="18" fill="#2a1240" stroke="#0a0412" stroke-width="6"/>
+        <path d="M1300 900 L1290 960 L1320 930 L1335 975 L1355 930 L1375 970 L1390 925 L1415 950 L1410 900Z" fill="#e9dcc8" stroke="#0a0412" stroke-width="4"/></g>
+      <g transform="rotate(-18 1250 700)"><rect x="1236" y="120" width="26" height="900" rx="10" fill="#2a1a10" stroke="#0a0412" stroke-width="5"/>
+        <path d="M1262 150 Q1120 90 990 220 Q1110 150 1250 210Z" fill="#c6ff9a" stroke="#7dff5c" stroke-width="6" filter="url(#bloom)"/></g>
+      <g filter="url(#rimGreen)">${pumpkin(1600, 360, 230, 190, { sw: 8, glowId: "bloomBig" })}</g>
+      <path d="M1450 190 L1470 120 L1520 165 L1600 95 L1680 165 L1730 120 L1750 190Z" fill="#ffcc33" stroke="#7a4a00" stroke-width="6"/>
+      <circle cx="1600" cy="140" r="14" fill="#ff2d55"/></g>`;
+  const slash = `<path d="M1180 180 Q1420 330 1300 640 Q1350 360 1180 180Z" fill="#c9f6ff" filter="url(#bloom)" opacity="0.95"/>
+      <path d="M1150 160 Q1460 340 1290 700" fill="none" stroke="#7de8ff" stroke-width="10" opacity="0.6" filter="url(#bloom)"/>`;
   return {
-    defs: `${rimFilter("rimSun", "#ffb347", -7, 6, 18)}${glow("redGlow", 8, "#ff2d3d")}
-      <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b1f6b"/><stop offset="0.45" stop-color="#7b3fa0"/><stop offset="0.75" stop-color="#ff7a59"/><stop offset="1" stop-color="#ffc26b"/></linearGradient>
-      <radialGradient id="sun" cx="0.78" cy="0.42" r="0.4"><stop offset="0" stop-color="#fff6d6"/><stop offset="0.12" stop-color="#ffd27a"/><stop offset="0.5" stop-color="#ff8a4d" stop-opacity="0.5"/><stop offset="1" stop-color="#ff8a4d" stop-opacity="0"/></radialGradient>
-      <linearGradient id="beamUp" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#7dffb0" stop-opacity="0.8"/><stop offset="1" stop-color="#7dffb0" stop-opacity="0"/></linearGradient>
-      <radialGradient id="coolL" cx="0" cy="0.3" r="0.8"><stop offset="0" stop-color="#0b0f40" stop-opacity="0.65"/><stop offset="1" stop-color="#0b0f40" stop-opacity="0"/></radialGradient>`,
-    body: `<rect width="1920" height="1080" fill="url(#sky)"/>
-      <rect width="1920" height="1080" fill="url(#sun)"/>
-      <circle cx="1500" cy="450" r="90" fill="#fff3c9" filter="url(#bloomBig)"/>
-      <g filter="url(#dof)">${cloudsFar}${plats}${beacon}</g>
-      ${spinner}${sparkles}${near}${speed}
-      ${avatarBack(1020, 470, 92, { shirt: "#e8334a", pants: "#1f2050", hair: "#2a1a10", rot: 18, pose: { armL: 150, armR: -150, legL: 30, legR: -42 }, rimId: "rimSun", shadow: false })}
-      <rect width="1920" height="1080" fill="url(#coolL)"/>
-      <rect width="1920" height="1080" fill="url(#vig)" opacity="0.7"/>
-      ${reactionInset({ expr: "shocked", border: "#ffcc1f", bg: ["#3b4fd6", "#120f3f"], shirt: "#e8334a", hair: "#2a1a10" })}
+    defs: `${rimFilter("rimMoon", "#c8e6ff", -6, 5, 16)}${rimFilter("rimGreen", "#7dff5c", 6, 4, 22)}${rimFilter("rimOrange2", "#ff9a3d", -6, 3, 12)}
+      <linearGradient id="hsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#07041a"/><stop offset="0.6" stop-color="#2a0f4a"/><stop offset="1" stop-color="#ff6a1a"/></linearGradient>
+      <radialGradient id="moonG" cx="0.4" cy="0.4" r="0.6"><stop offset="0" stop-color="#fffbe8"/><stop offset="1" stop-color="#ffd9a0"/></radialGradient>`,
+    body: `<rect width="1920" height="1080" fill="url(#hsky)"/>
+      ${Array.from({ length: 60 }, () => `<circle cx="${r() * 1920}" cy="${r() * 450}" r="${r() * 2 + 0.4}" fill="#fff" opacity="${0.3 + r() * 0.6}"/>`).join("")}
+      <circle cx="1600" cy="330" r="330" fill="#ffb347" opacity="0.35" filter="url(#bloomBig)"/>
+      <circle cx="1600" cy="330" r="280" fill="url(#moonG)"/>
+      <g filter="url(#dof)"><path d="M0 700 Q300 640 600 690 T1200 680 T1920 700 L1920 1080 L0 1080Z" fill="#120a20"/>${trees}${graves}</g>
+      ${fog}${bats}
+      ${boss}
+      ${goo}${obby}${spinner}
+      ${avatarFront(250, 560, 40, { shirt: "#ff8a1a", pants: "#2a1a40", hair: "#1a1010", expr: "shocked", rot: 18, shadow: false, pose: { armL: 150, armR: -150, legL: 35, legR: -40 }, rimId: "rimOrange2" })}
+      ${slash}
+      ${avatarFront(950, 470, 84, { shirt: "#2a1a4a", pants: "#120c22", hair: "#d8d8e8", sash: "#7de8ff", expr: "angry", rot: 22, shadow: false, pose: { armL: 60, armR: -165, legL: 40, legR: -30 }, itemR: `<g transform="rotate(195)">${neonSword("#7de8ff")}</g>`, rimId: "rimMoon" })}
+      ${burst(1300, 470, 0.7, "#c9f6ff")}
+      <rect width="1920" height="1080" fill="url(#vig)" opacity="0.8"/>
       <rect width="1920" height="1080" filter="url(#grain)"/>`,
-    icon: [770, 220, 800],
-  };
-}
-
-function pizzaTycoon() {
-  const r = rng(42);
-  const city = Array.from({ length: 22 }, (_, i) => {
-    const w = 60 + r() * 90, h = 120 + r() * 300, x = i * 92 - 40;
-    const wins = Array.from({ length: 10 }, () => `<rect x="${x + 10 + r() * (w - 25)}" y="${680 - h + 20 + r() * (h - 40)}" width="9" height="12" fill="#ffd27a" opacity="${0.3 + r() * 0.6}"/>`).join("");
-    return `<rect x="${x}" y="${680 - h}" width="${w}" height="${h}" fill="#1a1440"/>${wins}`;
-  }).join("");
-  const [bx0, bx1, by0, by1] = [960, 1760, 150, 820];
-  const awning = Array.from({ length: 10 }, (_, i) => {
-    const w = (bx1 - bx0 - 40) / 10, x = bx0 + 20 + i * w;
-    return `<path d="M${x} 520 L${x + w} 520 L${x + w + 6} 600 Q${x + w / 2} 630 ${x - 6} 600Z" fill="${i % 2 ? "#fff3e0" : "#e0262c"}" stroke="${INK}" stroke-width="3"/>`;
-  }).join("");
-  const slice = `<g transform="translate(1600 420) scale(0.6)" filter="url(#neonOrange)">
-      <path d="M-120 -80 L120 -80 L0 150Z" fill="none" stroke="#ffb020" stroke-width="12" stroke-linejoin="round"/>
-      <path d="M-120 -80 Q0 -120 120 -80" fill="none" stroke="#ff6a1a" stroke-width="12"/>
-      <circle cx="-35" cy="-30" r="20" fill="none" stroke="#ff3b3b" stroke-width="8"/><circle cx="35" cy="-20" r="18" fill="none" stroke="#ff3b3b" stroke-width="8"/><circle cx="0" cy="40" r="16" fill="none" stroke="#ff3b3b" stroke-width="8"/></g>`;
-  const coin = (x, y, k, tilt = 1) => `<g transform="translate(${x} ${y}) scale(${k * tilt} ${k})"><circle r="40" fill="#c98a00" stroke="${INK}" stroke-width="5"/><circle r="30" fill="#ffd23f" stroke="#e6a400" stroke-width="4"/><text y="13" text-anchor="middle" font-family="Luckiest" font-size="38" fill="#e6a400">$</text></g>`;
-  const pile = (cx, cy, w, h, n, seed) => {
-    const rr = rng(seed);
-    let s = `<ellipse cx="${cx}" cy="${cy}" rx="${w * 0.55}" ry="${h * 0.2}" fill="#7a4a00" opacity="0.6"/>`;
-    const cs = [];
-    for (let i = 0; i < n; i++) {
-      const t = rr(), u = rr() * 2 - 1;
-      const y = cy - t * h, half = w * 0.5 * (1 - t) * (0.6 + 0.4 * Math.sqrt(1 - u * u));
-      cs.push([cx + u * half, y, 0.6 + rr() * 0.5, 0.5 + rr() * 0.5]);
-    }
-    cs.sort((a, b) => a[1] - b[1]);
-    return s + cs.map((c) => coin(...c)).join("");
-  };
-  const rain = Array.from({ length: 12 }, (_, i) => coin(i % 2 ? 860 + r() * 220 : 1650 + r() * 250, 40 + r() * 520, 0.5 + r() * 0.6, 0.3 + r() * 0.7)).join("");
-  const bill = (x, y, rot) => `<g transform="translate(${x} ${y}) rotate(${rot})"><rect x="-70" y="-34" width="140" height="68" rx="6" fill="#4fcf62" stroke="${INK}" stroke-width="5"/><rect x="-58" y="-24" width="116" height="48" rx="5" fill="none" stroke="#1e7a30" stroke-width="3"/><circle r="16" fill="#1e7a30"/></g>`;
-  const X = 1340, Y = 650, S = 98, ARM = -150;
-  const fan = `<g transform="translate(1.52 2.2) rotate(180)">${[-30, -10, 10, 30].map((a) => `<g transform="rotate(${a})"><rect x="-0.3" y="-1.3" width="0.6" height="1.2" rx="0.05" fill="#4fcf62" stroke="${INK}" stroke-width="0.04"/><circle cy="-0.75" r="0.14" fill="#1e7a30"/></g>`).join("")}</g>`;
-  return {
-    defs: `${rimFilter("rimGold", "#ffcc4d", -6, 5, 18)}${glow("neonOrange", 8, "#ff8a1a")}
-      <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#120a35"/><stop offset="0.6" stop-color="#4a1f6e"/><stop offset="1" stop-color="#ff7a3d"/></linearGradient>
-      <pattern id="brick" width="80" height="40" patternUnits="userSpaceOnUse"><rect width="80" height="40" fill="#7a2a1c"/><path d="M0 0 H80 M0 20 H80 M40 0 V20 M0 20 V40 M80 20 V40" stroke="#4a160d" stroke-width="4"/></pattern>
-      <linearGradient id="bShade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1a0a30" stop-opacity="0.7"/><stop offset="0.6" stop-color="#1a0a30" stop-opacity="0.2"/><stop offset="1" stop-color="#1a0a30" stop-opacity="0.6"/></linearGradient>
-      <radialGradient id="shopGlow" cx="0.5" cy="0.5" r="0.6"><stop offset="0" stop-color="#ffe9a8"/><stop offset="0.6" stop-color="#ffb347"/><stop offset="1" stop-color="#ff7a1a"/></radialGradient>
-      <radialGradient id="streetGlow" cx="0.55" cy="0" r="0.7"><stop offset="0" stop-color="#ffb347" stop-opacity="0.8"/><stop offset="1" stop-color="#ffb347" stop-opacity="0"/></radialGradient>
-      <radialGradient id="coolL2" cx="0" cy="0.4" r="0.8"><stop offset="0" stop-color="#0a0526" stop-opacity="0.8"/><stop offset="1" stop-color="#0a0526" stop-opacity="0"/></radialGradient>`,
-    body: `<rect width="1920" height="1080" fill="url(#dusk)"/>
-      <g filter="url(#dof2)">${city}</g>
-      <rect y="680" width="1920" height="400" fill="#140c22"/>
-      <g filter="url(#dof)">
-        <rect x="${bx0}" y="${by0}" width="${bx1 - bx0}" height="${by1 - by0}" fill="url(#brick)" stroke="${INK}" stroke-width="6"/>
-        <rect x="${bx0}" y="${by0}" width="${bx1 - bx0}" height="${by1 - by0}" fill="url(#bShade)"/>
-        <rect x="${bx0 - 20}" y="${by0 - 30}" width="${bx1 - bx0 + 40}" height="40" fill="#3a1410" stroke="${INK}" stroke-width="5"/>
-        <rect x="1040" y="610" width="640" height="210" fill="url(#shopGlow)" filter="url(#bloom)"/>
-        <path d="M1360 610 V820 M1040 700 H1680" stroke="#5a2a10" stroke-width="10"/>
-        ${awning}${slice}
-        <text x="1360" y="275" text-anchor="middle" font-family="Bangers" font-size="120" letter-spacing="8" fill="#fff4d6" stroke="#ff8a1a" stroke-width="4" filter="url(#neonOrange)">PIZZA EMPIRE</text>
-      </g>
-      <path d="M960 820 L1760 820 L1920 1080 L700 1080Z" fill="url(#streetGlow)" style="mix-blend-mode:screen"/>
-      ${rain}
-      ${pile(1780, 1060, 420, 260, 70, 3)}${pile(820, 1080, 300, 150, 40, 9)}
-      ${bill(1050, 900, -20)}${bill(1620, 880, 25)}
-      ${avatarBack(X, Y, S, { shirt: "#f4f4f4", pants: "#c81e28", hair: "#3a2010", hat: CHEF_HAT, rot: 0, pose: { armL: 150, armR: ARM, legL: 6, legR: -6 }, itemR: fan, rimId: "rimGold" })}
-      <rect width="1920" height="1080" fill="url(#coolL2)"/>
-      <rect width="1920" height="1080" fill="url(#vig)" opacity="0.75"/>
-      ${reactionInset({ expr: "money", border: "#2bd94a", bg: ["#ffb347", "#a8320f"], shirt: "#f4f4f4", hair: "#3a2010", marks: "#fff4c2" })}
-      <rect width="1920" height="1080" filter="url(#grain)"/>`,
-    icon: [990, 120, 760],
-  };
-}
-
-function neonDefense() {
-  const H = 640, VP = [1260, H];
-  const r = rng(99);
-  const stars = Array.from({ length: 90 }, () => `<circle cx="${r() * 1920}" cy="${r() * 560}" r="${r() * 2.2 + 0.4}" fill="#fff" opacity="${0.3 + r() * 0.7}"/>`).join("");
-  const sunStripes = [0, 1, 2, 3, 4, 5].map((i) => `<rect x="900" y="${470 + i * 28 + i * i * 2}" width="760" height="${4 + i * 2.8}" fill="#000"/>`).join("");
-  const vLines = Array.from({ length: 41 }, (_, i) => {
-    const bx = -2600 + i * 190;
-    return `<line x1="${VP[0] + (bx - VP[0]) * 0.02}" y1="${H}" x2="${bx}" y2="1080"/>`;
-  }).join("");
-  const hLines = Array.from({ length: 12 }, (_, i) => `<line x1="0" y1="${H + (1080 - H) * Math.pow(i / 11, 2.2)}" x2="1920" y2="${H + (1080 - H) * Math.pow(i / 11, 2.2)}"/>`).join("");
-  // giant boss silhouette in front of the sun
-  const boss = `<g transform="translate(1260 640)">
-      <rect x="-60" y="-120" width="50" height="120" fill="#0a0418"/><rect x="10" y="-120" width="50" height="120" fill="#0a0418"/>
-      <rect x="-150" y="-380" width="300" height="270" rx="10" fill="#0a0418"/>
-      <rect x="-250" y="-380" width="90" height="250" rx="10" fill="#0a0418" transform="rotate(14 -205 -380)"/>
-      <rect x="160" y="-380" width="90" height="250" rx="10" fill="#0a0418" transform="rotate(-14 205 -380)"/>
-      <rect x="-100" y="-540" width="200" height="170" rx="16" fill="#0a0418"/>
-      <path d="M-150 -380 H150 M-100 -540 H100" stroke="#ff3df5" stroke-width="4" filter="url(#neon)"/>
-      <g filter="url(#neonRed)"><path d="M-70 -480 L-20 -462 L-70 -444Z M70 -480 L20 -462 L70 -444Z" fill="#ff1f5a"/>
-      <rect x="-50" y="-415" width="100" height="10" fill="#ff1f5a"/></g>
-      <circle cx="0" cy="-250" r="40" fill="none" stroke="#ff1f5a" stroke-width="8" filter="url(#neonRed)"/></g>`;
-  const tower = (x, y, k, col) => `<g transform="translate(${x} ${y}) scale(${k})" filter="url(#neon)">
-    <path d="M-60 0 L-40 -30 L40 -30 L60 0 L40 20 L-40 20Z" fill="#12052b" stroke="${col}" stroke-width="5"/>
-    <rect x="-28" y="-150" width="56" height="122" fill="#12052b" stroke="${col}" stroke-width="5"/>
-    <path d="M-44 -150 L0 -200 L44 -150Z" fill="#12052b" stroke="${col}" stroke-width="5"/>
-    <circle cx="0" cy="-160" r="12" fill="${col}"/></g>`;
-  const minion = (x, y, k, col) => `<g transform="translate(${x} ${y}) scale(${k})" filter="url(#neon)">
-    <path d="M0 -60 L40 -40 L40 10 L0 30 L-40 10 L-40 -40Z" fill="#12052b" stroke="${col}" stroke-width="5"/>
-    <path d="M-40 -40 L0 -20 L40 -40 M0 -20 L0 30" stroke="${col}" stroke-width="4" fill="none"/></g>`;
-  const laser = (a, b, col) => `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="9" filter="url(#neon)" stroke-linecap="round"/><line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#fff" stroke-width="3"/>`;
-  const burst = (x, y, k = 1) => `<g transform="translate(${x} ${y}) scale(${k})" filter="url(#neon)">${Array.from({ length: 10 }, (_, i) => `<line x1="0" y1="0" x2="${Math.cos(i * 0.628) * 46}" y2="${Math.sin(i * 0.628) * 46}" stroke="#fff35c" stroke-width="5" stroke-linecap="round"/>`).join("")}</g>`;
-  const T = [[880, 860, 1.0, "#ff3df5"], [1640, 840, 1.0, "#7dff5c"], [1060, 720, 0.6, "#ffb03d"], [1500, 710, 0.6, "#00f0ff"]];
-  const top = ([x, y, k]) => [x, y - 160 * k];
-  return {
-    defs: `${rimFilter("rimCyan", "#00e5ff", -6, 4, 16)}${glow("neon", 7)}${glow("neonRed", 9, "#ff1f5a")}
-      <linearGradient id="nsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#05000f"/><stop offset="0.55" stop-color="#2d0b5a"/><stop offset="1" stop-color="#8a1a8a"/></linearGradient>
-      <linearGradient id="nsun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff35c"/><stop offset="0.5" stop-color="#ff7a3d"/><stop offset="1" stop-color="#ff2fa8"/></linearGradient>
-      <linearGradient id="nfloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b0047"/><stop offset="1" stop-color="#07000f"/></linearGradient>
-      <mask id="sunMask"><rect width="1920" height="1080" fill="#fff"/>${sunStripes}</mask>
-      <radialGradient id="nshade" cx="0" cy="0.5" r="0.8"><stop offset="0" stop-color="#07000f" stop-opacity="0.8"/><stop offset="1" stop-color="#07000f" stop-opacity="0"/></radialGradient>`,
-    body: `<rect width="1920" height="1080" fill="url(#nsky)"/>${stars}
-      <circle cx="1260" cy="430" r="330" fill="#ff2fa8" opacity="0.4" filter="url(#bloomBig)"/>
-      <circle cx="1260" cy="430" r="280" fill="url(#nsun)" mask="url(#sunMask)"/>
-      <path d="M0 ${H} L140 540 L280 610 L440 500 L600 ${H}Z M1540 ${H} L1660 520 L1780 590 L1920 500 L1920 ${H}Z" fill="#2b0f4d" stroke="#ff3df5" stroke-width="3" opacity="0.9"/>
-      <g filter="url(#dof)">${boss}</g>
-      <rect y="${H}" width="1920" height="${1080 - H}" fill="url(#nfloor)"/>
-      <g stroke="#ff3df5" stroke-width="2.5" opacity="0.7" filter="url(#neon)">${vLines}${hLines}</g>
-      <line x1="0" y1="${H}" x2="1920" y2="${H}" stroke="#ff9cf9" stroke-width="4" filter="url(#neon)"/>
-      ${minion(1180, 700, 0.5, "#ff3d6e")}${minion(1380, 740, 0.6, "#ff3d6e")}${minion(1300, 680, 0.4, "#ffe23d")}
-      ${T.map((t) => tower(...t)).join("")}
-      ${laser(top(T[0]), [1210, 290], "#ff3df5")}${laser(top(T[1]), [1310, 300], "#7dff5c")}
-      ${laser(top(T[2]), [1180, 690], "#ffb03d")}${laser(top(T[3]), [1380, 720], "#00f0ff")}
-      ${burst(1210, 290, 1.4)}${burst(1310, 300, 1.2)}${burst(1380, 720)}
-      ${avatarBack(1260, 790, 84, { shirt: "#141a3a", pants: "#0b0f24", hair: "#1a1030", rot: 0, pose: { armL: 6, armR: -150, legL: 10, legR: -10 }, rimId: "rimCyan" })}
-      <rect width="1920" height="1080" fill="url(#nshade)"/>
-      <rect width="1920" height="1080" fill="url(#vig)" opacity="0.7"/>
-      ${reactionInset({ expr: "determined", border: "#00e5ff", bg: ["#5a1a8a", "#0a0218"], shirt: "#141a3a", hair: "#1a1030" })}
-      <rect width="1920" height="1080" filter="url(#grain)"/>`,
-    icon: [900, 110, 720],
+    icon: [1080, 60, 820],
   };
 }
 
@@ -457,53 +414,37 @@ function title(lines, { x, y, rot = -4, font: f, stroke = 22, outline = "#000", 
 const G = {
   red: ["#ff5a3c", "#c40000"], orange: ["#ffd23f", "#ff6a00"], white: ["#ffffff", "#c9d3e6"],
   gold: ["#fff4a8", "#ffae00"], green: ["#b8ff9a", "#18c23a"], cyan: ["#e8ffff", "#00c8ff"],
-  pink: ["#ffe1fb", "#ff3df5"], sky: ["#ffffff", "#8fd8ff"],
+  pink: ["#ffe1fb", "#ff3df5"], sky: ["#ffffff", "#8fd8ff"], purple: ["#f1dcff", "#9a3dff"],
 };
 
 const GAMES = [
   {
-    slug: "the-night-shift",
-    scene: nightShift,
+    slug: "2v2-sword-tycoon",
+    scene: swordTycoon,
     thumb: title([
-      { parts: [{ t: "THE NIGHT", grad: G.red }], size: 190 },
-      { parts: [{ t: "SHIFT", grad: G.red }], size: 230, mt: -18 },
-      { parts: [{ t: "SURVIVE ", grad: G.orange }, { t: "TILL ", grad: G.white }, { t: "6AM", grad: G.orange }], size: 104, mt: 4 },
-    ], { x: 60, y: 40, font: "Creepster", stroke: 26, glow: "0 0 40px rgba(255,30,0,.75)" }),
-    icon: title([{ parts: [{ t: "NIGHT", grad: G.red }], size: 132 }, { parts: [{ t: "SHIFT", grad: G.orange }], size: 132, mt: -22 }],
-      { x: 0, y: 270, font: "Creepster", stroke: 18, glow: "0 0 28px rgba(255,30,0,.8)", align: "center", rot: -3 }),
+      { parts: [{ t: "2", grad: G.red }, { t: "V", grad: G.white }, { t: "2 ", grad: G.cyan }, { t: "SWORD TYCOON", grad: G.gold }], size: 138 },
+    ], { x: 0, y: 46, font: "Luckiest", stroke: 24, glow: "0 0 40px rgba(255,80,120,.55),0 0 60px rgba(0,200,255,.4)", align: "center", rot: -2 })
+      + `<div style="position:absolute;left:36px;bottom:40px;transform:rotate(-3deg);background:linear-gradient(180deg,#ff9a1a,#d84a00);border:8px solid #000;border-radius:22px;padding:12px 30px 4px;box-shadow:0 0 40px rgba(255,140,0,.6)">
+          <span style="font:64px/1 Luckiest;color:#fff;-webkit-text-stroke:8px #000;paint-order:stroke fill">NEW HALLOWEEN WEAPONS!</span></div>`,
+    icon: title([{ parts: [{ t: "2", grad: G.red }, { t: "V", grad: G.white }, { t: "2", grad: G.cyan }], size: 190 }],
+      { x: 0, y: 330, font: "Luckiest", stroke: 24, glow: "0 0 30px rgba(255,255,255,.4)", align: "center", rot: -4 }),
   },
   {
-    slug: "sky-high-obby",
-    scene: skyObby,
+    slug: "survive-halloween",
+    scene: surviveHalloween,
     thumb: title([
-      { parts: [{ t: "SKY HIGH", grad: G.orange }], size: 190 },
-      { parts: [{ t: "OBBY", grad: G.sky }], size: 270, mt: -4 },
-      { parts: [{ t: "100+ ", grad: G.gold }, { t: "STAGES!", grad: G.white }], size: 92, mt: 14 },
-    ], { x: 60, y: 46, font: "Luckiest", stroke: 26, glow: "0 0 40px rgba(255,170,60,.6)" }),
-    icon: title([{ parts: [{ t: "OBBY", grad: G.orange }], size: 150 }],
-      { x: 0, y: 340, font: "Luckiest", stroke: 20, glow: "0 0 30px rgba(255,170,60,.7)", align: "center", rot: -5 }),
-  },
-  {
-    slug: "pizza-empire-tycoon",
-    scene: pizzaTycoon,
-    thumb: title([
-      { parts: [{ t: "PIZZA", grad: G.gold }], size: 220 },
-      { parts: [{ t: "TYCOON", grad: G.white }], size: 170, mt: -6 },
-      { parts: [{ t: "+$1,000,000", grad: G.green }], size: 104, mt: 14 },
-    ], { x: 60, y: 40, font: "Luckiest", stroke: 26, glow: "0 0 40px rgba(255,190,60,.6)" }),
-    icon: title([{ parts: [{ t: "TYCOON", grad: G.gold }], size: 112 }],
-      { x: 0, y: 370, font: "Luckiest", stroke: 18, glow: "0 0 30px rgba(255,190,60,.7)", align: "center", rot: -4 }),
-  },
-  {
-    slug: "neon-defense",
-    scene: neonDefense,
-    thumb: title([
-      { parts: [{ t: "NEON", grad: G.cyan }], size: 180 },
-      { parts: [{ t: "DEFENSE", grad: G.pink }], size: 128, mt: 0 },
-      { parts: [{ t: "BOSS ", grad: G.orange }, { t: "WAVE", grad: G.white }], size: 90, mt: 18 },
-    ], { x: 60, y: 60, font: "Orbitron", stroke: 22, glow: "0 0 30px #00e5ff,0 0 60px rgba(255,61,245,.6)", rot: -3 }),
-    icon: title([{ parts: [{ t: "NEON TD", grad: G.cyan }], size: 84 }],
-      { x: 0, y: 400, font: "Orbitron", stroke: 16, glow: "0 0 24px #00e5ff", align: "center", rot: -3 }),
+      { parts: [{ t: "SURVIVE", grad: G.orange }], size: 190 },
+      { parts: [{ t: "HALLOWEEN", grad: G.purple }], size: 165, mt: -16 },
+      { parts: [{ t: "BOSS ", grad: G.red }, { t: "+ ", grad: G.white }, { t: "OBBY", grad: G.green }], size: 96, mt: 6 },
+    ], { x: 50, y: 30, font: "Creepster", stroke: 24, glow: "0 0 40px rgba(255,120,0,.6)" })
+      + `<div style="position:absolute;left:520px;top:345px;transform:rotate(-5deg);background:linear-gradient(180deg,#b44dff,#5a12b0);border:8px solid #000;border-radius:20px;padding:10px 26px 2px;box-shadow:0 0 36px rgba(180,77,255,.7)">
+          <span style="font:54px/1 Luckiest;color:#fff;-webkit-text-stroke:8px #000;paint-order:stroke fill">100 LEVELS!</span></div>`
+      + `<div style="position:absolute;right:40px;top:36px;width:620px;text-align:right">
+          <div style="font:46px/1 Luckiest;color:#fff;-webkit-text-stroke:8px #000;paint-order:stroke fill;letter-spacing:2px">👑 PUMPKIN KING</div>
+          <div style="margin-top:10px;height:40px;border:6px solid #000;border-radius:12px;background:#2a0a10;overflow:hidden;box-shadow:0 0 24px rgba(255,40,60,.6)">
+            <div style="width:62%;height:100%;margin-left:auto;background:linear-gradient(180deg,#ff6a7a,#d0102a)"></div></div></div>`,
+    icon: title([{ parts: [{ t: "SURVIVE", grad: G.orange }], size: 100 }, { parts: [{ t: "HALLOWEEN", grad: G.purple }], size: 84, mt: -10 }],
+      { x: 0, y: 320, font: "Creepster", stroke: 16, glow: "0 0 26px rgba(255,120,0,.7)", align: "center", rot: -3 }),
   },
 ];
 
