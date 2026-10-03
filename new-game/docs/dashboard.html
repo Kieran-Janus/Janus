@@ -1,0 +1,448 @@
+<title>Roblox AI Launchpad</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: header with overall progress, then steps (left) beside a sticky cost panel (right); stacks on phones. */
+:root {
+  --bg: #edf0f5; --surface: #ffffff; --ink: #14213d; --muted: #5b6780; --line: #d5dbe6;
+  --accent: #2b5fd9; --accent-ink: #ffffff;
+  --free: #1e8e5a; --free-bg: #ddf3e8;
+  --paid: #b45309; --paid-bg: #fcebcf;
+  --opt: #6b4fbb; --opt-bg: #e9e3f7;
+  --code-bg: #0f1a30; --code-fg: #dce6ff;
+  --f-display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+  --f-body: "Instrument Sans", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1424; --surface: #151e33; --ink: #e6ecf8; --muted: #93a0bc; --line: #26324d;
+    --accent: #6c93f5; --accent-ink: #0d1424;
+    --free: #5bd39b; --free-bg: #12362a; --paid: #f0a44b; --paid-bg: #3a2a10;
+    --opt: #b6a2f2; --opt-bg: #2a2347; --code-bg: #0a101f; --code-fg: #cfdbfa; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1424; --surface: #151e33; --ink: #e6ecf8; --muted: #93a0bc; --line: #26324d;
+  --accent: #6c93f5; --accent-ink: #0d1424;
+  --free: #5bd39b; --free-bg: #12362a; --paid: #f0a44b; --paid-bg: #3a2a10;
+  --opt: #b6a2f2; --opt-bg: #2a2347; --code-bg: #0a101f; --code-fg: #cfdbfa; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+  padding-inline: 16px; padding-block: 24px 64px; }
+.wrap { max-width: 1120px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+code, .mono { font-family: var(--f-mono); }
+
+header.top { display: grid; gap: 16px; margin-bottom: 24px; }
+header.top h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 700; letter-spacing: -0.02em; }
+header.top p { margin: 0; color: var(--muted); max-width: 62ch; }
+.progress { display: grid; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.progress .row { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-weight: 600; }
+.bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; }
+button { font: inherit; cursor: pointer; }
+.btn { background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; }
+.btn:hover { border-color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } .costs { position: static !important; order: -1; } }
+
+details.part { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 12px; }
+details.part > summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+details.part > summary::-webkit-details-marker { display: none; }
+.badge-n { flex: none; width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: var(--accent-ink);
+  display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; }
+.part.done .badge-n { background: var(--free); color: var(--bg); }
+.part h2 { font-size: 18px; flex: 1 1 200px; min-width: 0; }
+.count { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.tag { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 99px; white-space: nowrap; }
+.tag.free { background: var(--free-bg); color: var(--free); }
+.tag.paid { background: var(--paid-bg); color: var(--paid); }
+.tag.opt { background: var(--opt-bg); color: var(--opt); }
+.body { padding: 0 16px 16px; display: grid; gap: 4px; }
+.why { color: var(--muted); margin: 0 0 8px; }
+.step { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.step input { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--accent); }
+.step label { cursor: pointer; display: block; }
+.step.checked label span.t { color: var(--muted); text-decoration: line-through; }
+.cmd { display: flex; gap: 8px; align-items: stretch; margin-top: 8px; }
+.cmd pre { margin: 0; flex: 1; min-width: 0; background: var(--code-bg); color: var(--code-fg); border-radius: 8px; padding: 10px 12px;
+  font-family: var(--f-mono); font-size: 12.5px; overflow-x: auto; white-space: pre; }
+.cmd button { flex: none; background: var(--code-bg); color: var(--code-fg); border: 0; border-radius: 8px; padding: 0 12px; font-size: 12px; }
+.check { margin-top: 8px; font-size: 13.5px; background: var(--free-bg); color: var(--ink); border-left: 3px solid var(--free); padding: 8px 12px; border-radius: 0 8px 8px 0; }
+.check b { color: var(--free); }
+.note { margin-top: 8px; font-size: 13.5px; background: var(--paid-bg); border-left: 3px solid var(--paid); padding: 8px 12px; border-radius: 0 8px 8px 0; }
+
+.costs { position: sticky; top: env(safe-area-inset-top, 0px); margin-top: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; }
+.costs h2 { font-size: 20px; }
+.total { background: var(--accent); color: var(--accent-ink); border-radius: 10px; padding: 12px 14px; }
+.total small { display: block; opacity: .85; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.total strong { font-family: var(--f-display); font-size: 34px; font-variant-numeric: tabular-nums; }
+.total span { font-size: 13px; opacity: .9; }
+.item { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.item .head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.item .name { font-weight: 600; }
+.item .price { font-variant-numeric: tabular-nums; font-family: var(--f-mono); font-size: 13px; }
+.item p { margin: 0; color: var(--muted); font-size: 13px; }
+select, input[type="number"] { font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; width: 100%; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.toggle { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.fine { font-size: 12px; color: var(--muted); margin: 0; }
+.fine a { color: var(--accent); }
+.freebox { display: grid; gap: 4px; }
+.freebox ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Roblox AI Launchpad</h1>
+    <p>Nine parts take you from nothing installed to an AI-powered Roblox game with live Claude NPCs. Tick each step as you finish it. Progress is saved in this browser. The cost panel shows what you pay and lets you change the assumptions.</p>
+    <div class="progress">
+      <div class="row"><span id="pLabel">0 of 0 steps done</span><span id="pPct" class="mono">0%</span></div>
+      <div class="bar"><i id="pBar"></i></div>
+      <div class="tools">
+        <button class="btn" id="expand" type="button">Expand all</button>
+        <button class="btn" id="collapse" type="button">Collapse all</button>
+        <button class="btn" id="reset" type="button">Reset progress</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <main id="parts"></main>
+    <aside class="costs" id="costs" aria-label="What you pay"></aside>
+  </div>
+</div>
+
+<script>
+/* ---------- content ---------- */
+const PARTS = [
+  { id: "p1", title: "Create your accounts", tag: ["free", "Free to sign up"],
+    why: "Five accounts. Only Claude and the Anthropic API cost money (see the cost panel).",
+    steps: [
+      { t: "Roblox account (roblox.com)" },
+      { t: "GitHub account (you already have one; this repo is your backup)" },
+      { t: "Anthropic Console account at console.anthropic.com. This is for the in-game NPC API key and is separate from a Claude subscription." },
+      { t: "Cloudflare account (free) at dash.cloudflare.com. It hosts the AI proxy." },
+      { t: "Claude plan at claude.ai (Pro or Max) so Claude Code can write your game." }
+    ],
+    check: "You can log in to all five." },
+
+  { id: "p2", title: "Install tools on your computer", tag: ["free", "All free"],
+    why: "Use your own Windows or Mac machine. Studio cannot run in the cloud session this repo was made in.",
+    steps: [
+      { t: "Install Roblox Studio from create.roblox.com and log in." },
+      { t: "Install Git (git-scm.com on Windows, xcode-select --install on Mac), Node.js LTS (nodejs.org) and VS Code." },
+      { t: "In VS Code install the extensions: Luau Language Server, StyLua, Selene." },
+      { t: "Install Claude Code from the Claude docs quickstart, then run claude once and log in." },
+      { t: "Clone this repo and switch to the branch.", cmd:
+        "git clone https://github.com/kieran-janus/janus.git\ncd janus\ngit checkout claude/clever-clarke-3zqgma\ncd new-game" },
+      { t: "Install Rokit (Mac/Linux shown). On Windows download the exe from github.com/rojo-rbx/rokit/releases, run it, then run rokit self-install.", cmd:
+        "curl -fsSL https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | sh" },
+      { t: "Restart your terminal, then install the pinned tools (Rojo, Wally, Selene, StyLua, luau-lsp, Lune).", cmd:
+        "rokit trust rojo-rbx/rojo\nrokit install" }
+    ],
+    check: "rojo --version, stylua --version, selene --version and claude --version all print a version. If a version in rokit.toml is rejected, run rokit update." },
+
+  { id: "p3", title: "Connect your files to Studio (Rojo)", tag: ["free", "Free"],
+    why: "Rojo mirrors the src/ folder into Studio live, so Claude edits real files and git tracks everything.",
+    steps: [
+      { t: "In Studio choose File, New, Baseplate. Save it as NewGame.rbxl outside the repo." },
+      { t: "Install the Rojo plugin: Toolbox, Creator Store, search Rojo. Or run the command on the right.", cmd: "rojo plugin install" },
+      { t: "Start the Rojo server inside new-game/ and leave it running. It prints Listening on port 34872.", cmd: "wally install\nrojo serve" },
+      { t: "In Studio open Plugins, Rojo, Connect. Accept the first sync." }
+    ],
+    check: "Explorer shows ServerScriptService > Server > Main and ReplicatedStorage > Shared > Config. For solo testing set Round.MinPlayers = 1 in Config.luau, press Play, and a state bar shows at the top." },
+
+  { id: "p4", title: "Connect Claude Code to your files", tag: ["paid", "Needs Claude plan"],
+    why: "Claude reads CLAUDE.md for the project rules and edits your Luau directly.",
+    steps: [
+      { t: "Open a second terminal tab (leave rojo serve running) and start Claude in the game folder.", cmd: "cd janus/new-game\nclaude" },
+      { t: "Test it with a tiny change: ask Claude to set Round.MinPlayers to 1 and IntermissionSeconds to 5." }
+    ],
+    check: "The change shows up in Studio under ReplicatedStorage.Shared.Config within a second. Press Play and the round starts after 5 seconds." },
+
+  { id: "p5", title: "Connect Claude to live Studio (MCP)", tag: ["free", "No extra charge found"],
+    why: "This lets Claude inspect the running game, read errors and playtest. Use Roblox's built-in MCP server. The older open-source one is no longer maintained.",
+    steps: [
+      { t: "Install Claude Code first, then open Studio. If Studio was already open, quit it fully and reopen." },
+      { t: "In Studio open the Assistant panel, Settings, MCP Servers, expand Quick connect, and switch on Claude Code." },
+      { t: "If Claude Code is not listed, add it by hand. Windows (PowerShell):", cmd: "claude mcp add Roblox_Studio -- \"$env:LOCALAPPDATA\\Roblox\\mcp.bat\"" },
+      { t: "Mac equivalent:", cmd: "claude mcp add Roblox_Studio -- /Applications/RobloxStudio.app/Contents/MacOS/StudioMCP" },
+      { t: "Restart Claude Code, run /mcp and confirm Roblox_Studio shows as connected." }
+    ],
+    check: "Ask Claude: List everything in Workspace and tell me if Output has errors. It answers from your open place.",
+    note: "The manual paths come from Roblox's docs as found via search and could not be opened directly. If they fail, check the current docs." },
+
+  { id: "p6", title: "Turn on AI NPCs (Anthropic, Cloudflare, Roblox)", tag: ["paid", "Pay per use"],
+    why: "Chain: player, your Roblox server, Cloudflare Worker, Anthropic, back. Your Anthropic key lives only in Cloudflare.",
+    steps: [
+      { t: "Console, Settings, API Keys, Create Key named new-game. Copy it; it is shown once." },
+      { t: "Add credit and set a monthly spend limit in Settings, Limits, so a bug cannot run up a bill." },
+      { t: "Make a long random PROXY_KEY. This is a password you invent, not your Anthropic key.", cmd: "openssl rand -hex 32" },
+      { t: "Deploy the Worker and store both secrets.", cmd:
+        "cd janus/new-game/tools/ai-proxy\nnpx wrangler login\nnpx wrangler deploy\nnpx wrangler secret put ANTHROPIC_API_KEY\nnpx wrangler secret put PROXY_KEY" },
+      { t: "Test the Worker. Replace the URL and key.", cmd:
+        "curl -X POST https://newgame-ai-proxy.YOU.workers.dev/chat \\\n  -H \"x-proxy-key: YOUR_PROXY_KEY\" -H \"content-type: application/json\" \\\n  -d '{\"system\":\"You are a pirate.\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":50}'" },
+      { t: "Publish the place: Studio, File, Publish to Roblox. Keep it private." },
+      { t: "Studio, Home, Game Settings, Security: turn on Allow HTTP Requests and Enable Studio Access to API Services." },
+      { t: "Creator Hub, your experience, Secrets: create AI_PROXY_KEY with your PROXY_KEY value and allow your workers.dev domain." },
+      { t: "Ask Claude to set Config.AI.ProxyUrl to your Worker URL ending in /chat." },
+      { t: "Test in Studio.", cmd: "print(require(game.ServerScriptService.Server.Services.AIService).Ask(game.Players:GetPlayers()[1], \"Guide\", \"Hello!\"))" }
+    ],
+    check: "A short, filtered, in-character reply prints. A 401 from the Worker means the keys do not match; a 502 means the Anthropic key or credit.",
+    note: "Menu names in Creator Hub change often. Search the exact term in Roblox docs if one differs." },
+
+  { id: "p7", title: "Open Cloud API key", tag: ["opt", "Optional, free"],
+    why: "Only needed for command-line publishing, remote DataStore edits and asset uploads.",
+    steps: [
+      { t: "Creator Hub, Open Cloud, API Keys, Create API Key. Add only the API systems you need and pick your experience." },
+      { t: "Add an IP allow-list if you can and set an expiry." },
+      { t: "Save it as ROBLOX_API_KEY in a local .env file (git-ignored). Never commit it or paste it into chat." }
+    ],
+    check: "The key lists only the systems and experience you chose." },
+
+  { id: "p8", title: "Make art and audio with AI", tag: ["opt", "Optional, paid tools"],
+    why: "These are web tools. Generate files, then import them through Studio's Asset Manager.",
+    steps: [
+      { t: "3D props: Studio Assistant mesh generation, or Meshy or Tripo. Export FBX or OBJ, then Asset Manager, Bulk Import." },
+      { t: "Textures and icons: generate an image, import it, copy the asset ID into an Assets table in Config.luau." },
+      { t: "Thumbnails: the thumbnails/ folder in this repo already renders and AI-generates them. generate.mjs needs OPENAI_API_KEY." },
+      { t: "Sound and voices: generate with ElevenLabs or similar, then import. Roblox moderates audio, so allow a few minutes." }
+    ],
+    check: "Each asset has an ID stored in Config, so swapping art is a one-line change." },
+
+  { id: "p9", title: "Daily workflow and launch", tag: ["free", "Free"],
+    why: "Three windows: rojo serve, claude, and Studio.",
+    steps: [
+      { t: "Tell Claude what you want, using the prompts/ folder for ready-made requests." },
+      { t: "Press Play in Studio and test with a friend or in a local server." },
+      { t: "Commit and push so nothing is lost.", cmd: "git add -A\ngit commit -m \"describe the change\"\ngit push" },
+      { t: "Run the pre-launch audit prompt (prompts/06-review.md) before going public." },
+      { t: "Publish: Studio, File, Publish to Roblox. Then set the experience public in Creator Hub." }
+    ],
+    check: "A friend can join the live game and the HUD and AI NPC both work." }
+];
+
+/* ---------- storage (per-browser convenience only) ---------- */
+const KEY = "roblox-ai-launchpad-v1";
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* ignore */ } }
+const state = Object.assign({ done: {}, open: {}, plan: "pro", msgs: 5000, cfPaid: false,
+  mesh: false, voice: false, images: false, ads: 0 }, load());
+
+/* ---------- helpers ---------- */
+function h(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const k in (attrs || {})) {
+    if (k === "class") n.className = attrs[k];
+    else if (k === "text") n.textContent = attrs[k];
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), attrs[k]);
+    else n.setAttribute(k, attrs[k]);
+  }
+  for (const c of kids) if (c != null) n.append(c);
+  return n;
+}
+const money = (n) => "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function copyText(text, btn, pre) {
+  const ok = () => { btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy"), 1200); };
+  const fallback = () => {
+    const r = document.createRange(); r.selectNodeContents(pre);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    btn.textContent = "Selected";
+  };
+  try { navigator.clipboard.writeText(text).then(ok, fallback); } catch (e) { fallback(); }
+}
+
+/* ---------- steps ---------- */
+function totals() {
+  let total = 0, done = 0;
+  PARTS.forEach((p) => p.steps.forEach((s, i) => { total++; if (state.done[p.id + "-" + i]) done++; }));
+  return { total, done };
+}
+function renderProgress() {
+  const { total, done } = totals();
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById("pLabel").textContent = done + " of " + total + " steps done";
+  document.getElementById("pPct").textContent = pct + "%";
+  document.getElementById("pBar").style.width = pct + "%";
+  PARTS.forEach((p) => {
+    const d = p.steps.filter((s, i) => state.done[p.id + "-" + i]).length;
+    const el = document.getElementById(p.id);
+    if (!el) return;
+    el.classList.toggle("done", d === p.steps.length);
+    el.querySelector(".count").textContent = d + "/" + p.steps.length;
+  });
+}
+function renderParts() {
+  const root = document.getElementById("parts");
+  root.textContent = "";
+  PARTS.forEach((p, pi) => {
+    const det = h("details", { class: "part", id: p.id });
+    if (state.open[p.id] !== false && (state.open[p.id] || pi === 0)) det.open = true;
+    det.addEventListener("toggle", () => { state.open[p.id] = det.open; save(); });
+    det.append(h("summary", null,
+      h("span", { class: "badge-n", text: String(pi + 1) }),
+      h("h2", { text: p.title }),
+      h("span", { class: "tag " + p.tag[0], text: p.tag[1] }),
+      h("span", { class: "count", text: "" })));
+    const body = h("div", { class: "body" }, h("p", { class: "why", text: p.why }));
+    p.steps.forEach((s, i) => {
+      const id = p.id + "-" + i;
+      const cb = h("input", { type: "checkbox", id: "cb-" + id });
+      cb.checked = !!state.done[id];
+      const row = h("div", { class: "step" + (cb.checked ? " checked" : "") }, cb);
+      const lab = h("label", { for: "cb-" + id }, h("span", { class: "t", text: s.t }));
+      const wrap = h("div", null, lab);
+      if (s.cmd) {
+        const pre = h("pre", { text: s.cmd });
+        const btn = h("button", { type: "button", text: "Copy" });
+        btn.addEventListener("click", () => copyText(s.cmd, btn, pre));
+        wrap.append(h("div", { class: "cmd" }, pre, btn));
+      }
+      cb.addEventListener("change", () => {
+        state.done[id] = cb.checked; row.classList.toggle("checked", cb.checked); save(); renderProgress();
+      });
+      row.append(wrap);
+      body.append(row);
+    });
+    if (p.check) body.append(h("div", { class: "check" }, h("b", { text: "Check: " }), p.check));
+    if (p.note) body.append(h("div", { class: "note", text: p.note }));
+    det.append(body);
+    root.append(det);
+  });
+  renderProgress();
+}
+
+/* ---------- costs ---------- */
+const PLANS = {
+  pro: ["Claude Pro", 20, "Includes Claude Code. Usage limits are shared with chat."],
+  max5: ["Claude Max 5x", 100, "Five times Pro usage. Worth it only if you hit limits."],
+  max20: ["Claude Max 20x", 200, "Twenty times Pro usage, for all-day building."],
+  api: ["Claude Code on API billing", 0, "No subscription. You pay per token instead, which can exceed Pro for heavy use."]
+};
+const PER_MSG = 0.0009; // Haiku 4.5: ~600 input + ~60 output tokens at $1 / $5 per million tokens
+const OPTS = [
+  ["mesh", "AI 3D mesh tool (Meshy, Tripo)", 20],
+  ["voice", "AI voice and sound effects (ElevenLabs)", 22],
+  ["images", "AI image generation for art and thumbnails", 10]
+];
+function monthly() {
+  const plan = PLANS[state.plan][1];
+  const npc = state.msgs * PER_MSG;
+  const cf = state.cfPaid ? 5 : 0;
+  const opts = OPTS.reduce((a, o) => a + (state[o[0]] ? o[2] : 0), 0);
+  return { plan, npc, cf, opts, ads: Math.max(0, +state.ads || 0) };
+}
+function renderCosts() {
+  const root = document.getElementById("costs");
+  root.textContent = "";
+  const m = monthly();
+  const sum = m.plan + m.npc + m.cf + m.opts + m.ads;
+
+  const rerender = () => { save(); renderCosts(); };
+
+  root.append(h("h2", { text: "What you pay" }));
+  root.append(h("div", { class: "total" },
+    h("small", { text: "Estimated per month" }),
+    h("strong", { id: "totalAmt", text: money(sum) }),
+    h("span", { text: " Up-front cost to start: $0.00" })));
+
+  // Claude plan
+  const sel = h("select", { id: "plan", "aria-label": "Claude plan" });
+  Object.entries(PLANS).forEach(([k, v]) => {
+    const o = h("option", { value: k, text: v[0] + (v[1] ? " ($" + v[1] + "/mo)" : "") });
+    if (k === state.plan) o.selected = true;
+    sel.append(o);
+  });
+  sel.addEventListener("change", () => { state.plan = sel.value; rerender(); });
+  root.append(h("div", { class: "item" },
+    h("div", { class: "head" }, h("span", { class: "name", text: "Claude Code access" }),
+      h("span", { class: "tag paid", text: "Required" })),
+    sel, h("p", { text: PLANS[state.plan][2] }),
+    h("span", { class: "price", text: money(m.plan) + " / mo" })));
+
+  // NPC API
+  const rng = h("input", { type: "range", id: "msgs", min: "0", max: "100000", step: "500", value: String(state.msgs), "aria-label": "NPC messages per month" });
+  rng.addEventListener("input", () => {
+    state.msgs = +rng.value; save();
+    const mm = monthly();
+    document.getElementById("npcCount").textContent = state.msgs.toLocaleString("en-US");
+    document.getElementById("npcPrice").textContent = money(mm.npc) + " / mo";
+    document.getElementById("totalAmt").textContent = money(mm.plan + mm.npc + mm.cf + mm.opts + mm.ads);
+  });
+  root.append(h("div", { class: "item" },
+    h("div", { class: "head" }, h("span", { class: "name", text: "In-game AI NPCs (Anthropic API)" }),
+      h("span", { class: "tag paid", text: "Pay per use" })),
+    rng,
+    h("p", null, h("b", { id: "npcCount", text: state.msgs.toLocaleString("en-US") }),
+      " player messages a month. Claude Haiku 4.5 costs $1 per million input and $5 per million output tokens, so a typical NPC message is about $0.001 (a tenth of a cent). Set a spend limit in the Console."),
+    h("span", { class: "price", id: "npcPrice", text: money(m.npc) + " / mo" })));
+
+  // Cloudflare
+  const cf = h("input", { type: "checkbox", id: "cf" }); cf.checked = state.cfPaid;
+  cf.addEventListener("change", () => { state.cfPaid = cf.checked; rerender(); });
+  root.append(h("div", { class: "item" },
+    h("div", { class: "head" }, h("span", { class: "name", text: "Cloudflare Worker (AI proxy)" }),
+      h("span", { class: "tag free", text: "Free tier" })),
+    h("p", { text: "The free plan allows 100,000 requests a day, plenty at the start. The paid plan is $5/mo with no daily cap." }),
+    h("label", { class: "toggle", for: "cf" }, cf, "I expect more than 100k NPC messages a day"),
+    h("span", { class: "price", text: money(m.cf) + " / mo" })));
+
+  // Optional tools
+  const ot = h("div", { class: "item" },
+    h("div", { class: "head" }, h("span", { class: "name", text: "AI art and audio tools" }),
+      h("span", { class: "tag opt", text: "Optional" })),
+    h("p", { text: "Estimates only. Most have free tiers and monthly plans that change often; check each site before subscribing." }));
+  OPTS.forEach(([k, label, price]) => {
+    const c = h("input", { type: "checkbox", id: "o-" + k }); c.checked = !!state[k];
+    c.addEventListener("change", () => { state[k] = c.checked; rerender(); });
+    ot.append(h("label", { class: "toggle", for: "o-" + k }, c, label + " (about $" + price + "/mo)"));
+  });
+  ot.append(h("span", { class: "price", text: money(m.opts) + " / mo" }));
+  root.append(ot);
+
+  // Ads
+  const ads = h("input", { type: "number", id: "ads", min: "0", step: "10", value: String(state.ads), "aria-label": "Ad budget per month" });
+  ads.addEventListener("change", () => { state.ads = Math.max(0, +ads.value || 0); rerender(); });
+  root.append(h("div", { class: "item" },
+    h("div", { class: "head" }, h("span", { class: "name", text: "Roblox ads budget" }),
+      h("span", { class: "tag opt", text: "Optional" })),
+    h("p", { text: "Only if you want paid promotion after launch. Enter a monthly amount in dollars." }),
+    ads, h("span", { class: "price", text: money(m.ads) + " / mo" })));
+
+  // Free list
+  const fb = h("div", { class: "item freebox" },
+    h("div", { class: "head" }, h("span", { class: "name", text: "Free, no card needed" }),
+      h("span", { class: "tag free", text: "$0" })));
+  const ul = h("ul");
+  ["Roblox account, Studio, publishing and Rojo plugin", "Open Cloud API keys and Roblox Secrets", "Rojo, Rokit, Wally, Selene, StyLua, Luau LSP, Lune",
+    "Git, GitHub, Node.js, VS Code", "Studio's built-in MCP server (no charge found; confirm in Studio)"].forEach((t) => ul.append(h("li", { text: t })));
+  fb.append(ul);
+  root.append(fb);
+
+  root.append(h("p", { class: "fine", text: "Roblox does not charge to publish. When players spend Robux, Roblox keeps a share and you can cash out the rest; check the current rates in Creator Hub before planning revenue. Prices checked October 2026 from public pricing pages and may change." }));
+}
+
+/* ---------- controls ---------- */
+document.getElementById("expand").addEventListener("click", () => {
+  document.querySelectorAll("details.part").forEach((d) => (d.open = true));
+});
+document.getElementById("collapse").addEventListener("click", () => {
+  document.querySelectorAll("details.part").forEach((d) => (d.open = false));
+});
+document.getElementById("reset").addEventListener("click", () => {
+  const b = document.getElementById("reset");
+  if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Click again to confirm"; setTimeout(() => { b.dataset.armed = ""; b.textContent = "Reset progress"; }, 3000); return; }
+  state.done = {}; save(); b.dataset.armed = ""; b.textContent = "Reset progress"; renderParts();
+});
+
+renderParts();
+renderCosts();
+</script>
