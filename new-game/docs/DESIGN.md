@@ -70,20 +70,42 @@ Map definitions live in `Config.Maps` (name, thumbnail asset id, spawn points fo
 - **Daily quests** generated per player.
 Not needed for 20 October. Do them only if M5 finishes early.
 
-## Milestones to 20 October
+## Spawn hub (lobby): "Spooky Town Square"
+Players spawn here between rounds. Spooky-cute, busy, and fun to stand around in.
+- Decorations: jack-o-lanterns, bunting, cobwebs, tombstones, a crooked clock tower, fog, floating candles, ambient music.
+- Interactive NPCs (all `Config.Npcs`): **Witch Wanda** (shop and cosmetics), **Boo Guide** (tutorial and tips), **Pumpkin Vendor** (buy pumpkin packs), **Voting Board** (map and difficulty votes), **Leaderboard Gravestone** (top pumpkin collectors).
+- Photo spot with emotes, a trick-or-treat door minigame for small rewards (optional).
+- Voice is on in the hub so players chat while waiting.
+
+## Monsters
+- **Pumpkin King**: the boss and main threat (M2).
+- Minions that make maps feel alive (pick 3 for launch, keep numbers in `Config.Monsters`):
+  - **Skeleton Patrol**: slow, walks fixed routes, blocks corridors.
+  - **Bat Swarm**: fast but short range, flies in zig-zags.
+  - **Ghost Cat**: steals a carried pumpkin if it touches you.
+  - **Scarecrow**: freezes in place until you get close.
+
+## Maps (upgrade from placeholders)
+Each map needs: a distinct layout with hiding spots, shortcuts and risky pumpkin areas; lighting (Atmosphere, fog, ColorCorrection, Bloom); particle effects (fireflies, mist, falling leaves); ambient sound; a themed prop kit. MVP ships 2 maps, both properly decorated.
+
+## Art plan (important)
+Claude can build layout, gameplay, lighting, effects and scripts directly in Studio through the Studio connection, and can kitbash scenes from Parts. For *high-quality* spooky-cute models it needs assets: use the Creator Store (check each model for scripts and licence before using), Roblox's built-in mesh generation, or AI mesh tools (Meshy, Tripo) cleaned up in Blender. Treat any free model as untrusted: strip unexpected scripts.
+
+## Milestones to 20 October (revised)
 Dates assume starting 4 October. Cut scope rather than slip the release.
 
 | # | Dates | Goal | Done when |
 | --- | --- | --- | --- |
-| M1 | 4-6 Oct | Round loop with map voting, difficulty voting, pumpkins spawn and collect, round results | Full round playable solo in Studio |
-| M2 | 7-9 Oct | Pumpkin King AI (pathfinding, hearing noise), catching, ghost/spectate state | A full 5-minute round with the King works with 2+ test players |
-| M3 | 10-12 Oct | Proximity voice on, muffle and ghost effects, noise-to-King link | Voice and non-voice players both have a working round |
-| M4 | 13-15 Oct | Shop, pumpkins currency, saving data (publish the place), VIP pass and products | Purchases work and data saves |
-| M5 | 16-17 Oct | Second map, UI polish, sounds, thumbnails and icon | Everything looks release-ready |
-| M6 | 18-19 Oct | Exploit/security audit (`prompts/06-review.md`), friends playtest, fix bugs | No critical bugs |
+| M1 | done | Round loop, map and difficulty voting, pumpkins | Full round playable |
+| M2 | done | Pumpkin King AI, catching, ghost state | 5-minute round with King works |
+| M3 | 5-7 Oct | Proximity voice, muffle and ghost effects, noise-to-King link | Voice and non-voice players both play fine |
+| M4 | 8-10 Oct | Spawn hub with decorations, NPCs, voting board, leaderboard | Hub looks alive and NPCs work |
+| M5 | 11-14 Oct | Minion monsters, map art pass on 2 maps (lighting, particles, props, sound) | Maps feel finished |
+| M6 | 14-16 Oct | Shop, pumpkins currency, saving (publish the place), VIP pass and products | Purchases work and data saves |
+| M7 | 17-19 Oct | UI polish, thumbnails and icon, security audit (`prompts/06-review.md`), friends playtest | No critical bugs |
 | Launch | 20 Oct | Set experience public | Live |
 
-Publish a private build early (by M2) so you can test saving and voice, which only work on a published place.
+Publish a private build by M3 so you can test saving and voice, which only work on a published place. If time runs short, cut minion types first, then the trick-or-treat minigame, then the second map.
 
 ## Config sections to add
 `Config.Voice`, `Config.King`, `Config.Maps`, `Config.Difficulty`, `Config.Pumpkins`, `Config.Shop`, `Config.Monetization`, `Config.Voting`. Keep every number there.
