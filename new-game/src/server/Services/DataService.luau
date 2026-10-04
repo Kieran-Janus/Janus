@@ -2,7 +2,9 @@
 --[[
 	Player data: load on join, autosave, save on leave / shutdown.
 	Swap the internals for ProfileStore later if you need session locking -
-	keep the same public API (Get / Add / Save) so nothing else changes.
+	keep the same public API (Get / Add / Spend / Save) so nothing else changes.
+	New saved fields go in Config.Data.Template; old saves get the missing fields (and
+	missing keys inside table fields such as Equipped) filled in from the template on load.
 ]]
 
 local DataStoreService = game:GetService("DataStoreService")
@@ -39,10 +41,33 @@ local function withRetry<T>(fn: () -> T): (boolean, T?)
 	return false, nil
 end
 
-local function copyTemplate(): { [string]: any }
-	local data = {}
-	for key, value in Config.Data.Template do
-		data[key] = value
+local function deepCopy(value: any): any
+	if type(value) ~= "table" then
+		return value
+	end
+	local copy = {}
+	for k, v in value do
+		copy[k] = deepCopy(v)
+	end
+	return copy
+end
+
+-- The template plus whatever the save has; template tables that are dictionaries (Equipped)
+-- also get any keys the save is missing.
+local function fromSave(saved: { [string]: any }?): { [string]: any }
+	local data = deepCopy(Config.Data.Template)
+	if not saved then
+		return data
+	end
+	for key, value in saved do
+		local default = data[key]
+		if type(default) == "table" and type(value) == "table" and next(default) ~= nil then
+			for k, v in value do
+				default[k] = v
+			end
+		elseif default == nil or type(default) == type(value) then
+			data[key] = value
+		end
 	end
 	return data
 end
@@ -86,17 +111,37 @@ function DataService.Add(player: Player, key: string, amount: number)
 	syncLeaderstats(player)
 end
 
-function DataService.Save(player: Player)
+-- Takes `amount` of a number field if the player has enough. Returns whether it did.
+function DataService.Spend(player: Player, key: string, amount: number): boolean
 	local data = cache[player]
-	if not store or not data or not loaded[player] then
-		return
+	if not data or amount < 0 or (data[key] or 0) < amount then
+		return false
+	end
+	data[key] -= amount
+	syncLeaderstats(player)
+	return true
+end
+
+--[[
+	Saves now. Returns true when the data is safely stored, or when saving is off (no
+	DataStore in an unpublished Studio place: nothing persists anyway). Returns false if the
+	player's save never loaded or every attempt failed.
+]]
+function DataService.Save(player: Player): boolean
+	local data = cache[player]
+	if not data or not loaded[player] then
+		return false
+	end
+	if not store then
+		return true
 	end
 	local activeStore = store
-	withRetry(function()
+	local ok = withRetry(function()
 		activeStore:UpdateAsync(tostring(player.UserId), function()
 			return data
 		end)
 	end)
+	return ok
 end
 
 local function onJoin(player: Player)
@@ -108,17 +153,15 @@ local function onJoin(player: Player)
 			return activeStore:GetAsync(tostring(player.UserId))
 		end)
 	end
-	local data = copyTemplate()
-	if ok and typeof(saved) == "table" then
-		for key, value in saved :: any do
-			data[key] = value
-		end
-	end
+	local data = fromSave(if ok and typeof(saved) == "table" then saved else nil)
 	data.Joins = (data.Joins or 0) + 1
 	cache[player] = data
 	-- If the load failed we still let them play, but never overwrite their real save.
-	loaded[player] = ok
+	-- With no DataStore at all (unpublished Studio place) nothing saves, so treat as loaded.
+	loaded[player] = ok or not store
 	syncLeaderstats(player)
+	-- Other services wait for this before reading the data (e.g. to put on cosmetics).
+	player:SetAttribute("DataReady", true)
 end
 
 local function onLeave(player: Player)

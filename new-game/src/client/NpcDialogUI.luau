@@ -5,8 +5,7 @@
 	  VotingBoard - adds whether voting is open right now
 	  Leaderboard - adds the current top list from the gravestone
 	  PhotoSpot   - opens the emote bar instead (hides when you walk away)
-	These are display-only placeholders; shop/purchase actions arrive with the shop (M6)
-	and will go through server-validated remotes.
+	  OpensShop   - NPCs with this set (Witch Wanda, Pumpkin Vendor) open the shop on that tab
 ]]
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -14,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local ShopUI = require(script.Parent.ShopUI)
 local Theme = require(script.Parent.Theme)
 
 local NpcDialogUI = {}
@@ -164,6 +164,13 @@ function NpcDialogUI.Mount(gui: ScreenGui)
 		lastOpen = now
 		local def = findNpc(id)
 		if not def then
+			return
+		end
+
+		if def.OpensShop then
+			dialog.Visible = false
+			emoteBar.Visible = false
+			ShopUI.Open(def.OpensShop)
 			return
 		end
 

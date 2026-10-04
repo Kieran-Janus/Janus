@@ -17,9 +17,13 @@ local LeaderboardService = require(Services.LeaderboardService)
 local VotingService = require(Services.VotingService)
 local GameService = require(Services.GameService)
 local AIService = require(Services.AIService)
+local ShopService = require(Services.ShopService)
+local MonetizationService = require(Services.MonetizationService)
 
 HubService.Start() -- first, so the hub spawn exists before characters load
 DataService.Start()
+ShopService.Start()
+MonetizationService.Start()
 MapService.Start()
 NoiseService.Start()
 SprintService.Start()

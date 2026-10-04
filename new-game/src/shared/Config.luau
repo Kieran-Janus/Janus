@@ -556,10 +556,8 @@ local Config = {
 				DisplayName = "Witch Wanda",
 				Offset = Vector3.new(-40, 0, -18),
 				Prompt = { ActionText = "Shop", ObjectText = "Witch Wanda" },
-				Lines = {
-					"Welcome, dearie! My cauldron of cosmetics is still bubbling.",
-					"Hats, pets, trails and spooky voices are coming soon. Save your pumpkins!",
-				},
+				OpensShop = "Hat", -- opens the shop on this tab instead of a dialog
+				Lines = { "Welcome, dearie! Hats, trails and pets, all freshly brewed." },
 			},
 			{
 				Id = "BooGuide",
@@ -581,10 +579,8 @@ local Config = {
 				DisplayName = "Pumpkin Vendor",
 				Offset = Vector3.new(40, 0, -18),
 				Prompt = { ActionText = "Browse", ObjectText = "Pumpkin Vendor" },
-				Lines = {
-					"Fresh pumpkins! Well... pumpkin packs, soon.",
-					"My stall opens with the shop update. Come back then!",
-				},
+				OpensShop = "Packs",
+				Lines = { "Fresh pumpkin packs and VIP passes!" },
 			},
 			{
 				Id = "VotingBoard",
@@ -629,12 +625,189 @@ local Config = {
 	},
 
 	Economy = {
+		-- Pumpkins collected in a round turn into this currency at the end (Rewards above).
 		CurrencyName = "Coins",
-		StartingCoins = 0,
-		-- Add products/gamepasses here and read them in a ShopService.
-		Products = {
-			-- DoubleCoins = { Id = 0, Price = 199 },
+	},
+
+	-- Cosmetic shop (Witch Wanda, or the Shop button). Prices are in Economy.CurrencyName.
+	-- Looks are built from Parts by src/shared/Cosmetics.luau from each item's Style, so the
+	-- same code dresses the character (server) and draws the shop previews (client).
+	Shop = {
+		RequestCooldown = 0.25, -- per-player spam guard on buy/equip
+		OpenKey = Enum.KeyCode.B,
+		Slots = { "Hat", "Trail", "Pet" }, -- shop tabs, in order; a player wears one per slot
+		SlotNames = { Hat = "Hats", Trail = "Trails", Pet = "Pets" },
+		Items = {
+			-- Hats sit on the head.
+			{
+				Id = "PumpkinCap",
+				Name = "Pumpkin Cap",
+				Slot = "Hat",
+				Price = 100,
+				Style = { Kind = "PumpkinCap", Color = Color3.fromRGB(255, 130, 20) },
+			},
+			{
+				Id = "WitchHat",
+				Name = "Witch Hat",
+				Slot = "Hat",
+				Price = 200,
+				Style = {
+					Kind = "WitchHat",
+					Color = Color3.fromRGB(60, 30, 90),
+					Band = Color3.fromRGB(255, 130, 20),
+				},
+			},
+			{
+				Id = "CatEars",
+				Name = "Cat Ears",
+				Slot = "Hat",
+				Price = 150,
+				Style = {
+					Kind = "CatEars",
+					Color = Color3.fromRGB(40, 35, 45),
+					Inner = Color3.fromRGB(255, 150, 190),
+				},
+			},
+			{
+				Id = "BatWings",
+				Name = "Bat Wings Headband",
+				Slot = "Hat",
+				Price = 300,
+				Style = { Kind = "BatWings", Color = Color3.fromRGB(45, 30, 60) },
+			},
+			{
+				Id = "KingCrown",
+				Name = "Pumpkin King Crown",
+				Slot = "Hat",
+				Price = 0,
+				VipOnly = true,
+				Style = { Kind = "Crown", Color = Color3.fromRGB(255, 210, 60) },
+			},
+			-- Trails stream behind you.
+			{
+				Id = "OrangeTrail",
+				Name = "Jack-o'-Glow",
+				Slot = "Trail",
+				Price = 120,
+				Style = {
+					Kind = "Trail",
+					Color = Color3.fromRGB(255, 140, 30),
+					Color2 = Color3.fromRGB(255, 220, 80),
+				},
+			},
+			{
+				Id = "SlimeTrail",
+				Name = "Slime Drip",
+				Slot = "Trail",
+				Price = 180,
+				Style = {
+					Kind = "Trail",
+					Color = Color3.fromRGB(120, 255, 110),
+					Color2 = Color3.fromRGB(40, 160, 60),
+				},
+			},
+			{
+				Id = "GhostTrail",
+				Name = "Ghostly Mist",
+				Slot = "Trail",
+				Price = 250,
+				Style = {
+					Kind = "Trail",
+					Color = Color3.fromRGB(200, 230, 255),
+					Color2 = Color3.fromRGB(150, 120, 220),
+				},
+			},
+			{
+				Id = "CandyTrail",
+				Name = "Candy Corn",
+				Slot = "Trail",
+				Price = 0,
+				VipOnly = true,
+				Style = {
+					Kind = "Trail",
+					Color = Color3.fromRGB(255, 200, 40),
+					Color2 = Color3.fromRGB(255, 110, 20),
+				},
+			},
+			-- Pets float by your shoulder.
+			{
+				Id = "MiniPumpkin",
+				Name = "Mini Pumpkin",
+				Slot = "Pet",
+				Price = 300,
+				Style = { Kind = "PumpkinPet", Color = Color3.fromRGB(255, 130, 20) },
+			},
+			{
+				Id = "BabyBat",
+				Name = "Baby Bat",
+				Slot = "Pet",
+				Price = 450,
+				Style = { Kind = "BatPet", Color = Color3.fromRGB(50, 35, 70) },
+			},
+			{
+				Id = "GhostKitty",
+				Name = "Ghost Kitty",
+				Slot = "Pet",
+				Price = 600,
+				Style = { Kind = "GhostPet", Color = Color3.fromRGB(200, 230, 255) },
+			},
+			{
+				Id = "SkellyPup",
+				Name = "Skelly Pup",
+				Slot = "Pet",
+				Price = 0,
+				VipOnly = true,
+				Style = { Kind = "SkullPet", Color = Color3.fromRGB(235, 228, 210) },
+			},
+		} :: { any }, -- styles differ per Kind
+		PetOffset = Vector3.new(2.6, 1.2, 1.5), -- from the character's root (right, up, back)
+		TrailLifetime = 0.6,
+	},
+
+	-- Robux purchases. IDs are 0 until the owner creates them in Creator Hub (see
+	-- docs/PROGRESS.md, M6); with an ID of 0 the shop shows "Coming soon" and nothing prompts.
+	Monetization = {
+		VipGamePassId = 0,
+		VipName = "VIP",
+		VipSuggestedRobux = 249, -- for reference only; the real price is set in Creator Hub
+		-- The paid gameplay edge (docs/DESIGN.md): kept modest so free players aren't left behind.
+		VipSpeedMultiplier = 1.1, -- walk and sprint speed
+		Tracker = {
+			Key = Enum.KeyCode.T,
+			Cooldown = 30, -- seconds between uses
+			ShowSeconds = 5, -- the arrow to the nearest King shows this long
 		},
+		ChatTag = { Text = "[VIP]", Color = Color3.fromRGB(255, 210, 60) },
+		VipPerks = {
+			"+10% walk and sprint speed",
+			"King tracker: press T for an arrow to the nearest King (30 s cooldown)",
+			"VIP chat tag and 3 VIP-only cosmetics",
+		},
+		-- Developer Products: coin packs. Key is saved with each receipt; don't rename.
+		Products = {
+			{
+				Key = "PumpkinPouch",
+				Name = "Pumpkin Pouch",
+				Id = 0,
+				Coins = 250,
+				SuggestedRobux = 25,
+			},
+			{
+				Key = "PumpkinCart",
+				Name = "Pumpkin Cart",
+				Id = 0,
+				Coins = 1200,
+				SuggestedRobux = 99,
+			},
+			{
+				Key = "PumpkinMountain",
+				Name = "Pumpkin Mountain",
+				Id = 0,
+				Coins = 3500,
+				SuggestedRobux = 249,
+			},
+		},
+		ReceiptHistory = 50, -- receipt ids remembered per player, so a purchase is never granted twice
 	},
 
 	Data = {
@@ -645,6 +818,9 @@ local Config = {
 			Wins = 0,
 			Joins = 0,
 			PumpkinsCollected = 0, -- lifetime, for the Leaderboard Gravestone
+			Owned = {} :: { [string]: boolean }, -- [itemId] = true
+			Equipped = { Hat = "", Trail = "", Pet = "" }, -- item id per Shop slot, "" = none
+			Receipts = {} :: { string }, -- recent Developer Product purchase ids (newest last)
 		},
 	},
 

@@ -4,6 +4,7 @@
 	speed, and reports noise while a sprinting player is actually moving.
 	Ghosts move at Ghost.FlySpeed, can't sprint and don't make noise.
 	Slow(player, multiplier, seconds) scales a living player's speed for a while (minion hits).
+	VIP players (attribute "VIP") move Config.Monetization.VipSpeedMultiplier faster.
 ]]
 
 local Players = game:GetService("Players")
@@ -35,6 +36,9 @@ function SprintService.Apply(player: Player)
 		return
 	end
 	local speed = if sprinting[player] then Config.Player.SprintSpeed else Config.Player.WalkSpeed
+	if player:GetAttribute("VIP") then
+		speed *= Config.Monetization.VipSpeedMultiplier
+	end
 	local slow = slows[player]
 	if slow and slow.Until > os.clock() then
 		speed *= slow.Multiplier

@@ -362,6 +362,19 @@ function KingService.Haunt(position: Vector3): number
 	return affected
 end
 
+-- Where the nearest King to `position` is, or nil if none is out yet (VIP tracker).
+function KingService.Nearest(position: Vector3): Vector3?
+	local best: Vector3? = nil
+	local bestDistance = math.huge
+	for _, king in kings do
+		local distance = (king.Root.Position - position).Magnitude
+		if king.Model.Parent and distance < bestDistance then
+			best, bestDistance = king.Root.Position, distance
+		end
+	end
+	return best
+end
+
 function KingService.Start() end
 
 return KingService
