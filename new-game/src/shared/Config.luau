@@ -12,8 +12,8 @@ local Config = {
 	},
 
 	Round = {
-		MinPlayers = 2,
-		IntermissionSeconds = 20,
+		MinPlayers = 1,
+		IntermissionSeconds = 5,
 		Duration = 120,
 		RewardWinner = 100,
 		RewardParticipant = 25,
