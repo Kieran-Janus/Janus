@@ -4,7 +4,10 @@ version = "0.1.0"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 
-# Add packages here, then run `wally install`. Examples worth having:
+# Add packages here, then run `wally install`. After your first package installs,
+# add this under ReplicatedStorage in default.project.json:
+#   "Packages": { "$path": "Packages" }
+# Add packages here. Examples worth having:
 #   Promise  = "evaera/promise@4.0.0"
 #   Signal   = "sleitnick/signal@2.0.1"
 #   Trove    = "sleitnick/trove@1.1.0"
