@@ -525,6 +525,20 @@ const GAMES = [
     icon: title([{ parts: [{ t: "PUMPKIN", grad: G.orange }], size: 96 }, { parts: [{ t: "PANIC", grad: G.purple }], size: 96, mt: -14 }],
       { x: 0, y: 330, font: "Creepster", stroke: 16, glow: "0 0 26px rgba(255,120,0,.7)", align: "center", rot: -3 }),
   },
+  {
+    slug: "pumpkin-panic-b",
+    scene: pumpkinPanic,
+    thumb: title([
+      { parts: [{ t: "DON'T MAKE", grad: G.white }], size: 140 },
+      { parts: [{ t: "A SOUND...", grad: G.orange }], size: 150, mt: -10 },
+    ], { x: 60, y: 40, font: "Creepster", stroke: 22, glow: "0 0 40px rgba(255,120,0,.6)" })
+      + `<div style="position:absolute;left:70px;top:350px;transform:rotate(-4deg);background:linear-gradient(180deg,#ffb03d,#d84a00);border:8px solid #000;border-radius:20px;padding:10px 26px 2px;box-shadow:0 0 36px rgba(255,140,0,.7)">
+          <span style="font:50px/1 Luckiest;color:#fff;-webkit-text-stroke:8px #000;paint-order:stroke fill">🎃 PUMPKIN PANIC</span></div>`
+      + `<div style="position:absolute;right:40px;bottom:40px;transform:rotate(3deg);background:linear-gradient(180deg,#b44dff,#5a12b0);border:8px solid #000;border-radius:20px;padding:10px 26px 2px;box-shadow:0 0 36px rgba(180,77,255,.7)">
+          <span style="font:52px/1 Luckiest;color:#fff;-webkit-text-stroke:8px #000;paint-order:stroke fill">32 PLAYERS 🎤</span></div>`,
+    icon: title([{ parts: [{ t: "PUMPKIN", grad: G.orange }], size: 96 }, { parts: [{ t: "PANIC", grad: G.purple }], size: 96, mt: -14 }],
+      { x: 0, y: 330, font: "Creepster", stroke: 16, glow: "0 0 26px rgba(255,120,0,.7)", align: "center", rot: -3 }),
+  },
 ];
 
 // ---------- render ----------
