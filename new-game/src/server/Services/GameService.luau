@@ -17,6 +17,7 @@ local GhostService = require(script.Parent.GhostService)
 local KingService = require(script.Parent.KingService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local MapService = require(script.Parent.MapService)
+local MinionService = require(script.Parent.MinionService)
 local NoiseService = require(script.Parent.NoiseService)
 local PumpkinService = require(script.Parent.PumpkinService)
 local VotingService = require(script.Parent.VotingService)
@@ -125,11 +126,13 @@ local function playRound(map: MapService.LoadedMap, difficultyId: string): { Res
 	KingService.Begin(map, difficultyId, isAlive, function(player)
 		knockOut(player, true)
 	end)
+	MinionService.Begin(map, difficultyId, isAlive)
 	-- Ends at 0:00, or early once every participant is caught.
 	countdown("Playing", Config.Round.Duration, function()
 		return next(alive) == nil
 	end)
 	KingService.Stop()
+	MinionService.Stop()
 	PumpkinService.Stop()
 	NoiseService.Clear()
 	for _, connection in connections do

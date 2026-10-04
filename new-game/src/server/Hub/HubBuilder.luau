@@ -7,16 +7,15 @@
 	HubBuilder.Build() -> Model   (also callable from the Studio command bar)
 	HubBuilder.ApplyLighting()
 
-	Client-side animation hooks (see src/client/HubAmbience.luau):
-	  tag "HubFloat"   on Models that bob (attributes BobHeight, Phase)
-	  tag "HubFlicker" on PointLights that flicker
+	Part helpers and the client animation tags (HubFloat, HubFlicker) live in
+	src/server/Build/Kit.luau, shared with the map builders.
 ]]
 
-local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Kit = require(script.Parent.Parent.Build.Kit)
 
 local HubBuilder = {}
 
@@ -26,36 +25,13 @@ local rng = Random.new(hubCfg.Seed)
 
 -- Helpers ------------------------------------------------------------------------------
 
-local function part(props: { [string]: any }, parent: Instance): Part
-	local p = Instance.new("Part")
-	p.Anchored = true
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	p.Material = Enum.Material.SmoothPlastic
-	for key, value in props do
-		(p :: any)[key] = value
-	end
-	p.Parent = parent
-	return p
-end
-
-local function wedge(props: { [string]: any }, parent: Instance): WedgePart
-	local w = Instance.new("WedgePart")
-	w.Anchored = true
-	w.Material = Enum.Material.SmoothPlastic
-	for key, value in props do
-		(w :: any)[key] = value
-	end
-	w.Parent = parent
-	return w
-end
-
-local function model(name: string, parent: Instance): Model
-	local m = Instance.new("Model")
-	m.Name = name
-	m.Parent = parent
-	return m
-end
+local part = Kit.part
+local wedge = Kit.wedge
+local model = Kit.model
+local upright = Kit.upright
+local light = Kit.light
+local particles = Kit.particles
+local holder = Kit.holder
 
 local function at(offset: Vector3): Vector3
 	return hubCfg.Center + offset
@@ -68,11 +44,6 @@ local function facingCenter(position: Vector3): CFrame
 		return CFrame.new(position)
 	end
 	return CFrame.lookAt(position, target)
-end
-
--- Upright cylinder (Roblox cylinders point along X, so rotate onto Y).
-local function upright(cf: CFrame): CFrame
-	return cf * CFrame.Angles(0, 0, math.rad(90))
 end
 
 -- Rough cone from stacked discs: bottom radius r1 to top radius r2 over `height`.
@@ -96,25 +67,6 @@ local function cone(
 			Color = color,
 		}, parent)
 	end
-end
-
-local function light(
-	parent: BasePart,
-	color: Color3,
-	range: number,
-	brightness: number,
-	flicker: boolean
-)
-	local l = Instance.new("PointLight")
-	l.Color = color
-	l.Range = range
-	l.Brightness = brightness
-	l.Shadows = false
-	l.Parent = parent
-	if flicker then
-		CollectionService:AddTag(l, "HubFlicker")
-	end
-	return l
 end
 
 local function nameTag(text: string, adornee: BasePart, height: number)
@@ -154,121 +106,22 @@ local function surfaceText(target: BasePart, text: string, color: Color3, face: 
 	gui.Parent = target
 end
 
-local function particles(parent: BasePart, props: { [string]: any }): ParticleEmitter
-	local e = Instance.new("ParticleEmitter")
-	e.LightInfluence = 0
-	for key, value in props do
-		(e :: any)[key] = value
-	end
-	e.Parent = parent
-	return e
-end
-
--- An invisible, non-colliding part used to hold lights, particles and prompts.
-local function holder(name: string, cf: CFrame, size: Vector3, parent: Instance): Part
-	return part({
-		Name = name,
-		CFrame = cf,
-		Size = size,
-		Transparency = 1,
-		CanCollide = false,
-		CanQuery = false,
-		CanTouch = false,
-	}, parent)
-end
-
 local function float(m: Model, bob: number)
-	m:SetAttribute("BobHeight", bob)
-	m:SetAttribute("Phase", rng:NextNumber(0, math.pi * 2))
-	CollectionService:AddTag(m, "HubFloat")
+	Kit.float(m, bob, rng)
 end
 
 -- Decorations --------------------------------------------------------------------------
 
--- Glowing carved face on the front of a ball of diameter `size` (front = cf.LookVector).
 local function carvedFace(cf: CFrame, size: number, parent: Instance)
-	local r = size / 2
-	local function onSurface(x: number, y: number): CFrame
-		local z = math.sqrt(math.max(r * r - x * x - y * y, 0))
-		return cf * CFrame.new(x, y, -z + 0.05)
-	end
-	for _, side in { -1, 1 } do
-		-- Triangle eyes: a wedge turned so its triangle faces forward.
-		wedge({
-			Name = "Eye",
-			Size = Vector3.new(0.1, size * 0.18, size * 0.16),
-			CFrame = onSurface(side * r * 0.35, r * 0.25)
-				* CFrame.Angles(0, math.rad(90 * side), 0),
-			Color = colors.Glow,
-			Material = Enum.Material.Neon,
-			CanCollide = false,
-		}, parent)
-	end
-	part({
-		Name = "Mouth",
-		Size = Vector3.new(size * 0.45, size * 0.1, 0.1),
-		CFrame = onSurface(0, -r * 0.3),
-		Color = colors.Glow,
-		Material = Enum.Material.Neon,
-		CanCollide = false,
-	}, parent)
+	Kit.carvedFace(cf, size, colors.Glow, parent)
 end
 
 local function jackOLantern(cf: CFrame, size: number, parent: Instance): Model
-	local m = model("JackOLantern", parent)
-	local body = part({
-		Name = "Pumpkin",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(size * 1.15, size, size * 1.15),
-		CFrame = cf * CFrame.new(0, size / 2, 0),
-		Color = colors.Orange,
-	}, m)
-	part({
-		Name = "Stem",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(size * 0.3, size * 0.18, size * 0.18),
-		CFrame = upright(cf * CFrame.new(0, size + size * 0.1, 0)),
-		Color = colors.Green,
-	}, m)
-	carvedFace(cf * CFrame.new(0, size / 2, 0), size, m)
-	light(body, colors.Glow, size * 4, 1.2, true)
-	m.PrimaryPart = body
-	return m
+	return Kit.jackOLantern(cf, size, colors, parent)
 end
 
 local function cobweb(cf: CFrame, size: number, parent: Instance)
-	local m = model("Cobweb", parent)
-	local spokes = 6
-	local points: { { Vector3 } } = {}
-	for i = 1, spokes do
-		local a = (i / spokes) * math.pi * 2
-		local dir = (cf.RightVector * math.cos(a) + cf.UpVector * math.sin(a))
-		part({
-			Name = "Strand",
-			Size = Vector3.new(0.06, 0.06, size),
-			CFrame = CFrame.lookAt(cf.Position + dir * size / 2, cf.Position + dir * size),
-			Color = colors.Bone,
-			Transparency = 0.35,
-			CanCollide = false,
-			CanQuery = false,
-		}, m)
-		points[i] = { cf.Position + dir * size * 0.45, cf.Position + dir * size * 0.85 }
-	end
-	for ring = 1, 2 do
-		for i = 1, spokes do
-			local a = points[i][ring]
-			local b = points[i % spokes + 1][ring]
-			part({
-				Name = "Strand",
-				Size = Vector3.new(0.05, 0.05, (b - a).Magnitude),
-				CFrame = CFrame.lookAt((a + b) / 2, b),
-				Color = colors.Bone,
-				Transparency = 0.35,
-				CanCollide = false,
-				CanQuery = false,
-			}, m)
-		end
-	end
+	Kit.cobweb(cf, size, colors.Bone, parent)
 end
 
 local function buildGround(hub: Model): BasePart

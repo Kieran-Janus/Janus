@@ -1,13 +1,16 @@
 --!strict
 --[[
 	Loads the round map and unloads it afterwards.
-	Uses ServerStorage.Maps.<Id> if a real map exists, otherwise builds a placeholder
-	from Config.Maps.List[i].Placeholder so every map is playable before art is done.
+	Uses ServerStorage.Maps.<Id> if a hand-made map exists, otherwise builds one with
+	src/server/Maps/<Builder>.luau from Config.Maps.List[i].
+	The loaded model is Workspace.Map with attribute MapId; the client uses it to switch to
+	the map's lighting and ambient sound (src/client/ZoneLighting.luau).
 ]]
 
 local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+local Builders = script.Parent.Parent.Maps
 
 export type LoadedMap = {
 	Id: string,
@@ -15,6 +18,7 @@ export type LoadedMap = {
 	Model: Model,
 	Floor: BasePart,
 	Spawns: { BasePart },
+	Hotspots: { BasePart }, -- areas where extra (risky) pumpkins spawn; may be empty
 }
 
 local MapService = {}
@@ -30,104 +34,6 @@ function MapService.Get(id: string): any
 	return nil
 end
 
-local function part(props: { [string]: any }, parent: Instance): Part
-	local p = Instance.new("Part")
-	p.Anchored = true
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	for key, value in props do
-		(p :: any)[key] = value
-	end
-	p.Parent = parent
-	return p
-end
-
-local function buildPlaceholder(def: any): Model
-	local cfg = def.Placeholder
-	local origin: Vector3 = Config.Maps.Origin
-	local size: Vector3 = cfg.Size
-	local rng = Random.new(cfg.Seed)
-
-	local model = Instance.new("Model")
-	model.Name = def.Id
-
-	part({
-		Name = "Floor",
-		Size = size,
-		Position = origin,
-		Color = cfg.FloorColor,
-		Material = Enum.Material.Grass,
-	}, model)
-
-	-- Perimeter walls so nobody walks off the edge.
-	local top = origin.Y + size.Y / 2
-	local wallY = top + cfg.WallHeight / 2
-	for _, w in
-		{
-			{ Vector3.new(size.X, cfg.WallHeight, 2), Vector3.new(0, 0, size.Z / 2) },
-			{ Vector3.new(size.X, cfg.WallHeight, 2), Vector3.new(0, 0, -size.Z / 2) },
-			{ Vector3.new(2, cfg.WallHeight, size.Z), Vector3.new(size.X / 2, 0, 0) },
-			{ Vector3.new(2, cfg.WallHeight, size.Z), Vector3.new(-size.X / 2, 0, 0) },
-		}
-	do
-		part({
-			Name = "Wall",
-			Size = w[1],
-			Position = Vector3.new(origin.X, wallY, origin.Z) + w[2],
-			Color = cfg.WallColor,
-			Material = Enum.Material.WoodPlanks,
-		}, model)
-	end
-
-	-- Obstacles stand in for props/rooms; kept out of the spawn ring.
-	local minS: Vector3, maxS: Vector3 = cfg.ObstacleMinSize, cfg.ObstacleMaxSize
-	local halfX, halfZ = size.X / 2 - maxS.X, size.Z / 2 - maxS.Z
-	local placed = 0
-	local tries = 0
-	while placed < cfg.Obstacles and tries < cfg.Obstacles * 10 do
-		tries += 1
-		local offset = Vector3.new(rng:NextNumber(-halfX, halfX), 0, rng:NextNumber(-halfZ, halfZ))
-		if offset.Magnitude >= cfg.ObstacleClearRadius then
-			local s = Vector3.new(
-				rng:NextNumber(minS.X, maxS.X),
-				rng:NextNumber(minS.Y, maxS.Y),
-				rng:NextNumber(minS.Z, maxS.Z)
-			)
-			part({
-				Name = "Obstacle",
-				Size = s,
-				CFrame = CFrame.new(origin + offset + Vector3.new(0, size.Y / 2 + s.Y / 2, 0))
-					* CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
-				Color = cfg.ObstacleColor,
-				Material = Enum.Material.Slate,
-			}, model)
-			placed += 1
-		end
-	end
-
-	local spawns = Instance.new("Folder")
-	spawns.Name = def.SpawnFolder
-	spawns.Parent = model
-	for i = 1, cfg.Spawns do
-		local angle = (i / cfg.Spawns) * math.pi * 2
-		part({
-			Name = "Spawn",
-			Size = Vector3.new(4, 1, 4),
-			Position = origin + Vector3.new(
-				math.cos(angle) * cfg.SpawnRadius,
-				size.Y,
-				math.sin(angle) * cfg.SpawnRadius
-			),
-			Transparency = 1,
-			CanCollide = false,
-			CanQuery = false,
-			CanTouch = false,
-		}, spawns)
-	end
-
-	return model
-end
-
 function MapService.Load(id: string): LoadedMap
 	MapService.Unload()
 	local def = MapService.Get(id)
@@ -140,9 +46,15 @@ function MapService.Load(id: string): LoadedMap
 		model = source:Clone()
 		model:PivotTo(CFrame.new(Config.Maps.Origin))
 	else
-		model = buildPlaceholder(def)
+		local builder = Builders:FindFirstChild(def.Builder or "")
+		assert(
+			builder and builder:IsA("ModuleScript"),
+			id .. " has no ServerStorage map or Builder"
+		)
+		model = (require :: any)(builder).Build(def)
 	end
 	model.Name = "Map"
+	model:SetAttribute("MapId", id)
 	model.Parent = workspace
 
 	local floor = model:FindFirstChild("Floor", true)
@@ -157,9 +69,24 @@ function MapService.Load(id: string): LoadedMap
 		end
 	end
 	assert(#spawns > 0, id .. " has no spawns")
+	local hotspots: { BasePart } = {}
+	local hotspotFolder = model:FindFirstChild("Hotspots")
+	if hotspotFolder then
+		for _, child in hotspotFolder:GetChildren() do
+			if child:IsA("BasePart") then
+				table.insert(hotspots, child)
+			end
+		end
+	end
 
-	local loaded: LoadedMap =
-		{ Id = id, Name = def.Name, Model = model, Floor = floor, Spawns = spawns }
+	local loaded: LoadedMap = {
+		Id = id,
+		Name = def.Name,
+		Model = model,
+		Floor = floor,
+		Spawns = spawns,
+		Hotspots = hotspots,
+	}
 	current = loaded
 	return loaded
 end
@@ -200,6 +127,31 @@ function MapService.RandomFloorPoint(
 		local result =
 			workspace:Raycast(point + Vector3.new(0, 200, 0), Vector3.new(0, -400, 0), params)
 		if result and result.Instance == floor then
+			return result.Position + Vector3.new(0, height, 0)
+		end
+	end
+	return nil
+end
+
+-- Like RandomFloorPoint, but inside one of the map's hotspot areas. nil if it has none.
+function MapService.RandomHotspotPoint(map: LoadedMap, attempts: number, height: number): Vector3?
+	if #map.Hotspots == 0 then
+		return nil
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { map.Model }
+	for _ = 1, attempts do
+		local area = map.Hotspots[math.random(1, #map.Hotspots)]
+		local point = area.CFrame
+			* Vector3.new(
+				(math.random() - 0.5) * area.Size.X,
+				0,
+				(math.random() - 0.5) * area.Size.Z
+			)
+		local result =
+			workspace:Raycast(point + Vector3.new(0, 200, 0), Vector3.new(0, -400, 0), params)
+		if result and result.Instance == map.Floor then
 			return result.Position + Vector3.new(0, height, 0)
 		end
 	end

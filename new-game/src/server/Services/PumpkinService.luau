@@ -4,6 +4,8 @@
 	Pickup is a server-side Touched check (no remote): the server decides who may collect,
 	checks distance, and counts each pumpkin once. A player's count for the current round
 	is the "Pumpkins" attribute on the Player, which the HUD reads.
+	A share of pumpkins (Config.Pumpkins.HotspotChance) spawn in the map's risky Hotspots.
+	The Ghost Cat (MinionService) can Steal pumpkins; Drop puts them back on the map later.
 ]]
 
 local Players = game:GetService("Players")
@@ -17,6 +19,7 @@ local PumpkinService = {}
 
 local folder: Folder? = nil
 local spawnThread: thread? = nil
+local roundMap: MapService.LoadedMap? = nil
 local active = 0
 local function nobody(_player: Player): boolean
 	return false
@@ -53,16 +56,17 @@ local function collect(pumpkin: BasePart, hit: BasePart)
 end
 
 local function spawnOne(map: MapService.LoadedMap)
-	local spot = MapService.RandomFloorPoint(
-		map,
-		Config.Pumpkins.EdgeMargin,
-		Config.Pumpkins.SpawnAttempts,
-		Config.Pumpkins.HoverHeight
-	)
+	local cfg = Config.Pumpkins
+	local spot: Vector3? = nil
+	if math.random() < cfg.HotspotChance then
+		spot = MapService.RandomHotspotPoint(map, cfg.SpawnAttempts, cfg.HoverHeight)
+	end
+	if not spot then
+		spot = MapService.RandomFloorPoint(map, cfg.EdgeMargin, cfg.SpawnAttempts, cfg.HoverHeight)
+	end
 	if not spot or not folder then
 		return
 	end
-	local cfg = Config.Pumpkins
 	local pumpkin = Instance.new("Part")
 	pumpkin.Name = "Pumpkin"
 	pumpkin.Shape = Enum.PartType.Ball
@@ -73,6 +77,12 @@ local function spawnOne(map: MapService.LoadedMap)
 	pumpkin.CanCollide = false
 	pumpkin.CanQuery = false -- don't block the King's line of sight or floor raycasts
 	pumpkin.Position = spot
+	local glow = Instance.new("PointLight")
+	glow.Color = cfg.Glow.Color
+	glow.Range = cfg.Glow.Range
+	glow.Brightness = cfg.Glow.Brightness
+	glow.Shadows = false
+	glow.Parent = pumpkin
 	pumpkin.Touched:Connect(function(hit)
 		collect(pumpkin, hit)
 	end)
@@ -90,6 +100,7 @@ function PumpkinService.Begin(
 	local level = Config.Difficulty.Levels[difficultyId]
 	canCollect = collectable
 	active = 0
+	roundMap = map
 
 	local newFolder = Instance.new("Folder")
 	newFolder.Name = "Pumpkins"
@@ -120,6 +131,27 @@ function PumpkinService.Stop()
 	end
 	canCollect = nobody
 	active = 0
+	roundMap = nil
+end
+
+-- Takes up to `amount` of this round's pumpkins from a player. Returns how many were taken.
+function PumpkinService.Steal(player: Player, amount: number): number
+	local taken = math.min(PumpkinService.GetCount(player), amount)
+	if taken > 0 then
+		player:SetAttribute("Pumpkins", PumpkinService.GetCount(player) - taken)
+	end
+	return taken
+end
+
+-- Puts `count` pumpkins back on the current round's map (ignores MaxPumpkins).
+function PumpkinService.Drop(count: number)
+	local map = roundMap
+	if not map or not folder then
+		return
+	end
+	for _ = 1, count do
+		spawnOne(map)
+	end
 end
 
 function PumpkinService.ResetCounts()

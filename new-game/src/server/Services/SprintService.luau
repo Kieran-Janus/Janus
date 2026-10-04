@@ -3,6 +3,7 @@
 	Sprinting. The client only asks to sprint (SetSprint(boolean)); the server sets the
 	speed, and reports noise while a sprinting player is actually moving.
 	Ghosts move at Ghost.FlySpeed, can't sprint and don't make noise.
+	Slow(player, multiplier, seconds) scales a living player's speed for a while (minion hits).
 ]]
 
 local Players = game:GetService("Players")
@@ -16,6 +17,7 @@ local SprintService = {}
 
 local sprinting: { [Player]: boolean } = {}
 local lastToggle: { [Player]: number } = {}
+local slows: { [Player]: { Multiplier: number, Until: number } } = {}
 
 local function humanoidOf(player: Player): Humanoid?
 	local character = player.Character
@@ -30,11 +32,28 @@ function SprintService.Apply(player: Player)
 	end
 	if player:GetAttribute("Out") then
 		humanoid.WalkSpeed = Config.Ghost.FlySpeed
-	elseif sprinting[player] then
-		humanoid.WalkSpeed = Config.Player.SprintSpeed
-	else
-		humanoid.WalkSpeed = Config.Player.WalkSpeed
+		return
 	end
+	local speed = if sprinting[player] then Config.Player.SprintSpeed else Config.Player.WalkSpeed
+	local slow = slows[player]
+	if slow and slow.Until > os.clock() then
+		speed *= slow.Multiplier
+	else
+		slows[player] = nil
+	end
+	humanoid.WalkSpeed = speed
+end
+
+function SprintService.Slow(player: Player, multiplier: number, seconds: number)
+	local slow = { Multiplier = multiplier, Until = os.clock() + seconds }
+	slows[player] = slow
+	SprintService.Apply(player)
+	task.delay(seconds, function()
+		if slows[player] == slow then
+			slows[player] = nil
+			SprintService.Apply(player)
+		end
+	end)
 end
 
 local function onSetSprint(player: Player, wants: unknown)
@@ -56,6 +75,7 @@ function SprintService.Start()
 	local function onPlayer(player: Player)
 		player.CharacterAdded:Connect(function()
 			sprinting[player] = nil
+			slows[player] = nil
 			task.defer(SprintService.Apply, player)
 		end)
 	end
@@ -66,6 +86,7 @@ function SprintService.Start()
 	Players.PlayerRemoving:Connect(function(player)
 		sprinting[player] = nil
 		lastToggle[player] = nil
+		slows[player] = nil
 	end)
 
 	task.spawn(function()
