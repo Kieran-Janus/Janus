@@ -22,12 +22,6 @@
           "$path": "src/client"
         }
       }
-    },
-    "HttpService": {
-      "$className": "HttpService",
-      "$properties": {
-        "HttpEnabled": true
-      }
     }
   }
 }

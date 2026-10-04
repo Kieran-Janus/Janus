@@ -140,7 +140,7 @@ curl -X POST https://newgame-ai-proxy.<you>.workers.dev/chat \
 Studio -> **File -> Publish to Roblox** -> create a new experience, name it, leave it private.
 
 ### 6e. Turn on HTTP + add the secret
-1. Studio -> **Home -> Game Settings -> Security -> Allow HTTP Requests = On**. (Rojo's project file also sets it, but confirm.)
+1. Studio -> **Home -> Game Settings -> Security -> Allow HTTP Requests = On**. (Rojo cannot set this for you; turn it on by hand.)
 2. Creator Hub (create.roblox.com) -> **Creations -> your experience -> Secrets** **(verify menu name)** -> **Create secret**:
    - Name: `AI_PROXY_KEY` (must match `Config.AI.SecretName`)
    - Value: your `PROXY_KEY`
