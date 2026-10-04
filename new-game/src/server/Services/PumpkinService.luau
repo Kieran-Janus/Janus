@@ -10,8 +10,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-
-type LoadedMap = { Model: Model, Floor: BasePart }
+local MapService = require(script.Parent.MapService)
+local NoiseService = require(script.Parent.NoiseService)
 
 local PumpkinService = {}
 
@@ -27,36 +27,13 @@ function PumpkinService.GetCount(player: Player): number
 	return player:GetAttribute("Pumpkins") or 0
 end
 
-local function findSpot(map: LoadedMap): Vector3?
-	local floor = map.Floor
-	local cfg = Config.Pumpkins
-	local halfX = floor.Size.X / 2 - cfg.EdgeMargin
-	local halfZ = floor.Size.Z / 2 - cfg.EdgeMargin
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Include
-	params.FilterDescendantsInstances = { map.Model }
-
-	for _ = 1, cfg.SpawnAttempts do
-		local point = floor.CFrame
-			* Vector3.new(math.random() * halfX * 2 - halfX, 0, math.random() * halfZ * 2 - halfZ)
-		local top = point + Vector3.new(0, floor.Size.Y / 2, 0)
-		-- Cast down from high above; only accept spots where the first thing hit is the floor.
-		local result =
-			workspace:Raycast(top + Vector3.new(0, 200, 0), Vector3.new(0, -400, 0), params)
-		if result and result.Instance == floor then
-			return result.Position + Vector3.new(0, cfg.HoverHeight, 0)
-		end
-	end
-	return nil
-end
-
 local function collect(pumpkin: BasePart, hit: BasePart)
 	if pumpkin:GetAttribute("Collected") then
 		return
 	end
 	local character = hit:FindFirstAncestorOfClass("Model")
 	local player = character and Players:GetPlayerFromCharacter(character)
-	if not player or not character or not canCollect(player) then
+	if not player or not character or player:GetAttribute("Out") or not canCollect(player) then
 		return
 	end
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -72,10 +49,16 @@ local function collect(pumpkin: BasePart, hit: BasePart)
 	active -= 1
 	pumpkin:Destroy()
 	player:SetAttribute("Pumpkins", PumpkinService.GetCount(player) + Config.Pumpkins.Value)
+	NoiseService.Report(pumpkin.Position, Config.King.Noise.PumpkinPickup, player)
 end
 
-local function spawnOne(map: LoadedMap)
-	local spot = findSpot(map)
+local function spawnOne(map: MapService.LoadedMap)
+	local spot = MapService.RandomFloorPoint(
+		map,
+		Config.Pumpkins.EdgeMargin,
+		Config.Pumpkins.SpawnAttempts,
+		Config.Pumpkins.HoverHeight
+	)
 	if not spot or not folder then
 		return
 	end
@@ -88,6 +71,7 @@ local function spawnOne(map: LoadedMap)
 	pumpkin.Material = Enum.Material.SmoothPlastic
 	pumpkin.Anchored = true
 	pumpkin.CanCollide = false
+	pumpkin.CanQuery = false -- don't block the King's line of sight or floor raycasts
 	pumpkin.Position = spot
 	pumpkin.Touched:Connect(function(hit)
 		collect(pumpkin, hit)
@@ -98,7 +82,7 @@ end
 
 -- Starts spawning for a round. `collectable` says whether a player may pick up right now.
 function PumpkinService.Begin(
-	map: LoadedMap,
+	map: MapService.LoadedMap,
 	difficultyId: string,
 	collectable: (Player) -> boolean
 )

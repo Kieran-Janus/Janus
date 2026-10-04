@@ -171,6 +171,48 @@ function MapService.Unload()
 	end
 end
 
+function MapService.Current(): LoadedMap?
+	return current
+end
+
+-- A random point on open floor (not on top of an obstacle), `height` studs above it.
+function MapService.RandomFloorPoint(
+	map: LoadedMap,
+	edgeMargin: number,
+	attempts: number,
+	height: number
+): Vector3?
+	local floor = map.Floor
+	local halfX = floor.Size.X / 2 - edgeMargin
+	local halfZ = floor.Size.Z / 2 - edgeMargin
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances = { map.Model }
+
+	for _ = 1, attempts do
+		local point = floor.CFrame
+			* Vector3.new(
+				math.random() * halfX * 2 - halfX,
+				floor.Size.Y / 2,
+				math.random() * halfZ * 2 - halfZ
+			)
+		-- Cast down from high above; only accept spots where the first thing hit is the floor.
+		local result =
+			workspace:Raycast(point + Vector3.new(0, 200, 0), Vector3.new(0, -400, 0), params)
+		if result and result.Instance == floor then
+			return result.Position + Vector3.new(0, height, 0)
+		end
+	end
+	return nil
+end
+
+-- Where players stand between rounds: the lobby SpawnLocation in the place.
+function MapService.LobbyCFrame(): CFrame
+	local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
+	local position = if spawn then spawn.Position else Vector3.zero
+	return CFrame.new(position + Vector3.new(0, Config.Maps.SpawnHeight, 0))
+end
+
 function MapService.Start()
 	assert(#Config.Maps.List > 0, "Config.Maps.List is empty")
 end

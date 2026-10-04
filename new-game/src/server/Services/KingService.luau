@@ -1,0 +1,367 @@
+--!strict
+--[[
+	The Pumpkin King: a server-controlled NPC that hunts players with pathfinding.
+
+	Each tick a King picks a goal, in priority order:
+	  1. Chase  - the nearest player it can see (within SightRange, clear line of sight;
+	              a ghost's Haunt shrinks SightRange for a few seconds)
+	  2. Listen - the loudest recent noise it can hear (NoiseService, within HearingRange)
+	  3. Wander - a random spot on the floor
+	A player within CatchRange is caught; GameService decides what that means.
+
+	The placeholder body is built from parts. To use a real model later, replace buildKing
+	but keep a Humanoid and a HumanoidRootPart.
+]]
+
+local PathfindingService = game:GetService("PathfindingService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local MapService = require(script.Parent.MapService)
+local NoiseService = require(script.Parent.NoiseService)
+
+type Level = {
+	Count: number,
+	WalkSpeed: number,
+	ChaseSpeed: number,
+	HearingRange: number,
+	SightRange: number,
+}
+
+type King = {
+	Model: Model,
+	Humanoid: Humanoid,
+	Root: BasePart,
+	Thread: thread?,
+}
+
+local KingService = {}
+
+local kings: { King } = {}
+local spawnThread: thread? = nil
+local catchConnection: RBXScriptConnection? = nil
+
+local function weld(part: BasePart, root: BasePart, offset: CFrame)
+	part.CFrame = root.CFrame * offset
+	part.Anchored = false
+	part.CanCollide = false
+	part.Massless = true
+	local w = Instance.new("WeldConstraint")
+	w.Part0 = root
+	w.Part1 = part
+	w.Parent = part
+end
+
+local function buildKing(position: Vector3): King
+	local cfg = Config.King
+	local model = Instance.new("Model")
+	model.Name = "PumpkinKing"
+
+	local root = Instance.new("Part")
+	root.Name = "HumanoidRootPart"
+	root.Size = Vector3.new(2, 2, 1)
+	root.Transparency = 1
+	root.CFrame = CFrame.new(position)
+	root.Parent = model
+	model.PrimaryPart = root
+
+	local body = Instance.new("Part")
+	body.Name = "Body"
+	body.Size = cfg.BodySize
+	body.Color = cfg.BodyColor
+	body.Material = Enum.Material.Fabric
+	body.Parent = model
+	weld(body, root, CFrame.new(0, cfg.BodySize.Y / 2 - 1, 0))
+
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Shape = Enum.PartType.Ball
+	head.Size = Vector3.one * cfg.HeadSize
+	head.Color = cfg.HeadColor
+	head.Material = Enum.Material.SmoothPlastic
+	head.Parent = model
+	weld(head, root, CFrame.new(0, cfg.BodySize.Y - 1 + cfg.HeadSize / 2, 0))
+
+	local crown = Instance.new("Part")
+	crown.Name = "Crown"
+	crown.Size = Vector3.new(cfg.HeadSize * 0.6, cfg.HeadSize * 0.3, cfg.HeadSize * 0.6)
+	crown.Color = cfg.CrownColor
+	crown.Material = Enum.Material.Neon
+	crown.Parent = model
+	weld(crown, root, CFrame.new(0, cfg.BodySize.Y - 1 + cfg.HeadSize, 0))
+
+	local humanoid = Instance.new("Humanoid")
+	humanoid.HipHeight = cfg.HipHeight
+	humanoid.DisplayName = cfg.Name
+	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+	humanoid.RigType = Enum.HumanoidRigType.R15
+	humanoid.RequiresNeck = false -- no real neck joint on the placeholder body
+	humanoid.BreakJointsOnDeath = false
+	humanoid.Parent = model
+
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CollisionGroup = "King"
+		end
+	end
+	return { Model = model, Humanoid = humanoid, Root = root, Thread = nil }
+end
+
+local function rootOf(player: Player): BasePart?
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health > 0 then
+		return humanoid.RootPart
+	end
+	return nil
+end
+
+local function canSee(king: King, target: BasePart, range: number): boolean
+	local origin = king.Root.Position + Vector3.new(0, Config.King.BodySize.Y, 0)
+	local offset = target.Position - origin
+	if offset.Magnitude > range then
+		return false
+	end
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local ignore: { Instance } = { king.Model }
+	for _, other in kings do
+		table.insert(ignore, other.Model)
+	end
+	params.FilterDescendantsInstances = ignore
+	params.CollisionGroup = "King" -- ghosts don't collide with the King, so they don't block its view
+	local hit = workspace:Raycast(origin, offset, params)
+	return hit ~= nil
+		and target.Parent ~= nil
+		and hit.Instance:IsDescendantOf(target.Parent :: Instance)
+end
+
+-- Follows a path toward `goal` for up to `budget` seconds. Returns false if no progress.
+local function walkTo(king: King, goal: Vector3, budget: number): boolean
+	local cfg = Config.King
+	local path = PathfindingService:CreatePath(cfg.Path)
+	local ok = pcall(function()
+		path:ComputeAsync(king.Root.Position, goal)
+	end)
+	local deadline = os.clock() + budget
+	local start = king.Root.Position
+
+	if not ok or path.Status ~= Enum.PathStatus.Success then
+		-- No path (goal inside a prop, mid-air, ...): step straight at it briefly.
+		king.Humanoid:MoveTo(goal)
+		task.wait(math.min(budget, 0.5))
+		return (king.Root.Position - start).Magnitude > 1
+	end
+
+	-- Waypoints are on the floor but the root floats at HipHeight, so compare flat distance.
+	local function flatDistance(a: Vector3, b: Vector3): number
+		return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+	end
+
+	local waypoints = path:GetWaypoints()
+	for i = 2, #waypoints do
+		if os.clock() > deadline then
+			break
+		end
+		local target = waypoints[i].Position
+		king.Humanoid:MoveTo(target)
+		local stuckSince = os.clock()
+		local last = king.Root.Position
+		while
+			flatDistance(king.Root.Position, target) > cfg.WaypointReachedDistance
+			and os.clock() < deadline
+		do
+			task.wait(0.1)
+			if (king.Root.Position - last).Magnitude > 0.5 then
+				last = king.Root.Position
+				stuckSince = os.clock()
+			elseif os.clock() - stuckSince > cfg.StuckSeconds then
+				return false
+			end
+		end
+	end
+	return true
+end
+
+local function think(
+	king: King,
+	level: Level,
+	isTarget: (Player) -> boolean,
+	map: MapService.LoadedMap
+)
+	local cfg = Config.King
+	while king.Model.Parent do
+		-- A haunted King sees less far for a moment.
+		local sight = level.SightRange
+		if (king.Model:GetAttribute("HauntedUntil") or 0) > os.clock() then
+			sight *= Config.Ghost.Haunt.SightMultiplier
+		end
+
+		-- 1. Chase the nearest visible player.
+		local chase: BasePart? = nil
+		local nearest = math.huge
+		for _, player in Players:GetPlayers() do
+			local root = rootOf(player)
+			if root and isTarget(player) then
+				local distance = (root.Position - king.Root.Position).Magnitude
+				if distance < nearest and canSee(king, root, sight) then
+					chase, nearest = root, distance
+				end
+			end
+		end
+
+		if chase then
+			king.Humanoid.WalkSpeed = level.ChaseSpeed
+			king.Model:SetAttribute("Mode", "Chase")
+			walkTo(king, chase.Position, cfg.RepathSeconds)
+		else
+			-- 2. Investigate the loudest noise, 3. or wander.
+			king.Humanoid.WalkSpeed = level.WalkSpeed
+			local noise = NoiseService.Loudest(king.Root.Position, level.HearingRange)
+			local goal: Vector3? = if noise then noise.Position else nil
+			king.Model:SetAttribute("Mode", if goal then "Listen" else "Wander")
+			if not goal then
+				goal = MapService.RandomFloorPoint(map, cfg.Path.AgentRadius * 2, 10, 0)
+			end
+			if goal then
+				walkTo(king, goal, cfg.WanderRepathSeconds)
+			else
+				task.wait(cfg.RepathSeconds)
+			end
+		end
+	end
+end
+
+local function spawnPoint(map: MapService.LoadedMap): Vector3?
+	local cfg = Config.King
+	local best: Vector3? = nil
+	local bestDistance = -1
+	for _ = 1, 20 do
+		local point =
+			MapService.RandomFloorPoint(map, cfg.Path.AgentRadius * 2, 10, cfg.HipHeight + 1)
+		if point then
+			local closest = math.huge
+			for _, player in Players:GetPlayers() do
+				local root = rootOf(player)
+				if root then
+					closest = math.min(closest, (root.Position - point).Magnitude)
+				end
+			end
+			if closest >= cfg.MinSpawnDistance then
+				return point
+			elseif closest > bestDistance then
+				best, bestDistance = point, closest
+			end
+		end
+	end
+	return best -- small map: the farthest spot found
+end
+
+--[[
+	Starts the hunt for a round. Kings appear after Config.King.SpawnDelay.
+	`isTarget(player)` says who can be chased/caught; `onCatch(player)` is called once per catch
+	(isTarget should return false for that player afterwards).
+]]
+function KingService.Begin(
+	map: MapService.LoadedMap,
+	difficultyId: string,
+	isTarget: (Player) -> boolean,
+	onCatch: (Player) -> ()
+)
+	KingService.Stop()
+	local level: Level = Config.King.Difficulty[difficultyId]
+	-- Ghosts are never targets, whatever the caller says.
+	local callerTarget = isTarget
+	isTarget = function(player: Player): boolean
+		return not player:GetAttribute("Out") and callerTarget(player)
+	end
+	ReplicatedStorage:SetAttribute("KingCount", 0)
+
+	local function tryCatch(player: Player)
+		if isTarget(player) and rootOf(player) then
+			onCatch(player)
+		end
+	end
+
+	spawnThread = task.delay(Config.King.SpawnDelay, function()
+		spawnThread = nil
+		for _ = 1, level.Count do
+			local point = spawnPoint(map)
+			if point then
+				local king = buildKing(point)
+				king.Model.Parent = map.Model
+				king.Root:SetNetworkOwner(nil) -- server physics, so clients can't move it
+				-- Touching any part of the King catches, as well as the CatchRange check below.
+				for _, part in king.Model:GetDescendants() do
+					if part:IsA("BasePart") then
+						part.Touched:Connect(function(hit)
+							local character = hit:FindFirstAncestorOfClass("Model")
+							local player = character and Players:GetPlayerFromCharacter(character)
+							if player then
+								tryCatch(player)
+							end
+						end)
+					end
+				end
+				king.Thread = task.spawn(think, king, level, isTarget, map)
+				table.insert(kings, king)
+			end
+		end
+		ReplicatedStorage:SetAttribute("KingCount", #kings)
+	end)
+
+	catchConnection = RunService.Heartbeat:Connect(function()
+		for _, king in kings do
+			for _, player in Players:GetPlayers() do
+				local root = rootOf(player)
+				if
+					root
+					and (root.Position - king.Root.Position).Magnitude <= Config.King.CatchRange
+				then
+					tryCatch(player)
+				end
+			end
+		end
+	end)
+end
+
+function KingService.Stop()
+	if spawnThread then
+		task.cancel(spawnThread)
+		spawnThread = nil
+	end
+	if catchConnection then
+		catchConnection:Disconnect()
+		catchConnection = nil
+	end
+	for _, king in kings do
+		if king.Thread then
+			task.cancel(king.Thread)
+		end
+		king.Model:Destroy()
+	end
+	table.clear(kings)
+	ReplicatedStorage:SetAttribute("KingCount", 0)
+end
+
+--[[
+	A ghost haunts from `position`: every King within Haunt.Range has its sight reduced for
+	Haunt.Seconds. Returns how many Kings were affected (0 = too far, nothing happened).
+]]
+function KingService.Haunt(position: Vector3): number
+	local cfg = Config.Ghost.Haunt
+	local affected = 0
+	for _, king in kings do
+		if (king.Root.Position - position).Magnitude <= cfg.Range then
+			king.Model:SetAttribute("HauntedUntil", os.clock() + cfg.Seconds)
+			affected += 1
+		end
+	end
+	return affected
+end
+
+function KingService.Start() end
+
+return KingService

@@ -112,6 +112,87 @@ local Config = {
 		TopCollectorWins = 1, -- Wins added to the player(s) with the most pumpkins
 	},
 
+	-- The Pumpkin King: a server-controlled NPC that hunts players.
+	King = {
+		Name = "The Pumpkin King",
+		-- Picked by the difficulty vote. Players walk at Player.WalkSpeed and sprint at SprintSpeed.
+		Difficulty = {
+			Easy = {
+				Count = 1,
+				WalkSpeed = 12, -- while wandering or investigating a noise
+				ChaseSpeed = 18,
+				HearingRange = 90, -- studs; noise farther away is ignored
+				SightRange = 45, -- studs; needs a clear line of sight
+			},
+			Hard = {
+				Count = 2,
+				WalkSpeed = 14,
+				ChaseSpeed = 21,
+				HearingRange = 130,
+				SightRange = 60,
+			},
+		},
+		SpawnDelay = 15, -- seconds of grace at round start before the King appears
+		MinSpawnDistance = 60, -- studs from every player when it spawns
+		CatchRange = 4.5, -- studs from the King's root to a player's root (touching also catches)
+		RepathSeconds = 0.6, -- how often the path is recomputed while chasing
+		WanderRepathSeconds = 3, -- and while wandering or investigating
+		StuckSeconds = 2.5, -- no progress for this long = give up on the current goal
+		WaypointReachedDistance = 2.5, -- studs (flat) to count a path waypoint as reached
+		HipHeight = 3,
+		BodySize = Vector3.new(3, 4, 2),
+		HeadSize = 4.5,
+		BodyColor = Color3.fromRGB(40, 25, 55),
+		HeadColor = Color3.fromRGB(255, 110, 0),
+		CrownColor = Color3.fromRGB(255, 210, 60),
+		Path = {
+			AgentRadius = 2.5,
+			AgentHeight = 8,
+			AgentCanJump = false,
+			WaypointSpacing = 4,
+		},
+		-- Noise attracts the King. Every loudness below is decided by the server; clients only
+		-- say "I'm sprinting" or "I shouted". Sprint, pickups and shouting mean players without
+		-- voice still play the stealth game (docs/DESIGN.md). M3 adds voice only as a clamped,
+		-- rate-limited hint on top.
+		Noise = {
+			MemorySeconds = 6, -- how long a noise stays interesting
+			TickSeconds = 0.5,
+			SprintPerTick = 6, -- loudness each tick while sprinting and moving
+			PumpkinPickup = 10,
+			Shout = 25,
+			ShoutCooldown = 4, -- seconds between shouts per player
+			ShoutText = "HEY!", -- shown above the player's head
+			ShoutBubbleSeconds = 1.5,
+		},
+	},
+
+	Player = {
+		WalkSpeed = 16,
+		SprintSpeed = 24,
+		SprintToggleCooldown = 0.1, -- per-player spam guard on the sprint remote
+	},
+
+	-- Caught players become ghosts: see-through, floating, can't collect pumpkins, ignored by
+	-- the King. Each ghost picks a mode on the ghost screen.
+	Ghost = {
+		Modes = { "Spectate", "Haunt", "GhostChat" }, -- order shown on the ghost screen
+		ModeNames = { Spectate = "Spectate", Haunt = "Haunt", GhostChat = "Ghost chat" },
+		DefaultMode = "Haunt",
+		ModeSwitchCooldown = 1,
+		Transparency = 0.65,
+		FlySpeed = 22,
+		FlyVerticalSpeed = 14,
+		MaxFlyHeight = 40, -- studs above the map floor
+		-- Haunt: a ghost near a King can blur its vision for a moment.
+		Haunt = {
+			Range = 25, -- studs from the ghost to the King
+			Seconds = 3, -- how long the King's sight is reduced
+			SightMultiplier = 0.4, -- King's SightRange is multiplied by this while haunted
+			Cooldown = 15, -- seconds per ghost
+		},
+	},
+
 	Economy = {
 		CurrencyName = "Coins",
 		StartingCoins = 0,

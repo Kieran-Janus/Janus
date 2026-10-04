@@ -3,7 +3,7 @@
 	Round loop: Waiting -> Voting -> Intermission -> Playing -> Results -> repeat.
 	State is published as attributes on ReplicatedStorage so any client UI
 	can read it with GetAttributeChangedSignal:
-	  State, TimeLeft, MapName, Difficulty
+	  State, TimeLeft, MapName, Difficulty, Alive (survivors left), KingCount
 	Round results are sent once per round through the RoundResults remote.
 ]]
 
@@ -13,7 +13,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(script.Parent.DataService)
+local GhostService = require(script.Parent.GhostService)
+local KingService = require(script.Parent.KingService)
 local MapService = require(script.Parent.MapService)
+local NoiseService = require(script.Parent.NoiseService)
 local PumpkinService = require(script.Parent.PumpkinService)
 local VotingService = require(script.Parent.VotingService)
 
@@ -71,6 +74,24 @@ local function playRound(map: MapService.LoadedMap, difficultyId: string): { Res
 	local alive: { [Player]: boolean } = {}
 	local connections: { RBXScriptConnection } = {}
 
+	local function countAlive()
+		local n = 0
+		for _ in alive do
+			n += 1
+		end
+		ReplicatedStorage:SetAttribute("Alive", n)
+	end
+
+	-- Caught by the King (inPlace) or died/reset: a ghost for the rest of the round.
+	local function knockOut(player: Player, inPlace: boolean)
+		if not alive[player] then
+			return
+		end
+		alive[player] = nil
+		countAlive()
+		GhostService.MarkOut(player, inPlace)
+	end
+
 	PumpkinService.ResetCounts()
 	for i, player in Players:GetPlayers() do
 		local humanoid = aliveHumanoid(player)
@@ -78,11 +99,10 @@ local function playRound(map: MapService.LoadedMap, difficultyId: string): { Res
 			table.insert(participants, player)
 			alive[player] = true
 			teleport(player, map.Spawns[(i - 1) % #map.Spawns + 1])
-			-- M1: dying (or resetting) knocks you out of the round. M2 turns this into ghosts.
 			table.insert(
 				connections,
 				humanoid.Died:Connect(function()
-					alive[player] = nil
+					knockOut(player, false)
 				end)
 			)
 		end
@@ -91,19 +111,30 @@ local function playRound(map: MapService.LoadedMap, difficultyId: string): { Res
 		connections,
 		Players.PlayerRemoving:Connect(function(player)
 			alive[player] = nil
+			countAlive()
 		end)
 	)
+	countAlive()
 
-	PumpkinService.Begin(map, difficultyId, function(player)
+	local function isAlive(player: Player): boolean
 		return alive[player] == true
+	end
+	GhostService.BeginRound(map, participants)
+	PumpkinService.Begin(map, difficultyId, isAlive)
+	KingService.Begin(map, difficultyId, isAlive, function(player)
+		knockOut(player, true)
 	end)
+	-- Ends at 0:00, or early once every participant is caught.
 	countdown("Playing", Config.Round.Duration, function()
 		return next(alive) == nil
 	end)
+	KingService.Stop()
 	PumpkinService.Stop()
+	NoiseService.Clear()
 	for _, connection in connections do
 		connection:Disconnect()
 	end
+	ReplicatedStorage:SetAttribute("Alive", nil)
 
 	-- Score and reward everyone who started the round and is still in the server.
 	local multiplier = Config.Difficulty.Levels[difficultyId].RewardMultiplier
@@ -166,7 +197,8 @@ local function loop()
 		if enoughPlayers() then
 			local rows = playRound(map, difficultyId)
 			roundResults:FireAllClients(rows)
-			-- Back to the lobby while results show.
+			GhostService.EndRound()
+			-- Back to the lobby (and back to normal from ghost) while results show.
 			for _, row in rows do
 				local player = Players:GetPlayerByUserId(row.UserId)
 				if player then

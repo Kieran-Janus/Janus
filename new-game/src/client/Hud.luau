@@ -16,15 +16,20 @@ function Hud.Mount(gui: ScreenGui)
 	bar.Name = "Hud"
 	bar.AnchorPoint = Vector2.new(0.5, 0)
 	bar.Position = UDim2.fromScale(0.5, 0.02)
-	bar.Size = UDim2.fromOffset(380, 64)
+	bar.Size = UDim2.fromOffset(460, 64)
 
 	local title = Theme.label(Config.Game.Name, 22, bar)
 	title.Size = UDim2.new(1, 0, 0, 36)
 
 	local detail = Theme.label("", 15, bar)
 	detail.TextColor3 = Theme.Muted
-	detail.Position = UDim2.fromOffset(0, 34)
-	detail.Size = UDim2.new(1, 0, 0, 24)
+	detail.Position = UDim2.fromOffset(10, 34)
+	detail.Size = UDim2.new(1, -20, 0, 24)
+	-- Shrink long lines (map + difficulty + counters) to fit instead of spilling out.
+	detail.TextScaled = true
+	local maxSize = Instance.new("UITextSizeConstraint")
+	maxSize.MaxTextSize = 15
+	maxSize.Parent = detail
 
 	local function refresh()
 		local state = ReplicatedStorage:GetAttribute("State") or "Loading"
@@ -46,11 +51,18 @@ function Hud.Mount(gui: ScreenGui)
 		end
 		if state == "Playing" then
 			table.insert(parts, ("Pumpkins: %d"):format(player:GetAttribute("Pumpkins") or 0))
+			table.insert(
+				parts,
+				("Survivors: %d"):format(ReplicatedStorage:GetAttribute("Alive") or 0)
+			)
+			if (ReplicatedStorage:GetAttribute("KingCount") or 0) == 0 then
+				table.insert(parts, "The King is coming...")
+			end
 		end
 		detail.Text = if #parts > 0 then table.concat(parts, "  |  ") else Config.Game.Name
 	end
 
-	for _, name in { "State", "TimeLeft", "MapName", "Difficulty" } do
+	for _, name in { "State", "TimeLeft", "MapName", "Difficulty", "Alive", "KingCount" } do
 		ReplicatedStorage:GetAttributeChangedSignal(name):Connect(refresh)
 	end
 	player:GetAttributeChangedSignal("Pumpkins"):Connect(refresh)
