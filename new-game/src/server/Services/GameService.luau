@@ -20,6 +20,7 @@ local MapService = require(script.Parent.MapService)
 local MinionService = require(script.Parent.MinionService)
 local NoiseService = require(script.Parent.NoiseService)
 local PumpkinService = require(script.Parent.PumpkinService)
+local RewardsService = require(script.Parent.RewardsService)
 local VotingService = require(script.Parent.VotingService)
 
 export type ResultRow = {
@@ -157,8 +158,11 @@ local function playRound(map: MapService.LoadedMap, difficultyId: string): { Res
 		if survived then
 			coins += Config.Rewards.SurvivorBonus
 		end
+		-- Friends in the server / group members earn a bit more (Config.Social).
+		coins = math.floor(coins * (1 + RewardsService.BonusPercent(player) / 100) + 0.5)
 		local top = best > 0 and pumpkins == best
 		DataService.Add(player, "Coins", coins)
+		RewardsService.RoundFinished(player)
 		LeaderboardService.Record(player, pumpkins)
 		if top then
 			DataService.Add(player, "Wins", Config.Rewards.TopCollectorWins)
