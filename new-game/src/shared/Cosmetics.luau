@@ -434,8 +434,15 @@ local function buildCustom(item: any, m: Model): Model
 			d.CastShadow = false
 		end
 	end
-	local handle = m.PrimaryPart or CustomAssets.BiggestPart(m)
-	assert(handle, "custom cosmetic " .. item.Id .. " has no parts")
+	local found = m.PrimaryPart or CustomAssets.BiggestPart(m)
+	local handle: BasePart
+	if found then
+		handle = found
+	else
+		warn("[Cosmetics] custom model " .. item.Id .. " has no parts; showing a placeholder")
+		m:ClearAllChildren()
+		handle = builders.Missing(m, item.Style)
+	end
 	m.PrimaryPart = handle
 	local origin = CustomAssets.Origin(m, CUSTOM_ANCHOR[item.Slot] or "Center")
 	handle.PivotOffset = handle.CFrame:ToObjectSpace(origin)

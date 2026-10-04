@@ -94,8 +94,13 @@ local function animateRig(humanoid: Humanoid)
 	end
 	local walk = load(ids.Walk)
 	local idle = load(ids.Idle)
+	if walk then
+		walk.Looped = true
+		walk.Priority = Enum.AnimationPriority.Movement
+	end
 	if idle then
 		idle.Looped = true
+		idle.Priority = Enum.AnimationPriority.Idle
 		idle:Play()
 	end
 	humanoid.Running:Connect(function(speed)
@@ -103,10 +108,15 @@ local function animateRig(humanoid: Humanoid)
 			return
 		end
 		if speed > 0.5 and not walk.IsPlaying then
-			walk.Looped = true
 			walk:Play(0.2)
+			if idle then
+				idle:Stop(0.2)
+			end
 		elseif speed <= 0.5 and walk.IsPlaying then
 			walk:Stop(0.2)
+			if idle then
+				idle:Play(0.2)
+			end
 		end
 	end)
 end
@@ -130,8 +140,13 @@ local function buildCustomKing(model: Model, position: Vector3): King
 		model.PrimaryPart = root
 		model:PivotTo(CFrame.new(position) * root.CFrame.Rotation)
 		setupHumanoid(humanoid)
-		animateRig(humanoid)
+		-- Animations can only load once the model is in the game: KingService.Begin.
+		model:SetAttribute("AnimatedRig", true)
 	else
+		-- A Humanoid without a HumanoidRootPart can't walk; replace it with ours.
+		if humanoid then
+			humanoid:Destroy()
+		end
 		-- A plain model: weld it to a hidden root, like the placeholder body.
 		local feet = CustomAssets.Origin(model, "Feet")
 		local newRoot = Instance.new("Part")
@@ -445,6 +460,9 @@ function KingService.Begin(
 			if point then
 				local king = buildKing(point)
 				king.Model.Parent = map.Model
+				if king.Model:GetAttribute("AnimatedRig") then
+					animateRig(king.Humanoid)
+				end
 				king.Root:SetNetworkOwner(nil) -- server physics, so clients can't move it
 				-- Touching any part of the King catches, as well as the CatchRange check below.
 				for _, part in king.Model:GetDescendants() do

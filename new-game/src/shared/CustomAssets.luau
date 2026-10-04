@@ -71,6 +71,12 @@ function CustomAssets.Clone(category: string, name: string): Model?
 				child.Parent = model
 			end
 			copy:Destroy()
+			-- The accessory's own weld points at a character that isn't there any more.
+			for _, d in model:GetDescendants() do
+				if d:IsA("JointInstance") and d.Name == "AccessoryWeld" then
+					d:Destroy()
+				end
+			end
 		end
 	end
 	if Config.Custom.StripScripts then
@@ -80,14 +86,14 @@ function CustomAssets.Clone(category: string, name: string): Model?
 			end
 		end
 	end
-	-- An accessory's own weld points at a character that isn't there any more.
-	for _, d in model:GetDescendants() do
-		if d:IsA("JointInstance") and d.Name == "AccessoryWeld" then
-			d:Destroy()
-		end
-	end
 	if not model.PrimaryPart then
-		model.PrimaryPart = CustomAssets.BiggestPart(model)
+		-- Keep the pivot the author set (its LookVector is the model's front).
+		local pivot = model:GetPivot()
+		local biggest = CustomAssets.BiggestPart(model)
+		model.PrimaryPart = biggest
+		if biggest then
+			biggest.PivotOffset = biggest.CFrame:ToObjectSpace(pivot)
+		end
 	end
 	return model
 end
