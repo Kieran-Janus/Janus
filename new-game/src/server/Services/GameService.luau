@@ -1,19 +1,34 @@
 --!strict
 --[[
-	Round loop: Waiting -> Intermission -> Playing -> Reward -> repeat.
+	Round loop: Waiting -> Voting -> Intermission -> Playing -> Results -> repeat.
 	State is published as attributes on ReplicatedStorage so any client UI
-	can read it with GetAttributeChangedSignal (no remotes needed).
-
-	This is the generic skeleton. Put your actual game mode in `runRound`.
+	can read it with GetAttributeChangedSignal:
+	  State, TimeLeft, MapName, Difficulty
+	Round results are sent once per round through the RoundResults remote.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(script.Parent.DataService)
+local MapService = require(script.Parent.MapService)
+local PumpkinService = require(script.Parent.PumpkinService)
+local VotingService = require(script.Parent.VotingService)
+
+export type ResultRow = {
+	UserId: number,
+	Name: string,
+	Pumpkins: number,
+	Coins: number,
+	Survived: boolean,
+	Top: boolean,
+}
 
 local GameService = {}
+
+local roundResults: RemoteEvent
 
 local function setState(state: string, timeLeft: number)
 	ReplicatedStorage:SetAttribute("State", state)
@@ -34,12 +49,97 @@ local function enoughPlayers(): boolean
 	return #Players:GetPlayers() >= Config.Round.MinPlayers
 end
 
--- TODO: your game mode. Return the winning Player (or nil for no winner).
-local function runRound(participants: { Player }): Player?
-	countdown("Playing", Config.Round.Duration, function()
-		return not enoughPlayers()
+local function aliveHumanoid(player: Player): Humanoid?
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health > 0 then
+		return humanoid
+	end
+	return nil
+end
+
+local function teleport(player: Player, spawn: BasePart)
+	local character = player.Character
+	if character then
+		character:PivotTo(CFrame.new(spawn.Position + Vector3.new(0, Config.Maps.SpawnHeight, 0)))
+	end
+end
+
+-- Plays one round on `map`. Returns the results rows (already rewarded).
+local function playRound(map: MapService.LoadedMap, difficultyId: string): { ResultRow }
+	local participants: { Player } = {}
+	local alive: { [Player]: boolean } = {}
+	local connections: { RBXScriptConnection } = {}
+
+	PumpkinService.ResetCounts()
+	for i, player in Players:GetPlayers() do
+		local humanoid = aliveHumanoid(player)
+		if humanoid then
+			table.insert(participants, player)
+			alive[player] = true
+			teleport(player, map.Spawns[(i - 1) % #map.Spawns + 1])
+			-- M1: dying (or resetting) knocks you out of the round. M2 turns this into ghosts.
+			table.insert(
+				connections,
+				humanoid.Died:Connect(function()
+					alive[player] = nil
+				end)
+			)
+		end
+	end
+	table.insert(
+		connections,
+		Players.PlayerRemoving:Connect(function(player)
+			alive[player] = nil
+		end)
+	)
+
+	PumpkinService.Begin(map, difficultyId, function(player)
+		return alive[player] == true
 	end)
-	return participants[math.random(1, #participants)]
+	countdown("Playing", Config.Round.Duration, function()
+		return next(alive) == nil
+	end)
+	PumpkinService.Stop()
+	for _, connection in connections do
+		connection:Disconnect()
+	end
+
+	-- Score and reward everyone who started the round and is still in the server.
+	local multiplier = Config.Difficulty.Levels[difficultyId].RewardMultiplier
+	local best = 0
+	for _, player in participants do
+		best = math.max(best, PumpkinService.GetCount(player))
+	end
+	local rows: { ResultRow } = {}
+	for _, player in participants do
+		if player.Parent ~= Players then
+			continue
+		end
+		local pumpkins = PumpkinService.GetCount(player)
+		local survived = alive[player] == true and aliveHumanoid(player) ~= nil
+		local coins = pumpkins * Config.Rewards.CoinsPerPumpkin * multiplier
+		if survived then
+			coins += Config.Rewards.SurvivorBonus
+		end
+		local top = best > 0 and pumpkins == best
+		DataService.Add(player, "Coins", coins)
+		if top then
+			DataService.Add(player, "Wins", Config.Rewards.TopCollectorWins)
+		end
+		table.insert(rows, {
+			UserId = player.UserId,
+			Name = player.DisplayName,
+			Pumpkins = pumpkins,
+			Coins = coins,
+			Survived = survived,
+			Top = top,
+		})
+	end
+	table.sort(rows, function(a, b)
+		return a.Pumpkins > b.Pumpkins
+	end)
+	return rows
 end
 
 local function loop()
@@ -49,31 +149,41 @@ local function loop()
 			task.wait(1)
 		end
 
-		countdown("Intermission", Config.Round.IntermissionSeconds, function()
+		local mapId, difficultyId = VotingService.Run(setState, function()
 			return not enoughPlayers()
 		end)
-		if not enoughPlayers() then
+		if not mapId or not difficultyId then
 			continue
 		end
 
-		local participants = Players:GetPlayers()
-		local winner = runRound(participants)
+		local map = MapService.Load(mapId)
+		ReplicatedStorage:SetAttribute("MapName", map.Name)
+		ReplicatedStorage:SetAttribute("Difficulty", Config.Difficulty.Levels[difficultyId].Name)
 
-		setState("Reward", 5)
-		for _, player in participants do
-			if player.Parent == Players then
-				DataService.Add(player, "Coins", Config.Round.RewardParticipant)
+		countdown("Intermission", Config.Round.IntermissionSeconds, function()
+			return not enoughPlayers()
+		end)
+		if enoughPlayers() then
+			local rows = playRound(map, difficultyId)
+			roundResults:FireAllClients(rows)
+			-- Back to the lobby while results show.
+			for _, row in rows do
+				local player = Players:GetPlayerByUserId(row.UserId)
+				if player then
+					task.spawn(player.LoadCharacter, player)
+				end
 			end
+			countdown("Results", Config.Round.ResultsSeconds)
 		end
-		if winner and winner.Parent == Players then
-			DataService.Add(winner, "Coins", Config.Round.RewardWinner)
-			DataService.Add(winner, "Wins", 1)
-		end
-		task.wait(5)
+
+		MapService.Unload()
+		ReplicatedStorage:SetAttribute("MapName", nil)
+		ReplicatedStorage:SetAttribute("Difficulty", nil)
 	end
 end
 
 function GameService.Start()
+	roundResults = Remotes.Event("RoundResults")
 	task.spawn(loop)
 end
 

@@ -20,7 +20,9 @@ local storeOk, storeResult = pcall(function()
 end)
 local store: DataStore? = if storeOk then storeResult else nil
 if not store then
-	warn("[DataService] DataStore unavailable - progress will NOT save. Publish the place and enable Studio API access.")
+	warn(
+		"[DataService] DataStore unavailable - progress will NOT save. Publish the place and enable Studio API access."
+	)
 end
 local cache: { [Player]: { [string]: any } } = {}
 local loaded: { [Player]: boolean } = {}
