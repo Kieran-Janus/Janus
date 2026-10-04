@@ -28,7 +28,11 @@ end
 
 function HubService.Start()
 	HubBuilder.ApplyLighting()
-	if not HubService.Get() then
+	local hub = HubService.Get()
+	if hub then
+		-- A hub saved in Studio still picks up custom NPC models (docs/CUSTOMIZE.md).
+		HubBuilder.ApplyCustomNpcs(hub)
+	else
 		HubBuilder.Build()
 	end
 	HubBuilder.DisableDefaultSpawn()

@@ -9,8 +9,10 @@
 	  3. Wander - a random spot on the floor
 	A player within CatchRange is caught; GameService decides what that means.
 
-	The placeholder body is built from parts. To use a real model later, replace buildKing
-	but keep a Humanoid and a HumanoidRootPart.
+	The placeholder body is built from parts. To use your own King, put a Model named
+	PumpkinKing in ReplicatedStorage.Custom.Characters (docs/CUSTOMIZE.md). It can be a real
+	R15 rig (Humanoid + HumanoidRootPart, e.g. from Avatar > Rig Builder; it walks with
+	Config.Custom.RigAnimations) or any plain model (it glides, welded to a hidden root).
 ]]
 
 local PathfindingService = game:GetService("PathfindingService")
@@ -19,6 +21,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local MapService = require(script.Parent.MapService)
 local NoiseService = require(script.Parent.NoiseService)
 
@@ -54,8 +57,116 @@ local function weld(part: BasePart, root: BasePart, offset: CFrame)
 	w.Parent = part
 end
 
+local function setCollisionGroup(model: Model)
+	for _, part in model:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.CollisionGroup = "King"
+		end
+	end
+end
+
+local function setupHumanoid(humanoid: Humanoid)
+	humanoid.DisplayName = Config.King.Name
+	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+	humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+	humanoid.BreakJointsOnDeath = false
+end
+
+-- Walk/idle animations for a custom R15 rig (plain models have nothing to animate).
+local function animateRig(humanoid: Humanoid)
+	local ids = Config.Custom.RigAnimations
+	local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator")
+	animator.Parent = humanoid
+	local function load(id: string): AnimationTrack?
+		if id == "" then
+			return nil
+		end
+		local animation = Instance.new("Animation")
+		animation.AnimationId = id
+		local ok, track = pcall(function()
+			return animator:LoadAnimation(animation)
+		end)
+		return if ok then track else nil
+	end
+	local walk = load(ids.Walk)
+	local idle = load(ids.Idle)
+	if idle then
+		idle.Looped = true
+		idle:Play()
+	end
+	humanoid.Running:Connect(function(speed)
+		if not walk then
+			return
+		end
+		if speed > 0.5 and not walk.IsPlaying then
+			walk.Looped = true
+			walk:Play(0.2)
+		elseif speed <= 0.5 and walk.IsPlaying then
+			walk:Stop(0.2)
+		end
+	end)
+end
+
+local function buildCustomKing(model: Model, position: Vector3): King
+	local cfg = Config.King
+	model.Name = "PumpkinKing"
+	CustomAssets.Fit(model, Config.Custom.Heights.PumpkinKing)
+	local humanoid = model:FindFirstChildOfClass("Humanoid")
+	local root = model:FindFirstChild("HumanoidRootPart")
+	if humanoid and root and root:IsA("BasePart") then
+		-- A real rig: it already knows how to stand and walk.
+		for _, part in model:GetDescendants() do
+			if part:IsA("BasePart") then
+				part.Anchored = false
+				if part ~= root then
+					part.CanCollide = false
+				end
+			end
+		end
+		model.PrimaryPart = root
+		model:PivotTo(CFrame.new(position) * root.CFrame.Rotation)
+		setupHumanoid(humanoid)
+		animateRig(humanoid)
+	else
+		-- A plain model: weld it to a hidden root, like the placeholder body.
+		local feet = CustomAssets.Origin(model, "Feet")
+		local newRoot = Instance.new("Part")
+		newRoot.Name = "HumanoidRootPart"
+		newRoot.Size = Vector3.new(2, 2, 1)
+		newRoot.Transparency = 1
+		newRoot.CFrame = feet * CFrame.new(0, cfg.HipHeight + 1, 0)
+		newRoot.Parent = model
+		for _, part in model:GetDescendants() do
+			if part:IsA("BasePart") and part ~= newRoot then
+				weld(part, newRoot, newRoot.CFrame:ToObjectSpace(part.CFrame))
+			end
+		end
+		model.PrimaryPart = newRoot
+		model:PivotTo(CFrame.new(position) * feet.Rotation)
+		local h = Instance.new("Humanoid")
+		h.HipHeight = cfg.HipHeight
+		h.RigType = Enum.HumanoidRigType.R15
+		h.RequiresNeck = false
+		setupHumanoid(h)
+		h.Parent = model
+		humanoid = h
+		root = newRoot
+	end
+	setCollisionGroup(model)
+	return {
+		Model = model,
+		Humanoid = humanoid :: Humanoid,
+		Root = root :: BasePart,
+		Thread = nil,
+	}
+end
+
 local function buildKing(position: Vector3): King
 	local cfg = Config.King
+	local custom = CustomAssets.Clone("Characters", "PumpkinKing")
+	if custom then
+		return buildCustomKing(custom, position)
+	end
 	local model = Instance.new("Model")
 	model.Name = "PumpkinKing"
 

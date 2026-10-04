@@ -15,6 +15,7 @@ local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local Kit = require(script.Parent.Parent.Build.Kit)
 
 local HubBuilder = {}
@@ -1027,6 +1028,59 @@ local function buildNpcs(hub: Model)
 	end
 end
 
+-- NPC kinds that are characters (the board, gravestone and photo spot carry screens and
+-- prompts other code relies on, so they keep their built look).
+local CHARACTER_KINDS = { Witch = true, Ghost = true, Vendor = true }
+
+--[[
+	Swaps an NPC's Part-built look for a custom model named after its Id in
+	ReplicatedStorage.Custom.Characters (e.g. WitchWanda). Runs every server start, also on a
+	hub saved in Studio; the prompt and name tag are kept.
+]]
+function HubBuilder.ApplyCustomNpcs(hub: Model)
+	local npcs = hub:FindFirstChild("Npcs")
+	if not npcs then
+		return
+	end
+	for _, def in Config.Npcs.List do
+		local m = npcs:FindFirstChild(def.Id)
+		if not (m and m:IsA("Model")) or not CHARACTER_KINDS[def.Kind] then
+			continue
+		end
+		local custom = CustomAssets.Clone("Characters", def.Id)
+		if not custom then
+			continue
+		end
+		CustomAssets.Fit(custom, Config.Custom.Heights[def.Id])
+		for _, d in custom:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.Anchored = true
+			end
+		end
+		-- Feet on the ground at the NPC's spot, facing the plaza.
+		local feet = CustomAssets.Origin(custom, "Feet")
+		custom:PivotTo(
+			facingCenter(at(def.Offset)) * feet:ToObjectSpace(custom:GetPivot())
+		)
+		for _, child in m:GetChildren() do
+			if child.Name ~= "PromptAnchor" then
+				child:Destroy()
+			end
+		end
+		custom.Name = "Look"
+		custom.Parent = m
+		local box, size = custom:GetBoundingBox()
+		local top = holder(
+			"TagAnchor",
+			CFrame.new(box.Position + Vector3.new(0, size.Y / 2, 0)),
+			Vector3.one,
+			m
+		)
+		nameTag(def.DisplayName, top, 1.5)
+		m.PrimaryPart = top
+	end
+end
+
 local function buildMusic(hub: Model)
 	local cfg = hubCfg.Music
 	if cfg.SoundId == "" then
@@ -1117,6 +1171,7 @@ function HubBuilder.Build(): Model
 	buildDeadTrees(hub)
 	buildAmbientParticles(hub)
 	buildNpcs(hub)
+	HubBuilder.ApplyCustomNpcs(hub)
 	buildMusic(hub)
 	hub.PrimaryPart = ground
 

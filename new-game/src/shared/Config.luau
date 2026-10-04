@@ -635,9 +635,87 @@ local Config = {
 	Shop = {
 		RequestCooldown = 0.25, -- per-player spam guard on buy/equip
 		OpenKey = Enum.KeyCode.B,
-		Slots = { "Hat", "Trail", "Pet" }, -- shop tabs, in order; a player wears one per slot
-		SlotNames = { Hat = "Hats", Trail = "Trails", Pet = "Pets" },
+		-- Shop tabs, in order; a player wears one item per slot. Skin comes first so it's put
+		-- on before the hat (a skin's head piece lifts the hat).
+		Slots = { "Skin", "Hat", "Trail", "Pet" },
+		SlotNames = { Skin = "Skins", Hat = "Hats", Trail = "Trails", Pet = "Pets" },
 		Items = {
+			-- Skins recolour your avatar and can add a head piece. HideClothes hides shirts and
+			-- pants; Head is a head-piece builder in src/shared/Cosmetics.luau (or drop a model
+			-- named after the item Id into ReplicatedStorage.Custom.Cosmetics).
+			{
+				Id = "Skeleton",
+				Name = "Skeleton",
+				Slot = "Skin",
+				Price = 400,
+				Style = {
+					Kind = "Skin",
+					BodyColor = Color3.fromRGB(235, 228, 210),
+					HideClothes = true,
+					Head = "SkinSkull",
+					HeadColor = Color3.fromRGB(235, 228, 210),
+					GlowColor = Color3.fromRGB(120, 255, 110),
+				},
+			},
+			{
+				Id = "PumpkinHead",
+				Name = "Pumpkin Head",
+				Slot = "Skin",
+				Price = 350,
+				Style = {
+					Kind = "Skin",
+					Head = "SkinPumpkin",
+					HeadColor = Color3.fromRGB(255, 130, 20),
+					GlowColor = Color3.fromRGB(255, 220, 90),
+				},
+			},
+			{
+				Id = "Zombie",
+				Name = "Zombie",
+				Slot = "Skin",
+				Price = 300,
+				Style = { Kind = "Skin", BodyColor = Color3.fromRGB(120, 170, 95) },
+			},
+			{
+				Id = "Ghost",
+				Name = "Ghost",
+				Slot = "Skin",
+				Price = 500,
+				Style = {
+					Kind = "Skin",
+					BodyColor = Color3.fromRGB(235, 240, 255),
+					Material = Enum.Material.Neon,
+					Transparency = 0.3,
+					HideClothes = true,
+				},
+			},
+			{
+				Id = "Mummy",
+				Name = "Mummy",
+				Slot = "Skin",
+				Price = 450,
+				Style = {
+					Kind = "Skin",
+					BodyColor = Color3.fromRGB(215, 205, 180),
+					Material = Enum.Material.Fabric,
+					HideClothes = true,
+				},
+			},
+			{
+				Id = "KingSkin",
+				Name = "Pumpkin King",
+				Slot = "Skin",
+				Price = 0,
+				VipOnly = true,
+				Style = {
+					Kind = "Skin",
+					BodyColor = Color3.fromRGB(40, 25, 55),
+					HideClothes = true,
+					Head = "SkinKing",
+					HeadColor = Color3.fromRGB(255, 110, 0),
+					GlowColor = Color3.fromRGB(255, 210, 60),
+				},
+			},
 			-- Hats sit on the head.
 			{
 				Id = "PumpkinCap",
@@ -781,7 +859,7 @@ local Config = {
 		VipPerks = {
 			"+10% walk and sprint speed",
 			"King tracker: press T for an arrow to the nearest King (30 s cooldown)",
-			"VIP chat tag and 3 VIP-only cosmetics",
+			"VIP chat tag and VIP-only cosmetics (Pumpkin King skin, crown, trail and pet)",
 		},
 		-- Developer Products: coin packs. Key is saved with each receipt; don't rename.
 		Products = {
@@ -810,6 +888,68 @@ local Config = {
 		ReceiptHistory = 50, -- receipt ids remembered per player, so a purchase is never granted twice
 	},
 
+	-- Custom art: drop your own models into ReplicatedStorage.Custom (docs/CUSTOMIZE.md,
+	-- src/shared/CustomAssets.luau). They're scaled to these sizes unless they have the
+	-- attribute KeepSize = true.
+	Custom = {
+		StripScripts = true, -- remove scripts from custom models (free models can hide bad ones)
+		Heights = { -- studs, feet to top
+			PumpkinKing = 10,
+			SkeletonPatrol = 6.2,
+			Bat = 1.4,
+			GhostCat = 3,
+			WitchWanda = 8,
+			BooGuide = 6.5,
+			PumpkinVendor = 7.5,
+		} :: { [string]: number },
+		CosmeticSize = { Hat = 2, Pet = 1.6, Skin = 2.4 } :: { [string]: number }, -- biggest side, studs
+		-- Walk and idle for a custom King that is a real R15 rig (Roblox's own R15 animations).
+		RigAnimations = {
+			Walk = "rbxassetid://507777826",
+			Idle = "rbxassetid://507766388",
+		},
+	},
+
+	-- Codes players type in the Codes box (Shop > Codes). Give one to each YouTuber/TikToker
+	-- and add a new one every update. Code is case-insensitive. Expires is "YYYY-MM-DD" (the
+	-- code works until the end of that day, UTC) or "" for never. Reward Coins, Item (a shop
+	-- item Id) or both.
+	Codes = {
+		RequestCooldown = 2, -- seconds between attempts per player
+		List = {
+			{ Code = "PUMPKIN", Coins = 250, Expires = "" },
+			{ Code = "RELEASE", Coins = 500, Expires = "2026-11-15" },
+			{ Code = "SPOOKY", Item = "PumpkinCap", Expires = "2026-11-01" },
+		} :: { { Code: string, Coins: number?, Item: string?, Expires: string } },
+	},
+
+	-- Daily login streak: coins the first time you join each day. Missing more than
+	-- GraceHours since your last claim resets the streak to day 1.
+	Daily = {
+		Rewards = { 50, 75, 100, 150, 200, 250, 500 }, -- day 1..7; after day 7 the last one repeats
+		CooldownHours = 20, -- earliest next claim
+		GraceHours = 48,
+	},
+
+	-- Friends make the algorithm and the game better (docs/VIRAL.md).
+	Social = {
+		FriendBonusPercent = 10, -- extra round coins per Roblox friend in the same server...
+		MaxFriendBonusPercent = 50, -- ...up to this
+		InviteButton = true, -- "Invite friends" button on the HUD
+		FavoritePromptAfterRounds = 1, -- ask to favourite once, after this many finished rounds; 0 = never
+		GroupId = 0, -- your Roblox group (0 = none); members get GroupBonusPercent extra round coins
+		GroupBonusPercent = 10,
+	},
+
+	-- Owner-only test panel (press OpenKey). The experience owner, the group owner and
+	-- UserIds are admins. Commands are checked on the server.
+	Admin = {
+		UserIds = {} :: { number },
+		OpenKey = Enum.KeyCode.F8,
+		AllowInLiveServers = false, -- false = only in Studio playtests
+		CoinsPerClick = 1000,
+	},
+
 	Data = {
 		StoreName = "PlayerData_v1", -- bump the suffix to wipe/reset all saves
 		AutosaveSeconds = 120,
@@ -819,8 +959,12 @@ local Config = {
 			Joins = 0,
 			PumpkinsCollected = 0, -- lifetime, for the Leaderboard Gravestone
 			Owned = {} :: { [string]: boolean }, -- [itemId] = true
-			Equipped = { Hat = "", Trail = "", Pet = "" }, -- item id per Shop slot, "" = none
+			Equipped = { Skin = "", Hat = "", Trail = "", Pet = "" }, -- item id per Shop slot, "" = none
 			Receipts = {} :: { string }, -- recent Developer Product purchase ids (newest last)
+			Codes = {} :: { [string]: boolean }, -- redeemed codes, upper case
+			Daily = { Streak = 0, Last = 0 }, -- login streak and the os.time() of the last claim
+			RoundsPlayed = 0,
+			FavoritePrompted = false,
 		},
 	},
 

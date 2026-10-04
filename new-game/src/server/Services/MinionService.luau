@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local MapService = require(script.Parent.MapService)
 local NoiseService = require(script.Parent.NoiseService)
@@ -113,8 +114,41 @@ local function newBody(name: string, parent: Instance): Body
 	return { Model = m, Pieces = {} }
 end
 
+--[[
+	A custom model from ReplicatedStorage.Custom.Characters.<name> (docs/CUSTOMIZE.md), as a
+	Body with one rigid piece per part (custom models don't swing their limbs). `anchor` is
+	"Feet" (stands on the floor at the root) or "Center" (bats).
+]]
+local function customBody(name: string, parent: Instance, anchor: string): Body?
+	local model = CustomAssets.Clone("Characters", name)
+	if not model then
+		return nil
+	end
+	CustomAssets.Fit(model, Config.Custom.Heights[name])
+	CustomAssets.MakeDecor(model)
+	local origin = CustomAssets.Origin(model, anchor)
+	model.Name = name
+	model.Parent = parent
+	local body: Body = { Model = model, Pieces = {} }
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			table.insert(body.Pieces, {
+				Part = d,
+				Joint = origin:ToObjectSpace(d.CFrame),
+				Offset = CFrame.identity,
+				Swing = nil,
+			})
+		end
+	end
+	return body
+end
+
 -- Feet at the root; faces the root's LookVector.
 local function buildSkeleton(parent: Instance): Body
+	local custom = customBody("SkeletonPatrol", parent, "Feet")
+	if custom then
+		return custom
+	end
 	local cfg = Config.Monsters.SkeletonPatrol
 	local body = newBody("SkeletonPatrol", parent)
 	piece(
@@ -161,6 +195,10 @@ local function buildSkeleton(parent: Instance): Body
 end
 
 local function buildBat(parent: Instance): Body
+	local custom = customBody("Bat", parent, "Center")
+	if custom then
+		return custom
+	end
 	local cfg = Config.Monsters.BatSwarm
 	local body = newBody("Bat", parent)
 	piece(body, {
@@ -190,6 +228,10 @@ end
 
 -- Paws at the root; faces the root's LookVector.
 local function buildCat(parent: Instance): Body
+	local custom = customBody("GhostCat", parent, "Feet")
+	if custom then
+		return custom
+	end
 	local cfg = Config.Monsters.GhostCat
 	local body = newBody("GhostCat", parent)
 	local fur =
