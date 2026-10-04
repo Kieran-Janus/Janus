@@ -98,7 +98,8 @@ function DataService.Save(player: Player)
 end
 
 local function onJoin(player: Player)
-	local ok, saved = false, nil
+	local ok: boolean = false
+	local saved: any = nil
 	if store then
 		local activeStore = store
 		ok, saved = withRetry(function()
