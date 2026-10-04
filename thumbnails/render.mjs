@@ -398,6 +398,71 @@ function surviveHalloween() {
   };
 }
 
+function pumpkinPanic() {
+  const r = rng(77);
+  const stars = Array.from({ length: 70 }, () => `<circle cx="${r() * 1920}" cy="${r() * 520}" r="${r() * 2 + 0.4}" fill="#fff" opacity="${0.3 + r() * 0.6}"/>`).join("");
+  // Spooky Town Square: crooked clock tower, lampposts, bunting, tombstones.
+  const tower = `<g transform="translate(330 760) rotate(-4)" filter="url(#dof)">
+      <rect x="-90" y="-560" width="180" height="560" fill="#1a1030" stroke="#07040e" stroke-width="6"/>
+      <path d="M-110 -560 L0 -700 L110 -560Z" fill="#2a0f3a" stroke="#07040e" stroke-width="6"/>
+      <circle cx="0" cy="-470" r="58" fill="#ffe9a8" filter="url(#bloom)"/><circle cx="0" cy="-470" r="58" fill="none" stroke="#3a2410" stroke-width="8"/>
+      <path d="M0 -470 L0 -515 M0 -470 L-22 -488" stroke="#3a2410" stroke-width="8" stroke-linecap="round"/>
+      ${[-380, -290, -200, -110].map((y) => `<rect x="-55" y="${y}" width="40" height="50" fill="#ffcf5c" opacity="0.9"/><rect x="15" y="${y}" width="40" height="50" fill="#ffcf5c" opacity="0.7"/>`).join("")}
+    </g>`;
+  const lamp = (x, y, k) => `<g transform="translate(${x} ${y}) scale(${k})"><rect x="-6" y="-260" width="12" height="260" fill="#0d0816"/>
+      <circle cx="0" cy="-275" r="60" fill="#ffb347" opacity="0.35" filter="url(#bloomBig)"/><rect x="-22" y="-300" width="44" height="46" rx="6" fill="#ffd27a" filter="url(#bloom)"/></g>`;
+  const bunting = (() => {
+    const flags = [];
+    for (let i = 0; i < 14; i++) {
+      const x = 120 + i * 62, y = 360 + Math.sin((i / 13) * Math.PI) * 60;
+      const c = ["#ff8a1a", "#9a3dff", "#5ad13a"][i % 3];
+      flags.push(`<path d="M${x} ${y} L${x + 44} ${y + 4} L${x + 20} ${y + 52}Z" fill="${c}" stroke="#0b0b16" stroke-width="3"/>`);
+    }
+    return `<path d="M100 360 Q560 470 1000 360" fill="none" stroke="#0b0b16" stroke-width="4"/>${flags.join("")}`;
+  })();
+  const grave = (x, y, k, t) => `<g transform="translate(${x} ${y}) scale(${k})">
+      <path d="M-90 0 L-90 -150 Q0 -240 90 -150 L90 0Z" fill="#4a4458" stroke="#120e1c" stroke-width="8"/>
+      <path d="M-90 0 L-90 -150 Q0 -240 90 -150 L90 0Z" fill="url(#shadeR)"/>
+      <text y="-95" text-anchor="middle" font-family="Creepster" font-size="44" fill="#d9d2ea">${t}</text></g>`;
+  const ground = `<path d="M0 780 Q480 740 960 770 T1920 760 L1920 1080 L0 1080Z" fill="#241a33"/>
+      <path d="M0 830 Q480 800 960 825 T1920 815" stroke="#3a2d4d" stroke-width="10" fill="none" opacity="0.6"/>
+      ${Array.from({ length: 30 }, () => `<ellipse cx="${r() * 1920}" cy="${840 + r() * 220}" rx="${30 + r() * 50}" ry="${8 + r() * 10}" fill="#2e2340" opacity="0.8"/>`).join("")}`;
+  const fog = Array.from({ length: 8 }, (_, i) => `<ellipse cx="${i * 280}" cy="${790 + (i % 2) * 40}" rx="300" ry="60" fill="#c9b6ff" opacity="0.12" filter="url(#soft)"/>`).join("");
+  const bats = [[880, 120, 1.2], [1000, 210, 0.8], [640, 170, 0.7], [1150, 90, 0.6]].map((b) => bat(...b)).join("");
+  // The Pumpkin King leaning in, listening, eyes blazing.
+  const king = `<g>
+      <ellipse cx="1500" cy="520" rx="460" ry="560" fill="#ff6a00" opacity="0.22" filter="url(#soft)"/>
+      <path d="M1250 600 Q1500 500 1760 600 L1920 1080 L1080 1080Z" fill="#1c0c2e" stroke="#0a0412" stroke-width="6"/>
+      <path d="M1080 1080 L1140 1010 L1180 1080 L1240 1000 L1280 1080Z M1640 1080 L1700 990 L1750 1080 L1820 1000 L1880 1080Z" fill="#05020a"/>
+      <path d="M1500 610 L1500 1080" stroke="#3a1a52" stroke-width="10"/>
+      <g transform="rotate(30 1270 640)"><rect x="1190" y="620" width="120" height="360" rx="20" fill="#2a1240" stroke="#0a0412" stroke-width="6"/>
+        <path d="M1190 970 L1176 1040 L1210 1006 L1226 1056 L1248 1006 L1270 1050 L1286 1002 L1312 1030 L1310 970Z" fill="#e9dcc8" stroke="#0a0412" stroke-width="4"/></g>
+      <g filter="url(#rimGreen2)">${pumpkin(1500, 390, 250, 205, { sw: 8, glowId: "bloomBig" })}</g>
+      <path d="M1335 205 L1355 125 L1410 175 L1500 95 L1590 175 L1645 125 L1665 205Z" fill="#ffcc33" stroke="#7a4a00" stroke-width="6" filter="url(#bloom)"/>
+      <circle cx="1500" cy="148" r="16" fill="#ff2d55"/>
+    </g>`;
+  // Sound waves from the shouting kid to the King.
+  const waves = [0, 1, 2, 3].map((i) => `<path d="M${880 + i * 70} ${560 - i * 18} q40 ${-60 - i * 10} 0 ${-130 - i * 20}" fill="none" stroke="#ffe066" stroke-width="${14 - i * 2}" stroke-linecap="round" opacity="${0.95 - i * 0.18}" filter="url(#bloom)"/>`).join("");
+  return {
+    defs: `${rimFilter("rimOrangeK", "#ff9a3d", -6, 3, 12)}${rimFilter("rimGreen2", "#ffb347", 6, 4, 26)}${rimFilter("rimMoonK", "#c8e6ff", -6, 5, 16)}
+      <linearGradient id="psky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#090520"/><stop offset="0.55" stop-color="#2c1150"/><stop offset="1" stop-color="#ff7a26"/></linearGradient>
+      <radialGradient id="moonP" cx="0.4" cy="0.4" r="0.6"><stop offset="0" stop-color="#fffbe8"/><stop offset="1" stop-color="#ffd9a0"/></radialGradient>`,
+    body: `<rect width="1920" height="1080" fill="url(#psky)"/>${stars}
+      <circle cx="760" cy="230" r="170" fill="#ffd27a" opacity="0.3" filter="url(#bloomBig)"/><circle cx="760" cy="230" r="140" fill="url(#moonP)"/>
+      ${bats}${tower}${lamp(620, 790, 1)}${lamp(1080, 780, 0.8)}${bunting}
+      ${ground}${fog}
+      ${king}
+      ${grave(560, 1000, 1.25, "RIP")}${grave(1010, 1040, 1.05, "BOO")}
+      ${avatarFront(470, 690, 66, { shirt: "#ff8a1a", pants: "#2a1a40", hair: "#1a1010", expr: "shocked", rot: -6, shadow: false, pose: { armL: 20, armR: -30, legL: 10, legR: -10 }, rimId: "rimOrangeK" })}
+      ${avatarFront(800, 640, 72, { shirt: "#2a5bd7", pants: "#16182a", hair: "#d8a040", expr: "scared", rot: 10, shadow: false, pose: { armL: 150, armR: -150, legL: 25, legR: -25 }, rimId: "rimMoonK" })}
+      ${waves}
+      <rect width="1920" height="1080" fill="url(#vig)" opacity="0.75"/>
+      ${reactionInset({ expr: "scared", border: "#ff8a1a", bg: ["#3a1a08", "#0d0410"], shirt: "#ff8a1a", hair: "#1a1010", hands: true })}
+      <rect width="1920" height="1080" filter="url(#grain)"/>`,
+    icon: [1190, 60, 620],
+  };
+}
+
 // ---------- titles (HTML overlay) ----------
 // A line = [{ t, grad:[top,bottom] }...]; drawn twice: thick outline layer + gradient fill layer.
 function title(lines, { x, y, rot = -4, font: f, stroke = 22, outline = "#000", glow: g = "", align = "left" }) {
@@ -446,6 +511,20 @@ const GAMES = [
     icon: title([{ parts: [{ t: "SURVIVE", grad: G.orange }], size: 100 }, { parts: [{ t: "HALLOWEEN", grad: G.purple }], size: 84, mt: -10 }],
       { x: 0, y: 320, font: "Creepster", stroke: 16, glow: "0 0 26px rgba(255,120,0,.7)", align: "center", rot: -3 }),
   },
+  {
+    slug: "pumpkin-panic",
+    scene: pumpkinPanic,
+    thumb: title([
+      { parts: [{ t: "PUMPKIN", grad: G.orange }], size: 176 },
+      { parts: [{ t: "PANIC", grad: G.purple }], size: 176, mt: -24 },
+    ], { x: 60, y: 30, font: "Creepster", stroke: 24, glow: "0 0 40px rgba(255,120,0,.6)" })
+      + `<div style="position:absolute;left:640px;top:250px;transform:rotate(-5deg);background:linear-gradient(180deg,#ff3d3d,#a80000);border:8px solid #000;border-radius:20px;padding:10px 26px 2px;box-shadow:0 0 36px rgba(255,40,40,.7)">
+          <span style="font:58px/1 Luckiest;color:#fff;-webkit-text-stroke:8px #000;paint-order:stroke fill">HE CAN HEAR YOU!</span></div>`
+      + `<div style="position:absolute;right:40px;bottom:40px;transform:rotate(3deg);background:linear-gradient(180deg,#b44dff,#5a12b0);border:8px solid #000;border-radius:20px;padding:10px 26px 2px;box-shadow:0 0 36px rgba(180,77,255,.7)">
+          <span style="font:52px/1 Luckiest;color:#fff;-webkit-text-stroke:8px #000;paint-order:stroke fill">🎤 VOICE CHAT</span></div>`,
+    icon: title([{ parts: [{ t: "PUMPKIN", grad: G.orange }], size: 96 }, { parts: [{ t: "PANIC", grad: G.purple }], size: 96, mt: -14 }],
+      { x: 0, y: 330, font: "Creepster", stroke: 16, glow: "0 0 26px rgba(255,120,0,.7)", align: "center", rot: -3 }),
+  },
 ];
 
 // ---------- render ----------
@@ -481,7 +560,8 @@ async function downscale(buf, w, h) {
   }, { src: `data:image/png;base64,${buf.toString("base64")}`, w, h });
   return Buffer.from(b64, "base64");
 }
-for (const g of GAMES) {
+// ONLY=<slug> renders just one game.
+for (const g of GAMES.filter((x) => !process.env.ONLY || x.slug === process.env.ONLY)) {
   const scene = g.scene();
   const dir = join(OUT, g.slug);
   mkdirSync(dir, { recursive: true });

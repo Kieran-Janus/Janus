@@ -141,15 +141,12 @@ function builders.CatEars(m: Model, style: any): BasePart
 	})
 	for _, side in { -1, 1 } do
 		local base = CFrame.new(side * 0.45, 0.35, 0) * CFrame.Angles(0, 0, math.rad(-side * 15))
-		part(
-			m,
-			{
-				Name = "Ear",
-				Size = Vector3.new(0.45, 0.6, 0.15),
-				CFrame = base,
-				Color = style.Color,
-			}
-		)
+		part(m, {
+			Name = "Ear",
+			Size = Vector3.new(0.45, 0.6, 0.15),
+			CFrame = base,
+			Color = style.Color,
+		})
 		part(m, {
 			Name = "Inner",
 			Size = Vector3.new(0.25, 0.38, 0.05),
@@ -459,7 +456,9 @@ function Cosmetics.Build(item: any): Model
 	local build = builders[item.Style.Kind]
 	if not build then
 		if item.Style.Kind ~= "Custom" then
-			warn("[Cosmetics] no builder for " .. tostring(item.Style.Kind) .. " (" .. item.Id .. ")")
+			warn(
+				"[Cosmetics] no builder for " .. tostring(item.Style.Kind) .. " (" .. item.Id .. ")"
+			)
 		end
 		build = builders.Missing
 	end

@@ -157,11 +157,7 @@ function RewardsUI.Mount(gui: ScreenGui)
 
 	-- Daily streak ------------------------------------------------------------------------------
 	Remotes.Event("DailyReward").OnClientEvent:Connect(function(streak: number, coins: number)
-		toast(
-			gui,
-			("Day %d streak! +%d %s"):format(streak, coins, Config.Economy.CurrencyName),
-			5
-		)
+		toast(gui, ("Day %d streak! +%d %s"):format(streak, coins, Config.Economy.CurrencyName), 5)
 	end)
 
 	-- Favourite prompt ------------------------------------------------------------------------------

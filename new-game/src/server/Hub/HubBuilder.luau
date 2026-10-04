@@ -1059,9 +1059,7 @@ function HubBuilder.ApplyCustomNpcs(hub: Model)
 		end
 		-- Feet on the ground at the NPC's spot, facing the plaza.
 		local feet = CustomAssets.Origin(custom, "Feet")
-		custom:PivotTo(
-			facingCenter(at(def.Offset)) * feet:ToObjectSpace(custom:GetPivot())
-		)
+		custom:PivotTo(facingCenter(at(def.Offset)) * feet:ToObjectSpace(custom:GetPivot()))
 		for _, child in m:GetChildren() do
 			if child.Name ~= "PromptAnchor" then
 				child:Destroy()

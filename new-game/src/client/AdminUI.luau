@@ -30,8 +30,7 @@ local function build(gui: ScreenGui): Frame
 	panel.Position = UDim2.new(1, -16, 0.5, 0)
 	panel.Size = UDim2.fromOffset(220, 60 + #COMMANDS * 44 + 40)
 	panel.Visible = false
-	local title =
-		Theme.label(("Admin (%s)"):format(Config.Admin.OpenKey.Name), 18, panel)
+	local title = Theme.label(("Admin (%s)"):format(Config.Admin.OpenKey.Name), 18, panel)
 	title.Size = UDim2.new(1, 0, 0, 40)
 	local status = Theme.label("", 13, panel)
 	status.TextColor3 = Theme.Muted
