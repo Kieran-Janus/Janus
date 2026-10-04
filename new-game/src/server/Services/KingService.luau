@@ -22,6 +22,7 @@ local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local MapService = require(script.Parent.MapService)
 local NoiseService = require(script.Parent.NoiseService)
 
@@ -43,6 +44,9 @@ type King = {
 local KingService = {}
 
 local kings: { King } = {}
+local lastHeard: { [Player]: number } = {}
+local kingHeard: RemoteEvent
+
 local spawnThread: thread? = nil
 local catchConnection: RBXScriptConnection? = nil
 
@@ -229,6 +233,41 @@ local function rootOf(player: Player): BasePart?
 	return nil
 end
 
+-- "THE KING HEARD YOU!" for the noisy player, "The King heard X!" for players nearby.
+local function announceHeard(king: King, player: Player)
+	local cfg = Config.King.Heard
+	local now = os.clock()
+	if player.Parent ~= Players or now - (lastHeard[player] or -math.huge) < cfg.Cooldown then
+		return
+	end
+	lastHeard[player] = now
+	kingHeard:FireClient(player, true, player.DisplayName)
+	local root = rootOf(player)
+	if root then
+		for _, other in Players:GetPlayers() do
+			local otherRoot = rootOf(other)
+			if
+				other ~= player
+				and otherRoot
+				and (otherRoot.Position - root.Position).Magnitude <= cfg.NearbyRadius
+			then
+				kingHeard:FireClient(other, false, player.DisplayName)
+			end
+		end
+	end
+	if cfg.RoarSoundId ~= "" then
+		local roar = Instance.new("Sound")
+		roar.SoundId = cfg.RoarSoundId
+		roar.Volume = cfg.RoarVolume
+		roar.RollOffMaxDistance = 200
+		roar.Parent = king.Root
+		roar:Play()
+		roar.Ended:Once(function()
+			roar:Destroy()
+		end)
+	end
+end
+
 local function canSee(king: King, target: BasePart, range: number): boolean
 	local origin = king.Root.Position + Vector3.new(0, Config.King.BodySize.Y, 0)
 	local offset = target.Position - origin
@@ -332,6 +371,9 @@ local function think(
 			king.Humanoid.WalkSpeed = level.WalkSpeed
 			local noise = NoiseService.Loudest(king.Root.Position, level.HearingRange)
 			local goal: Vector3? = if noise then noise.Position else nil
+			if noise and noise.Player and isTarget(noise.Player) then
+				announceHeard(king, noise.Player)
+			end
 			king.Model:SetAttribute("Mode", if goal then "Listen" else "Wander")
 			if not goal then
 				goal = MapService.RandomFloorPoint(map, cfg.Path.AgentRadius * 2, 10, 0)
@@ -486,6 +528,11 @@ function KingService.Nearest(position: Vector3): Vector3?
 	return best
 end
 
-function KingService.Start() end
+function KingService.Start()
+	kingHeard = Remotes.Event("KingHeard")
+	Players.PlayerRemoving:Connect(function(player)
+		lastHeard[player] = nil
+	end)
+end
 
 return KingService

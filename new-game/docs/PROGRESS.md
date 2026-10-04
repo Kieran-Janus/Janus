@@ -33,5 +33,7 @@ Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a not
   - M7 security audit done; fixes: pumpkin anti-teleport check, AI chat off until it has a UI plus a whole-server request cap, vote spam guard 0.5 s, admin check uses the server-set attribute, three small leaks on players leaving mid-load.
   - M7 art: `thumbnails/output/pumpkin-panic/thumbnail-1920x1080.png` and `icon-512x512.png` (`ONLY=pumpkin-panic node thumbnails/render.mjs` to re-render).
   - Fixed `stylua.toml` (the `syntax` key broke StyLua 0.20, the pinned version).
+  - Clip moment: "THE KING HEARD YOU!" banner + flash when the King turns to your noise; nearby players see "The King heard X!" (`Config.King.Heard`, `KingHeardUI`).
+  - Skins re-apply after `CharacterAppearanceLoaded` so late-loading clothes don't cover them.
   - Claude Code commands added: `/verify`, `/add-cosmetic`, `/reskin`, `/add-npc`, `/add-monster`, `/add-map`, `/new-code`, `/new-event`, `/tweak`, `/polish-hub`.
 

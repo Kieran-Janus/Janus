@@ -30,7 +30,7 @@ Written 4 October 2026 (night). Launch target: **20 October**. Halloween: **31 O
 | 5-6 Oct | V1 verify + fixes; Robux IDs; upload thumbnail/icon; rename |
 | 7-9 Oct | Visual pass: polish hub, reskin King/NPCs/minions, 4-6 new cosmetics |
 | 10-12 Oct | UI polish (M7): consistent buttons, mobile layout, results screen juice, sounds |
-| 13-15 Oct | Clip moments: "THE KING HEARD YOU!" banner, King roar sound, ghost "haunt cam" |
+| 13-15 Oct | Clip moments: King roar sound (banner is done), ghost "haunt cam" |
 | 16-17 Oct | Friends playtest (voice), fix list, performance check on a phone |
 | 18-19 Oct | Soft launch to friends; creators get personal codes |
 | 20 Oct | Public launch; post codes; watch analytics daily |
@@ -40,7 +40,7 @@ Written 4 October 2026 (night). Launch target: **20 October**. Halloween: **31 O
 
 ## Framework next steps (for Claude Code)
 These are the remaining engineering items, roughly by value. Paste one at a time or let `/next-milestone` take M7.
-1. **"The King heard you" moment:** when voice or shouting noise makes the King switch target, show a big banner + a growl sound for the heard player and nearby players. This is the clip moment.
+1. ~~"The King heard you" moment~~ **done overnight**: banner + red flash for the heard player, "The King heard X!" for players nearby (`Config.King.Heard`). Add a roar: put a Creator Store sound id in `Config.King.Heard.RoarSoundId`.
 2. **Mobile pass:** every button reachable on a phone (Sprint/Shout/Tracker/Codes/Invite/Shop), text readable at 360 px wide, no overlap with Roblox's own buttons.
 3. **Sounds:** pickup, King footsteps, King roar, ghost whoosh, UI clicks (all `SoundId`s in Config so you can swap them).
 4. **Results screen juice:** coin count-up, MVP spotlight, "Play again" auto-continues.

@@ -298,6 +298,17 @@ local Config = {
 		-- say "I'm sprinting" or "I shouted". Sprint, pickups and shouting mean players without
 		-- voice still play the stealth game (docs/DESIGN.md). M3 adds voice only as a clamped,
 		-- rate-limited hint on top.
+		-- The clip moment: when the King turns towards a noise a player made, that player sees
+		-- a big banner and players nearby are told who it heard.
+		Heard = {
+			Cooldown = 8, -- seconds before the same player can trigger it again
+			NearbyRadius = 60, -- studs; players this close to the heard player see "The King heard X!"
+			Banner = "THE KING HEARD YOU!",
+			NearbyText = "The King heard %s!", -- %s = display name
+			BannerSeconds = 2.2,
+			RoarSoundId = "", -- e.g. "rbxassetid://123" from the Creator Store; "" = silent
+			RoarVolume = 1,
+		},
 		Noise = {
 			MemorySeconds = 6, -- how long a noise stays interesting
 			TickSeconds = 0.5,
