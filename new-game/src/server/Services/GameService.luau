@@ -15,6 +15,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 local GhostService = require(script.Parent.GhostService)
 local KingService = require(script.Parent.KingService)
+local LeaderboardService = require(script.Parent.LeaderboardService)
 local MapService = require(script.Parent.MapService)
 local NoiseService = require(script.Parent.NoiseService)
 local PumpkinService = require(script.Parent.PumpkinService)
@@ -155,6 +156,7 @@ local function playRound(map: MapService.LoadedMap, difficultyId: string): { Res
 		end
 		local top = best > 0 and pumpkins == best
 		DataService.Add(player, "Coins", coins)
+		LeaderboardService.Record(player, pumpkins)
 		if top then
 			DataService.Add(player, "Wins", Config.Rewards.TopCollectorWins)
 		end
@@ -205,6 +207,7 @@ local function loop()
 					task.spawn(player.LoadCharacter, player)
 				end
 			end
+			task.spawn(LeaderboardService.Refresh) -- show new totals on the gravestone
 			countdown("Results", Config.Round.ResultsSeconds)
 		end
 

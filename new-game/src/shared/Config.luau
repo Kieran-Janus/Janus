@@ -226,6 +226,199 @@ local Config = {
 		},
 	},
 
+	-- Spawn hub. Built by src/server/Hub/HubBuilder.luau from these settings when Workspace.Hub
+	-- is missing (so hand edits made in Studio are kept). Positions are relative to Center.
+	Hub = {
+		Name = "Spooky Town Square",
+		Center = Vector3.new(0, 0, 0), -- top of the baseplate
+		Seed = 31, -- random variation in decorations
+		Radius = 70, -- cobblestone plaza
+		GroundColor = Color3.fromRGB(88, 78, 96),
+		GroundMaterial = Enum.Material.Cobblestone,
+		Spawn = { Offset = Vector3.new(0, 0, 24), Size = Vector3.new(14, 1, 14) },
+
+		Lighting = {
+			ClockTime = 19.6, -- dusk
+			Brightness = 1.6,
+			Ambient = Color3.fromRGB(70, 55, 95),
+			OutdoorAmbient = Color3.fromRGB(95, 75, 120),
+			Atmosphere = {
+				Density = 0.38,
+				Offset = 0.15,
+				Color = Color3.fromRGB(150, 120, 190),
+				Decay = Color3.fromRGB(255, 140, 70),
+				Glare = 0.2,
+				Haze = 1.6,
+			},
+			ColorCorrection = {
+				Brightness = 0.02,
+				Contrast = 0.12,
+				Saturation = 0.18,
+				TintColor = Color3.fromRGB(255, 238, 255),
+			},
+			Bloom = { Intensity = 0.7, Size = 28, Threshold = 0.92 },
+		},
+
+		Music = {
+			SoundId = "", -- e.g. "rbxassetid://123"; empty = no music (pick one from the Creator Store)
+			Volume = 0.25,
+		},
+
+		Colors = {
+			Orange = Color3.fromRGB(255, 130, 20),
+			Purple = Color3.fromRGB(120, 60, 170),
+			Green = Color3.fromRGB(110, 200, 90),
+			Bone = Color3.fromRGB(235, 228, 210),
+			Stone = Color3.fromRGB(120, 118, 128),
+			Wood = Color3.fromRGB(92, 62, 40),
+			Iron = Color3.fromRGB(35, 32, 40),
+			Glow = Color3.fromRGB(255, 200, 90),
+		},
+
+		ClockTower = {
+			Offset = Vector3.new(0, 0, -50),
+			Floors = 5,
+			FloorHeight = 9,
+			Width = 14,
+			Lean = 2.5, -- degrees each floor tilts, for the crooked look
+			ClockTime = { Hour = 11, Minute = 55 }, -- the hands are frozen just before midnight
+		},
+		Cauldron = { Offset = Vector3.new(0, 0, 0), Radius = 5 },
+		Lampposts = { Count = 10, Radius = 60, Height = 14 },
+		Bunting = { FlagsPerSpan = 9, Sag = 2.5, Colors = { "Orange", "Purple", "Green" } },
+		JackOLanterns = { Count = 16, Radius = 52, Size = 3 },
+		Candles = {
+			Count = 18,
+			MinRadius = 10,
+			MaxRadius = 34,
+			MinHeight = 8,
+			MaxHeight = 16,
+			BobHeight = 0.8,
+		},
+		Graveyard = {
+			Offset = Vector3.new(-48, 0, 34),
+			Epitaphs = {
+				"RIP Mr. Bones",
+				"Here lies Boo's homework",
+				"Ate 100 candies",
+				"Back in 5 mins",
+				"Too spooky",
+				"BRB haunting",
+			},
+		},
+		Cobwebs = { Size = 5 },
+		DeadTrees = {
+			Offsets = {
+				Vector3.new(-62, 0, -30),
+				Vector3.new(62, 0, -34),
+				Vector3.new(-30, 0, 62),
+				Vector3.new(58, 0, 52),
+			},
+		},
+		Particles = {
+			Fireflies = { Rate = 6, Color = Color3.fromRGB(210, 255, 120) },
+			Mist = { Rate = 4, Color = Color3.fromRGB(190, 175, 220) },
+			Bubbles = { Rate = 8, Color = Color3.fromRGB(120, 255, 110) },
+			Leaves = { Rate = 2, Color = Color3.fromRGB(205, 110, 40) },
+		},
+		PhotoSpot = {
+			Sign = "Spooky Town Square",
+			-- Built-in Roblox emotes (the "/e wave" set: wave, point, dance, dance2, dance3, laugh, cheer).
+			Emotes = {
+				{ Label = "Wave", Emote = "wave" },
+				{ Label = "Cheer", Emote = "cheer" },
+				{ Label = "Dance", Emote = "dance" },
+				{ Label = "Dance 2", Emote = "dance2" },
+				{ Label = "Laugh", Emote = "laugh" },
+				{ Label = "Point", Emote = "point" },
+			},
+			CloseDistance = 18, -- the emote bar hides when you walk this far away
+		},
+	},
+
+	-- Hub NPCs and interactive props. Kind picks the placeholder model; Lines are shown in the
+	-- dialog when the prompt is used. Offsets are relative to Hub.Center; they face the center.
+	Npcs = {
+		InteractCooldown = 0.5,
+		List = {
+			{
+				Id = "WitchWanda",
+				Kind = "Witch",
+				DisplayName = "Witch Wanda",
+				Offset = Vector3.new(-40, 0, -18),
+				Prompt = { ActionText = "Shop", ObjectText = "Witch Wanda" },
+				Lines = {
+					"Welcome, dearie! My cauldron of cosmetics is still bubbling.",
+					"Hats, pets, trails and spooky voices are coming soon. Save your pumpkins!",
+				},
+			},
+			{
+				Id = "BooGuide",
+				Kind = "Ghost",
+				DisplayName = "Boo Guide",
+				Offset = Vector3.new(-16, 0, 32),
+				Prompt = { ActionText = "Get tips", ObjectText = "Boo Guide" },
+				Lines = {
+					"Boo! Welcome to Pumpkin Panic! Vote for a map and difficulty on the Voting Board.",
+					"In a round, grab as many pumpkins as you can. Each one is worth coins at the end.",
+					"The Pumpkin King hunts by sound. Sprinting (Shift), shouting (G) and talking make noise!",
+					"If you get caught you become a ghost: spectate, haunt the King, or chat with other ghosts.",
+					"Hard mode has two Kings but pays double. Good luck!",
+				},
+			},
+			{
+				Id = "PumpkinVendor",
+				Kind = "Vendor",
+				DisplayName = "Pumpkin Vendor",
+				Offset = Vector3.new(40, 0, -18),
+				Prompt = { ActionText = "Browse", ObjectText = "Pumpkin Vendor" },
+				Lines = {
+					"Fresh pumpkins! Well... pumpkin packs, soon.",
+					"My stall opens with the shop update. Come back then!",
+				},
+			},
+			{
+				Id = "VotingBoard",
+				Kind = "Board",
+				DisplayName = "Voting Board",
+				Offset = Vector3.new(16, 0, 36),
+				Prompt = { ActionText = "Vote", ObjectText = "Voting Board" },
+				Lines = {
+					"Voting opens between rounds. Pick a map and Easy or Hard on the board or the vote panel.",
+				},
+			},
+			{
+				Id = "Leaderboard",
+				Kind = "Gravestone",
+				DisplayName = "Leaderboard Gravestone",
+				Offset = Vector3.new(-30, 0, 46),
+				Prompt = { ActionText = "Read", ObjectText = "Top Pumpkin Collectors" },
+				Lines = { "Here lie the greatest pumpkin collectors of all time..." },
+			},
+			{
+				Id = "PhotoSpot",
+				Kind = "PhotoSpot",
+				DisplayName = "Photo Spot",
+				Offset = Vector3.new(44, 0, 30),
+				Prompt = { ActionText = "Strike a pose", ObjectText = "Photo Spot" },
+				Lines = { "Say pumpkin!" },
+			},
+		},
+		Prompt = {
+			HoldDuration = 0,
+			MaxActivationDistance = 12,
+			Height = 3, -- studs above the ground
+			Forward = 3, -- studs in front of the NPC, towards the plaza
+		},
+	},
+
+	-- Leaderboard Gravestone: top lifetime pumpkin collectors.
+	Leaderboard = {
+		StoreName = "TopPumpkins_v1", -- OrderedDataStore (published places with API access only)
+		TopCount = 10,
+		RefreshSeconds = 60,
+	},
+
 	Economy = {
 		CurrencyName = "Coins",
 		StartingCoins = 0,
@@ -242,6 +435,7 @@ local Config = {
 			Coins = 0,
 			Wins = 0,
 			Joins = 0,
+			PumpkinsCollected = 0, -- lifetime, for the Leaderboard Gravestone
 		},
 	},
 

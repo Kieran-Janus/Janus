@@ -206,9 +206,11 @@ function MapService.RandomFloorPoint(
 	return nil
 end
 
--- Where players stand between rounds: the lobby SpawnLocation in the place.
+-- Where players stand between rounds: the hub spawn pad (or any SpawnLocation as a fallback).
 function MapService.LobbyCFrame(): CFrame
-	local spawn = workspace:FindFirstChildOfClass("SpawnLocation")
+	local hub = workspace:FindFirstChild("Hub")
+	local spawn = (hub and hub:FindFirstChild("Spawn"))
+		or workspace:FindFirstChildOfClass("SpawnLocation")
 	local position = if spawn then spawn.Position else Vector3.zero
 	return CFrame.new(position + Vector3.new(0, Config.Maps.SpawnHeight, 0))
 end
