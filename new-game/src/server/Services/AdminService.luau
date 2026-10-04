@@ -100,7 +100,8 @@ function commands.RebuildHub(_player, _data)
 end
 
 local function run(player: Player, name: unknown): (boolean, string)
-	if not isAdmin(player) then
+	-- "Admin" is set by this server on join (clients can't set attributes that replicate).
+	if not player:GetAttribute("Admin") then
 		return false, "Not allowed."
 	end
 	local now = os.clock()

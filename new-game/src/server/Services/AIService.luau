@@ -20,6 +20,8 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local AIService = {}
 
+local windowStart, windowCount = 0, 0
+
 local lastAsked: { [Player]: number } = {}
 local history: { [Player]: { [string]: { { role: string, content: string } } } } = {}
 
@@ -50,6 +52,14 @@ function AIService.Ask(player: Player, npcId: string, message: string): string
 		return "Give me a second to think!"
 	end
 	lastAsked[player] = now
+	-- Whole-server cap, so a few spammers can't drain the HTTP quota or the API bill.
+	if now - windowStart >= 60 then
+		windowStart, windowCount = now, 0
+	end
+	if windowCount >= Config.AI.MaxRequestsPerMinute then
+		return "I'm busy, try again soon!"
+	end
+	windowCount += 1
 
 	message = message:sub(1, Config.AI.MaxMessageLength)
 

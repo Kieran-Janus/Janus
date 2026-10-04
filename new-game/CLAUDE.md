@@ -31,3 +31,11 @@ Roblox game written in Luau, synced to Studio with Rojo. This project is indepen
 
 ## Roblox Studio MCP
 If the Roblox Studio MCP server is connected, use it to inspect the live DataModel, read output logs, and run playtests to verify changes instead of guessing. Instances created in Studio but not in `src/` are NOT in git; mention it when adding any.
+
+## Customisation (docs/CUSTOMIZE.md)
+- Looks are swappable: `src/shared/CustomAssets.luau` lets a model in `ReplicatedStorage.Custom.<Characters|Cosmetics>` (synced from `assets/`, ignoreUnknownInstances) replace any Part-built placeholder. Any new character, NPC or cosmetic you add must support this the same way (check `CustomAssets.Clone` first, keep the placeholder as fallback, add its size to `Config.Custom`).
+- Never put scripts inside custom models; they are stripped (`Config.Custom.StripScripts`).
+- Test with the F8 admin panel in Studio (`AdminService`/`AdminUI`): coins, unlock all, reset daily, rebuild hub, reset save.
+- Slash commands in `.claude/commands/` cover common jobs (`/verify`, `/add-cosmetic`, `/reskin`, `/add-npc`, `/add-monster`, `/add-map`, `/new-code`, `/new-event`, `/tweak`, `/polish-hub`, `/next-milestone`).
+- Anti-exploit: positions come from the server; pumpkin pickups reject teleports (`PumpkinService.tooFast`). Keep new pickups/rewards just as strict.
+

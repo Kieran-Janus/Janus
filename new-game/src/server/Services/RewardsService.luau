@@ -133,8 +133,14 @@ end
 -- Friends and groups ------------------------------------------------------------------------------
 
 local function checkFriends(player: Player)
+	if player.Parent ~= Players then
+		return
+	end
 	friends[player] = friends[player] or {}
 	for _, other in Players:GetPlayers() do
+		if player.Parent ~= Players or other.Parent ~= Players or not friends[player] then
+			continue -- someone left while we were asking Roblox
+		end
 		if other ~= player and friends[player][other.UserId] == nil then
 			local ok, result = pcall(function()
 				return player:IsFriendsWithAsync(other.UserId)
@@ -192,7 +198,9 @@ function RewardsService.Start()
 				local ok, result = pcall(function()
 					return player:IsInGroupAsync(Config.Social.GroupId)
 				end)
-				inGroup[player] = ok and result == true
+				if player.Parent == Players then
+					inGroup[player] = ok and result == true
+				end
 			end)
 		end
 		if player:GetAttribute("DataReady") then

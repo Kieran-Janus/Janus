@@ -22,7 +22,7 @@ local Config = {
 	Voting = {
 		Seconds = 20,
 		MapChoices = 3, -- maps offered per vote (capped by how many maps exist)
-		MinSecondsBetweenVotes = 0.2, -- per-player spam guard on the vote remote
+		MinSecondsBetweenVotes = 0.5, -- per-player spam guard on the vote remote
 	},
 
 	Maps = {
@@ -969,7 +969,9 @@ local Config = {
 	},
 
 	AI = {
-		Enabled = true,
+		-- Off until an in-game chat box uses it (nothing calls AskNpc yet; see docs/ROADMAP.md).
+		Enabled = false,
+		MaxRequestsPerMinute = 60, -- whole server, protects your API bill
 		-- Your proxy (see tools/ai-proxy). The key lives in Roblox Secrets, never in code.
 		ProxyUrl = "https://YOUR-WORKER.workers.dev/chat",
 		SecretName = "AI_PROXY_KEY",

@@ -153,6 +153,9 @@ local function onJoin(player: Player)
 			return activeStore:GetAsync(tostring(player.UserId))
 		end)
 	end
+	if player.Parent ~= Players then
+		return -- left while the save was loading; onLeave already ran
+	end
 	local data = fromSave(if ok and typeof(saved) == "table" then saved else nil)
 	data.Joins = (data.Joins or 0) + 1
 	cache[player] = data

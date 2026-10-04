@@ -25,6 +25,20 @@ local function nobody(_player: Player): boolean
 	return false
 end
 local canCollect: (Player) -> boolean = nobody
+-- Anti-teleport: where and when each player last picked up a pumpkin this round.
+local lastPickup: { [Player]: { Time: number, Position: Vector3 } } = {}
+
+-- True if the player can't have got here from their last pickup by running.
+local function tooFast(player: Player, position: Vector3): boolean
+	local prev = lastPickup[player]
+	if not prev then
+		return false
+	end
+	local maxSpeed = Config.Player.SprintSpeed * Config.Monetization.VipSpeedMultiplier * 1.3
+	local flat = Vector3.new(position.X - prev.Position.X, 0, position.Z - prev.Position.Z)
+	local allowed = maxSpeed * (os.clock() - prev.Time) + Config.Pumpkins.PickupRange * 2
+	return flat.Magnitude > allowed
+end
 
 function PumpkinService.GetCount(player: Player): number
 	return player:GetAttribute("Pumpkins") or 0
@@ -47,6 +61,10 @@ local function collect(pumpkin: BasePart, hit: BasePart)
 	if (root.Position - pumpkin.Position).Magnitude > Config.Pumpkins.PickupRange then
 		return
 	end
+	if tooFast(player, root.Position) then
+		return -- teleported (exploit) since the last pickup; the pumpkin stays for others
+	end
+	lastPickup[player] = { Time = os.clock(), Position = root.Position }
 
 	pumpkin:SetAttribute("Collected", true)
 	active -= 1
@@ -97,6 +115,7 @@ function PumpkinService.Begin(
 	collectable: (Player) -> boolean
 )
 	PumpkinService.Stop()
+	table.clear(lastPickup)
 	local level = Config.Difficulty.Levels[difficultyId]
 	canCollect = collectable
 	active = 0
@@ -132,6 +151,7 @@ function PumpkinService.Stop()
 	canCollect = nobody
 	active = 0
 	roundMap = nil
+	table.clear(lastPickup)
 end
 
 -- Takes up to `amount` of this round's pumpkins from a player. Returns how many were taken.

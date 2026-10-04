@@ -10,7 +10,8 @@ The `/next-milestone` command reads this file. Update the Status column when a m
 | M4 | Spawn hub: decorations, NPCs, voting board, leaderboard | done | look at it, pick assets |
 | M5 | Minion monsters (Skeleton Patrol, Bat Swarm, Ghost Cat) and map art pass on 2 maps | done | pick Creator Store assets |
 | M6 | Shop, pumpkin currency, saving, VIP pass and products | blocked | create gamepass/product IDs in Creator Hub |
-| M7 | UI polish, thumbnails and icon, security audit, playtest | todo | thumbnails, friends playtest |
+| V1 | Verify the overnight cloud work in Studio (run `/verify`): skins tab, custom models, codes, daily streak, invite, F8 admin panel, anti-teleport pumpkins | todo | no |
+| M7 | UI polish, thumbnails and icon, security audit, playtest | in progress | upload thumbnails, friends playtest |
 | Launch | Set the experience public on 20 October | todo | yes: only the owner does this |
 
 Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a note below).
@@ -24,3 +25,13 @@ Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a not
   2. Developer Products > create "Pumpkin Pouch" (suggested 25 R$), "Pumpkin Cart" (99 R$) and "Pumpkin Mountain" (249 R$). Copy each Product ID into the matching `Id` in `Config.Monetization.Products`.
   3. Publish the place (File > Publish to Roblox) and test one purchase in a live server: Studio test purchases don't charge but also don't prove ProcessReceipt on Roblox's servers.
   Then set this row to `done`. Real prices are whatever you set in Creator Hub; the shop reads them live.
+- **Overnight (cloud session, not yet run in Studio):** written and statically checked (luau-lsp with Roblox types, StyLua, Rojo build), but nobody has pressed Play on it yet, so V1 must run first.
+  - Customisation: `src/shared/CustomAssets.luau` + `assets/` → `ReplicatedStorage.Custom` (ignoreUnknownInstances). Custom models replace the King (plain model or animated R15 rig), minions, the Witch/Boo/Vendor NPCs (also on a hub saved in Studio) and any cosmetic. Guide: `docs/CUSTOMIZE.md`.
+  - New Skins shop tab (Skeleton, Pumpkin Head, Zombie, Ghost, Mummy, VIP Pumpkin King): recolour, hide clothes, head pieces; restores the avatar when removed; hats sit on top of head pieces.
+  - Viral features (`docs/VIRAL.md`): Codes (button above Shop; `Config.Codes`), daily streak toast (`Config.Daily`), +10% round coins per friend in the server (cap 50%) and optional group bonus (`Config.Social`), Invite button, one-time favourite prompt after the first round.
+  - F8 admin panel in Studio (`AdminService`, `AdminUI`).
+  - M7 security audit done; fixes: pumpkin anti-teleport check, AI chat off until it has a UI plus a whole-server request cap, vote spam guard 0.5 s, admin check uses the server-set attribute, three small leaks on players leaving mid-load.
+  - M7 art: `thumbnails/output/pumpkin-panic/thumbnail-1920x1080.png` and `icon-512x512.png` (`ONLY=pumpkin-panic node thumbnails/render.mjs` to re-render).
+  - Fixed `stylua.toml` (the `syntax` key broke StyLua 0.20, the pinned version).
+  - Claude Code commands added: `/verify`, `/add-cosmetic`, `/reskin`, `/add-npc`, `/add-monster`, `/add-map`, `/new-code`, `/new-event`, `/tweak`, `/polish-hub`.
+
