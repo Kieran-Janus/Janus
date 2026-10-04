@@ -174,7 +174,7 @@ function GhostUI.Mount(gui: ScreenGui)
 			ContextActionService:UnbindAction("Haunt")
 		end
 		if mode == "GhostChat" then
-			status.Text = "Ghost chat is on. Voice for ghosts arrives in a later update."
+			status.Text = "Ghost chat: talk with other ghosts here. The living can't hear you."
 		elseif mode == "Spectate" then
 			status.Text = "Spectating survivors."
 			watch(0)

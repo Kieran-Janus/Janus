@@ -8,6 +8,7 @@ local GhostUI = require(script.Parent.GhostUI)
 local Hud = require(script.Parent.Hud)
 local ResultsUI = require(script.Parent.ResultsUI)
 local VoteUI = require(script.Parent.VoteUI)
+local VoiceMeter = require(script.Parent.VoiceMeter)
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "GameUI"
@@ -20,3 +21,4 @@ ResultsUI.Mount(gui)
 GhostUI.Mount(gui)
 GhostFlight.Mount()
 Controls.Mount()
+VoiceMeter.Mount()

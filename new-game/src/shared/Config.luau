@@ -193,6 +193,39 @@ local Config = {
 		},
 	},
 
+	-- Proximity voice (VoiceChatService.UseAudioApi = Enabled, EnableDefaultVoice = true).
+	-- Voice is a bonus: everything here must degrade to "nothing happens" for players
+	-- without voice, and the game must stay fully playable without it.
+	Voice = {
+		-- Built-in Acoustic Simulation: voices are muffled through walls and bend around
+		-- corners (SoundService.AcousticSimulationEnabled). Map parts block sound unless
+		-- their AudioCanCollide is off.
+		AcousticSimulation = true,
+		-- How loud a voice is by distance: studs -> volume (1 = full, 0 = silent).
+		Attenuation = { [0] = 1, [15] = 0.9, [45] = 0.4, [80] = 0 },
+		-- Ghost voices get an echo (AudioEcho; levels are in decibels).
+		GhostEcho = {
+			DelayTime = 0.22, -- seconds between echoes
+			Feedback = 0.45, -- 0 = one echo, 1 = never fades
+			DryLevel = -2,
+			WetLevel = -6,
+		},
+		-- Ghost chat: ghosts in "GhostChat" mode hear each other; living players never hear
+		-- ghosts. Enforced server-side with AudioDeviceInput access lists.
+		ReconcileSeconds = 1, -- how often voice routing is re-checked (respawns, mode changes)
+		-- Voice -> King noise. The client may send a mic level HINT; the server clamps it,
+		-- rate-limits it and turns it into noise. It can never be louder than MaxLoudness,
+		-- and non-voice players have the same tools (sprint, pickups, shout).
+		Noise = {
+			HintSeconds = 0.25, -- client sends at most this often
+			MinHintGapSeconds = 0.2, -- server drops hints that arrive faster than this
+			MinLevel = 0.04, -- mic level (0-1) below this is treated as silence
+			LevelGain = 4, -- mic RMS is small for normal speech; scaled by this, then capped at 1
+			MaxLoudness = 18, -- noise at full mic level (Shout is 25)
+			RequireActiveMic = false, -- also require AudioDeviceInput.Active (verify on a published place before enabling)
+		},
+	},
+
 	Economy = {
 		CurrencyName = "Coins",
 		StartingCoins = 0,
