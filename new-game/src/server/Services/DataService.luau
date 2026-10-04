@@ -13,7 +13,15 @@ local Config = require(ReplicatedStorage.Shared.Config)
 
 local DataService = {}
 
-local store = DataStoreService:GetDataStore(Config.Data.StoreName)
+-- GetDataStore throws in Studio until the place is published and "Enable Studio Access to
+-- API Services" is on. Fall back to no-save mode so the game still runs while building.
+local storeOk, storeResult = pcall(function()
+	return DataStoreService:GetDataStore(Config.Data.StoreName)
+end)
+local store: DataStore? = if storeOk then storeResult else nil
+if not store then
+	warn("[DataService] DataStore unavailable - progress will NOT save. Publish the place and enable Studio API access.")
+end
 local cache: { [Player]: { [string]: any } } = {}
 local loaded: { [Player]: boolean } = {}
 
@@ -78,20 +86,25 @@ end
 
 function DataService.Save(player: Player)
 	local data = cache[player]
-	if not data or not loaded[player] then
+	if not store or not data or not loaded[player] then
 		return
 	end
+	local activeStore = store
 	withRetry(function()
-		store:UpdateAsync(tostring(player.UserId), function()
+		activeStore:UpdateAsync(tostring(player.UserId), function()
 			return data
 		end)
 	end)
 end
 
 local function onJoin(player: Player)
-	local ok, saved = withRetry(function()
-		return store:GetAsync(tostring(player.UserId))
-	end)
+	local ok, saved = false, nil
+	if store then
+		local activeStore = store
+		ok, saved = withRetry(function()
+			return activeStore:GetAsync(tostring(player.UserId))
+		end)
+	end
 	local data = copyTemplate()
 	if ok and typeof(saved) == "table" then
 		for key, value in saved :: any do
