@@ -16,6 +16,20 @@ local function modulesUnder(rt, path: string): { any }
 	return out
 end
 
+-- Main.server / Main.client catch a failing service or UI and only warn "[Main] X failed to
+-- ...", so the game keeps running. In tests that warning is a failure.
+local function noMainFailures(rt)
+	local failures = {}
+	for _, text in rt.warnings do
+		if text:find("[Main]", 1, true) then
+			table.insert(failures, text)
+		end
+	end
+	if #failures > 0 then
+		error(table.concat(failures, "\n"), 0)
+	end
+end
+
 describe("server and shared modules", function()
 	local rt = Runtime.new()
 	for _, path in { "ReplicatedStorage.Shared", "ServerScriptService.Server" } do
@@ -36,6 +50,7 @@ describe("server boot", function()
 			error(err, 0)
 		end
 		server:advance(1)
+		noMainFailures(server)
 		expect(server.workspace:FindFirstChild("Hub")).toBeInstanceOf("Model")
 		expect(server:find("ReplicatedStorage.Remotes")).toBeInstanceOf("Folder")
 	end)
@@ -94,6 +109,7 @@ describe("client modules", function()
 			error(err, 0)
 		end
 		client:advance(10)
+		noMainFailures(client)
 		local gui = client.game:GetService("Players").LocalPlayer.PlayerGui
 		expect(gui:FindFirstChildOfClass("ScreenGui")).toBeInstanceOf("ScreenGui")
 		local names = {}

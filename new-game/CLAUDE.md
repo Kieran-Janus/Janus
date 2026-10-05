@@ -33,7 +33,8 @@ Roblox game written in Luau, synced to Studio with Rojo. This project is indepen
 - `rojo serve` - live-sync to Studio
 - `rojo build -o NewGame.rbxl` - build a place file
 - `rojo sourcemap default.project.json -o sourcemap.json` - for luau-lsp
-- `lune run tests/run` - smoke tests that run without Studio (pure logic: Config, Items, Lobby...). Add a `tests/specs/<Name>.spec.luau` for new pure logic; see the header of `tests/run.luau`.
+- `lune run tests/run` - offline tests without Studio: the harness builds the DataModel from the Rojo project and runs the real code (Config checks, Items/Lobby, hub and map builders, cosmetics, every module, server + client boot, a full round). Add a `tests/specs/<name>.spec.luau` for new code; see `tests/README.md` (Runtime API, matchers, limits). Run it before finishing a task.
+- `lune run tests/preview -- hub` (or `-- map <MapId>`, `-- section <Name>`) - exports a scene JSON for preview images with the cloud renderer (`tests/README.md`, "Preview images").
 
 ## Roblox Studio MCP
 If the Roblox Studio MCP server is connected, use it to inspect the live DataModel, read output logs, and run playtests to verify changes instead of guessing. Instances created in Studio but not in `src/` are NOT in git; mention it when adding any.

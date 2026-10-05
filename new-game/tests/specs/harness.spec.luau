@@ -137,6 +137,32 @@ describe("instances", function()
 	end)
 end)
 
+describe("CFrame", function()
+	it(
+		"lookAt / lookAlong / new(pos, target) face the target (Lune's own lookAt is mirrored)",
+		function()
+			local at = Vector3.new(1, 2, 3)
+			for _, target in
+				{
+					Vector3.new(4, 2, 7),
+					Vector3.new(1, 2, 10),
+					Vector3.new(-5, 2, 3),
+					Vector3.new(1, 9, 3),
+				}
+			do
+				local dir = (target - at).Unit
+				expect(CFrame.lookAt(at, target).LookVector).toBeNear(dir, 1e-5)
+				expect(CFrame.lookAt(at, target).Position).toBeNear(at)
+				expect(CFrame.new(at, target).LookVector).toBeNear(dir, 1e-5)
+				expect(CFrame.lookAlong(at, target - at).LookVector).toBeNear(dir, 1e-5)
+			end
+			local cf = CFrame.lookAt(Vector3.zero, Vector3.new(0, 0, 5))
+			expect(cf.RightVector).toBeNear(Vector3.new(-1, 0, 0), 1e-5)
+			expect(cf.UpVector).toBeNear(Vector3.new(0, 1, 0), 1e-5)
+		end
+	)
+end)
+
 describe("model geometry", function()
 	it("pivots to the PrimaryPart pivot and moves every part rigidly", function()
 		local model = Instance.new("Model")

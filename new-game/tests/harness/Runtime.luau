@@ -219,8 +219,12 @@ function Runtime:recordCall(className: string, method: string, instance: any, ..
 		list = {}
 		self.callLog[key] = list
 	end
+	self.callSeq = (self.callSeq or 0) + 1
 	if #list < 10000 then
-		table.insert(list, { instance = instance, args = table.pack(...) })
+		table.insert(
+			list,
+			{ instance = instance, method = method, args = table.pack(...), seq = self.callSeq }
+		)
 	end
 end
 
@@ -788,9 +792,25 @@ end
 
 -- Inspection -------------------------------------------------------------------------------------
 
--- Calls made to a stubbed engine method: a list of { instance = ..., args = { n = ... } }.
-function Runtime:calls(className: string, method: string): { any }
-	return self.callLog[className .. ":" .. method] or {}
+--[[
+	Calls made to a stubbed engine method: a list of { instance, args = { n = ... }, seq },
+	where seq orders calls across methods. With several method names, the calls to any of them
+	in the order they were made: rt:calls("Terrain", { "FillBall", "FillBlock" }).
+]]
+function Runtime:calls(className: string, method: string | { string }): { any }
+	if type(method) == "string" then
+		return self.callLog[className .. ":" .. method] or {}
+	end
+	local all = {}
+	for _, name in method do
+		for _, call in self.callLog[className .. ":" .. name] or {} do
+			table.insert(all, call)
+		end
+	end
+	table.sort(all, function(a, b)
+		return a.seq < b.seq
+	end)
+	return all
 end
 
 -- Every BasePart under `root` (default: Workspace), excluding Terrain.
@@ -802,6 +822,18 @@ function Runtime:parts(root: any?): { any }
 		end
 	end
 	return out
+end
+
+-- The source code of a script (an instance or a path for Runtime:find).
+function Runtime:source(target: any): string
+	if type(target) == "string" then
+		target = self:find(target)
+	end
+	local d = Dom.data(target)
+	if not d or d.source == nil then
+		error(("%s has no source"):format(tostring(target)), 2)
+	end
+	return d.source
 end
 
 -- Instance.new from test code (can also create classes scripts can't, like Player).

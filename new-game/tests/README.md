@@ -28,10 +28,12 @@ an event handler, a Script), even if the test itself didn't notice.
 
 | Spec | Checks |
 | --- | --- |
-| `config.spec` | Shop items: unique Ids, known Slot, whole non-negative Price, Style.Kind; NPCs: Id, Kind, Offset, prompt; maps: unique ids, builder module exists, sizes; codes only give real items. |
+| `config.spec` | Shop items: unique Ids, known Slot, a Rarity from `Config.Rarity.Order`, `Items.Price` = own Price or the rarity price, Style.Kind; NPCs: Id, Kind, Offset, prompt; maps: unique ids, builder module exists, sizes, all Lighting groups, a Modes list of real modes; playlists point at a map made for their mode; lobby zones have Offset + Size and don't overlap; codes only give real items. |
+| `Core.spec` | v2 foundation: feature switches, the v2 maps and playlists, rarity prices, `Items` helpers, the Pumpkin Shop replacing the witch, v2 save fields, `Lobby` zone maths, `Tags`. |
+| `Startup.spec` | The `ORDER` lists in `Main.server.luau` / `Main.client.luau` name real modules once each (GameService last, MenuUI first); the placeholder services and UIs start / mount with their feature off and on. |
 | `builders.spec` | `HubBuilder.Build()` and every map builder in `src/server/Maps` run, make parts with finite, positive sizes, are deterministic; custom NPC models in `ReplicatedStorage.Custom.Characters` are scaled and placed; `MapService.Load` finds floor, spawns and random floor points (raycasts hit real geometry). Notes how many Ball parts have unequal sides (Roblox renders those as spheres). |
 | `cosmetics.spec` | Every shop item: `Cosmetics.Preview`, `Cosmetics.Build` (pivot at the design origin), `Cosmetics.Wear` / `TakeOff` on a character, skins restore the avatar, a custom model in `ReplicatedStorage.Custom.Cosmetics` replaces the placeholder and is scaled. |
-| `modules.spec` | Every ModuleScript requires cleanly (server, shared, client); `Main.server.luau` boots and plays a whole round with a player in it; `Main.client.luau` boots against what the server replicated. |
+| `modules.spec` | Every ModuleScript requires cleanly (server, shared, client); `Main.server.luau` boots and plays a whole round with a player in it; `Main.client.luau` boots against what the server replicated. A `[Main] X failed to ...` warning (Main catches failing services and UIs) fails the test. |
 | `harness.spec` | Self-tests of the harness (geometry, raycasts, scheduler, signals, services). If these fail, don't trust the others. |
 
 ## Writing a spec
@@ -78,7 +80,8 @@ runs as the test.
 | `rt:fireServer(remote, player, ...)` / `rt:invokeServer(remote, player, ...)` | A client calling a RemoteEvent / RemoteFunction. |
 | `rt:triggerPrompt(prompt, player)` / `rt:purchase(player, productId)` / `rt:triggerAction(name)` | ProximityPrompt, Developer Product receipt, ContextActionService action. |
 | `rt:replicateFrom(serverRt)` | Copies ReplicatedStorage / Workspace / Lighting children from a server runtime into a client runtime. |
-| `rt:calls("Class", "Method")` | Calls made to engine methods the harness only stubs (`Terrain:FillBall`, `RemoteEvent:FireClient`, `Sound:Play`, ...). |
+| `rt:calls("Class", "Method")` | Calls made to engine methods the harness only stubs (`Terrain:FillBall`, `RemoteEvent:FireClient`, `Sound:Play`, ...); pass a list of method names to get them all in call order. |
+| `rt:source(pathOrScript)` | A script's source code (e.g. to read the `ORDER` list in a Main script). |
 | `rt:parts(root?)`, `rt:create(className, props?, parent?)` | Helpers. |
 | `rt.warnings`, `rt.logs`, `rt.errors` | Game output and task errors. |
 | `rt.secrets`, `rt.httpHandler`, `rt.gamePasses`, `rt.groupRanks`, `rt.friends`, `rt.dataStoreFailures`, `rt.filterText` | Set up service behaviour (see the top of `harness/Services.luau`). |
@@ -93,6 +96,34 @@ Color3), `toBeTruthy`, `toBeFalsy`, `toBeNil`, `toBeGreaterThan`, `toBeGreaterTh
 with `.never` (`expect(x).never.toBe(y)`). Also `T.beforeEach`, `T.afterEach`, `T.skip`,
 `T.note`.
 
+## Preview images (cloud tooling)
+
+`tests/preview.luau` builds the hub, a map or a lobby section inside the harness and writes a
+scene JSON for the offline previewer that lives in the cloud environment at
+`/tmp/claude-0/render` (not part of this repo). From `new-game/`:
+
+```sh
+lune run tests/preview -- hub                         # -> tests/out/hub.json
+lune run tests/preview -- map PumpkinPatch            # -> tests/out/PumpkinPatch.json
+lune run tests/preview -- section ReadyArea           # src/server/Hub/Sections/ReadyArea.luau
+lune run tests/preview -- hub out/hub.json            # or any output path
+
+node /tmp/claude-0/render/render.mjs tests/out/hub.json tests/out/hub --views overview,top,ground
+```
+
+- `hub` runs `HubBuilder.Build()`; `map` runs `MapService.Load(id)` (the map's builder, or a model
+  in `ServerStorage.Maps`); `section` builds `Sections/<Name>` into an empty hub Model with
+  `Build(hub, Config.Lobby.Zones[<Name>])` (it errors clearly while that folder doesn't exist).
+- Lighting comes from `Config.Hub.Lighting` or the map's `Lighting`; the terrain is the
+  `Terrain:Fill*` calls the harness recorded (`Air` fills are exported but not drawn).
+- The exporter is `/tmp/claude-0/render/export.luau` by default; point `--exporter <path>` or
+  the `ROBLOX_PREVIEW_EXPORTER` environment variable elsewhere. Without it the script stops
+  with a message saying so.
+- The renderer writes `overview.png` (3/4 aerial view), `top.png` (map, north = -Z up) and
+  `ground.png` (eye height from the south). See `/tmp/claude-0/render/README.md` for views,
+  options and what is approximated.
+- `tests/out/` and `out/` are git-ignored.
+
 ## How the harness works
 
 | File | Role |
@@ -103,7 +134,8 @@ with `.never` (`expect(x).never.toBe(y)`). Also `T.beforeEach`, `T.afterEach`, `
 | `harness/Dom.luau` | The instance tree: pure-Luau instances with Roblox semantics (members before children, type-checked properties, Destroy locks Parent, Clone remaps references, attributes, tags, structural events). |
 | `harness/Engine.luau` | Real math: `Position`/`Orientation` vs `CFrame`, `GetPivot`/`PivotTo`, `GetBoundingBox`, `ScaleTo`, `BulkMoveTo`, attachments, humanoids, camera projection, raycasts. |
 | `harness/Services.luau` | Deterministic services: Players, RunService, CollectionService, TweenService, DataStoreService (in memory, JSON), HttpService, MarketplaceService, TextService, PhysicsService, PathfindingService (straight lines), Debris, input services. |
-| `harness/Globals.luau` | `task`, `Random`, `TweenInfo`, `DateTime`, `RaycastParams`, `OverlapParams`, virtual `tick`/`os.time`/`os.clock`. |
+| `harness/Globals.luau` | `task`, `Random`, `TweenInfo`, `DateTime`, `RaycastParams`, `OverlapParams`, virtual `tick`/`os.time`/`os.clock`, and a fixed `CFrame.lookAt` (Lune's is mirrored, see Limits) plus `CFrame.lookAlong` and `CFrame.new(pos, lookAt)`. |
+| `preview.luau` | Exports the hub / a map / a lobby section as a scene JSON for the preview renderer (below). |
 | `harness/Scheduler.luau` | Virtual time behind `task.*`. |
 | `harness/Api.luau` | Generated list of every class's events, methods and callbacks. |
 
@@ -142,6 +174,10 @@ definitions file luau-lsp uses).
 - **Approximate pivots**: a Model with no PrimaryPart whose pivot was never set pivots at the
   centre of its bounding box. `ScaleTo` scales parts, attachments, joints, nested models,
   SpecialMeshes, light ranges and HipHeight, not every scalable property.
+- **Lune 0.8.9's `CFrame.lookAt` is wrong** (it mirrors the look direction's Z: a target at +Z
+  gives a LookVector of -Z). The `CFrame` scripts see in the harness is fixed (`harness.spec`
+  checks it); if you use `require("@lune/roblox").CFrame` directly in a spec, use
+  `rt.env.CFrame` instead.
 - **Lune 0.8.9 gaps**: `number * Vector3` (number first) and `number / Vector3` error, write
   `vector * number`; EnumItems aren't stable table keys; `EnumItem:IsA`,
   `CFrame:FuzzyEq` and `CFrame:AngleBetween` don't exist; classes or properties newer than

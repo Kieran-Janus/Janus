@@ -14,6 +14,46 @@ local typeof = Types.typeof
 
 local Globals = {}
 
+-- CFrame: Lune 0.8.9's CFrame.lookAt mirrors the look direction's Z (a target at +Z gives a
+-- LookVector of -Z) and it lacks lookAlong and CFrame.new(position, lookAt). Everything else
+-- comes straight from Lune.
+
+local LuneCFrame = roblox.CFrame
+
+local function lookAt(at: Vector3, target: Vector3, up: Vector3?): CFrame
+	local look = target - at
+	if look.Magnitude < 1e-9 then
+		return LuneCFrame.new(at)
+	end
+	look = look.Unit
+	local right = look:Cross(up or Vector3.yAxis)
+	if right.Magnitude < 1e-6 then
+		-- Looking straight along `up`: any perpendicular will do.
+		right = look:Cross(Vector3.new(0, 0, -1))
+		if right.Magnitude < 1e-6 then
+			right = look:Cross(Vector3.xAxis)
+		end
+	end
+	right = right.Unit
+	return LuneCFrame.fromMatrix(at, right, right:Cross(look), -look)
+end
+
+Globals.CFrame = setmetatable({
+	lookAt = lookAt,
+	lookAlong = function(at: Vector3, direction: Vector3, up: Vector3?): CFrame
+		return lookAt(at, at + direction, up)
+	end,
+	new = function(...)
+		if select("#", ...) == 2 then
+			local a, b = ...
+			if typeof(a) == "Vector3" and typeof(b) == "Vector3" then
+				return lookAt(a, b)
+			end
+		end
+		return LuneCFrame.new(...)
+	end,
+}, { __index = LuneCFrame })
+
 -- Random (mulberry32: deterministic per seed; not Roblox's exact sequence) -------------------
 
 local TWO32 = 4294967296
@@ -554,7 +594,7 @@ function Globals.build(rt: any): { [string]: any }
 		Vector2 = roblox.Vector2,
 		Vector3int16 = roblox.Vector3int16,
 		Vector2int16 = roblox.Vector2int16,
-		CFrame = roblox.CFrame,
+		CFrame = Globals.CFrame,
 		Color3 = roblox.Color3,
 		BrickColor = roblox.BrickColor,
 		UDim = roblox.UDim,
