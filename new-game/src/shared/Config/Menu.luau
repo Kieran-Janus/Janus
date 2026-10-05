@@ -3,9 +3,9 @@
 	TOP-LEFT MENU (Config.Menu)
 
 	One big "Menu" button at the top left (on/off: Config.Features.Menu) opens a grid of
-	tiles. On a keyboard, Key (M) opens and closes it too. When the screen is too narrow
-	for the whole button next to the bar at the top middle, it shows only its icon, or moves
-	just below that bar.
+	tiles. It sits in Roblox's own top bar, right of the Roblox and chat buttons, so the chat
+	window can't cover it (Button.InTopBar). On a keyboard, Key (M) opens and closes it too.
+	When there's no room for the word "Menu" it shows only its icon.
 
 	Tiles: shown in the order listed below. Each line is one tile:
 	  Id       which tile it is (don't change it: the code finds tiles by Id)
@@ -43,6 +43,12 @@ return {
 		TextSize = 22,
 		Color = Color3.fromRGB(255, 130, 20), -- pumpkin orange, easy to spot
 		Gap = 8, -- space kept between the button and the bar at the top middle
+		-- true = put the button in Roblox's own top bar, next to the Roblox and chat buttons,
+		-- so the chat window can never cover it. false (or no room in the top bar) = just
+		-- below the top bar, using Left/Top above.
+		InTopBar = true,
+		TopBarPadding = 7, -- gap around the button inside the top bar
+		TopBarMinHeight = 32, -- smaller top bar than this (e.g. hidden) = use the old spot
 	},
 
 	-- The tile grid the button opens.

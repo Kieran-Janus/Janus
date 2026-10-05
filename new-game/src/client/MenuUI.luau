@@ -30,6 +30,7 @@
 	shows just its icon, or sits below the Hud (src/client/MenuLogic.luau).
 ]]
 local ContextActionService = game:GetService("ContextActionService")
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -249,6 +250,16 @@ end
 -- The big Menu button: a ☰ icon (three bars, so it draws whatever the font) and the word.
 local function buildButton(gui: ScreenGui)
 	local cfg = Config.Menu.Button
+	-- The button sits in Roblox's top bar, beside Roblox's own buttons, whenever there is room
+	-- (Config.Menu.Button.InTopBar): nothing else, not even the chat window, can cover it
+	-- there. That needs its own ScreenGui, because the game's gui keeps clear of the top bar.
+	local topGui = Instance.new("ScreenGui")
+	topGui.Name = "MenuButtonGui"
+	topGui.ResetOnSpawn = false
+	topGui.ScreenInsets = Enum.ScreenInsets.None
+	topGui.DisplayOrder = gui.DisplayOrder + 1
+	topGui.Parent = gui.Parent
+
 	local button = Theme.button("", gui, cfg.Color)
 	button.Name = "MenuButton"
 	button.ZIndex = 3 -- above the Hud and toasts, below every panel
@@ -298,6 +309,23 @@ local function buildButton(gui: ScreenGui)
 	end
 
 	local function place()
+		local bar = GuiService.TopbarInset
+		local pad = cfg.TopBarPadding
+		if
+			cfg.InTopBar
+			and bar.Height >= cfg.TopBarMinHeight
+			and bar.Width >= cfg.IconWidth + pad
+		then
+			local full = bar.Width >= cfg.Width + pad
+			button.Parent = topGui
+			button.Position = UDim2.fromOffset(bar.Min.X + pad, bar.Min.Y + pad)
+			button.Size =
+				UDim2.fromOffset(if full then cfg.Width else cfg.IconWidth, bar.Height - 2 * pad)
+			label.Visible = full
+			bars.Position = if full then UDim2.new(0, 26, 0.5, 0) else UDim2.fromScale(0.5, 0.5)
+			return
+		end
+		button.Parent = gui
 		local spot = MenuLogic.ButtonPlace(hudEdges())
 		button.Position = UDim2.fromOffset(spot.X, spot.Y)
 		button.Size = UDim2.fromOffset(spot.Width, spot.Height)
@@ -326,6 +354,7 @@ local function buildButton(gui: ScreenGui)
 		task.defer(watchHud, child)
 	end)
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
+	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(place)
 	place()
 
 	button.Activated:Connect(MenuUI.Toggle)
