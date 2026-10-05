@@ -19,6 +19,33 @@ local Config = {
 		ResultsShowTop = 10, -- rows on the results screen
 	},
 
+	-- The results screen after each round (src/client/ResultsUI.luau). It stays up for
+	-- Round.ResultsSeconds; Round.ResultsShowTop rows are listed (your own row is always shown).
+	Results = {
+		PopSeconds = 0.35, -- panel slides in with a little bounce
+		RowDelay = 0.08, -- rows appear one after another
+		CountUpDelay = 0.6, -- seconds before coins start counting up
+		CountUpSeconds = 1.6, -- coins count from 0 to the total in this long
+		CoinSoundEvery = 0.12, -- coin sound while your coins count up, at most this often
+		SpotlightSpinSeconds = 6, -- one turn of the glow behind the MVP's headshot
+		MaxListHeight = 300, -- rows scroll past this many pixels
+		Text = {
+			Title = "Round over!",
+			Mvp = "MVP",
+			MvpLine = "%s collected %d pumpkins!", -- name, pumpkins
+			Survived = "Survived!",
+			Caught = "Caught",
+			NextRound = "Next round in %d",
+			Nobody = "Nobody finished this round.",
+		},
+		Colors = {
+			Mvp = Color3.fromRGB(255, 210, 60),
+			Survived = Color3.fromRGB(110, 220, 120),
+			Caught = Color3.fromRGB(170, 160, 190),
+			MyRow = Color3.fromRGB(255, 130, 20), -- background tint of your own row
+		},
+	},
+
 	Voting = {
 		Seconds = 20,
 		MapChoices = 3, -- maps offered per vote (capped by how many maps exist)
