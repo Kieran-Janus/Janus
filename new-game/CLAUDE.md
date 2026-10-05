@@ -8,6 +8,7 @@ Roblox game written in Luau, synced to Studio with Rojo. This project is indepen
 - `src/server/` -> ServerScriptService.Server (`Main.server.luau` starts the services listed in its `ORDER`, each in `Services/`, each in its own pcall)
 - `src/server/Modes/` -> one module per game mode (`KingHunt`, `HideSeek`, `ScareMaze`) with `Run(ctx) -> RoundResult` (types and contract in `Modes/Types.luau`). `GameService` runs the loop (ready players, playlist vote, map, countdowns, rewards, results, back to lobby); a mode only plays and scores the round. Playlists (mode + map) are in `Config.Modes`, helpers in `src/shared/Playlists.luau`.
 - `src/client/` -> StarterPlayerScripts.Client (`Main.client.luau` mounts the modules listed in its `ORDER`, each in its own thread)
+- `assets/` -> ReplicatedStorage.Custom (custom models: Characters, Cosmetics, Props); `maps/` -> ServerStorage.Maps (hand-edited round maps). Both ignoreUnknownInstances.
 - `Packages/` -> Wally packages (git-ignored)
 - `tools/ai-proxy/` -> Cloudflare Worker that proxies Claude for in-game NPCs
 - `prompts/` -> reusable prompts for building features
@@ -41,7 +42,8 @@ Roblox game written in Luau, synced to Studio with Rojo. This project is indepen
 If the Roblox Studio MCP server is connected, use it to inspect the live DataModel, read output logs, and run playtests to verify changes instead of guessing. Instances created in Studio but not in `src/` are NOT in git; mention it when adding any.
 
 ## Customisation (docs/CUSTOMIZE.md)
-- Looks are swappable: `src/shared/CustomAssets.luau` lets a model in `ReplicatedStorage.Custom.<Characters|Cosmetics>` (synced from `assets/`, ignoreUnknownInstances) replace any Part-built placeholder. Any new character, NPC or cosmetic you add must support this the same way (check `CustomAssets.Clone` first, keep the placeholder as fallback, add its size to `Config.Custom`).
+- Looks are swappable: `src/shared/CustomAssets.luau` lets a model in `ReplicatedStorage.Custom.<Characters|Cosmetics|Props>` (synced from `assets/`, ignoreUnknownInstances) replace any Part-built placeholder. Any new character, NPC or cosmetic you add must support this the same way (check `CustomAssets.Clone` first, keep the placeholder as fallback, add its size to `Config.Custom`). Lobby decorations go through `Kit.prop(name, cframe, parent, size?, build)` (`src/server/Build/Kit.luau`).
+- The lobby (`Workspace.Hub`): `src/server/Hub/HubBuilder.luau` builds it; each lobby area is `src/server/Hub/Sections/<Name>.luau` (`Build(hub, zone)`, its own Model, inside its `Config.Lobby.Zones` area); NPCs are in `Hub/Npcs.luau`. Decorations skip zones (`HubLayout.Blocked`) and parts coloured from `Config.Hub.Palette` carry the attribute `PaletteRole`. A hub saved in the place is kept unless its `BuildVersion` attribute is below `Config.Hub.BuildVersion` (**bump it when hub code changes**) and it isn't `Locked`; `HubService.EnsureRequired` always restores the spawn, Ready pad and shopkeeper (by tag). `src/server/Tools/Bake.luau` (command bar, edit mode) bakes the hub or a map for hand editing.
 - Never put scripts inside custom models; they are stripped (`Config.Custom.StripScripts`).
 - Test with the F8 admin panel in Studio (`AdminService`/`AdminUI`): coins, unlock all, reset daily, rebuild hub, reset save, plus any command a service registers.
 - Slash commands in `.claude/commands/` cover common jobs (`/verify`, `/add-cosmetic`, `/reskin`, `/add-npc`, `/add-monster`, `/add-map`, `/new-code`, `/new-event`, `/tweak`, `/polish-hub`, `/next-milestone`).

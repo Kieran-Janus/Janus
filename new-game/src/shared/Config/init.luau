@@ -17,15 +17,41 @@
 	Everything is still read the same way: Config.Features.Parkour, Config.Lobby.Zones, ...
 ]]
 
--- One hub NPC (Npcs.List below). OpensShop is optional.
+-- One hub NPC (Npcs.List below). Give it a Zone (it stands in the middle of that lobby zone)
+-- or an Offset (studs from Hub.Center). OpensShop is optional.
 export type NpcDef = {
 	Id: string,
 	Kind: string,
 	DisplayName: string,
-	Offset: Vector3,
+	Zone: string?,
+	Offset: Vector3?,
 	Prompt: { ActionText: string, ObjectText: string },
 	OpensShop: string?,
 	Lines: { string },
+}
+
+--[[
+	LOBBY COLOURS (Config.Hub.Palette). Each name is a colour "role". Every lobby part painted
+	from here has the attribute PaletteRole (see it in Studio: select a part > Properties >
+	Attributes), plus PaletteShade when it is a darker (0.3 = 30% darker) or lighter (-0.2)
+	version of that colour. Change a colour below and every part with that role follows the
+	next time the game starts (also on a hand-edited, Locked hub). A part you recolour by hand
+	keeps your colour until this colour changes; delete its PaletteRole to keep it for good.
+]]
+local hubPalette: { [string]: Color3 } = {
+	Ground = Color3.fromRGB(88, 78, 96), -- the plaza cobbles
+	Stone = Color3.fromRGB(120, 118, 128), -- clock tower, tombstones, statue, Ready pad
+	Wood = Color3.fromRGB(92, 62, 40), -- stall, posts, trees, signs
+	Iron = Color3.fromRGB(35, 32, 40), -- lamps, fences, cauldron
+	Bone = Color3.fromRGB(235, 228, 210), -- candles, cobwebs, ropes
+	Orange = Color3.fromRGB(255, 130, 20), -- pumpkins, awning stripes
+	Purple = Color3.fromRGB(120, 60, 170), -- roofs, awning stripes, spawn pad
+	Green = Color3.fromRGB(110, 200, 90), -- pumpkin stems, the cauldron brew, the Ready glow
+	Glow = Color3.fromRGB(255, 200, 90), -- lights, lit windows, flames, carved faces
+	Gold = Color3.fromRGB(255, 210, 60), -- the King statue's crown
+	Cloth = Color3.fromRGB(70, 110, 160), -- the shopkeeper's shirt
+	Straw = Color3.fromRGB(200, 170, 90), -- the shopkeeper's hat
+	Dark = Color3.fromRGB(30, 22, 40), -- screens and backdrops
 }
 
 local Config = {
@@ -510,16 +536,27 @@ local Config = {
 		},
 	},
 
-	-- Spawn hub. Built by src/server/Hub/HubBuilder.luau from these settings when Workspace.Hub
-	-- is missing (so hand edits made in Studio are kept). Positions are relative to Center.
+	--[[
+		THE LOBBY ("Spooky Town Square", Workspace.Hub). Built by src/server/Hub/HubBuilder.luau
+		from these settings; each lobby area (Ready pad, shop, minigames) is its own file in
+		src/server/Hub/Sections/ and sits in its Config.Lobby.Zones area. Positions are relative
+		to Center. The hub saved in your place file is used as it is, except:
+		  - it is rebuilt from code when its BuildVersion is lower than the one below, unless you
+		    set the attribute Locked = true on Workspace.Hub (do that once you edit it by hand);
+		  - a missing spawn, Ready pad or shopkeeper is always put back, even on a Locked hub.
+		Step by step: docs/CUSTOMIZE.md > "Editing the lobby and maps by hand".
+	]]
 	Hub = {
 		Name = "Spooky Town Square",
+		-- Bump this number (2 -> 3) whenever the hub code or these settings change in a way the
+		-- saved hub should pick up: a saved hub with a lower number is rebuilt on the next start.
+		BuildVersion = 2,
 		Center = Vector3.new(0, 0, 0), -- top of the baseplate
 		Seed = 31, -- random variation in decorations
 		Radius = 105, -- cobblestone plaza (room for 32 players)
-		GroundColor = Color3.fromRGB(88, 78, 96),
-		GroundMaterial = Enum.Material.Cobblestone,
+		GroundMaterial = Enum.Material.Cobblestone, -- colour: Palette.Ground
 		Spawn = { Offset = Vector3.new(0, 0, 24), Size = Vector3.new(14, 1, 14) },
+		NameTagDistance = 120, -- NPC name tags hide further away than this (studs)
 
 		Lighting = {
 			ClockTime = 19.6, -- dusk
@@ -548,15 +585,38 @@ local Config = {
 			Volume = 0.25,
 		},
 
-		Colors = {
-			Orange = Color3.fromRGB(255, 130, 20),
-			Purple = Color3.fromRGB(120, 60, 170),
-			Green = Color3.fromRGB(110, 200, 90),
-			Bone = Color3.fromRGB(235, 228, 210),
-			Stone = Color3.fromRGB(120, 118, 128),
-			Wood = Color3.fromRGB(92, 62, 40),
-			Iron = Color3.fromRGB(35, 32, 40),
-			Glow = Color3.fromRGB(255, 200, 90),
+		-- Lobby colours by role: edit them in hubPalette at the top of this file.
+		Palette = hubPalette,
+		Colors = hubPalette, -- the old name for Palette (the same colours), still used by some code
+
+		-- The Ready area (src/server/Hub/Sections/ReadyArea.luau): a glowing pad players stand
+		-- on to join the next round, inside the lobby zone Config.Lobby.Zones.ReadyArea (move it
+		-- there). The pad is the part tagged ReadyPad: resize or move it in Studio and it still works.
+		ReadyArea = {
+			PadSize = Vector3.new(16, 0.6, 16), -- the stone platform: width, thickness, depth (studs)
+			GlowRole = "Green", -- the Palette colour of the glowing ring on the pad
+			ArchHeight = 16, -- the jack-o-lantern arch over the front of the pad (studs)
+			ArchLanterns = 9, -- jack-o-lanterns along the arch
+			SideLanterns = 3, -- jack-o-lanterns along each side of the pad
+			LanternSize = 1.8,
+			-- The floating sign above the arch. The client fills in the numbers
+			-- (src/client/ReadySign.luau); %d is replaced by a number.
+			Sign = {
+				Height = 22, -- studs above the plaza
+				MaxDistance = 300, -- hidden further away than this (studs)
+				Title = "READY %d / %d", -- players ready / players needed to start
+				TitleEnough = "READY %d", -- once enough players are ready
+				TitleWaiting = "READY", -- before the server has counted anyone
+				YouAreReady = "You're ready!",
+				-- The second line for each round state; other states are shown as they are.
+				States = {
+					["Waiting for players"] = "Stand here to play!",
+					Voting = "Voting now!",
+					Intermission = "Round starting soon!",
+					Playing = "Round on! Stand here for the next one",
+					Results = "Round over!",
+				} :: { [string]: string },
+			},
 		},
 
 		ClockTower = {
@@ -658,12 +718,14 @@ local Config = {
 		},
 	},
 
-	-- Hub NPCs and interactive props. Kind picks the placeholder model; Lines are shown in the
-	-- dialog when the prompt is used. Offsets are relative to Hub.Center; they face the center.
+	-- Hub NPCs and interactive props (built by src/server/Hub/Npcs.luau). Kind picks the
+	-- placeholder model; Lines are shown in the dialog when the prompt is used. Where it stands:
+	-- Zone = a Config.Lobby.Zones name (the middle of that area, e.g. the shop) or Offset =
+	-- studs from Hub.Center. They face the center.
 	-- OpensShop (optional) opens the shop on that tab instead of a dialog.
 	-- v2 removed Witch Wanda and the Boo Guide: the Pumpkin Shop is the only shopkeeper. To bring
-	-- them back, copy their entries from git history (run in the repo:
-	-- git show 7717d52:new-game/src/shared/Config.luau) into this list.
+	-- them back, restore their entries and their builders from git history (commit 7717d52:
+	-- src/shared/Config.luau and src/server/Hub/HubBuilder.luau).
 	Npcs = {
 		InteractCooldown = 0.5,
 		List = {
@@ -671,7 +733,7 @@ local Config = {
 				Id = "PumpkinVendor", -- the shopkeeper (the Id stays the same so saved hubs keep working)
 				Kind = "Vendor",
 				DisplayName = "Pumpkin Shop",
-				Offset = Vector3.new(40, 0, -18),
+				Zone = "Shop", -- stands in the Shop area (Config.Lobby.Zones.Shop)
 				Prompt = { ActionText = "Shop", ObjectText = "Pumpkin Shop" },
 				OpensShop = "Skin",
 				Lines = {
@@ -1065,7 +1127,8 @@ local Config = {
 
 	-- Custom art: drop your own models into ReplicatedStorage.Custom (docs/CUSTOMIZE.md,
 	-- src/shared/CustomAssets.luau). They're scaled to these sizes unless they have the
-	-- attribute KeepSize = true.
+	-- attribute KeepSize = true. Lobby props (Custom > Props: JackOLantern, Lamppost, DeadTree,
+	-- ...) are scaled to the size of the decoration they replace.
 	Custom = {
 		StripScripts = true, -- remove scripts from custom models (free models can hide bad ones)
 		Heights = { -- studs, feet to top

@@ -2,7 +2,10 @@
 --[[
 	Loads the round map and unloads it afterwards.
 	Uses ServerStorage.Maps.<Id> if a hand-made map exists, otherwise builds one with
-	src/server/Maps/<Builder>.luau from Config.Maps.List[i].
+	src/server/Maps/<Builder>.luau from Config.Maps.List[i]. Bake a built map into
+	ServerStorage.Maps to edit it by hand: src/server/Tools/Bake.luau (Bake.Map("<Id>")).
+	ServerStorage.Maps is synced from the maps/ folder (default.project.json), so a map saved
+	there as <Id>.rbxm is in git too.
 	The loaded model is Workspace.Map with attribute MapId; the client uses it to switch to
 	the map's lighting and ambient sound (src/client/ZoneLighting.luau).
 
@@ -231,21 +234,24 @@ function MapService.RandomHotspotPoint(map: LoadedMap, attempts: number, height:
 	return nil
 end
 
--- Where players stand between rounds: a part tagged HubSpawn, else the hub's Spawn pad (or
--- any SpawnLocation as a fallback).
+-- Where players stand between rounds: a part tagged HubSpawn in the lobby (or the hub's
+-- "Spawn", or any SpawnLocation, as fallbacks).
 function MapService.LobbyCFrame(): CFrame
-	local spawn: Instance? = nil
+	local spawn: BasePart? = nil
 	for _, tagged in CollectionService:GetTagged(Tags.HubSpawn) do
 		if tagged:IsA("BasePart") and tagged:IsDescendantOf(workspace) then
 			spawn = tagged
 			break
 		end
 	end
-	local hub = workspace:FindFirstChild("Hub")
-	spawn = spawn
-		or (hub and hub:FindFirstChild("Spawn"))
-		or workspace:FindFirstChildOfClass("SpawnLocation")
-	local position = if spawn and spawn:IsA("BasePart") then spawn.Position else Vector3.zero
+	if not spawn then
+		local hub = workspace:FindFirstChild("Hub")
+		local named = hub and hub:FindFirstChild("Spawn")
+		spawn = if named and named:IsA("BasePart")
+			then named
+			else workspace:FindFirstChildOfClass("SpawnLocation")
+	end
+	local position = if spawn then spawn.CFrame.Position else Vector3.zero
 	return CFrame.new(position + Vector3.new(0, Config.Maps.SpawnHeight, 0))
 end
 
