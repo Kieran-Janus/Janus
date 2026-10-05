@@ -1,9 +1,10 @@
 --!strict
 --[[
 	The hub Voting Board: a live SurfaceGui on Hub.Npcs.VotingBoard.Screen.
-	While a vote is open it shows the map and difficulty choices with counts, and its
-	buttons cast votes (the server validates them like any other vote). Otherwise it shows
-	the round state, map and difficulty. The SurfaceGui lives in PlayerGui (Adornee = the
+	While a vote is open it shows the game (mode + map) and, when an offered mode uses it, the
+	difficulty choices with counts, and its buttons cast votes (the server validates them
+	like any other vote; players not on the Ready pad see a hint instead). Otherwise it shows
+	the round state, mode, map and difficulty. The SurfaceGui lives in PlayerGui (Adornee = the
 	board) so its buttons are clickable.
 ]]
 local Players = game:GetService("Players")
@@ -14,7 +15,12 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Theme = require(script.Parent.Theme)
 
 type Option = { Id: string, Name: string, Votes: number }
-type VoteState = { Open: boolean, Maps: { Option }, Difficulties: { Option } }
+type VoteState = {
+	Open: boolean,
+	Maps: { Option },
+	Difficulties: { Option },
+	ReadyOnly: boolean?,
+}
 
 local VoteBoardUI = {}
 
@@ -95,22 +101,29 @@ function VoteBoardUI.Mount()
 		text("Voting Board", 0, 0.16, Config.Hub.Colors.Orange)
 		local state = current
 		if state and state.Open then
-			text("Pick the next map", 1, 0.1, Theme.Muted)
+			-- Only Ready players can vote (when the server says so): the others get a hint.
+			if state.ReadyOnly and player:GetAttribute("Ready") ~= true then
+				text(Config.Lobby.Ready.Text.VoteHint, 1, 0.1, Theme.Selected)
+			else
+				text("Pick the next game", 1, 0.1, Theme.Muted)
+			end
 			row("Map", state.Maps, 2)
-			text("Easy or Hard?", 3, 0.1, Theme.Muted)
-			row("Difficulty", state.Difficulties, 4)
+			if #state.Difficulties > 0 then
+				text("Easy or Hard?", 3, 0.1, Theme.Muted)
+				row("Difficulty", state.Difficulties, 4)
+			end
 		else
 			local roundState = ReplicatedStorage:GetAttribute("State") or "Waiting"
-			local mapName = ReplicatedStorage:GetAttribute("MapName")
-			local difficulty = ReplicatedStorage:GetAttribute("Difficulty")
+			local parts = {}
+			for _, name in { "ModeName", "MapName", "Difficulty" } do
+				local value = ReplicatedStorage:GetAttribute(name)
+				if value then
+					table.insert(parts, tostring(value))
+				end
+			end
 			text(tostring(roundState), 1, 0.2)
-			if mapName then
-				text(
-					("%s  |  %s"):format(tostring(mapName), tostring(difficulty or "")),
-					2,
-					0.14,
-					Theme.Muted
-				)
+			if #parts > 0 then
+				text(table.concat(parts, "  |  "), 2, 0.14, Theme.Muted)
 			end
 			text("The next vote opens between rounds.", 3, 0.12, Theme.Muted)
 		end
@@ -122,7 +135,12 @@ function VoteBoardUI.Mount()
 			render()
 		end
 	end)
-	for _, name in { "State", "MapName", "Difficulty" } do
+	player:GetAttributeChangedSignal("Ready"):Connect(function()
+		if current and current.Open and current.ReadyOnly then
+			render()
+		end
+	end)
+	for _, name in { "State", "ModeName", "MapName", "Difficulty" } do
 		ReplicatedStorage:GetAttributeChangedSignal(name):Connect(function()
 			if not (current and current.Open) then
 				render()

@@ -1,40 +1,56 @@
 --!strict
 --[[
-	Round loop: Waiting -> Voting -> Intermission -> Playing -> Results -> repeat.
-	State is published as attributes on ReplicatedStorage so any client UI
-	can read it with GetAttributeChangedSignal:
-	  State, TimeLeft, MapName, Difficulty, Alive (survivors left), KingCount
-	Round results are sent once per round through the RoundResults remote.
+	The round loop, the same for every game mode:
+	  Waiting for players -> Voting -> Intermission -> the mode plays -> Results -> again
+	- Waiting: until Config.Lobby.Ready.MinReady players stand on the Ready pad (ReadyService).
+	- Voting: VotingService offers playlists (a mode on a map, Config.Modes.Playlists).
+	- Intermission: the map loads. The vote and intermission stop if too few stay ready.
+	- The mode plays: src/server/Modes/<Mode>.luau, Run(ctx) (see Modes/Types.luau). Only the
+	  players who are ready when the round starts take part; everyone else stays in the lobby.
+	- Results: the mode's rows, plus the friend/group bonus (RewardsService), coins and Wins
+	  granted here (DataService), then the players who took part go back to the lobby spawn and
+	  must step on the Ready pad again.
+	If a round breaks (a bug in a mode or a map), the Output window says why, everything is
+	cleaned up and a new round starts after Config.Round.ErrorWaitSeconds.
+
+	ReplicatedStorage attributes clients read:
+	  State, TimeLeft, MapName, Difficulty (only for modes that use it), Mode (mode id, e.g.
+	  "KingHunt"), ModeName (e.g. "King Hunt"); modes add their own (King Hunt: Alive, KingCount).
+	Remote RoundResults(rows, info): rows = Modes/Types.luau ResultRow list (best first),
+	  info = { ScoreLabel, Winner?, MvpLine?, Mode, ModeName }.
+	Owner buttons (F8 panel): "Start round now", and in Studio "Force mode".
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Playlists = require(ReplicatedStorage.Shared.Playlists)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Types = require(script.Parent.Parent.Modes.Types)
+local AdminService = require(script.Parent.AdminService)
 local DataService = require(script.Parent.DataService)
 local GhostService = require(script.Parent.GhostService)
-local KingService = require(script.Parent.KingService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local MapService = require(script.Parent.MapService)
-local MinionService = require(script.Parent.MinionService)
-local NoiseService = require(script.Parent.NoiseService)
-local PumpkinService = require(script.Parent.PumpkinService)
+local ReadyService = require(script.Parent.ReadyService)
 local RewardsService = require(script.Parent.RewardsService)
 local VotingService = require(script.Parent.VotingService)
 
-export type ResultRow = {
-	UserId: number,
-	Name: string,
-	Pumpkins: number,
-	Coins: number,
-	Survived: boolean,
-	Top: boolean,
-}
+local ModesFolder = script.Parent.Parent.Modes
 
 local GameService = {}
 
 local roundResults: RemoteEvent
+
+-- Owner test buttons (AdminService): start the next round now / pick its playlist.
+local startNow = false
+local forcedPlaylist: Playlists.Playlist? = nil
+
+-- What the current round has running, so it can be cleaned up if it breaks.
+local activeMode: Types.Mode? = nil
+local roundPlayers: { Player } = {}
 
 local function setState(state: string, timeLeft: number)
 	ReplicatedStorage:SetAttribute("State", state)
@@ -51,8 +67,12 @@ local function countdown(state: string, seconds: number, stopIf: (() -> boolean)
 	end
 end
 
-local function enoughPlayers(): boolean
-	return #Players:GetPlayers() >= Config.Round.MinPlayers
+-- Enough players are ready for a round (or the owner pressed "Start round now").
+local function canStart(): boolean
+	if #Players:GetPlayers() == 0 then
+		return false
+	end
+	return startNow or ReadyService.Count() >= ReadyService.Needed()
 end
 
 local function aliveHumanoid(player: Player): Humanoid?
@@ -71,161 +91,341 @@ local function teleport(player: Player, spawn: BasePart)
 	end
 end
 
--- Plays one round on `map`. Returns the results rows (already rewarded).
-local function playRound(map: MapService.LoadedMap, difficultyId: string): { ResultRow }
-	local participants: { Player } = {}
-	local alive: { [Player]: boolean } = {}
-	local connections: { RBXScriptConnection } = {}
-
-	local function countAlive()
-		local n = 0
-		for _ in alive do
-			n += 1
+-- The mode module for `modeId`, or the fallback mode (with a warning) if it is missing or broken.
+local function loadMode(modeId: string): (Types.Mode, string)
+	local moduleScript = ModesFolder:FindFirstChild(modeId)
+	if moduleScript and moduleScript:IsA("ModuleScript") then
+		local ok, mode = pcall(require, moduleScript)
+		if ok and type(mode) == "table" and type((mode :: any).Run) == "function" then
+			return mode :: any, modeId
 		end
-		ReplicatedStorage:SetAttribute("Alive", n)
-	end
-
-	-- Caught by the King (inPlace) or died/reset: a ghost for the rest of the round.
-	local function knockOut(player: Player, inPlace: boolean)
-		if not alive[player] then
-			return
-		end
-		alive[player] = nil
-		countAlive()
-		GhostService.MarkOut(player, inPlace)
-	end
-
-	PumpkinService.ResetCounts()
-	for i, player in Players:GetPlayers() do
-		local humanoid = aliveHumanoid(player)
-		if humanoid then
-			table.insert(participants, player)
-			alive[player] = true
-			teleport(player, map.Spawns[(i - 1) % #map.Spawns + 1])
-			table.insert(
-				connections,
-				humanoid.Died:Connect(function()
-					knockOut(player, false)
-				end)
+		warn(
+			("[GameService] Mode %s is broken, playing %s instead: %s"):format(
+				modeId,
+				Config.Modes.FallbackMode,
+				if ok then "it has no Run function" else tostring(mode)
 			)
-		end
+		)
+	else
+		warn(
+			("[GameService] There is no src/server/Modes/%s.luau, playing %s instead."):format(
+				modeId,
+				Config.Modes.FallbackMode
+			)
+		)
 	end
-	table.insert(
-		connections,
-		Players.PlayerRemoving:Connect(function(player)
-			alive[player] = nil
-			countAlive()
+	local fallback = ModesFolder:FindFirstChild(Config.Modes.FallbackMode)
+	assert(fallback and fallback:IsA("ModuleScript"), "the fallback mode module is missing")
+	return (require :: any)(fallback), Config.Modes.FallbackMode
+end
+
+--[[
+	Runs mode.Run(ctx) in its own thread and waits for it, at most
+	Config.Round.SafetyLimitSeconds. Errors if Run broke or got stuck (recover() then calls the
+	mode's Cleanup).
+]]
+local function runMode(mode: Types.Mode, ctx: Types.RoundContext): Types.RoundResult
+	local done = false
+	local result: Types.RoundResult? = nil
+	local failure: string? = nil
+	local finished = Instance.new("BindableEvent")
+	local thread = task.spawn(function()
+		local ok, value = xpcall(mode.Run, debug.traceback, ctx)
+		if ok then
+			result = value
+		else
+			failure = tostring(value)
+		end
+		done = true
+		finished:Fire()
+	end)
+	if not done then
+		local timeout = task.delay(Config.Round.SafetyLimitSeconds, function()
+			finished:Fire()
 		end)
-	)
-	countAlive()
-
-	local function isAlive(player: Player): boolean
-		return alive[player] == true
-	end
-	GhostService.BeginRound(map, participants)
-	PumpkinService.Begin(map, difficultyId, isAlive)
-	KingService.Begin(map, difficultyId, isAlive, function(player)
-		knockOut(player, true)
-	end)
-	MinionService.Begin(map, difficultyId, isAlive)
-	-- Ends at 0:00, or early once every participant is caught.
-	countdown("Playing", Config.Round.Duration, function()
-		return next(alive) == nil
-	end)
-	KingService.Stop()
-	MinionService.Stop()
-	PumpkinService.Stop()
-	NoiseService.Clear()
-	for _, connection in connections do
-		connection:Disconnect()
-	end
-	ReplicatedStorage:SetAttribute("Alive", nil)
-
-	-- Score and reward everyone who started the round and is still in the server.
-	local multiplier = Config.Difficulty.Levels[difficultyId].RewardMultiplier
-	local best = 0
-	for _, player in participants do
-		best = math.max(best, PumpkinService.GetCount(player))
-	end
-	local rows: { ResultRow } = {}
-	for _, player in participants do
-		if player.Parent ~= Players then
-			continue
+		finished.Event:Wait()
+		if coroutine.status(timeout) ~= "dead" then
+			task.cancel(timeout)
 		end
-		local pumpkins = PumpkinService.GetCount(player)
-		local survived = alive[player] == true and aliveHumanoid(player) ~= nil
-		local coins = pumpkins * Config.Rewards.CoinsPerPumpkin * multiplier
-		if survived then
-			coins += Config.Rewards.SurvivorBonus
+	end
+	finished:Destroy()
+	if not done then
+		if coroutine.status(thread) ~= "dead" then
+			task.cancel(thread)
 		end
+		error(
+			("the round ran past Config.Round.SafetyLimitSeconds (%d s)"):format(
+				Config.Round.SafetyLimitSeconds
+			),
+			0
+		)
+	end
+	if failure then
+		error(failure, 0)
+	end
+	if type(result) ~= "table" or type(result.Rows) ~= "table" then
+		error("the mode's Run didn't return a RoundResult", 0)
+	end
+	return result :: Types.RoundResult
+end
+
+local function number(value: unknown, default: number): number
+	if
+		typeof(value) == "number"
+		and value == value
+		and value ~= math.huge
+		and value ~= -math.huge
+	then
+		return value
+	end
+	return default
+end
+
+--[[
+	Grants every row's rewards (friend/group bonus on top of the mode's base coins, Wins for
+	Top) to players still in the server, and returns the rows to show (bonus coins included).
+]]
+local function reward(result: Types.RoundResult): { Types.ResultRow }
+	local rows: { Types.ResultRow } = {}
+	local seen: { [Player]: boolean } = {}
+	for _, row in result.Rows do
+		local player = Players:GetPlayerByUserId(number(row.UserId, 0))
+		if not player or seen[player] then
+			continue -- left the server, or a second row for the same player
+		end
+		seen[player] = true
+		local score = number(row.Score, number(row.Pumpkins, 0))
+		local base = math.max(0, number(row.Coins, 0))
 		-- Friends in the server / group members earn a bit more (Config.Social).
-		coins = math.floor(coins * (1 + RewardsService.BonusPercent(player) / 100) + 0.5)
-		local top = best > 0 and pumpkins == best
+		local coins = math.floor(base * (1 + RewardsService.BonusPercent(player) / 100) + 0.5)
 		DataService.Add(player, "Coins", coins)
 		RewardsService.RoundFinished(player)
-		LeaderboardService.Record(player, pumpkins)
-		if top then
+		if row.Top == true then
 			DataService.Add(player, "Wins", Config.Rewards.TopCollectorWins)
 		end
 		table.insert(rows, {
 			UserId = player.UserId,
 			Name = player.DisplayName,
-			Pumpkins = pumpkins,
+			Score = score,
+			Pumpkins = score,
 			Coins = coins,
-			Survived = survived,
-			Top = top,
+			Survived = row.Survived == true,
+			Top = row.Top == true,
+			Team = if typeof(row.Team) == "string" then row.Team else nil,
+			Badge = if typeof(row.Badge) == "string" then row.Badge else nil,
+			Stat = if typeof(row.Stat) == "string" then row.Stat else nil,
 		})
 	end
-	table.sort(rows, function(a, b)
-		return a.Pumpkins > b.Pumpkins
-	end)
 	return rows
+end
+
+-- Players who took part go back to the lobby spawn (a fresh character: no ghost, no gear)
+-- and must step on the Ready pad again to play the next round.
+local function sendToLobby(players: { Player })
+	ReadyService.Reset(players)
+	for _, player in players do
+		if player.Parent == Players then
+			-- LoadCharacter still works; the type checker flags it as deprecated (there is a
+			-- newer LoadCharacterAsync), hence the cast. pcall: they may leave meanwhile.
+			task.spawn(pcall, (player :: any).LoadCharacter, player)
+		end
+	end
+end
+
+local function clearRoundAttributes()
+	for _, name in { "MapName", "Difficulty", "Mode", "ModeName", "Alive" } do
+		ReplicatedStorage:SetAttribute(name, nil)
+	end
+end
+
+-- Who plays: the ready players with a living character (everyone alive if the owner forced
+-- a start with nobody on the pad).
+local function pickPlayers(forced: boolean): { Player }
+	local list: { Player } = {}
+	for _, player in ReadyService.List() do
+		if aliveHumanoid(player) then
+			table.insert(list, player)
+		end
+	end
+	if #list == 0 and forced then
+		for _, player in Players:GetPlayers() do
+			if aliveHumanoid(player) then
+				table.insert(list, player)
+			end
+		end
+	end
+	return list
+end
+
+-- One full round. Returns false early (back to waiting) when there aren't enough players,
+-- true once a round was played.
+local function playOneRound(): boolean
+	while not canStart() do
+		setState("Waiting for players", 0)
+		task.wait(1)
+	end
+
+	local forced = forcedPlaylist
+	forcedPlaylist = nil
+	local playlistId, difficultyId = VotingService.Run({
+		SetState = setState,
+		AbortIf = function()
+			return not canStart()
+		end,
+		EndIf = function()
+			return startNow
+		end,
+		Forced = forced,
+	})
+	if not playlistId or not difficultyId then
+		forcedPlaylist = forcedPlaylist or forced -- keep the owner's pick for the next try
+		return false
+	end
+	local playlist: Playlists.Playlist = forced or Playlists.Get(playlistId) or Playlists.Fallback()
+
+	local map = MapService.Load(playlist.Map)
+	if map.Id ~= playlist.Map then
+		-- The map was broken and MapService loaded a fallback one: play the fallback mode there.
+		playlist = Playlists.ForMap(map.Id, Config.Modes.FallbackMode)
+	end
+	local mode, modeId = loadMode(playlist.Mode)
+	local modeName = Playlists.ModeName(modeId)
+	local usesDifficulty = Config.Modes.List[modeId] ~= nil
+		and Config.Modes.List[modeId].UsesDifficulty
+	ReplicatedStorage:SetAttribute("MapName", map.Name)
+	ReplicatedStorage:SetAttribute(
+		"Difficulty",
+		if usesDifficulty then Config.Difficulty.Levels[difficultyId].Name else nil
+	)
+	ReplicatedStorage:SetAttribute("Mode", modeId)
+	ReplicatedStorage:SetAttribute("ModeName", modeName)
+
+	countdown("Intermission", Config.Round.IntermissionSeconds, function()
+		return startNow or not canStart()
+	end)
+	local forcedStart = startNow
+	startNow = false
+	local players = if canStart() or forcedStart then pickPlayers(forcedStart) else {}
+	local needed = if forced or forcedStart then 1 else Playlists.MinPlayers(playlist)
+	if #players < needed then
+		setState("Not enough players", 0)
+		task.wait(Config.Round.CancelledSeconds)
+		MapService.Unload()
+		clearRoundAttributes()
+		return false
+	end
+
+	roundPlayers = players
+	activeMode = mode
+	GhostService.BeginRound(map, players)
+	local result = runMode(mode, {
+		Map = map,
+		Players = players,
+		Difficulty = difficultyId,
+		Playlist = playlist,
+		SetState = setState,
+		Countdown = countdown,
+		Teleport = teleport,
+		AliveHumanoid = aliveHumanoid,
+	})
+	activeMode = nil
+	ReplicatedStorage:SetAttribute("Alive", nil)
+
+	local rows = reward(result)
+	GhostService.EndRound()
+	roundResults:FireAllClients(rows, {
+		ScoreLabel = tostring(result.ScoreLabel or ""),
+		Winner = if typeof(result.Winner) == "string" then result.Winner else nil,
+		MvpLine = if typeof(result.MvpLine) == "string" then result.MvpLine else nil,
+		Mode = modeId,
+		ModeName = modeName,
+	})
+	-- Back to the lobby (and back to normal from ghost) while results show.
+	sendToLobby(players)
+	roundPlayers = {}
+	task.spawn(LeaderboardService.Refresh) -- show new totals on the gravestone
+	countdown("Results", Config.Round.ResultsSeconds)
+
+	MapService.Unload()
+	clearRoundAttributes()
+	return true
+end
+
+-- After a round broke: stop whatever was running and put everyone back in the lobby.
+local function recover()
+	local mode = activeMode
+	activeMode = nil
+	local cleanup = mode and mode.Cleanup
+	if cleanup then
+		xpcall(cleanup, function(err: unknown)
+			warn("[GameService] The mode's Cleanup failed too: " .. tostring(err))
+		end)
+	end
+	pcall(VotingService.Close)
+	pcall(GhostService.EndRound)
+	pcall(sendToLobby, roundPlayers)
+	roundPlayers = {}
+	pcall(MapService.Unload)
+	clearRoundAttributes()
+	setState("Waiting for players", 0)
 end
 
 local function loop()
 	while true do
-		while not enoughPlayers() do
-			setState("Waiting for players", 0)
-			task.wait(1)
+		local ok, err = xpcall(playOneRound, debug.traceback)
+		if not ok then
+			warn(
+				("[GameService] A round broke, starting a new one in %d s: %s"):format(
+					Config.Round.ErrorWaitSeconds,
+					tostring(err)
+				)
+			)
+			recover()
+			task.wait(Config.Round.ErrorWaitSeconds)
 		end
+	end
+end
 
-		local mapId, difficultyId = VotingService.Run(setState, function()
-			return not enoughPlayers()
-		end)
-		if not mapId or not difficultyId then
-			continue
+-- Owner buttons in the F8 admin panel (AdminService).
+local function registerAdminCommands()
+	AdminService.Register("StartRoundNow", "Start round now", function(_player, _data)
+		local state = ReplicatedStorage:GetAttribute("State")
+		if state == "Playing" then
+			return "A round is already being played."
 		end
+		startNow = true
+		return "Starting: skips the wait, the vote and the Ready pad (everyone plays if nobody is ready)."
+	end)
 
-		local map = MapService.Load(mapId)
-		ReplicatedStorage:SetAttribute("MapName", map.Name)
-		ReplicatedStorage:SetAttribute("Difficulty", Config.Difficulty.Levels[difficultyId].Name)
-
-		countdown("Intermission", Config.Round.IntermissionSeconds, function()
-			return not enoughPlayers()
-		end)
-		if enoughPlayers() then
-			local rows = playRound(map, difficultyId)
-			roundResults:FireAllClients(rows)
-			GhostService.EndRound()
-			-- Back to the lobby (and back to normal from ghost) while results show.
-			for _, row in rows do
-				local player = Players:GetPlayerByUserId(row.UserId)
-				if player then
-					task.spawn(player.LoadCharacter, player)
+	if RunService:IsStudio() or Config.Modes.ForceModeInLiveServers then
+		AdminService.Register("ForceMode", "Force mode", function(_player, _data)
+			local list = Playlists.Enabled()
+			if #list == 0 then
+				forcedPlaylist = nil
+				return "No playlist has its mode switched on in Config.Features."
+			end
+			local index = 0
+			if forcedPlaylist then
+				for i, playlist in list do
+					if playlist.Id == forcedPlaylist.Id then
+						index = i
+					end
 				end
 			end
-			task.spawn(LeaderboardService.Refresh) -- show new totals on the gravestone
-			countdown("Results", Config.Round.ResultsSeconds)
-		end
-
-		MapService.Unload()
-		ReplicatedStorage:SetAttribute("MapName", nil)
-		ReplicatedStorage:SetAttribute("Difficulty", nil)
+			forcedPlaylist = list[index + 1] -- after the last one: nil = a normal vote again
+			if forcedPlaylist then
+				return ("Next round: %s (any player count). Press again for the next one."):format(
+					forcedPlaylist.Name
+				)
+			end
+			return "Next round: normal vote."
+		end)
 	end
 end
 
 function GameService.Start()
 	roundResults = Remotes.Event("RoundResults")
+	registerAdminCommands()
 	task.spawn(loop)
 end
 

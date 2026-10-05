@@ -1,12 +1,16 @@
 --!strict
 --[[
 	Results screen after each round (timings, text and colours in Config.Results):
-	  - slides in, rows appear one after another, sorted by pumpkins
-	  - the top collector gets an MVP spotlight with their avatar headshot
+	  - slides in, rows appear one after another, best score first
+	  - the top player gets an MVP spotlight with their avatar headshot
 	  - everyone's coins count up; your own count plays the coin sound
-	  - survivors get a "Survived!" badge, caught players "Caught"
+	  - survivors get a "Survived!" badge, caught players "Caught" (a mode can send its own
+	    badge text, team and extra detail per row)
 	  - your own row is highlighted (and always shown, even outside the top N)
 	  - "Next round in X" counts down with the server's Results timer
+	Server -> client: RoundResults(rows, info). info.ScoreLabel heads the score column (e.g.
+	"Pumpkins"); info.Winner (optional) shows under the title; info.MvpLine (optional) is the
+	MVP text ("%s" = name, "%d" = score).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,14 +23,24 @@ local Layout = require(script.Parent.Layout)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
 
+-- The same shape as src/server/Modes/Types.luau ResultRow.
 type ResultRow = {
 	UserId: number,
 	Name: string,
+	Score: number?,
 	Pumpkins: number,
 	Coins: number,
 	Survived: boolean,
 	Top: boolean,
+	Team: string?,
+	Badge: string?,
+	Stat: string?,
 }
+type ResultInfo = { ScoreLabel: string?, Winner: string?, MvpLine: string? }
+
+local function scoreOf(row: ResultRow): number
+	return if typeof(row.Score) == "number" then row.Score else row.Pumpkins
+end
 
 local ResultsUI = {}
 
@@ -105,7 +119,7 @@ function ResultsUI.Mount(gui: ScreenGui)
 		end
 	end
 
-	local function mvpSpotlight(result: ResultRow, order: number)
+	local function mvpSpotlight(result: ResultRow, order: number, mvpLine: string)
 		local box = Instance.new("Frame")
 		box.Name = "Mvp"
 		box.BackgroundTransparency = 1
@@ -162,7 +176,10 @@ function ResultsUI.Mount(gui: ScreenGui)
 		title.TextXAlignment = Enum.TextXAlignment.Left
 		title.Position = UDim2.fromOffset(130, 18)
 		title.Size = UDim2.new(1, -140, 0, 34)
-		local line = Theme.label(text.MvpLine:format(result.Name, result.Pumpkins), 18, box)
+		-- A mode's own MvpLine might not have exactly "%s ... %d"; never let that break the screen.
+		local ok, formatted =
+			pcall(string.format, mvpLine, result.Name, math.floor(scoreOf(result)))
+		local line = Theme.label(if ok then formatted else result.Name, 18, box)
 		line.TextXAlignment = Enum.TextXAlignment.Left
 		line.TextWrapped = true
 		line.Position = UDim2.fromOffset(130, 54)
@@ -212,29 +229,44 @@ function ResultsUI.Mount(gui: ScreenGui)
 			frame.BackgroundTransparency = 0.6
 			frame.BackgroundColor3 = cfg.Colors.MyRow
 		end
-		cell(frame, 1, ("%d. %s"):format(rank, result.Name), Theme.Text, 17)
-		cell(frame, 2, tostring(result.Pumpkins), Theme.Text, 17)
+		-- "1. Name", plus the team and any extra detail the mode sent ("1. Name (Seekers, found 3)").
+		local extras = {}
+		for _, extra in { result.Team, result.Stat } do
+			if typeof(extra) == "string" and extra ~= "" then
+				table.insert(extras, extra)
+			end
+		end
+		local name = ("%d. %s"):format(rank, result.Name)
+		if #extras > 0 then
+			name ..= (" (%s)"):format(table.concat(extras, ", "))
+		end
+		cell(frame, 1, name, Theme.Text, 17)
+		cell(frame, 2, tostring(scoreOf(result)), Theme.Text, 17)
 		local coins = cell(frame, 3, "+0", Theme.Selected, 17)
 		local slot = Instance.new("Frame")
 		slot.BackgroundTransparency = 1
 		slot.Position = UDim2.fromScale(COLUMNS[4].X, 0)
 		slot.Size = UDim2.fromScale(COLUMNS[4].Width, 1)
 		slot.Parent = frame
-		if result.Top and result.Pumpkins > 0 then
+		local custom = if typeof(result.Badge) == "string" and result.Badge ~= ""
+			then result.Badge
+			else nil
+		if result.Top and scoreOf(result) > 0 then
 			badge(text.Mvp, cfg.Colors.Mvp, slot)
 		elseif result.Survived then
-			badge(text.Survived, cfg.Colors.Survived, slot)
+			badge(custom or text.Survived, cfg.Colors.Survived, slot)
 		else
-			badge(text.Caught, cfg.Colors.Caught, slot)
+			badge(custom or text.Caught, cfg.Colors.Caught, slot)
 		end
 		frame.Visible = false
 		return { Label = coins, Total = result.Coins, Mine = mine }
 	end
 
-	roundResults.OnClientEvent:Connect(function(rows: { ResultRow })
+	roundResults.OnClientEvent:Connect(function(rows: { ResultRow }, info: ResultInfo?)
 		if typeof(rows) ~= "table" then
 			return
 		end
+		local details: ResultInfo = if typeof(info) == "table" then info else {}
 		clear()
 		hideToken += 1
 		local token = hideToken
@@ -244,15 +276,32 @@ function ResultsUI.Mount(gui: ScreenGui)
 		title.LayoutOrder = 0
 		title.Size = UDim2.new(1, -24, 0, 34)
 
+		-- e.g. "The Seekers win!" (only modes with teams send one).
+		if typeof(details.Winner) == "string" and details.Winner ~= "" then
+			local winner = Theme.label(details.Winner, 20, panel)
+			winner.Name = "Winner"
+			winner.TextColor3 = cfg.Colors.Mvp
+			winner.LayoutOrder = 0
+			winner.Size = UDim2.new(1, -24, 0, 24)
+			title.LayoutOrder = -1
+		end
+
 		local top = rows[1]
-		if top and top.Top and top.Pumpkins > 0 then
-			mvpSpotlight(top, 1)
+		if top and top.Top and scoreOf(top) > 0 then
+			local mvpLine = if typeof(details.MvpLine) == "string"
+				then details.MvpLine
+				elseif typeof(details.ScoreLabel) == "string" then text.MvpLineDefault
+				else text.MvpLine
+			mvpSpotlight(top, 1, mvpLine)
 		end
 
 		local header = row(panel, 2)
 		header.Size = UDim2.new(1, -24, 0, 22)
+		local scoreLabel = if typeof(details.ScoreLabel) == "string"
+			then details.ScoreLabel
+			else text.ScoreLabel
 		for i, column in COLUMNS do
-			cell(header, i, column.Header, Theme.Muted, 14)
+			cell(header, i, if i == 2 then scoreLabel else column.Header, Theme.Muted, 14)
 		end
 
 		local list = Instance.new("ScrollingFrame")

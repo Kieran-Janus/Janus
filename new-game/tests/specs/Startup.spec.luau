@@ -101,9 +101,10 @@ describe("Main.client.luau", function()
 		expect(order[1]).toBe("MenuUI")
 	end)
 
+	-- (Spectate is real now and needs the server's remotes: modules.spec mounts it against a
+	-- replicated server, and Rounds.spec tests the Ready pad and playlist logic.)
 	local stubs = {
 		MenuUI = "Menu",
-		Spectate = "LobbySpectate",
 		CrateUI = "Crates",
 		ParkourUI = "Parkour",
 		CandyRushUI = "CandyRush",
@@ -123,10 +124,6 @@ describe("Main.client.luau", function()
 	end
 
 	it("answers the Menu's calls", function()
-		local Spectate = client:require(folder.Spectate)
-		Spectate.Toggle()
-		Spectate.Stop()
-		expect(Spectate.IsActive()).toBe(false)
 		local CrateUI = client:require(folder.CrateUI)
 		CrateUI.Open("PumpkinCrate")
 		CrateUI.Open(nil)

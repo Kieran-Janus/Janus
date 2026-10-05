@@ -6,6 +6,7 @@ Roblox game written in Luau, synced to Studio with Rojo. This project is indepen
 - `src/shared/` -> ReplicatedStorage.Shared (Config, Remotes, Tags, Items, Lobby, shared modules)
 - `src/shared/Config/` -> the Config ModuleScript: `init.luau` (the main table) plus one short file per v2 feature (`Features`, `Modes`, `Lobby`, `Parkour`, `Minigames`, `EasterEggs`, `HideSeek`, `ScareMaze`, `Rarity`, `Crates`, `Menu`), `Maps/<Id>.luau` (one per round map, listed in `Config.Maps.List`) and `Skins/` (crate skins, appended to `Config.Shop.Items`). Still required as `ReplicatedStorage.Shared.Config`.
 - `src/server/` -> ServerScriptService.Server (`Main.server.luau` starts the services listed in its `ORDER`, each in `Services/`, each in its own pcall)
+- `src/server/Modes/` -> one module per game mode (`KingHunt`, `HideSeek`, `ScareMaze`) with `Run(ctx) -> RoundResult` (types and contract in `Modes/Types.luau`). `GameService` runs the loop (ready players, playlist vote, map, countdowns, rewards, results, back to lobby); a mode only plays and scores the round. Playlists (mode + map) are in `Config.Modes`, helpers in `src/shared/Playlists.luau`.
 - `src/client/` -> StarterPlayerScripts.Client (`Main.client.luau` mounts the modules listed in its `ORDER`, each in its own thread)
 - `Packages/` -> Wally packages (git-ignored)
 - `tools/ai-proxy/` -> Cloudflare Worker that proxies Claude for in-game NPCs
