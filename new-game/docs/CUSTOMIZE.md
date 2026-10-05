@@ -29,6 +29,7 @@ Test anything fast in a Studio playtest with **F8** (admin panel): +Coins, Unloc
 | Ghost mode rules (fly speed, haunt) | `Config.Ghost` |
 | Voice range and echo | `Config.Voice` |
 | Hub layout, colours, lighting, music, decorations | `Config.Hub` (then F8 > Rebuild hub, or delete `Workspace.Hub`) |
+| Hub terrain, forest, mansion, statue, fence, glowing paths | `Config.Hub.Polish` (same rebuild) |
 | NPC names, positions, dialogue | `Config.Npcs.List` |
 | Shop items and prices (hats, trails, pets, skins) | `Config.Shop.Items` |
 | VIP perks, Robux products | `Config.Monetization` (IDs from Creator Hub) |

@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local Kit = require(script.Parent.Parent.Build.Kit)
+local HubExtras = require(script.Parent.HubExtras)
 
 local HubBuilder = {}
 
@@ -1297,6 +1298,7 @@ function HubBuilder.Build(): Model
 	buildDeadTrees(hub)
 	buildAmbientParticles(hub)
 	buildNpcs(hub)
+	HubExtras.Build(hub) -- terrain, forest, mansion, statue, fence, paths (Config.Hub.Polish)
 	HubBuilder.ApplyCustomNpcs(hub)
 	HubBuilder.ApplyMusic(hub)
 	hub.PrimaryPart = ground

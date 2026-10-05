@@ -603,7 +603,7 @@ local Config = {
 		Name = "Spooky Town Square",
 		Center = Vector3.new(0, 0, 0), -- top of the baseplate
 		Seed = 31, -- random variation in decorations
-		Radius = 70, -- cobblestone plaza
+		Radius = 105, -- cobblestone plaza (room for 32 players)
 		GroundColor = Color3.fromRGB(88, 78, 96),
 		GroundMaterial = Enum.Material.Cobblestone,
 		Spawn = { Offset = Vector3.new(0, 0, 24), Size = Vector3.new(14, 1, 14) },
@@ -655,11 +655,11 @@ local Config = {
 			ClockTime = { Hour = 11, Minute = 55 }, -- the hands are frozen just before midnight
 		},
 		Cauldron = { Offset = Vector3.new(0, 0, 0), Radius = 5 },
-		Lampposts = { Count = 10, Radius = 60, Height = 14 },
+		Lampposts = { Count = 14, Radius = 92, Height = 14 },
 		Bunting = { FlagsPerSpan = 9, Sag = 2.5, Colors = { "Orange", "Purple", "Green" } },
-		JackOLanterns = { Count = 16, Radius = 52, Size = 3 },
+		JackOLanterns = { Count = 16, Radius = 78, Size = 3 },
 		Candles = {
-			Count = 18,
+			Count = 26,
 			MinRadius = 10,
 			MaxRadius = 34,
 			MinHeight = 8,
@@ -678,6 +678,44 @@ local Config = {
 			},
 		},
 		Cobwebs = { Size = 5 },
+		-- Extra dressing around the plaza (src/server/Hub/HubExtras.luau).
+		Polish = {
+			Terrain = {
+				Enabled = true, -- grass ground, hills and mud around the plaza
+				Radius = 320, -- studs of ground around the hub
+				Depth = 6,
+				Hills = 16,
+				HillRingMin = 160, -- hills stay this far out...
+				HillRingMax = 300, -- ...and inside this
+				HillMinRadius = 22,
+				HillMaxRadius = 46,
+				MudPatches = 12,
+				HideBaseplate = true, -- the default Baseplate becomes invisible (still solid underneath)
+			},
+			Forest = { Count = 26, RingMin = 125, RingMax = 200, MinHeight = 16, MaxHeight = 28 },
+			Mansion = { -- a dark haunted house on a hill far behind the clock tower
+				Offset = Vector3.new(0, 0, -330),
+				HillRadius = 70,
+				HillSink = 45, -- how far the hill's centre is below the ground (higher = flatter hill)
+				Size = Vector3.new(64, 30, 30),
+				WindowColor = Color3.fromRGB(255, 170, 60),
+				Color = Color3.fromRGB(28, 22, 36),
+			},
+			KingStatue = { Offset = Vector3.new(0, 0, -30), Height = 16 },
+			PumpkinPatch = { Offset = Vector3.new(76, 0, 8), Radius = 12, Pumpkins = 14 },
+			ExtraGraves = { Offset = Vector3.new(-80, 0, 50), Spread = 14, Count = 10 },
+			Fence = { Radius = 110, PostSpacing = 10, Height = 4.5, Gaps = 4, GapWidth = 16 },
+			-- Glowing stepping stones from the spawn pad to each NPC.
+			Paths = {
+				Spacing = 4.5,
+				StoneSize = 2.4,
+				StopShort = 7, -- studs before the NPC
+				Color = Color3.fromRGB(200, 105, 35), -- dim orange: Neon glows a lot
+				Transparency = 0.55,
+			},
+			Cobwebs = 8, -- on fence posts
+			FogRate = 5, -- ground fog along the fence
+		},
 		DeadTrees = {
 			Offsets = {
 				Vector3.new(-62, 0, -30),
