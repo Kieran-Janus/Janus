@@ -22,27 +22,45 @@ return {
 	} :: { [string]: { Offset: Vector3, Size: Vector3, Height: number? } },
 
 	-- The Ready pad (Config.Features.ReadyPad): stand on it to join the next round.
+	-- The pad is any part tagged ReadyPad (src/shared/Tags.luau): move, resize, recolour or
+	-- duplicate it in Studio and it keeps working. Round pads (cylinders) work too.
+	-- With no ReadyPad part in the game, everyone in the lobby counts as ready (a warning
+	-- in the Output window says so), so rounds still start.
 	Ready = {
-		MinReady = 1, -- a vote starts once this many players are ready
+		MinReady = 1, -- a vote starts once this many players are ready (2 = never alone)
 		CheckSeconds = 0.25, -- how often the server checks who is standing on the pad
-		PadHeight = 8, -- studs above the pad's top that still count as standing on it (jumping is fine)
-		VoteOnlyReady = true, -- true = only ready players can vote
+		PadHeight = 12, -- studs above the pad's top that still count as standing on it (jumping is fine)
+		EdgeMargin = 1, -- studs past the pad's edge that still count (feet hanging over the side)
+		LeaveGraceSeconds = 1, -- stepping off for less than this doesn't un-ready you (wobbles, jumps)
+		VoteOnlyReady = true, -- true = only ready players can vote (others see the vote greyed out)
 		PadText = "Stand here to play!",
+		Text = { -- shown on the top bar and the vote panel
+			Count = "Ready: %d/%d", -- ready players / players needed
+			StandOnPad = "Stand on the Ready pad to play",
+			YoureReady = "You're ready!",
+			NextRound = "Stand on the Ready pad to play next round",
+			ReadyNextRound = "You're ready for the next round",
+			VoteHint = "Stand on the Ready pad to vote",
+		},
 	},
 
-	-- Watching the round from the lobby (Config.Features.LobbySpectate): Menu > Spectate.
+	-- Watching the round from the lobby (Config.Features.LobbySpectate): Menu > Spectate, or the
+	-- "Watch the round" button the lobby shows while a round is being played.
+	-- Keys: change the lists below (keyboard keys and gamepad buttons both work).
 	Spectate = {
-		NextKey = Enum.KeyCode.X, -- next player (E is taken by prompts, Q/G/H/T by other actions)
-		PreviousKey = Enum.KeyCode.Z, -- previous player
-		NextButton = Enum.KeyCode.ButtonR1, -- the same on a gamepad
-		PreviousButton = Enum.KeyCode.ButtonL1,
+		NextKeys = { Enum.KeyCode.E, Enum.KeyCode.Right, Enum.KeyCode.ButtonR1 }, -- next player
+		PreviousKeys = { Enum.KeyCode.Q, Enum.KeyCode.Left, Enum.KeyCode.ButtonL1 }, -- previous player
+		ShowWatchButton = true, -- false = only the Menu's Spectate tile starts watching
+		MessageSeconds = 2.5, -- how long "Nobody is playing right now." stays up
 		Text = {
 			Watching = "Watching %s", -- %s = the player's name
 			King = "Watching the Pumpkin King",
 			Nobody = "Nobody is playing right now.",
+			NobodyLeft = "Nobody left to watch",
 			Next = "Next",
 			Previous = "Back",
-			Stop = "Stop watching",
+			Stop = "Stop",
+			WatchButton = "Watch the round",
 		},
 	},
 }

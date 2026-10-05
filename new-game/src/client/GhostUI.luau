@@ -4,7 +4,7 @@
 	  - mode buttons: Spectate / Haunt / Ghost chat (SetGhostMode)
 	  - Haunt mode: a Haunt button (H) with its cooldown
 	  - Spectate mode: camera follows a survivor or a King, with previous/next buttons and a
-	    "Watch King" button
+	    "Watch King" button (who can be watched: src/client/SpectateTargets.luau)
 	  - the moment you're caught, a short camera orbit around the King (Config.Ghost.HauntCam)
 ]]
 local ContextActionService = game:GetService("ContextActionService")
@@ -15,6 +15,7 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Layout = require(script.Parent.Layout)
+local SpectateTargets = require(script.Parent.SpectateTargets)
 local Theme = require(script.Parent.Theme)
 
 local GhostUI = {}
@@ -100,72 +101,17 @@ function GhostUI.Mount(gui: ScreenGui)
 	nextButton.Size = UDim2.new(0, 44, 1, 0)
 
 	-- Spectating ---------------------------------------------------------------
-	-- A target is a surviving Player or a King Model.
+	-- A target is a surviving Player or a King Model (src/client/SpectateTargets.luau).
 	local target: Instance? = nil
-
-	local function kings(): { Model }
-		local list = {}
-		local map = workspace:FindFirstChild("Map")
-		if map then
-			for _, child in map:GetChildren() do
-				if child.Name == "PumpkinKing" and child:IsA("Model") then
-					table.insert(list, child)
-				end
-			end
-		end
-		return list
-	end
-
-	-- Everything you can watch: the Kings first, then the survivors.
-	local function targets(): { Instance }
-		local list: { Instance } = {}
-		for _, king in kings() do
-			table.insert(list, king)
-		end
-		for _, other in Players:GetPlayers() do
-			if other:GetAttribute("InRound") and not other:GetAttribute("Out") then
-				table.insert(list, other)
-			end
-		end
-		return list
-	end
+	local kings = SpectateTargets.Kings
 
 	local function label(t: Instance): string
-		if t:IsA("Player") then
-			return "Watching " .. t.DisplayName
-		end
-		return "Watching " .. Config.King.Name
+		return "Watching " .. SpectateTargets.Name(t)
 	end
 
 	local function watch(step: number)
-		local list = targets()
-		if #list == 0 then
-			target = nil
-			watching.Text = "Nobody left to watch"
-			return
-		end
-		local index = (target and table.find(list, target)) or 0
-		target = list[(index + step - 1) % #list + 1]
-		watching.Text = label(target :: Instance)
-	end
-
-	local function stillWatchable(t: Instance?): boolean
-		if not t or t.Parent == nil then
-			return false
-		end
-		if t:IsA("Player") then
-			return t:GetAttribute("Out") ~= true
-		end
-		return true
-	end
-
-	-- The Humanoid the camera should follow for a target.
-	local function subjectOf(t: Instance?): Humanoid?
-		if not t then
-			return nil
-		end
-		local model = if t:IsA("Player") then t.Character else t
-		return model and model:FindFirstChildOfClass("Humanoid")
+		target = SpectateTargets.Step(target, step)
+		watching.Text = if target then label(target) else "Nobody left to watch"
 	end
 
 	watchKing.Activated:Connect(function()
@@ -193,13 +139,14 @@ function GhostUI.Mount(gui: ScreenGui)
 	end)
 
 	local hauntCamUntil = 0
+	local restoreCamera = SpectateTargets.RestoreCamera
 
-	local function restoreCamera()
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			local camera = workspace.CurrentCamera
-			camera.CameraSubject = humanoid
+	-- A ghost spectating from the lobby needs the map streamed to it.
+	local streaming = false
+	local function setStreaming(on: boolean)
+		if on ~= streaming then
+			streaming = on
+			SpectateTargets.StreamMap(on)
 		end
 	end
 
@@ -274,6 +221,7 @@ function GhostUI.Mount(gui: ScreenGui)
 		wasOut = out
 		local mode = player:GetAttribute("GhostMode")
 		panel.Visible = out
+		setStreaming(out and mode == "Spectate")
 		if not out then
 			ContextActionService:UnbindAction("Haunt")
 			if target then
@@ -323,14 +271,10 @@ function GhostUI.Mount(gui: ScreenGui)
 			return -- the haunt cam has the camera for a moment
 		end
 		if player:GetAttribute("GhostMode") == "Spectate" then
-			if not stillWatchable(target) then
+			if not SpectateTargets.Watchable(target) then
 				watch(1)
 			end
-			local humanoid = subjectOf(target)
-			if humanoid and workspace.CurrentCamera.CameraSubject ~= humanoid then
-				local camera = workspace.CurrentCamera
-				camera.CameraSubject = humanoid
-			end
+			SpectateTargets.Follow(target)
 		elseif hauntButton.Visible then
 			local readyAt = player:GetAttribute("HauntReadyAt") or 0
 			local remaining = readyAt - workspace:GetServerTimeNow()

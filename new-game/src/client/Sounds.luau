@@ -129,11 +129,13 @@ function Sounds.Mount()
 	end)
 
 	-- Round --------------------------------------------------------------------------------------
+	-- Players waiting in the lobby during someone else's round don't hear its start or its
+	-- last-seconds ticks (they only hear the vote and intermission countdowns).
 	local tick = Config.Sounds.CountdownTick
 	local lastState = ReplicatedStorage:GetAttribute("State")
 	ReplicatedStorage:GetAttributeChangedSignal("State"):Connect(function()
 		local state = ReplicatedStorage:GetAttribute("State")
-		if state == "Playing" and lastState ~= "Playing" then
+		if state == "Playing" and lastState ~= "Playing" and player:GetAttribute("InRound") then
 			Sounds.Play("RoundStart")
 		end
 		lastState = state
@@ -146,6 +148,7 @@ function Sounds.Mount()
 			and left > 0
 			and left <= tick.LastSeconds
 			and table.find(tick.States, state)
+			and (state ~= "Playing" or player:GetAttribute("InRound"))
 		then
 			Sounds.Play("CountdownTick")
 		end

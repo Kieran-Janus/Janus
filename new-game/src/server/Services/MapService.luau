@@ -5,11 +5,19 @@
 	src/server/Maps/<Builder>.luau from Config.Maps.List[i].
 	The loaded model is Workspace.Map with attribute MapId; the client uses it to switch to
 	the map's lighting and ambient sound (src/client/ZoneLighting.luau).
+
+	A map must have a part named "Floor" and a folder named after its SpawnFolder with spawn
+	parts in it. If a map is broken (missing those, or its builder errors), the Output window
+	says what is wrong and the game carries on with the next thing that works: the same map
+	built from code, then the first map made for Config.Modes.FallbackMode. So the returned
+	map's Id can differ from the one asked for.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+local Tags = require(game:GetService("ReplicatedStorage").Shared.Tags)
 local Builders = script.Parent.Parent.Maps
 
 export type LoadedMap = {
@@ -34,61 +42,126 @@ function MapService.Get(id: string): any
 	return nil
 end
 
-function MapService.Load(id: string): LoadedMap
-	MapService.Unload()
-	local def = MapService.Get(id)
-	assert(def, "unknown map " .. id)
+-- The hand-made copy of a map in ServerStorage.Maps, if there is one.
+local function handMade(id: string): Model?
+	local folder = ServerStorage:FindFirstChild("Maps")
+	local source = folder and folder:FindFirstChild(id)
+	return if source and source:IsA("Model") then source else nil
+end
 
-	local mapsFolder = ServerStorage:FindFirstChild("Maps")
-	local source = mapsFolder and mapsFolder:FindFirstChild(id)
+local function partsIn(folder: Instance?): { BasePart }
+	local parts: { BasePart } = {}
+	if folder then
+		for _, child in folder:GetChildren() do
+			if child:IsA("BasePart") then
+				table.insert(parts, child)
+			end
+		end
+	end
+	return parts
+end
+
+--[[
+	Makes one map (cloned from ServerStorage.Maps when `useHandMade`, else built from code) and
+	checks it has a Floor and spawns before it goes into Workspace. Errors with a short
+	reason if anything is wrong; a broken map never stays in Workspace.
+]]
+local function make(def: any, useHandMade: boolean): LoadedMap
+	local id: string = def.Id
+	local source = if useHandMade then handMade(id) else nil
 	local model: Model
-	if source and source:IsA("Model") then
+	if source then
 		model = source:Clone()
 		model:PivotTo(CFrame.new(Config.Maps.Origin))
 	else
-		local builder = Builders:FindFirstChild(def.Builder or "")
-		assert(
-			builder and builder:IsA("ModuleScript"),
-			id .. " has no ServerStorage map or Builder"
-		)
-		model = (require :: any)(builder).Build(def)
+		local builder = Builders:FindFirstChild(tostring(def.Builder or ""))
+		if not (builder and builder:IsA("ModuleScript")) then
+			error(("no builder src/server/Maps/%s.luau"):format(tostring(def.Builder)), 0)
+		end
+		local built = (require :: any)(builder).Build(def)
+		if typeof(built) ~= "Instance" or not built:IsA("Model") then
+			error("its builder's Build(def) didn't return a Model", 0)
+		end
+		model = built
 	end
+
+	local floor = model:FindFirstChild("Floor", true)
+	local spawnFolder = model:FindFirstChild(tostring(def.SpawnFolder))
+		or model:FindFirstChild(tostring(def.SpawnFolder), true)
+	local spawns = partsIn(spawnFolder)
+	local problem = if not (floor and floor:IsA("BasePart"))
+		then "it has no part named Floor"
+		elseif #spawns == 0 then ("its %s folder has no spawn parts"):format(
+			tostring(def.SpawnFolder)
+		)
+		else nil
+	if problem or not (floor and floor:IsA("BasePart")) then
+		model:Destroy()
+		error(problem or "it has no part named Floor", 0)
+	end
+
 	model.Name = "Map"
 	model:SetAttribute("MapId", id)
 	model.Parent = workspace
-
-	local floor = model:FindFirstChild("Floor", true)
-	assert(floor and floor:IsA("BasePart"), id .. " has no Floor part")
-	local spawns: { BasePart } = {}
-	local spawnFolder = model:FindFirstChild(def.SpawnFolder)
-	if spawnFolder then
-		for _, child in spawnFolder:GetChildren() do
-			if child:IsA("BasePart") then
-				table.insert(spawns, child)
-			end
-		end
-	end
-	assert(#spawns > 0, id .. " has no spawns")
-	local hotspots: { BasePart } = {}
-	local hotspotFolder = model:FindFirstChild("Hotspots")
-	if hotspotFolder then
-		for _, child in hotspotFolder:GetChildren() do
-			if child:IsA("BasePart") then
-				table.insert(hotspots, child)
-			end
-		end
-	end
-
-	local loaded: LoadedMap = {
+	return {
 		Id = id,
 		Name = def.Name,
 		Model = model,
 		Floor = floor,
 		Spawns = spawns,
-		Hotspots = hotspots,
+		Hotspots = partsIn(model:FindFirstChild("Hotspots")),
 	}
-	current = loaded
-	return loaded
+end
+
+-- Loads map `id` (unloading the current one). Never leaves the game without a map: see the
+-- header for what happens when a map is broken. Errors only if no map at all can be made.
+function MapService.Load(id: string): LoadedMap
+	MapService.Unload()
+	type Attempt = { Def: any, HandMade: boolean }
+	local attempts: { Attempt } = {}
+	local def = MapService.Get(id)
+	if def then
+		if handMade(id) then
+			table.insert(attempts, { Def = def, HandMade = true })
+		end
+		table.insert(attempts, { Def = def, HandMade = false })
+	else
+		warn(("[MapService] There is no map %q in Config.Maps.List."):format(tostring(id)))
+	end
+	-- Last resort: the maps made for the fallback mode (King Hunt), hand-made or from code.
+	local fallbackMode = Config.Modes.FallbackMode
+	for _, other in Config.Maps.List do
+		if other ~= def and (other.Modes == nil or table.find(other.Modes, fallbackMode)) then
+			if handMade(other.Id) then
+				table.insert(attempts, { Def = other, HandMade = true })
+			end
+			table.insert(attempts, { Def = other, HandMade = false })
+		end
+	end
+
+	for _, attempt in attempts do
+		local ok, result = pcall(make, attempt.Def, attempt.HandMade)
+		if ok then
+			if attempt.Def ~= def then
+				warn(
+					("[MapService] Loaded %s instead of %s so the round can still be played."):format(
+						attempt.Def.Id,
+						tostring(id)
+					)
+				)
+			end
+			current = result
+			return result
+		end
+		warn(
+			("[MapService] Map %s (%s) is broken: %s"):format(
+				tostring(attempt.Def.Id),
+				if attempt.HandMade then "hand-made, ServerStorage.Maps" else "built from code",
+				tostring(result)
+			)
+		)
+	end
+	error("[MapService] No map could be loaded: check Config.Maps.List and src/server/Maps/.")
 end
 
 function MapService.Unload()
@@ -158,12 +231,21 @@ function MapService.RandomHotspotPoint(map: LoadedMap, attempts: number, height:
 	return nil
 end
 
--- Where players stand between rounds: the hub spawn pad (or any SpawnLocation as a fallback).
+-- Where players stand between rounds: a part tagged HubSpawn, else the hub's Spawn pad (or
+-- any SpawnLocation as a fallback).
 function MapService.LobbyCFrame(): CFrame
+	local spawn: Instance? = nil
+	for _, tagged in CollectionService:GetTagged(Tags.HubSpawn) do
+		if tagged:IsA("BasePart") and tagged:IsDescendantOf(workspace) then
+			spawn = tagged
+			break
+		end
+	end
 	local hub = workspace:FindFirstChild("Hub")
-	local spawn = (hub and hub:FindFirstChild("Spawn"))
+	spawn = spawn
+		or (hub and hub:FindFirstChild("Spawn"))
 		or workspace:FindFirstChildOfClass("SpawnLocation")
-	local position = if spawn then spawn.Position else Vector3.zero
+	local position = if spawn and spawn:IsA("BasePart") then spawn.Position else Vector3.zero
 	return CFrame.new(position + Vector3.new(0, Config.Maps.SpawnHeight, 0))
 end
 

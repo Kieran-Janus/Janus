@@ -50,9 +50,9 @@ return function(t: any)
 		t.eq(order[1], "MenuUI", "the Menu mounts first")
 	end)
 
-	-- Placeholder modules: name -> feature switch.
+	-- Placeholder modules: name -> feature switch. (ReadyService and Spectate are real now:
+	-- their pure logic is tested in Rounds.spec.luau.)
 	local serverStubs = {
-		ReadyService = "ReadyPad",
 		ParkourService = "Parkour",
 		CandyRushService = "CandyRush",
 		WebScourService = "WebScour",
@@ -61,7 +61,6 @@ return function(t: any)
 	}
 	local clientStubs = {
 		MenuUI = "Menu",
-		Spectate = "LobbySpectate",
 		CrateUI = "Crates",
 		ParkourUI = "Parkour",
 		CandyRushUI = "CandyRush",
@@ -81,8 +80,6 @@ return function(t: any)
 			end
 			Config.Features[feature] = saved
 		end
-		local ReadyService = require(t.Server.Services.ReadyService) :: any
-		t.eq(#ReadyService.List(), 0, "no players in tests")
 	end)
 
 	t.test("placeholder UIs mount with their feature on and off", function()
@@ -95,10 +92,6 @@ return function(t: any)
 			end
 			Config.Features[feature] = saved
 		end
-		local Spectate = require(t.Client.Spectate) :: any
-		Spectate.Toggle()
-		Spectate.Stop()
-		t.eq(Spectate.IsActive(), false)
 		local CrateUI = require(t.Client.CrateUI) :: any
 		CrateUI.Open("PumpkinCrate")
 		CrateUI.Open(nil)

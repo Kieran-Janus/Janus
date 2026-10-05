@@ -47,12 +47,17 @@ local Config = {
 		Version = "0.1.0",
 	},
 
+	-- The round loop (src/server/Services/GameService.luau), the same for every game mode:
+	-- Waiting for players -> Voting -> Intermission -> play -> Results -> again.
+	-- How many players a round needs: Config.Lobby.Ready.MinReady (Config/Lobby.luau).
 	Round = {
-		MinPlayers = 1,
 		IntermissionSeconds = 5, -- after voting, while the map loads
-		Duration = 300, -- seconds of play per round
+		Duration = 300, -- seconds of play per King Hunt round (other modes: their own file)
 		ResultsSeconds = 10, -- how long the results screen stays up
 		ResultsShowTop = 10, -- rows on the results screen
+		CancelledSeconds = 3, -- "Not enough players" shows this long when a round is called off
+		ErrorWaitSeconds = 5, -- if a round breaks (a bug), wait this long, then start a new one
+		SafetyLimitSeconds = 1200, -- a round still going after this long is stopped (only a bug does that)
 	},
 
 	-- First-round tutorial for new players (RoundsPlayed = 0 and not TutorialDone): Boo Guide
@@ -122,7 +127,9 @@ local Config = {
 		Text = {
 			Title = "Round over!",
 			Mvp = "MVP",
-			MvpLine = "%s collected %d pumpkins!", -- name, pumpkins
+			MvpLine = "%s collected %d pumpkins!", -- King Hunt: name, pumpkins
+			MvpLineDefault = "%s got the top score: %d!", -- other modes, unless they send their own
+			ScoreLabel = "Pumpkins", -- King Hunt's score column (other modes send their own)
 			Survived = "Survived!",
 			Caught = "Caught",
 			NextRound = "Next round in %d",
@@ -136,9 +143,11 @@ local Config = {
 		},
 	},
 
+	-- The vote before each round (src/server/Services/VotingService.luau): players pick a
+	-- playlist (a mode on a map, Config.Modes.Playlists) and, for King Hunt, the difficulty.
 	Voting = {
 		Seconds = 20,
-		MapChoices = 3, -- maps offered per vote (capped by how many maps exist)
+		-- How many choices the vote offers: Config.Modes.VoteChoices (Config/Modes.luau).
 		MinSecondsBetweenVotes = 0.5, -- per-player spam guard on the vote remote
 	},
 
@@ -202,7 +211,7 @@ local Config = {
 	Rewards = {
 		CoinsPerPumpkin = 5, -- multiplied by the difficulty's RewardMultiplier
 		SurvivorBonus = 25, -- coins for still being alive when the round ends
-		TopCollectorWins = 1, -- Wins added to the player(s) with the most pumpkins
+		TopCollectorWins = 1, -- Wins added to each round's top player(s) (most pumpkins in King Hunt)
 	},
 
 	-- The Pumpkin King: a server-controlled NPC that hunts players.
@@ -415,6 +424,7 @@ local Config = {
 		FlickerHz = 20, -- light flicker updates per second (not every frame)
 		ShopStateCooldown = 0.2, -- a client asking for its shop state faster than this gets the last answer
 		HauntTryCooldown = 0.25, -- spam guard on the Haunt button when it misses
+		SpectateFocusCooldown = 0.5, -- spam guard: spectators asking the server to stream the map to them
 	},
 
 	-- Screen layout for phones, tablets and PC (src/client/Layout.luau).

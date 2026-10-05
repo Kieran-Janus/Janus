@@ -1,6 +1,7 @@
 --!strict
 --[[
-	Round moments (Config.Juice), all local to this player and only while playing:
+	Round moments (Config.Juice), all local to this player and only while playing (in the
+	round, or watching it with Spectate from the lobby):
 	  - "RUN!" banner when the King appears (KingCount goes up)
 	  - red heartbeat pulse at the screen edges while a King chases you (the server marks
 	    each King with TargetUserId) and is within Heartbeat.Distance; faster when closer
@@ -15,12 +16,16 @@ local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Spectate = require(script.Parent.Spectate)
 local Theme = require(script.Parent.Theme)
 
 local RoundJuiceUI = {}
 
+-- A round is on and this player is in it (or watching it from the lobby): players busy in
+-- the lobby don't get round banners over their screen.
 local function playing(): boolean
 	return ReplicatedStorage:GetAttribute("State") == "Playing"
+		and (Players.LocalPlayer:GetAttribute("InRound") == true or Spectate.IsActive())
 end
 
 function RoundJuiceUI.Mount(gui: ScreenGui)

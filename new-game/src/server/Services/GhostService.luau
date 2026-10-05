@@ -9,7 +9,10 @@
 	is a ghost and what each request is allowed to do.
 
 	Player attributes the client reads: InRound, Out, GhostMode, GhostChat, HauntReadyAt
-	Client -> server: SetGhostMode(mode) event, Haunt() function -> number of Kings affected
+	Client -> server: SetGhostMode(mode) event, Haunt() function -> number of Kings affected,
+	  SpectateFocus(on: boolean) event: someone watching the round from the lobby (a ghost in
+	  Spectate mode, or a lobby player using Spectate) gets the map streamed to them
+	  (Player.ReplicationFocus = the map's Floor) until they stop or the round ends.
 
 	Collision groups: ghosts don't collide with players, other ghosts or the King.
 ]]
@@ -109,6 +112,31 @@ function GhostService.EndRound()
 		for _, name in { "InRound", "Out", "GhostMode", "GhostChat", "HauntReadyAt" } do
 			player:SetAttribute(name, nil)
 		end
+		player.ReplicationFocus = nil
+	end
+end
+
+-- Watching from afar: stream the map to this player (see the header). Players still playing
+-- (in the round and not out) can't move their streaming away from themselves.
+local lastFocus: { [Player]: number } = {}
+
+local function onSpectateFocus(player: Player, on: unknown)
+	if typeof(on) ~= "boolean" then
+		return
+	end
+	if not on then
+		player.ReplicationFocus = nil
+		return
+	end
+	local now = os.clock()
+	if now - (lastFocus[player] or 0) < Config.Performance.SpectateFocusCooldown then
+		return
+	end
+	lastFocus[player] = now
+	local playing = player:GetAttribute("InRound") == true and player:GetAttribute("Out") ~= true
+	local map = roundMap
+	if map and not playing and map.Floor.Parent then
+		player.ReplicationFocus = map.Floor
 	end
 end
 
@@ -191,6 +219,7 @@ function GhostService.Start()
 
 	Remotes.Event("SetGhostMode").OnServerEvent:Connect(onSetGhostMode)
 	Remotes.Function("Haunt").OnServerInvoke = onHaunt
+	Remotes.Event("SpectateFocus").OnServerEvent:Connect(onSpectateFocus)
 	Players.PlayerAdded:Connect(onPlayer)
 	for _, player in Players:GetPlayers() do
 		onPlayer(player)
@@ -198,6 +227,7 @@ function GhostService.Start()
 	Players.PlayerRemoving:Connect(function(player)
 		lastSwitch[player] = nil
 		lastHauntTry[player] = nil
+		lastFocus[player] = nil
 	end)
 end
 
