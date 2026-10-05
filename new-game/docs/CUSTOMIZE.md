@@ -55,7 +55,7 @@ Every character has a placeholder made from Parts. Put a model with the **exact 
 | `GhostCat` | Ghost Cat minion | 3 |
 | `WitchWanda` | Witch Wanda (shop NPC) | 8 |
 | `BooGuide` | Boo Guide (tips NPC) | 6.5 |
-| `PumpkinVendor` | Pumpkin Vendor NPC | 7.5 |
+| `PumpkinVendor` | Pumpkin Vendor NPC (the person only; the stall stays and they stand behind the counter) | 7.5 |
 
 Sizes are in `Config.Custom.Heights`. To keep the size you built, add an attribute to the model: **KeepSize** (boolean) = true.
 
@@ -76,6 +76,8 @@ Sizes are in `Config.Custom.Heights`. To keep the size you built, add an attribu
 Notes:
 - Custom minions and NPCs are posed as one rigid model (no swinging limbs). For a lively look, add bobbing or glowing parts. The King can be a fully animated rig.
 - Board, gravestone and photo spot NPCs keep their built look, because the game draws text on them.
+- **Don't place NPC models by hand in Workspace > Hub.** The hub is rebuilt from code, so hand-placed characters end up floating or doubled. Put them in `Custom > Characters` with the right name and the game places them.
+- **Move an NPC** (e.g. swap where the Witch and the Vendor stand): swap their `Offset` values in `Config.Npcs.List`, then F8 > Rebuild hub.
 
 ---
 

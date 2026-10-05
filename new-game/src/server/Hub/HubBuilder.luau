@@ -838,7 +838,9 @@ local function buildVendor(cf: CFrame, m: Model): BasePart
 	for i = 0, 2 do
 		jackOLantern(cf * CFrame.new(-3 + i * 3, 3, -2.5), 1.3, m)
 	end
-	-- The vendor: a pumpkin-headed farmer behind the counter.
+	-- The vendor: a pumpkin-headed farmer behind the counter. Grouped as "Keeper" so a custom
+	-- PumpkinVendor model replaces just them and keeps the stall (ApplyCustomNpcs).
+	local keeper = model("Keeper", m)
 	part({
 		Name = "Body",
 		Shape = Enum.PartType.Cylinder,
@@ -846,7 +848,7 @@ local function buildVendor(cf: CFrame, m: Model): BasePart
 		CFrame = upright(cf * CFrame.new(0, 2.5, 0.5)),
 		Color = Color3.fromRGB(70, 110, 160),
 		Material = Enum.Material.Fabric,
-	}, m)
+	}, keeper)
 	local headCf = cf * CFrame.new(0, 6, 0.5)
 	local head = part({
 		Name = "Head",
@@ -854,8 +856,8 @@ local function buildVendor(cf: CFrame, m: Model): BasePart
 		Size = Vector3.new(3.4, 3, 3.4),
 		CFrame = headCf,
 		Color = colors.Orange,
-	}, m)
-	carvedFace(headCf, 3, m)
+	}, keeper)
+	carvedFace(headCf, 3, keeper)
 	part({
 		Name = "Hat",
 		Shape = Enum.PartType.Cylinder,
@@ -863,7 +865,7 @@ local function buildVendor(cf: CFrame, m: Model): BasePart
 		CFrame = upright(cf * CFrame.new(0, 7.4, 0.5)),
 		Color = Color3.fromRGB(200, 170, 90),
 		Material = Enum.Material.Fabric,
-	}, m)
+	}, keeper)
 	nameTag(m.Name, head, 6)
 	return counter
 end
@@ -1032,6 +1034,12 @@ end
 -- prompts other code relies on, so they keep their built look).
 local CHARACTER_KINDS = { Witch = true, Ghost = true, Vendor = true }
 
+-- Kinds where the character stands in a stall: a custom model replaces only the person
+-- ("Keeper") and stands this far behind the NPC's spot, so the stall stays.
+local STALL_KINDS: { [string]: CFrame } = { Vendor = CFrame.new(0, 0, 0.5) }
+-- Keeper parts of a stall built before the Keeper model existed (hub saved in Studio).
+local OLD_KEEPER_PARTS = { Body = true, Head = true, Hat = true, Eye = true, Mouth = true }
+
 --[[
 	Swaps an NPC's Part-built look for a custom model named after its Id in
 	ReplicatedStorage.Custom.Characters (e.g. WitchWanda). Runs every server start, also on a
@@ -1057,15 +1065,23 @@ function HubBuilder.ApplyCustomNpcs(hub: Model)
 				d.Anchored = true
 			end
 		end
+		local stall = STALL_KINDS[def.Kind]
 		-- Feet on the ground at the NPC's spot, facing the plaza.
 		local feet = CustomAssets.Origin(custom, "Feet")
 		-- +1: the plaza's top, same as the Part-built NPCs.
-		custom:PivotTo(
-			facingCenter(at(def.Offset + Vector3.new(0, 1, 0)))
-				* feet:ToObjectSpace(custom:GetPivot())
-		)
+		local spot = facingCenter(at(def.Offset + Vector3.new(0, 1, 0)))
+		if stall then
+			spot *= stall
+		end
+		custom:PivotTo(spot * feet:ToObjectSpace(custom:GetPivot()))
 		for _, child in m:GetChildren() do
-			if child.Name ~= "PromptAnchor" then
+			local remove = if stall
+				then child.Name == "Keeper"
+					or child.Name == "Look"
+					or child.Name == "TagAnchor"
+					or (child:IsA("BasePart") and OLD_KEEPER_PARTS[child.Name] == true)
+				else child.Name ~= "PromptAnchor"
+			if remove then
 				child:Destroy()
 			end
 		end
