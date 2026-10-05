@@ -209,7 +209,148 @@ function builders.Crown(m: Model, style: any): BasePart
 	return handle
 end
 
+-- A three-tier candy corn cone (yellow, orange, white tip), tipped back a little.
+function builders.CandyCornHat(m: Model, style: any): BasePart
+	local tilt = CFrame.Angles(math.rad(-10), 0, math.rad(6))
+	local handle = part(m, {
+		Name = "Handle",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.55, 1.6, 1.6),
+		CFrame = tilt * upright(CFrame.new(0, 0.25, 0)),
+		Color = style.Base,
+	})
+	part(m, {
+		Name = "Middle",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.55, 1.15, 1.15),
+		CFrame = tilt * upright(CFrame.new(0, 0.78, 0)),
+		Color = style.Middle,
+	})
+	part(m, {
+		Name = "Tip",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(0.75, 0.8, 0.75),
+		CFrame = tilt * CFrame.new(0, 1.25, 0),
+		Color = style.Tip,
+	})
+	return handle
+end
+
+-- A bow on the side of the head whose loops are little bat wings.
+function builders.BatBow(m: Model, style: any): BasePart
+	local at = CFrame.new(0.45, 0.05, -0.1) * CFrame.Angles(0, 0, math.rad(-15))
+	local handle = part(m, {
+		Name = "Handle",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.one * 0.38,
+		CFrame = at,
+		Color = style.Knot,
+	})
+	for _, side in { -1, 1 } do
+		for i, size in { Vector3.new(0.55, 0.5, 0.08), Vector3.new(0.4, 0.32, 0.08) } do
+			part(m, {
+				Name = "Wing",
+				Size = size,
+				CFrame = at
+					* CFrame.new(side * (0.3 + (i - 1) * 0.32), 0.05 - (i - 1) * 0.12, 0)
+					* CFrame.Angles(0, 0, math.rad(side * (15 + i * 12))),
+				Color = style.Color,
+			})
+		end
+	end
+	eyes(m, 0.07, -0.14, 0.08, 0.08, style.EyeColor)
+	-- the eyes were placed at the origin; move them onto the knot
+	for _, child in m:GetChildren() do
+		if child.Name == "Eye" and child:IsA("BasePart") then
+			child.CFrame = at * child.CFrame
+		end
+	end
+	return handle
+end
+
 -- Pets ----------------------------------------------------------------------------------------
+
+-- A tiny witch's cauldron with bubbling green brew.
+function builders.CauldronPet(m: Model, style: any): BasePart
+	local handle = part(m, {
+		Name = "Handle",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.new(1.35, 1.05, 1.35),
+		Color = style.Color,
+		Material = Enum.Material.Metal,
+	})
+	part(m, {
+		Name = "Rim",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.18, 1.2, 1.2),
+		CFrame = upright(CFrame.new(0, 0.42, 0)),
+		Color = style.Color,
+		Material = Enum.Material.Metal,
+	})
+	part(m, {
+		Name = "Brew",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.06, 1.0, 1.0),
+		CFrame = upright(CFrame.new(0, 0.46, 0)),
+		Color = style.Brew,
+		Material = Enum.Material.Neon,
+	})
+	for i, offset in { Vector3.new(0.2, 0.62, 0.1), Vector3.new(-0.18, 0.72, -0.15) } do
+		part(m, {
+			Name = "Bubble",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * (0.22 - i * 0.04),
+			CFrame = CFrame.new(offset),
+			Color = style.Brew,
+			Material = Enum.Material.Neon,
+		})
+	end
+	for i = 1, 3 do
+		local a = i / 3 * math.pi * 2
+		part(m, {
+			Name = "Leg",
+			Size = Vector3.new(0.14, 0.3, 0.14),
+			CFrame = CFrame.new(math.cos(a) * 0.4, -0.55, math.sin(a) * 0.4),
+			Color = style.Color,
+			Material = Enum.Material.Metal,
+		})
+	end
+	return handle
+end
+
+-- A round little spider with big eyes and eight legs.
+function builders.SpiderPet(m: Model, style: any): BasePart
+	local handle = part(m, {
+		Name = "Handle",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.one * 1.0,
+		CFrame = CFrame.new(0, 0, 0.25),
+		Color = style.Color,
+	})
+	part(m, {
+		Name = "Head",
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.one * 0.62,
+		CFrame = CFrame.new(0, -0.05, -0.42),
+		Color = style.Color,
+	})
+	eyes(m, 0.02, -0.7, 0.14, 0.2, style.EyeColor)
+	for _, side in { -1, 1 } do
+		for i = 1, 4 do
+			local z = -0.2 + (i - 1) * 0.22
+			local yaw = math.rad(side * (-30 + (i - 1) * 25))
+			part(m, {
+				Name = "Leg",
+				Size = Vector3.new(0.75, 0.08, 0.08),
+				CFrame = CFrame.new(side * 0.55, -0.05, z)
+					* CFrame.Angles(0, yaw, math.rad(side * -30))
+					* CFrame.new(side * 0.3, 0, 0),
+				Color = style.Color,
+			})
+		end
+	end
+	return handle
+end
 
 function builders.PumpkinPet(m: Model, style: any): BasePart
 	local handle = part(m, {

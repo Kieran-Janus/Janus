@@ -961,6 +961,30 @@ local Config = {
 				VipOnly = true,
 				Style = { Kind = "Crown", Color = Color3.fromRGB(255, 210, 60) },
 			},
+			{
+				Id = "CandyCornHat",
+				Name = "Candy Corn Hat",
+				Slot = "Hat",
+				Price = 180,
+				Style = {
+					Kind = "CandyCornHat",
+					Base = Color3.fromRGB(255, 200, 40),
+					Middle = Color3.fromRGB(255, 120, 20),
+					Tip = Color3.fromRGB(250, 245, 230),
+				},
+			},
+			{
+				Id = "BatBow",
+				Name = "Bat Bow",
+				Slot = "Hat",
+				Price = 220,
+				Style = {
+					Kind = "BatBow",
+					Color = Color3.fromRGB(70, 40, 110),
+					Knot = Color3.fromRGB(255, 120, 190),
+					EyeColor = Color3.fromRGB(255, 230, 90),
+				},
+			},
 			-- Trails stream behind you.
 			{
 				Id = "OrangeTrail",
@@ -1007,6 +1031,28 @@ local Config = {
 					Color2 = Color3.fromRGB(255, 110, 20),
 				},
 			},
+			{
+				Id = "CandySwirlTrail",
+				Name = "Candy Swirl",
+				Slot = "Trail",
+				Price = 150,
+				Style = {
+					Kind = "Trail",
+					Color = Color3.fromRGB(255, 120, 190),
+					Color2 = Color3.fromRGB(255, 245, 250),
+				},
+			},
+			{
+				Id = "PurpleFogTrail",
+				Name = "Purple Fog",
+				Slot = "Trail",
+				Price = 280,
+				Style = {
+					Kind = "Trail",
+					Color = Color3.fromRGB(150, 80, 220),
+					Color2 = Color3.fromRGB(60, 30, 100),
+				},
+			},
 			-- Pets float by your shoulder.
 			{
 				Id = "MiniPumpkin",
@@ -1028,6 +1074,29 @@ local Config = {
 				Slot = "Pet",
 				Price = 600,
 				Style = { Kind = "GhostPet", Color = Color3.fromRGB(200, 230, 255) },
+			},
+			{
+				Id = "MiniCauldron",
+				Name = "Mini Cauldron",
+				Slot = "Pet",
+				Price = 550,
+				Style = {
+					Kind = "CauldronPet",
+					Color = Color3.fromRGB(40, 36, 46),
+					Brew = Color3.fromRGB(120, 255, 110),
+				},
+			},
+			{
+				Id = "SpiderPet",
+				Name = "Itsy Spider",
+				Slot = "Pet",
+				Price = 0,
+				VipOnly = true,
+				Style = {
+					Kind = "SpiderPet",
+					Color = Color3.fromRGB(85, 60, 115), -- dusky purple, readable in dark maps
+					EyeColor = Color3.fromRGB(255, 80, 80),
+				},
 			},
 			{
 				Id = "SkellyPup",
@@ -1059,7 +1128,7 @@ local Config = {
 		VipPerks = {
 			"+10% walk and sprint speed",
 			"King tracker: press T for an arrow to the nearest King (30 s cooldown)",
-			"VIP chat tag and VIP-only cosmetics (Pumpkin King skin, crown, trail and pet)",
+			"VIP chat tag and VIP-only cosmetics (Pumpkin King skin, crown, trail and two pets)",
 		},
 		-- Developer Products: coin packs. Key is saved with each receipt; don't rename.
 		Products = {
