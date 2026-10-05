@@ -10,6 +10,11 @@
 	              Shop keeper)
 	  Cosmetics   the shop item Id (Config.Shop.Items),       Cosmetics (hats, pets, skin
 	              e.g. WitchHat, MiniPumpkin, Skeleton        head pieces) and shop previews
+	  Props       a lobby decoration: JackOLantern,           Kit.prop (HubBuilder, HubExtras,
+	              Lamppost, DeadTree, Gravestone, Candle,     Hub/Npcs, Hub/Sections): every
+	              Cobweb, KingStatue, ClockTower, Cauldron,   copy in the lobby swaps at once
+	              VendorStall, ReadyPadArch                   (the built ones have the
+	                                                          attribute PropName)
 
 	Two ways to add one (docs/CUSTOMIZE.md has screenshots-free step by step):
 	  1. In Studio: put the Model in ReplicatedStorage > Custom > Characters (etc.) and save.
@@ -17,10 +22,12 @@
 	  2. In git: right-click the model > Save to File... and save it as
 	     assets/Characters/PumpkinKing.rbxm. Rojo syncs it in.
 
-	Size: models are scaled to Config.Custom.Heights[name] (characters) or
-	Config.Custom.CosmeticSize[slot] (cosmetics). Set the attribute KeepSize = true on a model
+	Size: models are scaled to Config.Custom.Heights[name] (characters),
+	Config.Custom.CosmeticSize[slot] (cosmetics) or the size of the decoration they replace
+	(props), measuring only the parts you can see. Set the attribute KeepSize = true on a model
 	to keep the size you built it at.
-	Facing: the model's front is its pivot's LookVector (-Z), like any Roblox character.
+	Facing: the model's front is its pivot's LookVector (-Z), like any Roblox character. Lobby
+	characters and props are only turned left/right, never tipped over.
 	Scripts inside custom models are removed (Config.Custom.StripScripts): free models from
 	the Creator Store can hide malicious scripts.
 ]]
@@ -112,12 +119,76 @@ function CustomAssets.BiggestPart(model: Model): BasePart?
 	return best
 end
 
+-- The 8 corners of a part's box, in world space.
+local function corners(part: BasePart): { Vector3 }
+	local half = part.Size / 2
+	local list = {}
+	for _, x in { -1, 1 } do
+		for _, y in { -1, 1 } do
+			for _, z in { -1, 1 } do
+				table.insert(list, part.CFrame * Vector3.new(half.X * x, half.Y * y, half.Z * z))
+			end
+		end
+	end
+	return list
+end
+
+-- The parts you can see (not fully transparent); all parts if none are visible.
+local function visibleParts(root: Instance): { BasePart }
+	local visible, all = {}, {}
+	local function add(d: Instance)
+		if d:IsA("BasePart") then
+			table.insert(all, d)
+			if d.Transparency < 1 then
+				table.insert(visible, d)
+			end
+		end
+	end
+	add(root)
+	for _, d in root:GetDescendants() do
+		add(d)
+	end
+	return if #visible > 0 then visible else all
+end
+
+--[[
+	The box around the parts you can see (big invisible hitboxes don't count), lined up with
+	`space` (default: the world). Returns its lowest and highest corner in that space, and
+	false when there are no parts at all.
+]]
+function CustomAssets.VisibleBox(root: Instance, space: CFrame?): (Vector3, Vector3, boolean)
+	local parts = visibleParts(root)
+	if #parts == 0 then
+		return Vector3.zero, Vector3.zero, false
+	end
+	local low = Vector3.new(math.huge, math.huge, math.huge)
+	local high = -low
+	for _, part in parts do
+		for _, corner in corners(part) do
+			local p = if space then space:PointToObjectSpace(corner) else corner
+			low = low:Min(p)
+			high = high:Max(p)
+		end
+	end
+	return low, high, true
+end
+
+-- Size of the visible parts, measured along the model's own axes (its pivot).
+function CustomAssets.VisibleSize(model: Model): Vector3
+	local low, high, found = CustomAssets.VisibleBox(model, model:GetPivot())
+	if not found then
+		local _, size = model:GetBoundingBox()
+		return size
+	end
+	return high - low
+end
+
 -- Scales `model` so its height (or its biggest side, if `largestSide`) is `target` studs.
 function CustomAssets.Fit(model: Model, target: number?, largestSide: boolean?)
 	if not target or target <= 0 or model:GetAttribute("KeepSize") == true then
 		return
 	end
-	local _, size = model:GetBoundingBox()
+	local size = CustomAssets.VisibleSize(model)
 	local current = if largestSide then math.max(size.X, size.Y, size.Z) else size.Y
 	if current <= 0.01 then
 		return
@@ -162,6 +233,44 @@ function CustomAssets.Origin(model: Model, anchor: string): CFrame
 		return CFrame.new(centre.X, minY, centre.Z) * facing
 	end
 	return CFrame.new(centre) * facing
+end
+
+-- Just the left/right turn of `cf` (no tilt), at the origin.
+function CustomAssets.Yaw(cf: CFrame): CFrame
+	local look = cf.LookVector
+	local flat = Vector3.new(look.X, 0, look.Z)
+	if flat.Magnitude < 1e-3 then
+		-- Facing straight up or down (a model imported lying down): use its top instead.
+		local up = cf.UpVector
+		flat = Vector3.new(-up.X, 0, -up.Z)
+		if flat.Magnitude < 1e-3 then
+			return CFrame.identity
+		end
+	end
+	return CFrame.lookAt(Vector3.zero, flat.Unit)
+end
+
+--[[
+	Stands `model` on the ground at `cf`: the bottom centre of its visible parts goes to
+	cf.Position and it is turned (left/right only) so its front faces cf's front. A tilted
+	model stays tilted, but is never tipped over by a tilted `cf`.
+]]
+function CustomAssets.PlaceFeet(model: Model, cf: CFrame)
+	local low, high = CustomAssets.VisibleBox(model)
+	local feet = Vector3.new((low.X + high.X) / 2, low.Y, (low.Z + high.Z) / 2)
+	local pivot = model:GetPivot()
+	local from = CFrame.new(feet) * CustomAssets.Yaw(pivot)
+	local to = CFrame.new(cf.Position) * CustomAssets.Yaw(cf)
+	model:PivotTo(to * from:ToObjectSpace(pivot))
+end
+
+-- Puts the centre of `model`'s visible parts at `cf`, turned exactly like `cf` (for flat
+-- things hung on walls, like cobwebs).
+function CustomAssets.PlaceCenter(model: Model, cf: CFrame)
+	local pivot = model:GetPivot()
+	local low, high = CustomAssets.VisibleBox(model, pivot)
+	local centre = pivot * CFrame.new((low + high) / 2)
+	model:PivotTo(cf * centre:ToObjectSpace(pivot))
 end
 
 -- Anchored, non-colliding decoration (for things the server moves by CFrame).

@@ -2,14 +2,19 @@
 --[[
 	Loads the round map and unloads it afterwards.
 	Uses ServerStorage.Maps.<Id> if a hand-made map exists, otherwise builds one with
-	src/server/Maps/<Builder>.luau from Config.Maps.List[i].
+	src/server/Maps/<Builder>.luau from Config.Maps.List[i]. Bake a built map into
+	ServerStorage.Maps to edit it by hand: src/server/Tools/Bake.luau (Bake.Map("<Id>")).
+	ServerStorage.Maps is synced from the maps/ folder (default.project.json), so a map saved
+	there as <Id>.rbxm is in git too.
 	The loaded model is Workspace.Map with attribute MapId; the client uses it to switch to
 	the map's lighting and ambient sound (src/client/ZoneLighting.luau).
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
+local Tags = require(game:GetService("ReplicatedStorage").Shared.Tags)
 local Builders = script.Parent.Parent.Maps
 
 export type LoadedMap = {
@@ -158,12 +163,24 @@ function MapService.RandomHotspotPoint(map: LoadedMap, attempts: number, height:
 	return nil
 end
 
--- Where players stand between rounds: the hub spawn pad (or any SpawnLocation as a fallback).
+-- Where players stand between rounds: a part tagged HubSpawn in the lobby (or the hub's
+-- "Spawn", or any SpawnLocation, as fallbacks).
 function MapService.LobbyCFrame(): CFrame
-	local hub = workspace:FindFirstChild("Hub")
-	local spawn = (hub and hub:FindFirstChild("Spawn"))
-		or workspace:FindFirstChildOfClass("SpawnLocation")
-	local position = if spawn then spawn.Position else Vector3.zero
+	local spawn: BasePart? = nil
+	for _, tagged in CollectionService:GetTagged(Tags.HubSpawn) do
+		if tagged:IsA("BasePart") and tagged:IsDescendantOf(workspace) then
+			spawn = tagged
+			break
+		end
+	end
+	if not spawn then
+		local hub = workspace:FindFirstChild("Hub")
+		local named = hub and hub:FindFirstChild("Spawn")
+		spawn = if named and named:IsA("BasePart")
+			then named
+			else workspace:FindFirstChildOfClass("SpawnLocation")
+	end
+	local position = if spawn then spawn.CFrame.Position else Vector3.zero
 	return CFrame.new(position + Vector3.new(0, Config.Maps.SpawnHeight, 0))
 end
 

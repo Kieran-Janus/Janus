@@ -13,7 +13,7 @@
 	  EasterEgg          EggId (string, matches Config.EasterEggs.List) and Coins (number)
 	  ScareTrigger       Kind (string: which scare plays)
 	Colours: any part can have the attribute PaletteRole (an attribute, not a tag) to take its
-	colour from Config.Hub.Palette.
+	colour from Config.Hub.Palette (and PaletteShade: 0.3 = 30% darker, -0.2 = 20% lighter).
 
 	Use them in code as Tags.ReadyPad etc. instead of typing the string.
 ]]
@@ -21,8 +21,10 @@
 local Tags = {
 	-- Lobby
 	ReadyPad = "ReadyPad", -- stand on it to join the next round
+	ReadySign = "ReadySign", -- shows "READY x / y" (a part holding the sign's BillboardGui)
 	HubSpawn = "HubSpawn", -- where players appear in the lobby
-	ShopKeeper = "ShopKeeper", -- the Pumpkin Shop keeper and its prompt
+	ShopKeeper = "ShopKeeper", -- the Pumpkin Shop keeper and its prompt (a tagged part with no
+	-- prompt gets one, so tagging any part ShopKeeper makes it open the shop)
 	-- Parkour
 	ParkourStart = "ParkourStart",
 	ParkourCheckpoint = "ParkourCheckpoint", -- attribute Index

@@ -16,10 +16,18 @@
 	  t.readFile(path)            source of a file, path relative to new-game (or nil)
 	Each spec gets fresh copies of every module, so specs can't affect each other.
 
-	Only pure logic can be tested here (Config, Items, Lobby maths...): there are no real
-	parts, players, remotes or physics. game:GetService works for ReplicatedStorage (with
-	Shared), ServerScriptService (with Server), StarterPlayer, RunService and Players (no
-	players); anything else errors with a clear message.
+	Mostly pure logic can be tested here (Config, Items, Lobby maths...): there are no players,
+	remotes, physics or rendering. game:GetService works for ReplicatedStorage (with Shared),
+	ServerScriptService (with Server), StarterPlayer, RunService and Players (no players);
+	anything else errors with a clear message. There is also a small world made of real
+	(Lune) instances, enough to BUILD things like the hub: Workspace (the global `workspace`,
+	with a Terrain whose Fill* calls do nothing), Lighting, SoundService, ServerStorage and a
+	CollectionService that works on instance tags. Model:GetPivot/PivotTo/ScaleTo/GetScale/
+	GetBoundingBox are simple stand-ins. Read part positions as part.CFrame.Position in code
+	you want to test (Lune can't read part.Position), and never touch an instance after it
+	was destroyed (Lune errors where Roblox returns nil).
+	  t.workspace                 this spec's Workspace
+	  t.setCustom(folder)         use `folder` (a Folder instance) as ReplicatedStorage.Custom
 	Note: Lune's own CFrame.lookAt has the Z direction flipped, so the one given to game code
 	here is a corrected copy.
 ]]
@@ -41,6 +49,26 @@ function CFrame.lookAt(position: any, target: any, up: any?): any
 	local right = look:Cross(up or roblox.Vector3.new(0, 1, 0)).Unit
 	local trueUp = right:Cross(look)
 	return roblox.CFrame.fromMatrix(position, right, trueUp, -look)
+end
+
+-- Roblox's Random (Lune has none): a small seeded generator with the same methods. The same
+-- seed always gives the same numbers, but not the numbers Roblox would give.
+local Random = {}
+Random.__index = Random
+function Random.new(seed: number?): any
+	local state = math.floor(seed or os.clock() * 1e6) % 2147483647
+	if state <= 0 then
+		state += 2147483646
+	end
+	return setmetatable({ State = state }, Random)
+end
+function Random.NextNumber(self: any, min: number?, max: number?): number
+	self.State = (self.State * 16807) % 2147483647
+	local low, high = min or 0, max or 1
+	return low + (high - low) * ((self.State - 1) / 2147483646)
+end
+function Random.NextInteger(self: any, min: number, max: number): number
+	return math.min(math.floor(Random.NextNumber(self, min, max + 1)), max)
 end
 
 local DATATYPES = {
@@ -230,9 +258,129 @@ makeNode = function(name: string, class: string, source: string?, dir: string?, 
 	return proxy
 end
 
+-- Engine methods Lune doesn't have (simple stand-ins, enough to build the hub) ---------------
+
+for _, method in { "FillBlock", "FillBall", "FillCylinder", "FillWedge", "Clear" } do
+	roblox.implementMethod("Terrain", method, function() end)
+end
+
+-- World-space box around every BasePart in `root`: (centre, size), or nil without parts.
+local function partsBox(root: any): (any, any)
+	local low, high = nil, nil
+	for _, d in root:GetDescendants() do
+		if d:IsA("BasePart") then
+			local half = d.Size / 2
+			for _, x in { -1, 1 } do
+				for _, y in { -1, 1 } do
+					for _, z in { -1, 1 } do
+						local p = d.CFrame * roblox.Vector3.new(half.X * x, half.Y * y, half.Z * z)
+						low = if low then low:Min(p) else p
+						high = if high then high:Max(p) else p
+					end
+				end
+			end
+		end
+	end
+	if not low then
+		return nil, nil
+	end
+	return (low + high) / 2, high - low
+end
+
+local function pivotOf(model: any): any
+	local primary = model.PrimaryPart
+	if primary then
+		return primary.CFrame * primary.PivotOffset
+	end
+	local ok, pivot = pcall(function()
+		return model.WorldPivot
+	end)
+	if ok then
+		return pivot
+	end
+	local centre = partsBox(model)
+	return if centre then roblox.CFrame.new(centre) else roblox.CFrame.new()
+end
+
+roblox.implementMethod("Model", "GetPivot", pivotOf)
+roblox.implementMethod("Model", "PivotTo", function(self: any, target: any)
+	local delta = target * pivotOf(self):Inverse()
+	for _, d in self:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CFrame = delta * d.CFrame
+		end
+	end
+	if not self.PrimaryPart then
+		self.WorldPivot = target
+	end
+end)
+roblox.implementMethod("Model", "GetScale", function(self: any): number
+	return self:GetAttribute("TestScale") or 1
+end)
+roblox.implementMethod("Model", "ScaleTo", function(self: any, scale: number)
+	local factor = scale / (self:GetAttribute("TestScale") or 1)
+	local pivot = pivotOf(self)
+	for _, d in self:GetDescendants() do
+		if d:IsA("BasePart") then
+			local rel = pivot:ToObjectSpace(d.CFrame)
+			d.Size = d.Size * factor
+			d.CFrame = pivot * roblox.CFrame.new(rel.Position * factor) * rel.Rotation
+		end
+	end
+	self:SetAttribute("TestScale", scale)
+end)
+roblox.implementMethod("Model", "GetBoundingBox", function(self: any): (any, any)
+	local centre, size = partsBox(self)
+	if not centre then
+		return pivotOf(self), roblox.Vector3.new()
+	end
+	return roblox.CFrame.new(centre), size
+end)
+
 -- Fake services -----------------------------------------------------------------------------
 
-local function folderService(name: string, children: { [string]: string }): any
+-- CollectionService on top of Lune's instance tags. Its signals never fire.
+local function collectionService(world: any): any
+	local service = {}
+	function service.AddTag(_self: any, instance: any, tag: string)
+		instance:AddTag(tag)
+	end
+	function service.RemoveTag(_self: any, instance: any, tag: string)
+		instance:RemoveTag(tag)
+	end
+	function service.HasTag(_self: any, instance: any, tag: string): boolean
+		return instance:HasTag(tag)
+	end
+	function service.GetTags(_self: any, instance: any): { string }
+		return instance:GetTags()
+	end
+	function service.GetTagged(_self: any, tag: string): { any }
+		local list = {}
+		for _, d in world:GetDescendants() do
+			if d:HasTag(tag) then
+				table.insert(list, d)
+			end
+		end
+		return list
+	end
+	local function signal(): any
+		return {
+			Connect = function()
+				return { Disconnect = function() end }
+			end,
+		}
+	end
+	service.GetInstanceAddedSignal = signal
+	service.GetInstanceRemovedSignal = signal
+	return service
+end
+
+-- `extras`: real instances to show as children too (ReplicatedStorage.Custom in tests).
+local function folderService(
+	name: string,
+	children: { [string]: string },
+	extras: { [string]: any }?
+): any
 	local attributes: { [string]: any } = {}
 	local service = {}
 	function service.GetAttribute(_self: any, key: string): any
@@ -243,7 +391,10 @@ local function folderService(name: string, children: { [string]: string }): any
 	end
 	function service.FindFirstChild(_self: any, childName: string): any
 		local dir = children[childName]
-		return if dir then makeNode(childName, "Folder", nil, dir, service) else nil
+		if dir then
+			return makeNode(childName, "Folder", nil, dir, service)
+		end
+		return if extras then extras[childName] else nil
 	end
 	function service.WaitForChild(self: any, childName: string): any
 		local child = service.FindFirstChild(self, childName)
@@ -266,9 +417,21 @@ local function folderService(name: string, children: { [string]: string }): any
 	})
 end
 
-local function newGame(): any
+local function newGame(extras: { [string]: any }): (any, any)
+	local world = roblox.Instance.new("DataModel")
+	local workspaceService = world:GetService("Workspace")
+	roblox.Instance.new("Terrain").Parent = workspaceService
 	local services: { [string]: any } = {
-		ReplicatedStorage = folderService("ReplicatedStorage", { Shared = ROOT .. "/src/shared" }),
+		ReplicatedStorage = folderService(
+			"ReplicatedStorage",
+			{ Shared = ROOT .. "/src/shared" },
+			extras
+		),
+		Workspace = workspaceService,
+		Lighting = world:GetService("Lighting"),
+		SoundService = world:GetService("SoundService"),
+		ServerStorage = world:GetService("ServerStorage"),
+		CollectionService = collectionService(world),
 		ServerScriptService = folderService(
 			"ServerScriptService",
 			{ Server = ROOT .. "/src/server" }
@@ -291,6 +454,9 @@ local function newGame(): any
 			IsStudio = function()
 				return true
 			end,
+			IsRunning = function()
+				return true
+			end,
 		},
 	}
 	local game = {}
@@ -301,12 +467,18 @@ local function newGame(): any
 		end
 		return service
 	end
-	return game
+	return game, workspaceService
 end
 
 -- Module loading ------------------------------------------------------------------------------
 
-type Session = { Game: any, Cache: { [string]: any }, Loading: { [string]: boolean } }
+type Session = {
+	Game: any,
+	Workspace: any,
+	Extras: { [string]: any }, -- extra ReplicatedStorage children (t.setCustom)
+	Cache: { [string]: any },
+	Loading: { [string]: boolean },
+}
 
 local loadFile: (session: Session, path: string, scriptNode: any) -> any
 
@@ -314,8 +486,10 @@ local function makeEnv(session: Session, scriptNode: any): { [string]: any }
 	local env: { [string]: any } = {
 		script = scriptNode,
 		game = session.Game,
+		workspace = session.Workspace,
 		task = task,
 		CFrame = CFrame,
+		Random = Random,
 		Instance = roblox.Instance,
 		require = function(target: any): any
 			local node = nodeMeta[target]
@@ -366,8 +540,13 @@ local function describe(value: any): string
 	return tostring(value)
 end
 
-local function makeT(specName: string): any
+local function makeT(specName: string, session: Session): any
 	local t = {}
+	t.workspace = session.Workspace
+	-- Makes `folder` (a Folder instance) appear as ReplicatedStorage.Custom.
+	function t.setCustom(folder: any)
+		session.Extras.Custom = folder
+	end
 	-- The script folders, for requiring server or client modules directly:
 	-- require(t.Server.Services.ReadyService), require(t.Client.MenuUI).
 	t.Server = makeNode("Server", "Folder", nil, ROOT .. "/src/server", nil)
@@ -443,7 +622,15 @@ table.sort(specFiles)
 for _, file in specFiles do
 	local specName = file:gsub("%.spec%.luau$", "")
 	print(specName)
-	local session: Session = { Game = newGame(), Cache = {}, Loading = {} }
+	local extras = {}
+	local game, workspaceService = newGame(extras)
+	local session: Session = {
+		Game = game,
+		Workspace = workspaceService,
+		Extras = extras,
+		Cache = {},
+		Loading = {},
+	}
 	table.clear(proxies) -- fresh module tree per spec
 	local ok, err = pcall(function()
 		local specFn = loadFile(
@@ -452,7 +639,7 @@ for _, file in specFiles do
 			makeNode(specName, "ModuleScript", nil, nil, nil)
 		)
 		assert(type(specFn) == "function", file .. " must return a function(t)")
-		specFn(makeT(specName))
+		specFn(makeT(specName, session))
 	end)
 	if not ok then
 		failed += 1
