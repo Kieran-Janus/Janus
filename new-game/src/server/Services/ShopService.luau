@@ -30,6 +30,7 @@ export type State = {
 local ShopService = {}
 
 local lastRequest: { [Player]: number } = {}
+local lastState: { [Player]: { At: number, State: State } } = {}
 local shopState: RemoteEvent
 
 local function isVip(player: Player): boolean
@@ -150,7 +151,17 @@ end
 
 function ShopService.Start()
 	shopState = Remotes.Event("ShopState")
-	Remotes.Function("GetShopState").OnServerInvoke = ShopService.State
+	-- Cheap, but one client spamming it gets its last answer back instead of a new one.
+	Remotes.Function("GetShopState").OnServerInvoke = function(player: Player): State
+		local now = os.clock()
+		local cached = lastState[player]
+		if cached and now - cached.At < Config.Performance.ShopStateCooldown then
+			return cached.State
+		end
+		local state = ShopService.State(player)
+		lastState[player] = { At = now, State = state }
+		return state
+	end
 	Remotes.Function("BuyItem").OnServerInvoke = onBuy
 	Remotes.Function("EquipItem").OnServerInvoke = onEquip
 
@@ -179,6 +190,7 @@ function ShopService.Start()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		lastRequest[player] = nil
+		lastState[player] = nil
 	end)
 end
 

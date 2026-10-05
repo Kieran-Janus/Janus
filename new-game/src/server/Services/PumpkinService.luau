@@ -184,6 +184,9 @@ function PumpkinService.Start()
 	Players.PlayerAdded:Connect(function(player)
 		player:SetAttribute("Pumpkins", 0)
 	end)
+	Players.PlayerRemoving:Connect(function(player)
+		lastPickup[player] = nil
+	end)
 end
 
 return PumpkinService

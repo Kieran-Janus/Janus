@@ -1,27 +1,44 @@
 --!strict
 --[[
-	Local-only hub animation, so the server never has to move decorations:
+	Local-only hub (and map) animation, so the server never has to move decorations:
 	  "HubFloat" Models bob up and down (attributes BobHeight, Phase)
 	  "HubFlicker" PointLights flicker like candles
 	Anything tagged later (the hub may be built after this client starts) is picked up too.
+	Cheap on phones (Config.Performance): only things near the camera animate, and the
+	flicker updates a few times a second rather than every frame.
 ]]
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+
+type Float = { Base: CFrame?, Bob: number, Phase: number }
+type Flicker = { Brightness: number, Seed: number }
 
 local HubAmbience = {}
 
 function HubAmbience.Mount()
-	local floats: { [Model]: CFrame } = {}
-	local flickers: { [PointLight]: number } = {}
+	local perf = Config.Performance
+	local floats: { [Model]: Float } = {}
+	local flickers: { [PointLight]: Flicker } = {}
 
 	local function addFloat(instance: Instance)
-		if instance:IsA("Model") and instance.PrimaryPart then
-			floats[instance] = instance:GetPivot()
+		if not instance:IsA("Model") then
+			return
 		end
+		-- Base is taken the first time its PrimaryPart is there: with streaming, a model can
+		-- arrive before its parts.
+		floats[instance] = {
+			Base = nil,
+			Bob = (instance:GetAttribute("BobHeight") or 0) :: number,
+			Phase = (instance:GetAttribute("Phase") or 0) :: number,
+		}
 	end
 	local function addFlicker(instance: Instance)
 		if instance:IsA("PointLight") then
-			flickers[instance] = instance.Brightness
+			flickers[instance] =
+				{ Brightness = instance.Brightness, Seed = instance.Range + math.random() }
 		end
 	end
 	for _, instance in CollectionService:GetTagged("HubFloat") do
@@ -39,22 +56,40 @@ function HubAmbience.Mount()
 		flickers[instance :: PointLight] = nil
 	end)
 
+	local nextFlicker = 0
+	local maxDistance = perf.AmbienceDistance
 	RunService.RenderStepped:Connect(function()
 		local t = os.clock()
-		for m, base in floats do
-			if m.Parent then
-				local bob = (m:GetAttribute("BobHeight") or 0) :: number
-				local phase = (m:GetAttribute("Phase") or 0) :: number
-				m:PivotTo(base * CFrame.new(0, math.sin(t * 1.5 + phase) * bob, 0))
-			else
+		local eye = workspace.CurrentCamera.CFrame.Position
+		for m, f in floats do
+			if not m.Parent then
 				floats[m] = nil
+				continue
+			end
+			local base = f.Base
+			if not base then
+				if not m.PrimaryPart then
+					continue
+				end
+				base = m:GetPivot()
+				f.Base = base
+			end
+			if (base.Position - eye).Magnitude <= maxDistance then
+				-- World-space bob: many models (candles) are built from rotated cylinders, so a
+				-- local offset would slide them sideways instead of up and down.
+				m:PivotTo(CFrame.new(0, math.sin(t * 1.5 + f.Phase) * f.Bob, 0) * base)
 			end
 		end
-		for l, brightness in flickers do
-			if l.Parent then
-				l.Brightness = brightness * (0.8 + 0.25 * math.noise(t * 3, l.Range))
-			else
+		if t < nextFlicker then
+			return
+		end
+		nextFlicker = t + 1 / perf.FlickerHz
+		for l, f in flickers do
+			local holder = l.Parent
+			if not holder then
 				flickers[l] = nil
+			elseif holder:IsA("BasePart") and (holder.Position - eye).Magnitude <= maxDistance then
+				l.Brightness = f.Brightness * (0.8 + 0.25 * math.noise(t * 3, f.Seed))
 			end
 		end
 	end)

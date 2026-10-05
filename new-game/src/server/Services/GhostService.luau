@@ -130,7 +130,14 @@ local function onSetGhostMode(player: Player, mode: unknown)
 end
 
 -- Returns the number of Kings haunted (0 = not allowed, on cooldown, or none in range).
+local lastHauntTry: { [Player]: number } = {}
+
 local function onHaunt(player: Player): number
+	local tryAt = os.clock()
+	if tryAt - (lastHauntTry[player] or 0) < Config.Performance.HauntTryCooldown then
+		return 0
+	end
+	lastHauntTry[player] = tryAt
 	if
 		not roundMap
 		or not player:GetAttribute("Out")
@@ -190,6 +197,7 @@ function GhostService.Start()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		lastSwitch[player] = nil
+		lastHauntTry[player] = nil
 	end)
 end
 

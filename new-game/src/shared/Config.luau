@@ -514,6 +514,14 @@ local Config = {
 		SettingsCooldown = 0.3, -- per-player spam guard on the Settings toggles
 	},
 
+	-- Keeping low-end phones smooth.
+	Performance = {
+		AmbienceDistance = 170, -- floating candles / flickering lights only animate this close to the camera
+		FlickerHz = 20, -- light flicker updates per second (not every frame)
+		ShopStateCooldown = 0.2, -- a client asking for its shop state faster than this gets the last answer
+		HauntTryCooldown = 0.25, -- spam guard on the Haunt button when it misses
+	},
+
 	-- Screen layout for phones, tablets and PC (src/client/Layout.luau).
 	UI = {
 		ReferenceHeight = 760, -- usable screen height the UI is drawn for; taller screens scale up...
