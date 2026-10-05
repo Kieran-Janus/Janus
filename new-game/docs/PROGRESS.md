@@ -10,7 +10,7 @@ The `/next-milestone` command reads this file. Update the Status column when a m
 | M4 | Spawn hub: decorations, NPCs, voting board, leaderboard | done | look at it, pick assets |
 | M5 | Minion monsters (Skeleton Patrol, Bat Swarm, Ghost Cat) and map art pass on 2 maps | done | pick Creator Store assets |
 | M6 | Shop, pumpkin currency, saving, VIP pass and products | blocked | create gamepass/product IDs in Creator Hub |
-| V1 | Verify the overnight cloud work in Studio (run `/verify`): skins tab, custom models, codes, daily streak, invite, F8 admin panel, anti-teleport pumpkins | todo | no |
+| V1 | Verify the overnight cloud work in Studio (run `/verify`): skins tab, custom models, codes, daily streak, invite, F8 admin panel, anti-teleport pumpkins | done | 2-player test (see notes) |
 | M7 | UI polish, thumbnails and icon, security audit, playtest | in progress | upload thumbnails, friends playtest |
 | Launch | Set the experience public on 20 October | todo | yes: only the owner does this |
 
@@ -36,4 +36,12 @@ Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a not
   - Clip moment: "THE KING HEARD YOU!" banner + flash when the King turns to your noise; nearby players see "The King heard X!" (`Config.King.Heard`, `KingHeardUI`).
   - Skins re-apply after `CharacterAppearanceLoaded` so late-loading clothes don't cover them.
   - Claude Code commands added: `/verify`, `/add-cosmetic`, `/reskin`, `/add-npc`, `/add-monster`, `/add-map`, `/new-code`, `/new-event`, `/tweak`, `/polish-hub`.
-
+- **V1 /verify (5 Oct, Studio, solo playtest):** Output clean on server and client from the start.
+  - Pass: spawn on hub pad; all 6 NPC prompts (Witch → shop Skins tab, Vendor → Packs & VIP, Boo tips, Voting Board dialog + live board, Gravestone top list, Photo Spot emote bar, wave plays); voting → map loads → teleport; pumpkins spawn and collect by walking; anti-teleport is a speed limit since the last pickup (~34 studs/s + 20) and works as designed; King appears at 15.0 s, switches Wander → Chase and catches; caught player turns ghost; results screen and return to hub; minions spawn (Easy 2/1/5) and move.
+  - Pass: Shop all 5 tabs incl. Skins; all 19 items equip/unequip, VIP-only refused without VIP; buy one per slot from a fresh save; skins hide clothes/colours and restore the avatar exactly; hat sits on top of a skin head piece and drops back when the skin is removed.
+  - Pass: Codes (PUMPKIN once then "already used", unknown/empty refused, SPOOKY gives the item); daily toast on rejoin after F8 > Reset daily; Invite opens Roblox's invite prompt; F8 panel: + Coins, Unlock all, Reset daily, Rebuild hub (board re-attaches), Reset my save (asks twice).
+  - Pass: custom models: test models in ReplicatedStorage.Custom replaced a hat, the King (scaled to 10 studs) and skeletons; scripts inside them were stripped.
+  - Fixed: GameUI used Global ZIndexBehavior, so the raised Shop panel (and the King-heard banner) drew over their own text; now Sibling. Shop panel made nearly opaque so the vote panel doesn't show through.
+  - Not tested (needs a 2-player local server: Studio Test tab > Clients and Servers > 2 players): ghost modes (Spectate / Haunt / Ghost chat) and haunting, catching with others still alive, friend bonus, voice routing. With one player, being caught ends the round instantly.
+  - For M7 polish: the HUD detail line wraps "The King is coming..." onto a cut-off second line during rounds.
+  - Note: the test reset my Studio save (F8 > Reset my save) and redeemed PUMPKIN on it.

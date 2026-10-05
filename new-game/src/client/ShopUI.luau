@@ -95,6 +95,7 @@ function ShopUI.Mount(gui: ScreenGui)
 	local panel = Theme.panel(gui)
 	panel.Name = "Shop"
 	panel.ZIndex = 10 -- above the vote panel and other HUD
+	panel.BackgroundTransparency = 0.03 -- nearly solid, so the vote panel doesn't show through
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.52)
 	panel.Size = UDim2.new(0.92, 0, 0.8, 0) -- capped below, so it also fits phones

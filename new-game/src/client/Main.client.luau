@@ -23,6 +23,9 @@ local ZoneLighting = require(script.Parent.ZoneLighting)
 local gui = Instance.new("ScreenGui")
 gui.Name = "GameUI"
 gui.ResetOnSpawn = false
+-- Sibling: a panel's ZIndex lifts it above other panels while its own children still draw
+-- on top of it (with Global, the raised Shop panel covered its own buttons and text).
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 Hud.Mount(gui)
