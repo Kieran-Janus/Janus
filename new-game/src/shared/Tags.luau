@@ -50,6 +50,8 @@ local Tags = {
 	HubFloat = "HubFloat", -- bobs up and down (client HubAmbience)
 	HubFlicker = "HubFlicker", -- light flickers (client HubAmbience)
 	HidingSpot = "HidingSpot", -- blocks the King's view while you stand in it
+	-- Cosmetics (set by src/shared/Cosmetics.luau)
+	SkinFx = "SkinFx", -- a CRAZY skin's model: players' screens animate it (client SkinFx)
 }
 
 return Tags

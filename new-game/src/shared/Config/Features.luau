@@ -20,5 +20,6 @@ return {
 	EasterEggs = false, -- hidden pumpkins around the lobby that give coins once each
 	Crates = false, -- crates bought with coins that give a random skin
 	RobuxCrates = false, -- crates can also be bought with Robux (needs Crates on too)
+	SkinEffects = true, -- CRAZY skins' animated rainbow, orbiting pieces and pulsing glow
 	Tutorial = false, -- Boo Guide's first-round tips (removed in v2; true brings them back)
 }
