@@ -35,6 +35,7 @@ Test anything fast in a Studio playtest with **F8** (admin panel): +Coins, Unloc
 | VIP perks, Robux products | `Config.Monetization` (IDs from Creator Hub) |
 | Codes for YouTubers | `Config.Codes.List` |
 | Daily streak rewards | `Config.Daily.Rewards` |
+| First-round tutorial tips and timings | `Config.Tutorial` |
 | Friend/group bonus, invite button, favourite prompt | `Config.Social` |
 | Map lighting and ambient sound | `Config.Maps.List[i].Lighting`, `.AmbientSound` |
 | Sound effects (clicks, pickups, King footsteps, minions, rewards) | `Config.Sounds` (SoundId "" = silent) |

@@ -19,6 +19,32 @@ local Config = {
 		ResultsShowTop = 10, -- rows on the results screen
 	},
 
+	-- First-round tutorial for new players (RoundsPlayed = 0 and not TutorialDone): Boo Guide
+	-- pops up in a small speech bubble with a tip at each moment, once each. "Skip" (or the
+	-- last tip) marks it done in the save. src/client/TutorialUI.luau, TutorialService.
+	Tutorial = {
+		Name = "Boo Guide",
+		SkipText = "Skip",
+		HubDelay = 2.5, -- seconds after joining before the first tip
+		MinSeconds = 2.5, -- a tip stays at least this long before the next one replaces it
+		Gap = 8, -- space above any panel along the bottom (vote, ghost, dialog)
+		Tips = {
+			Hub = { Text = "Walk to the Voting Board or wait for the vote.", Seconds = 7 },
+			RoundStart = { Text = "Grab pumpkins! Each one is coins.", Seconds = 5 },
+			Pickup = { Text = "Nice! Keep going.", Seconds = 3 },
+			King = {
+				Text = "The King hunts by SOUND: don't sprint or shout near him.",
+				Seconds = 6,
+			},
+			Caught = { Text = "You're a ghost now: spectate or haunt the King.", Seconds = 6 },
+			Results = { Text = "Spend coins with Witch Wanda!", Seconds = 6 },
+		},
+		Colors = {
+			Name = Color3.fromRGB(255, 170, 70),
+			Boo = Color3.fromRGB(240, 240, 255),
+		},
+	},
+
 	-- Round moments on screen (src/client/RoundJuiceUI.luau). Spooky-cute, never gory.
 	Juice = {
 		Run = { Text = "RUN!", Seconds = 1.8, Color = Color3.fromRGB(255, 120, 30) }, -- when the King appears
@@ -1243,6 +1269,7 @@ local Config = {
 			RoundsPlayed = 0,
 			FavoritePrompted = false,
 			Settings = { Music = true, Sounds = true }, -- the Settings panel's toggles
+			TutorialDone = false, -- finished or skipped the first-round tutorial
 		},
 	},
 

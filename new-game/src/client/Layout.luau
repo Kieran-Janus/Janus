@@ -37,6 +37,11 @@ local function scaleValue(): number
 	return if globalScale then globalScale.Scale else 1
 end
 
+-- How many screen pixels one UI unit is right now (the big-screen scale-up).
+function Layout.Scale(): number
+	return scaleValue()
+end
+
 function Layout.Screen(): Vector2
 	if not root then
 		return workspace.CurrentCamera.ViewportSize
