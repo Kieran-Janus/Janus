@@ -19,6 +19,7 @@ return {
 		CandyRush = { Offset = Vector3.new(-60, 0, 0), Size = Vector3.new(30, 0, 26) },
 		WebScour = { Offset = Vector3.new(-38, 0, -32), Size = Vector3.new(32, 0, 26) },
 		Parkour = { Offset = Vector3.new(0, 0, -80), Size = Vector3.new(60, 0, 44), Height = 60 },
+		Crates = { Offset = Vector3.new(46, 0, 6), Size = Vector3.new(20, 0, 12) }, -- crate stand by the shop
 	} :: { [string]: { Offset: Vector3, Size: Vector3, Height: number? } },
 
 	-- The Ready pad (Config.Features.ReadyPad): stand on it to join the next round.
