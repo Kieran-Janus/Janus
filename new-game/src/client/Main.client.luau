@@ -3,18 +3,21 @@
 	Client entry point: builds the UI and input handlers.
 	Add a new screen or controller = add its module name to ORDER below (a module next to
 	this script with a Mount(gui) function).
-	Layout and Sounds mount first and in order. Every other module mounts on its own: if one
-	breaks or waits for something, the Output window shows a warning with its name and the
-	rest of the UI still appears. A feature switched off in Config.Features shows nothing.
+	Layout, PanelManager and Sounds mount first and in order. Every other module mounts on
+	its own: if one breaks or waits for something, the Output window shows a warning with
+	its name and the rest of the UI still appears. A feature switched off in Config.Features
+	shows nothing.
 ]]
 local Players = game:GetService("Players")
 
 local Layout = require(script.Parent.Layout)
+local PanelManager = require(script.Parent.PanelManager)
 local Sounds = require(script.Parent.Sounds)
 
--- Mounted in this order, each in its own thread after Layout and Sounds.
+-- Mounted in this order, each in its own thread after Layout, PanelManager and Sounds.
 local ORDER = {
-	"MenuUI", -- the top-left Menu that the panels below put their buttons in
+	"MenuUI", -- the top-left Menu: the panels below put their buttons in it as tiles
+	"MenuTiles", -- the Menu's own tiles (Skins, Crates, Vote, Spectate, VIP...)
 	"Hud",
 	"VoteUI",
 	"ResultsUI",
@@ -53,7 +56,8 @@ gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-Layout.Mount(gui) -- first: the screen scale and button column the others use
+Layout.Mount(gui) -- first: the screen scale and the Menu tiles the others use
+PanelManager.Mount(gui) -- one centred panel at a time (Menu, Shop, Settings, Codes...)
 Sounds.Mount() -- early, so every button made below gets click/hover sounds
 
 local function report(name: string, err: unknown)

@@ -59,8 +59,8 @@ return function(t: any)
 		EasterEggService = "EasterEggs",
 		CrateService = "Crates",
 	}
+	-- (MenuUI is no longer a placeholder: its sums are tested in Menu.spec.luau.)
 	local clientStubs = {
-		MenuUI = "Menu",
 		Spectate = "LobbySpectate",
 		CrateUI = "Crates",
 		ParkourUI = "Parkour",

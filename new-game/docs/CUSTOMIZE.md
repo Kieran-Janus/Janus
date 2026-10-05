@@ -41,7 +41,8 @@ Test anything fast in a Studio playtest with **F8** (admin panel): +Coins, Unloc
 | Sound effects (clicks, pickups, King footsteps, minions, rewards) | `Config.Sounds` (SoundId "" = silent) |
 | Hub music, King roar | `Config.Hub.Music`, `Config.King.Heard.RoarSoundId` |
 | UI colours and font | `src/client/Theme.luau` |
-| UI size on big screens, phone layout, side buttons | `Config.UI` |
+| UI size on big screens, phone layout | `Config.UI` |
+| Top-left Menu: its button, tile order, words, icons, colours | `Config.Menu` (`src/shared/Config/Menu.luau`) |
 | Character/NPC/hat/pet/skin looks | A model in `ReplicatedStorage > Custom` (below) |
 | A whole map | A model in `ServerStorage > Maps` (below) |
 

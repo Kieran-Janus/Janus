@@ -1,8 +1,8 @@
 --!strict
 --[[
 	Client side of RewardsService (docs/VIRAL.md):
-	  Codes button  - opens a small box to type a code; the server decides.
-	  Invite button - Roblox's invite-friends prompt (Config.Social.InviteButton).
+	  Codes tile    - (in the Menu) opens a small box to type a code; the server decides.
+	  Invite tile   - (in the Menu) Roblox's invite-friends prompt (Config.Social.InviteButton).
 	  Daily toast   - "Day 3 streak! +100 Coins" when the server pays the daily reward.
 	  Favourite     - Roblox's "favourite this experience" prompt, once, when the server says.
 ]]

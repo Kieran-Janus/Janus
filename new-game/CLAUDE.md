@@ -16,7 +16,7 @@ Roblox game written in Luau, synced to Studio with Rojo. This project is indepen
 2. Every file starts with `--!strict`. Use Luau types.
 3. **Server is authoritative.** Clients send intent through `Remotes`; the server validates type, range, ownership and cooldown on every remote. Never trust client-sent values for currency, damage, or position.
 4. New remotes are created via `Remotes.Event("Name")` / `Remotes.Function("Name")`; no loose RemoteEvents in the explorer.
-5. New server features = new file in `src/server/Services/` exposing `Start()`, added to `ORDER` in `Main.server.luau`. New client screens = a module with `Mount(gui)` added to `ORDER` in `Main.client.luau`.
+5. New server features = new file in `src/server/Services/` exposing `Start()`, added to `ORDER` in `Main.server.luau`. New client screens = a module with `Mount(gui)` added to `ORDER` in `Main.client.luau`. A button for a screen is a tile in the top-left Menu: `MenuUI.AddTile({ Id, Label, Order, OnClick, ... })` (or `Layout.SideButton`), with a line in `Config.Menu.Tiles`; never a loose button on screen. A centred panel calls `PanelManager.Register(panel)` so only one is open at a time and Escape closes it.
 6. Persist data only through `DataService`. Add new saved fields to `Config.Data.Template`.
 7. Any AI-generated or player text shown to players must pass through `TextService` filtering.
 8. Never put API keys in code. Use Roblox Secrets (`HttpService:GetSecret`).

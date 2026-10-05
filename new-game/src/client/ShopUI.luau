@@ -1,8 +1,8 @@
 --!strict
 --[[
-	The shop: a tab per cosmetic slot (Config.Shop.Slots) plus "Packs & VIP".
-	Opens from the Shop button / B key and the Pumpkin Shop stall (Config.Npcs OpensShop ->
-	ShopUI.Open(tab)). Every action goes through the server (ShopService); this only shows
+	The shop (title: Config.Shop.Title): a tab per cosmetic slot (Config.Shop.Slots) plus
+	"Packs & VIP". Opens from the Menu (Shop, Skins and VIP & Packs tiles), the B key and the
+	Pumpkin Shop stall (Config.Npcs OpensShop -> ShopUI.Open(tab), the Skins tab). Every action goes through the server (ShopService); this only shows
 	the state it sends back. Each card shows a rarity tag (Config.Rarity) and the price from
 	Items.Price. Robux buttons open Roblox's own purchase prompt and are disabled while an ID
 	in Config.Monetization is still 0.
@@ -86,7 +86,7 @@ function ShopUI.Mount(gui: ScreenGui)
 	local tab = Config.Shop.Slots[1]
 	local busy = false
 
-	-- Shop button -------------------------------------------------------------------------
+	-- Shop button (a tile in the Menu, see Layout.SideButton) ---------------------------------
 	local shopButton = Layout.SideButton(if Layout.IsPhone() then "Shop" else "Shop (B)", 4)
 	shopButton.Name = "ShopButton"
 	shopButton.BackgroundColor3 = Theme.Selected

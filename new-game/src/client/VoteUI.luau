@@ -1,6 +1,8 @@
 --!strict
 -- Vote panel: one row of map buttons and one row of difficulty buttons with live counts.
 -- Shown while the server's vote is open; sends intent only (the server validates).
+-- VoteUI.Open() -> boolean   shows the panel again if a vote is open (Menu > Vote); false
+--                            when no vote is open right now.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -11,6 +13,17 @@ type Option = { Id: string, Name: string, Votes: number }
 type VoteState = { Open: boolean, Maps: { Option }, Difficulties: { Option } }
 
 local VoteUI = {}
+
+local votePanel: Frame? = nil
+local voteOpen = false
+
+function VoteUI.Open(): boolean
+	if votePanel and voteOpen then
+		votePanel.Visible = true
+		return true
+	end
+	return false
+end
 
 function VoteUI.Mount(gui: ScreenGui)
 	local castVote = Remotes.Event("CastVote")
@@ -24,6 +37,7 @@ function VoteUI.Mount(gui: ScreenGui)
 	panel.Size = UDim2.fromOffset(560, 200)
 	panel.Visible = false
 	Layout.Fit(panel, true)
+	votePanel = panel
 
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, 6)
@@ -96,8 +110,9 @@ function VoteUI.Mount(gui: ScreenGui)
 		if typeof(state) ~= "table" then
 			return
 		end
-		panel.Visible = state.Open
-		if not state.Open then
+		voteOpen = state.Open == true
+		panel.Visible = voteOpen
+		if not voteOpen then
 			table.clear(mine)
 			return
 		end
