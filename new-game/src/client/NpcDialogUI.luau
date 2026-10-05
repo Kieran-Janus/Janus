@@ -5,7 +5,7 @@
 	  VotingBoard - adds whether voting is open right now
 	  Leaderboard - adds the current top list from the gravestone
 	  PhotoSpot   - opens the emote bar instead (hides when you walk away)
-	  OpensShop   - NPCs with this set (Witch Wanda, Pumpkin Vendor) open the shop on that tab
+	  OpensShop   - NPCs with this set (the Pumpkin Shop) open the shop on that tab
 ]]
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")

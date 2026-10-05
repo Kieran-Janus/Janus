@@ -20,7 +20,7 @@ rojo serve             # then Studio -> Plugins -> Rojo -> Connect
 
 | Piece | File | Purpose |
 | --- | --- | --- |
-| Config | `src/shared/Config.luau` | **All** tweakable values: rounds, rewards, economy, AI personas |
+| Config | `src/shared/Config/` (`init.luau` plus one file per v2 feature) | **All** tweakable values: rounds, rewards, economy, AI personas |
 | Remotes | `src/shared/Remotes.luau` | One place to declare networking |
 | Data | `src/server/Services/DataService.luau` | Load/autosave/save with retries, leaderstats |
 | Rounds | `src/server/Services/GameService.luau` | Intermission -> Play -> Reward loop (drop your mode in `runRound`) |
@@ -30,7 +30,7 @@ rojo serve             # then Studio -> Plugins -> Rojo -> Connect
 
 ## Easy changes
 
-- **Numbers/names/prices/NPC personalities:** edit `src/shared/Config.luau`, nothing else.
+- **Numbers/names/prices/NPC personalities:** edit `src/shared/Config/` (`init.luau` plus one file per v2 feature), nothing else.
 - **New feature:** use `prompts/02-add-system.md`.
 - **Reset all player saves:** bump `Config.Data.StoreName` (`PlayerData_v1` -> `v2`).
 - **Turn AI off instantly:** `Config.AI.Enabled = false`.

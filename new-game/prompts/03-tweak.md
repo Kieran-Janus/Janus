@@ -1,6 +1,6 @@
 # Quick tweaks
 
-Most tweaks are one line in `src/shared/Config.luau`. Just say what you want:
+Most tweaks are one line in `src/shared/Config/` (`init.luau` plus one file per v2 feature). Just say what you want:
 
 ```
 Make rounds 3 minutes, winner reward 250, and require 3 players.

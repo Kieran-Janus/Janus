@@ -1,10 +1,11 @@
 --!strict
 --[[
 	The shop: a tab per cosmetic slot (Config.Shop.Slots) plus "Packs & VIP".
-	Opens from the Shop button / B key, Witch Wanda and the Pumpkin Vendor (Config.Npcs
-	OpensShop -> ShopUI.Open(tab)). Every action goes through the server (ShopService); this
-	only shows the state it sends back. Robux buttons open Roblox's own purchase prompt and
-	are disabled while an ID in Config.Monetization is still 0.
+	Opens from the Shop button / B key and the Pumpkin Shop stall (Config.Npcs OpensShop ->
+	ShopUI.Open(tab)). Every action goes through the server (ShopService); this only shows
+	the state it sends back. Each card shows a rarity tag (Config.Rarity) and the price from
+	Items.Price. Robux buttons open Roblox's own purchase prompt and are disabled while an ID
+	in Config.Monetization is still 0.
 ]]
 local ContextActionService = game:GetService("ContextActionService")
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -13,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Layout = require(script.Parent.Layout)
 local Sounds = require(script.Parent.Sounds)
@@ -108,7 +110,7 @@ function ShopUI.Mount(gui: ScreenGui)
 	sizeLimit.MaxSize = Vector2.new(660, 460)
 	sizeLimit.Parent = panel
 
-	local title = Theme.label("Witch Wanda's Shop", 22, panel)
+	local title = Theme.label(Config.Shop.Title, 22, panel)
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Position = UDim2.fromOffset(16, 8)
 	title.Size = UDim2.new(0.6, 0, 0, 32)
@@ -190,6 +192,25 @@ function ShopUI.Mount(gui: ScreenGui)
 		end)
 	end
 
+	-- Small coloured rarity label in the top-left corner of a card's preview.
+	local function rarityTag(item: any, parent: Frame)
+		local info = Items.RarityInfo(item)
+		local tag = Theme.label(info.Name, 14, parent)
+		tag.Name = "RarityTag"
+		tag.ZIndex = 2 -- above the preview
+		tag.AutomaticSize = Enum.AutomaticSize.X
+		tag.Position = UDim2.fromOffset(12, 12)
+		tag.Size = UDim2.fromOffset(0, 20)
+		tag.BackgroundTransparency = 0.1
+		tag.BackgroundColor3 = info.Color
+		tag.TextStrokeTransparency = 0.6
+		Theme.round(tag, 6)
+		local padding = Instance.new("UIPadding")
+		padding.PaddingLeft = UDim.new(0, 6)
+		padding.PaddingRight = UDim.new(0, 6)
+		padding.Parent = tag
+	end
+
 	local function renderItems(slot: string)
 		local grid = Instance.new("UIGridLayout")
 		grid.CellSize = UDim2.fromOffset(140, cardHeight)
@@ -205,12 +226,14 @@ function ShopUI.Mount(gui: ScreenGui)
 			local view = preview(Cosmetics.Preview(item), frame)
 			view.Position = UDim2.fromOffset(8, 8)
 			view.Size = UDim2.new(1, -16, 0, previewHeight)
+			rarityTag(item, frame)
 
 			local name = Theme.label(item.Name, 14, frame)
 			name.TextWrapped = true
 			name.Position = UDim2.fromOffset(6, previewHeight + 10)
 			name.Size = UDim2.new(1, -12, 0, 34)
 
+			local price = Items.Price(item)
 			local usable = if item.VipOnly then state.Vip else owns(item.Id)
 			local equipped = state.Equipped[slot] == item.Id
 			local action = button("", frame)
@@ -239,8 +262,13 @@ function ShopUI.Mount(gui: ScreenGui)
 				action.Activated:Connect(function()
 					ShopUI.Open("Packs")
 				end)
+			elseif price == nil then
+				-- Not sold for coins (CrateOnly): only crates give it.
+				action.Text = "From crates"
+				action.AutoButtonColor = false
+				action.BackgroundColor3 = Color3.fromRGB(70, 65, 80)
 			else
-				action.Text = ("Buy  %d"):format(item.Price)
+				action.Text = ("Buy  %d"):format(price)
 				action.BackgroundColor3 = Theme.Selected
 				action.Activated:Connect(function()
 					act(function()

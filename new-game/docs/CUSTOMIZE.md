@@ -4,7 +4,7 @@ The game is built so you can change almost anything without touching code. There
 
 | Layer | What it controls | Where | How hard |
 | --- | --- | --- | --- |
-| **1. Config** | Every number, name, price, colour, dialogue line, code, reward | `src/shared/Config.luau` | Edit text, save. Rojo syncs it live. |
+| **1. Config** | Every number, name, price, colour, dialogue line, code, reward | `src/shared/Config/` (`init.luau` plus one file per v2 feature) | Edit text, save. Rojo syncs it live. |
 | **2. Custom models** | How every character, NPC, hat, pet and skin *looks* | Studio: `ReplicatedStorage > Custom` | Build or import a model, give it the right name. |
 | **3. Code** | New behaviour (a new monster, mode, item type) | `src/` | Ask Claude Code with a slash command (bottom of this page). |
 

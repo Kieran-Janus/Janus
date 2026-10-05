@@ -3,9 +3,45 @@
 	THE tweak file. Every number, name, price and AI persona lives here.
 	Want a longer round? Change Round.Duration. Want a new NPC? Add to AI.Npcs.
 	Nothing else in the codebase should hardcode gameplay values.
+
+	The v2 settings each have their own short file in this folder (src/shared/Config/):
+	  Features.luau    on/off switch for every v2 feature (start here!)
+	  Modes.luau       game modes and the mode + map pairs offered in the vote
+	  Lobby.luau       lobby areas, the Ready pad and spectating
+	  Parkour.luau, Minigames.luau, EasterEggs.luau, HideSeek.luau, ScareMaze.luau
+	  Rarity.luau      Common / Uncommon / Rare / CRAZY prices and colours
+	  Crates.luau      crates and their odds
+	  Menu.luau        the top-left menu tiles
+	  Maps/<Id>.luau   one file per round map (added to Maps.List below)
+	  Skins/           crate skins, one file per theme (added to Shop.Items below)
+	Everything is still read the same way: Config.Features.Parkour, Config.Lobby.Zones, ...
 ]]
 
+-- One hub NPC (Npcs.List below). OpensShop is optional.
+export type NpcDef = {
+	Id: string,
+	Kind: string,
+	DisplayName: string,
+	Offset: Vector3,
+	Prompt: { ActionText: string, ObjectText: string },
+	OpensShop: string?,
+	Lines: { string },
+}
+
 local Config = {
+	-- v2 settings, one file each (see the list above).
+	Features = require(script.Features),
+	Modes = require(script.Modes),
+	Lobby = require(script.Lobby),
+	Parkour = require(script.Parkour),
+	Minigames = require(script.Minigames),
+	EasterEggs = require(script.EasterEggs),
+	HideSeek = require(script.HideSeek),
+	ScareMaze = require(script.ScareMaze),
+	Rarity = require(script.Rarity),
+	Crates = require(script.Crates),
+	Menu = require(script.Menu),
+
 	Game = {
 		Name = "Pumpkin Panic", -- working title, see docs/DESIGN.md
 		Version = "0.1.0",
@@ -22,6 +58,7 @@ local Config = {
 	-- First-round tutorial for new players (RoundsPlayed = 0 and not TutorialDone): Boo Guide
 	-- pops up in a small speech bubble with a tip at each moment, once each. "Skip" (or the
 	-- last tip) marks it done in the save. src/client/TutorialUI.luau, TutorialService.
+	-- Switched off in v2: set Config.Features.Tutorial = true to bring it back.
 	Tutorial = {
 		Name = "Boo Guide",
 		SkipText = "Skip",
@@ -37,7 +74,7 @@ local Config = {
 				Seconds = 6,
 			},
 			Caught = { Text = "You're a ghost now: spectate or haunt the King.", Seconds = 6 },
-			Results = { Text = "Spend coins with Witch Wanda!", Seconds = 6 },
+			Results = { Text = "Spend coins at the Pumpkin Shop!", Seconds = 6 },
 		},
 		Colors = {
 			Name = Color3.fromRGB(255, 170, 70),
@@ -112,188 +149,20 @@ local Config = {
 		--   1. a Model named after the Id in ServerStorage.Maps (hand-built or Creator Store art)
 		--      with a part named "Floor", a folder named SpawnFolder holding spawn parts and
 		--      optionally a folder "Hotspots" of parts where extra pumpkins appear;
-		--   2. otherwise src/server/Maps/<Builder>.luau builds it from the settings below.
+		--   2. otherwise src/server/Maps/<Builder>.luau builds it from its settings file.
 		-- Lighting, particles and ambient sound switch on the client when the camera is over the
 		-- map (src/client/ZoneLighting.luau) so players in the hub keep the hub look.
 		LightingFadeSeconds = 1.5,
 		ZoneCheckSeconds = 0.25,
+		-- Every map's settings are in their own file: src/shared/Config/Maps/<Id>.luau.
+		-- To add a map: copy one of those files, change its Id/Name/Builder, add it here and
+		-- add a playlist for it in Config/Modes.luau.
 		List = {
-			{
-				Id = "PumpkinPatch",
-				Name = "Haunted Pumpkin Patch",
-				Thumbnail = 0, -- rbxassetid, 0 = none yet
-				SpawnFolder = "Spawns",
-				Builder = "PumpkinPatch",
-				Seed = 1,
-				Size = Vector3.new(220, 1, 220),
-				WallHeight = 14, -- the thorny hedge around the edge
-				Spawns = 8,
-				SpawnRadius = 20,
-				Colors = {
-					Grass = Color3.fromRGB(62, 92, 44),
-					Dirt = Color3.fromRGB(92, 64, 42),
-					Hedge = Color3.fromRGB(32, 52, 34),
-					Corn = Color3.fromRGB(176, 160, 70),
-					CornTop = Color3.fromRGB(214, 190, 90),
-					Hay = Color3.fromRGB(222, 184, 92),
-					Barn = Color3.fromRGB(150, 42, 40),
-					Roof = Color3.fromRGB(70, 44, 40),
-					Wood = Color3.fromRGB(92, 62, 40),
-					Stone = Color3.fromRGB(120, 118, 128),
-					Iron = Color3.fromRGB(35, 32, 40),
-					Orange = Color3.fromRGB(255, 130, 20),
-					Green = Color3.fromRGB(110, 200, 90),
-					Glow = Color3.fromRGB(255, 200, 90),
-					Bone = Color3.fromRGB(235, 228, 210),
-				},
-				-- Offsets are from the map centre (x, z); the spawn clearing is in the middle.
-				Layout = {
-					ClearingRadius = 30, -- nothing big is placed here
-					CornMaze = { -- tall rows block the King's view; gaps are the way through
-						Offset = Vector3.new(58, 0, -58),
-						Size = Vector3.new(76, 10, 76), -- y = stalk height
-						RowSpacing = 9,
-						GapsPerRow = 2,
-						GapWidth = 6,
-					},
-					Barn = { -- doors at both ends make it a shortcut; hay inside to hide in
-						Offset = Vector3.new(-60, 0, -58),
-						Size = Vector3.new(30, 16, 40),
-						DoorWidth = 12,
-						DoorHeight = 12,
-					},
-					Field = { -- open pumpkin rows: lots of pumpkins, nowhere to hide (risky)
-						Offset = Vector3.new(-58, 0, 58),
-						Size = Vector3.new(70, 0, 56),
-						Rows = 6,
-						DecorPumpkinsPerRow = 7,
-					},
-					Graveyard = {
-						Offset = Vector3.new(58, 0, 58),
-						Size = Vector3.new(60, 0, 56),
-						Tombstones = 14,
-					},
-					Haystacks = 7, -- walk-in hiding spots scattered in the open
-					JumpFences = 6, -- low fences players can hop; the King can't jump
-					JumpFenceHeight = 3.5,
-					HayBales = 14,
-					DeadTrees = 9,
-					Lanterns = 12,
-					JackOLanterns = 14,
-					Scarecrows = 3,
-				},
-				Lighting = {
-					ClockTime = 0.2, -- full moon
-					Brightness = 2,
-					Ambient = Color3.fromRGB(85, 70, 110),
-					OutdoorAmbient = Color3.fromRGB(110, 100, 150),
-					Atmosphere = {
-						Density = 0.42,
-						Offset = 0.1,
-						Color = Color3.fromRGB(120, 110, 170),
-						Decay = Color3.fromRGB(255, 150, 80),
-						Glare = 0.3,
-						Haze = 2,
-					},
-					ColorCorrection = {
-						Brightness = 0.04,
-						Contrast = 0.1,
-						Saturation = 0.2,
-						TintColor = Color3.fromRGB(240, 235, 255),
-					},
-					Bloom = { Intensity = 0.8, Size = 30, Threshold = 0.9 },
-				},
-				Particles = {
-					Fireflies = { Rate = 14, Color = Color3.fromRGB(210, 255, 120) },
-					Mist = { Rate = 10, Color = Color3.fromRGB(190, 175, 220) },
-					Leaves = { Rate = 6, Color = Color3.fromRGB(205, 110, 40) },
-				},
-				-- Crickets loop (Pro Sound Effects, Creator Store); "" = none
-				AmbientSound = { SoundId = "rbxassetid://9112764040", Volume = 0.3 },
-			},
-			{
-				Id = "SpookyMansion",
-				Name = "Spooky Mansion",
-				Thumbnail = 0,
-				SpawnFolder = "Spawns",
-				Builder = "SpookyMansion",
-				Seed = 2,
-				Size = Vector3.new(180, 1, 180),
-				WallHeight = 20, -- outer walls; the roof caved in long ago
-				Spawns = 8,
-				SpawnRadius = 16,
-				Colors = {
-					Floor = Color3.fromRGB(96, 66, 50),
-					OuterWall = Color3.fromRGB(70, 62, 82),
-					Wall = Color3.fromRGB(88, 60, 110),
-					Trim = Color3.fromRGB(50, 34, 40),
-					Rug = Color3.fromRGB(140, 30, 50),
-					RugAlt = Color3.fromRGB(60, 40, 120),
-					Wood = Color3.fromRGB(80, 50, 34),
-					DarkWood = Color3.fromRGB(48, 30, 24),
-					Gold = Color3.fromRGB(230, 180, 70),
-					Stone = Color3.fromRGB(120, 118, 128),
-					Curtain = Color3.fromRGB(110, 20, 40),
-					Plant = Color3.fromRGB(50, 80, 50),
-					Bone = Color3.fromRGB(235, 228, 210),
-					Orange = Color3.fromRGB(255, 130, 20),
-					Green = Color3.fromRGB(110, 200, 90),
-					Glow = Color3.fromRGB(255, 200, 90),
-					Slime = Color3.fromRGB(120, 255, 110),
-				},
-				Layout = {
-					-- A 3x3 grid of rooms, listed north-west to south-east. The middle one is
-					-- where everyone spawns. Every neighbouring pair of rooms shares a doorway.
-					Rooms = {
-						"Library",
-						"Gallery",
-						"Bedroom",
-						"Dining",
-						"GrandHall",
-						"Kitchen",
-						"Conservatory",
-						"Ballroom",
-						"Crypt",
-					},
-					WallHeight = 16, -- inside walls
-					WallThickness = 2,
-					DoorWidth = 12,
-					DoorHeight = 11,
-					-- Extra gaps hidden behind a fake bookcase: players walk through, the King
-					-- can't path through them (PathfindingModifier label "SecretDoor").
-					SecretDoors = 3,
-					SecretDoorWidth = 6,
-					Hotspots = { "Ballroom", "Dining" }, -- rooms where extra pumpkins appear
-				},
-				Lighting = {
-					ClockTime = 22,
-					Brightness = 1.4,
-					Ambient = Color3.fromRGB(95, 70, 120),
-					OutdoorAmbient = Color3.fromRGB(105, 85, 135),
-					Atmosphere = {
-						Density = 0.36,
-						Offset = 0.2,
-						Color = Color3.fromRGB(110, 90, 150),
-						Decay = Color3.fromRGB(90, 60, 140),
-						Glare = 0,
-						Haze = 1.4,
-					},
-					ColorCorrection = {
-						Brightness = 0.03,
-						Contrast = 0.15,
-						Saturation = 0.1,
-						TintColor = Color3.fromRGB(245, 230, 255),
-					},
-					Bloom = { Intensity = 0.9, Size = 26, Threshold = 0.88 },
-				},
-				Particles = {
-					Dust = { Rate = 10, Color = Color3.fromRGB(230, 220, 200) },
-					Wisps = { Rate = 5, Color = Color3.fromRGB(150, 220, 255) },
-					Mist = { Rate = 5, Color = Color3.fromRGB(170, 150, 210) },
-				},
-				-- "HAUNTED AMBIENCE" (DistroKid, Creator Store); "" = none
-				AmbientSound = { SoundId = "rbxassetid://134980593475246", Volume = 0.3 },
-			},
+			require(script.Maps.PumpkinPatch) :: any, -- King Hunt
+			require(script.Maps.SpookyMansion) :: any, -- King Hunt
+			require(script.Maps.PumpkinFarm) :: any, -- Hide & Seek
+			require(script.Maps.HedgeMaze) :: any, -- Hide & Seek
+			require(script.Maps.ScareMaze) :: any, -- ScareMaze
 		} :: { any }, -- maps differ in shape (each Builder reads its own Layout)
 	},
 
@@ -704,7 +573,7 @@ local Config = {
 			Offset = Vector3.new(-48, 0, 34),
 			Epitaphs = {
 				"RIP Mr. Bones",
-				"Here lies Boo's homework",
+				"Here lies my homework",
 				"Ate 100 candies",
 				"Back in 5 mins",
 				"Too spooky",
@@ -781,40 +650,23 @@ local Config = {
 
 	-- Hub NPCs and interactive props. Kind picks the placeholder model; Lines are shown in the
 	-- dialog when the prompt is used. Offsets are relative to Hub.Center; they face the center.
+	-- OpensShop (optional) opens the shop on that tab instead of a dialog.
+	-- v2 removed Witch Wanda and the Boo Guide: the Pumpkin Shop is the only shopkeeper. To bring
+	-- them back, copy their entries from git history (run in the repo:
+	-- git show 7717d52:new-game/src/shared/Config.luau) into this list.
 	Npcs = {
 		InteractCooldown = 0.5,
 		List = {
 			{
-				Id = "WitchWanda",
-				Kind = "Witch",
-				DisplayName = "Witch Wanda",
-				Offset = Vector3.new(-40, 0, -18),
-				Prompt = { ActionText = "Shop", ObjectText = "Witch Wanda" },
-				OpensShop = "Hat", -- opens the shop on this tab instead of a dialog
-				Lines = { "Welcome, dearie! Hats, trails and pets, all freshly brewed." },
-			},
-			{
-				Id = "BooGuide",
-				Kind = "Ghost",
-				DisplayName = "Boo Guide",
-				Offset = Vector3.new(-16, 0, 32),
-				Prompt = { ActionText = "Get tips", ObjectText = "Boo Guide" },
-				Lines = {
-					"Boo! Welcome to Pumpkin Panic! Vote for a map and difficulty on the Voting Board.",
-					"In a round, grab as many pumpkins as you can. Each one is worth coins at the end.",
-					"The Pumpkin King hunts by sound. Sprinting (Shift), shouting (G) and talking make noise!",
-					"If you get caught you become a ghost: spectate, haunt the King, or chat with other ghosts.",
-					"Hard mode has two Kings but pays double. Good luck!",
-				},
-			},
-			{
-				Id = "PumpkinVendor",
+				Id = "PumpkinVendor", -- the shopkeeper (the Id stays the same so saved hubs keep working)
 				Kind = "Vendor",
-				DisplayName = "Pumpkin Vendor",
+				DisplayName = "Pumpkin Shop",
 				Offset = Vector3.new(40, 0, -18),
-				Prompt = { ActionText = "Browse", ObjectText = "Pumpkin Vendor" },
-				OpensShop = "Packs",
-				Lines = { "Fresh pumpkin packs and VIP passes!" },
+				Prompt = { ActionText = "Shop", ObjectText = "Pumpkin Shop" },
+				OpensShop = "Skin",
+				Lines = {
+					"Welcome to the Pumpkin Shop! Skins, hats, trails and pets, fresh from the patch.",
+				},
 			},
 			{
 				Id = "VotingBoard",
@@ -842,7 +694,7 @@ local Config = {
 				Prompt = { ActionText = "Strike a pose", ObjectText = "Photo Spot" },
 				Lines = { "Say pumpkin!" },
 			},
-		},
+		} :: { NpcDef },
 		Prompt = {
 			HoldDuration = 0,
 			MaxActivationDistance = 12,
@@ -863,10 +715,15 @@ local Config = {
 		CurrencyName = "Coins",
 	},
 
-	-- Cosmetic shop (Witch Wanda, or the Shop button). Prices are in Economy.CurrencyName.
-	-- Looks are built from Parts by src/shared/Cosmetics.luau from each item's Style, so the
-	-- same code dresses the character (server) and draws the shop previews (client).
+	-- Cosmetic shop (the Pumpkin Shop stall in the lobby, or the Shop button). Prices are in
+	-- Economy.CurrencyName. Looks are built from Parts by src/shared/Cosmetics.luau from each
+	-- item's Style, so the same code dresses the character (server) and draws the shop previews
+	-- (client).
+	-- Price: an item costs its Rarity's price (Config/Rarity.luau: Common 125, Uncommon 500,
+	-- Rare 1000, Crazy 100000). Give an item its own "Price = 300," to override that. VipOnly
+	-- items come free with VIP and can't be bought. Crate skins are added from Config/Skins/.
 	Shop = {
+		Title = "Pumpkin Shop", -- shown at the top of the shop panel
 		RequestCooldown = 0.25, -- per-player spam guard on buy/equip
 		OpenKey = Enum.KeyCode.B,
 		-- Shop tabs, in order; a player wears one item per slot. Skin comes first so it's put
@@ -881,7 +738,7 @@ local Config = {
 				Id = "Skeleton",
 				Name = "Skeleton",
 				Slot = "Skin",
-				Price = 400,
+				Rarity = "Uncommon",
 				Style = {
 					Kind = "Skin",
 					BodyColor = Color3.fromRGB(235, 228, 210),
@@ -895,7 +752,7 @@ local Config = {
 				Id = "PumpkinHead",
 				Name = "Pumpkin Head",
 				Slot = "Skin",
-				Price = 350,
+				Rarity = "Uncommon",
 				Style = {
 					Kind = "Skin",
 					Head = "SkinPumpkin",
@@ -907,14 +764,14 @@ local Config = {
 				Id = "Zombie",
 				Name = "Zombie",
 				Slot = "Skin",
-				Price = 300,
+				Rarity = "Common",
 				Style = { Kind = "Skin", BodyColor = Color3.fromRGB(120, 170, 95) },
 			},
 			{
 				Id = "Ghost",
 				Name = "Ghost",
 				Slot = "Skin",
-				Price = 500,
+				Rarity = "Rare",
 				Style = {
 					Kind = "Skin",
 					BodyColor = Color3.fromRGB(235, 240, 255),
@@ -927,7 +784,7 @@ local Config = {
 				Id = "Mummy",
 				Name = "Mummy",
 				Slot = "Skin",
-				Price = 450,
+				Rarity = "Uncommon",
 				Style = {
 					Kind = "Skin",
 					BodyColor = Color3.fromRGB(215, 205, 180),
@@ -940,6 +797,7 @@ local Config = {
 				Name = "Pumpkin King",
 				Slot = "Skin",
 				Price = 0,
+				Rarity = "Rare",
 				VipOnly = true,
 				Style = {
 					Kind = "Skin",
@@ -955,14 +813,14 @@ local Config = {
 				Id = "PumpkinCap",
 				Name = "Pumpkin Cap",
 				Slot = "Hat",
-				Price = 100,
+				Rarity = "Common",
 				Style = { Kind = "PumpkinCap", Color = Color3.fromRGB(255, 130, 20) },
 			},
 			{
 				Id = "WitchHat",
 				Name = "Witch Hat",
 				Slot = "Hat",
-				Price = 200,
+				Rarity = "Uncommon",
 				Style = {
 					Kind = "WitchHat",
 					Color = Color3.fromRGB(60, 30, 90),
@@ -973,7 +831,7 @@ local Config = {
 				Id = "CatEars",
 				Name = "Cat Ears",
 				Slot = "Hat",
-				Price = 150,
+				Rarity = "Common",
 				Style = {
 					Kind = "CatEars",
 					Color = Color3.fromRGB(40, 35, 45),
@@ -984,7 +842,7 @@ local Config = {
 				Id = "BatWings",
 				Name = "Bat Wings Headband",
 				Slot = "Hat",
-				Price = 300,
+				Rarity = "Uncommon",
 				Style = { Kind = "BatWings", Color = Color3.fromRGB(45, 30, 60) },
 			},
 			{
@@ -992,6 +850,7 @@ local Config = {
 				Name = "Pumpkin King Crown",
 				Slot = "Hat",
 				Price = 0,
+				Rarity = "Rare",
 				VipOnly = true,
 				Style = { Kind = "Crown", Color = Color3.fromRGB(255, 210, 60) },
 			},
@@ -999,7 +858,7 @@ local Config = {
 				Id = "CandyCornHat",
 				Name = "Candy Corn Hat",
 				Slot = "Hat",
-				Price = 180,
+				Rarity = "Common",
 				Style = {
 					Kind = "CandyCornHat",
 					Base = Color3.fromRGB(255, 200, 40),
@@ -1011,7 +870,7 @@ local Config = {
 				Id = "BatBow",
 				Name = "Bat Bow",
 				Slot = "Hat",
-				Price = 220,
+				Rarity = "Uncommon",
 				Style = {
 					Kind = "BatBow",
 					Color = Color3.fromRGB(70, 40, 110),
@@ -1024,7 +883,7 @@ local Config = {
 				Id = "OrangeTrail",
 				Name = "Jack-o'-Glow",
 				Slot = "Trail",
-				Price = 120,
+				Rarity = "Common",
 				Style = {
 					Kind = "Trail",
 					Color = Color3.fromRGB(255, 140, 30),
@@ -1035,7 +894,7 @@ local Config = {
 				Id = "SlimeTrail",
 				Name = "Slime Drip",
 				Slot = "Trail",
-				Price = 180,
+				Rarity = "Common",
 				Style = {
 					Kind = "Trail",
 					Color = Color3.fromRGB(120, 255, 110),
@@ -1046,7 +905,7 @@ local Config = {
 				Id = "GhostTrail",
 				Name = "Ghostly Mist",
 				Slot = "Trail",
-				Price = 250,
+				Rarity = "Uncommon",
 				Style = {
 					Kind = "Trail",
 					Color = Color3.fromRGB(200, 230, 255),
@@ -1058,6 +917,7 @@ local Config = {
 				Name = "Candy Corn",
 				Slot = "Trail",
 				Price = 0,
+				Rarity = "Uncommon",
 				VipOnly = true,
 				Style = {
 					Kind = "Trail",
@@ -1069,7 +929,7 @@ local Config = {
 				Id = "CandySwirlTrail",
 				Name = "Candy Swirl",
 				Slot = "Trail",
-				Price = 150,
+				Rarity = "Common",
 				Style = {
 					Kind = "Trail",
 					Color = Color3.fromRGB(255, 120, 190),
@@ -1080,7 +940,7 @@ local Config = {
 				Id = "PurpleFogTrail",
 				Name = "Purple Fog",
 				Slot = "Trail",
-				Price = 280,
+				Rarity = "Uncommon",
 				Style = {
 					Kind = "Trail",
 					Color = Color3.fromRGB(150, 80, 220),
@@ -1092,28 +952,28 @@ local Config = {
 				Id = "MiniPumpkin",
 				Name = "Mini Pumpkin",
 				Slot = "Pet",
-				Price = 300,
+				Rarity = "Common",
 				Style = { Kind = "PumpkinPet", Color = Color3.fromRGB(255, 130, 20) },
 			},
 			{
 				Id = "BabyBat",
 				Name = "Baby Bat",
 				Slot = "Pet",
-				Price = 450,
+				Rarity = "Uncommon",
 				Style = { Kind = "BatPet", Color = Color3.fromRGB(50, 35, 70) },
 			},
 			{
 				Id = "GhostKitty",
 				Name = "Ghost Kitty",
 				Slot = "Pet",
-				Price = 600,
+				Rarity = "Rare",
 				Style = { Kind = "GhostPet", Color = Color3.fromRGB(200, 230, 255) },
 			},
 			{
 				Id = "MiniCauldron",
 				Name = "Mini Cauldron",
 				Slot = "Pet",
-				Price = 550,
+				Rarity = "Uncommon",
 				Style = {
 					Kind = "CauldronPet",
 					Color = Color3.fromRGB(40, 36, 46),
@@ -1125,6 +985,7 @@ local Config = {
 				Name = "Itsy Spider",
 				Slot = "Pet",
 				Price = 0,
+				Rarity = "Rare",
 				VipOnly = true,
 				Style = {
 					Kind = "SpiderPet",
@@ -1137,6 +998,7 @@ local Config = {
 				Name = "Skelly Pup",
 				Slot = "Pet",
 				Price = 0,
+				Rarity = "Rare",
 				VipOnly = true,
 				Style = { Kind = "SkullPet", Color = Color3.fromRGB(235, 228, 210) },
 			},
@@ -1201,9 +1063,7 @@ local Config = {
 			SkeletonPatrol = 6.2,
 			Bat = 1.4,
 			GhostCat = 3,
-			WitchWanda = 8,
-			BooGuide = 6.5,
-			PumpkinVendor = 7.5,
+			PumpkinVendor = 7.5, -- the Pumpkin Shop keeper
 		} :: { [string]: number },
 		CosmeticSize = { Hat = 2, Pet = 1.6, Skin = 2.4 } :: { [string]: number }, -- biggest side, studs
 		-- Walk and idle for a custom King that is a real R15 rig (Roblox's own R15 animations).
@@ -1253,6 +1113,9 @@ local Config = {
 		CoinsPerClick = 1000,
 	},
 
+	-- Saved player data. A new saved field only needs a line in Template: old saves get the
+	-- default. Tables with something in them (Equipped, Daily, Settings, Parkour, ...) fill in
+	-- missing keys one level deep; empty tables ({}) are taken whole from the save.
 	Data = {
 		StoreName = "PlayerData_v1", -- bump the suffix to wipe/reset all saves
 		AutosaveSeconds = 120,
@@ -1270,6 +1133,12 @@ local Config = {
 			FavoritePrompted = false,
 			Settings = { Music = true, Sounds = true }, -- the Settings panel's toggles
 			TutorialDone = false, -- finished or skipped the first-round tutorial
+			-- v2
+			EasterEggs = {} :: { [string]: boolean }, -- [eggId] = true once found
+			Parkour = { Best = 0, LastReward = 0, Runs = 0 }, -- best time (s), os.time() of the last reward, finishes
+			Minigames = { CandyRushWins = 0, WebScourBest = 0 },
+			Crates = { Opened = 0 }, -- crates opened, ever
+			Stats = { HideSeekTags = 0, HideSeekWins = 0, ScareMazeEscapes = 0 },
 		},
 	},
 
@@ -1298,5 +1167,11 @@ local Config = {
 		FilterAIText = true,
 	},
 }
+
+-- Crate skins (src/shared/Config/Skins/) join the shop list, so the shop, crates, codes and
+-- saves all find them in Config.Shop.Items.
+for _, item in require(script.Skins) do
+	table.insert(Config.Shop.Items, item)
+end
 
 return Config

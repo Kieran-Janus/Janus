@@ -12,5 +12,5 @@ Act as a Roblox game designer who knows what retains players.
 4. Propose 3 social/viral mechanics (trading, co-op, leaderboards, shareable moments).
 5. Say where AI can make the game unique (NPCs, generated quests, personalised events).
 6. Give me an MVP backlog of at most 10 tickets, each shippable in a day, ordered by player-visible value.
-Write it to docs/DESIGN.md and put every number you propose into src/shared/Config.luau.
+Write it to docs/DESIGN.md and put every number you propose into src/shared/Config/init.luau.
 ```

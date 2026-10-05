@@ -9,6 +9,7 @@
 	last tip, tells the server (FinishTutorial) so it never shows again.
 	Phones: the bubble lifts itself above any panel along the bottom (vote, ghost, dialog,
 	emotes) but never over the HUD, and Layout.Fit keeps it clear of the thumbstick/jump.
+	Off in v2: Mount does nothing unless Config.Features.Tutorial is true.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -39,6 +40,9 @@ local function circle(parent: Instance, size: number, color: Color3): Frame
 end
 
 function TutorialUI.Mount(gui: ScreenGui)
+	if not Config.Features.Tutorial then
+		return
+	end
 	local cfg = Config.Tutorial
 	local player = Players.LocalPlayer
 	local finishTutorial = Remotes.Event("FinishTutorial")

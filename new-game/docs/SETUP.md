@@ -59,7 +59,7 @@ You build on your own machine (Windows or Mac). The cloud session this repo was 
 4. In Studio: **Plugins tab -> Rojo -> Connect**. Click Connect.
 5. First connect: Rojo shows a diff of what it will sync. Accept it.
 
-**Check:** In Explorer you now see `ServerScriptService > Server > Main`, `ReplicatedStorage > Shared > Config`, and `StarterPlayer > StarterPlayerScripts > Client > Main`. Press **Play**: a bar at the top shows "Waiting for players" (needs 2 players; set `Round.MinPlayers = 1` in `Config.luau` for solo testing, save, and watch it update in Studio live).
+**Check:** In Explorer you now see `ServerScriptService > Server > Main`, `ReplicatedStorage > Shared > Config`, and `StarterPlayer > StarterPlayerScripts > Client > Main`. Press **Play**: a bar at the top shows "Waiting for players" (needs 2 players; set `Round.MinPlayers = 1` in `Config/init.luau` for solo testing, save, and watch it update in Studio live).
 
 ---
 
@@ -72,7 +72,7 @@ You build on your own machine (Windows or Mac). The cloud session this repo was 
    ```
 2. Claude reads `CLAUDE.md` automatically. Test it:
    > Set Round.MinPlayers to 1 and IntermissionSeconds to 5.
-3. Claude edits `src/shared/Config.luau`; Rojo pushes it into Studio within a second.
+3. Claude edits `src/shared/Config/` (`init.luau` plus one file per v2 feature); Rojo pushes it into Studio within a second.
 
 **Check:** the change appears in Studio's Explorer under `ReplicatedStorage.Shared.Config` without you doing anything. Press Play and the round starts after 5 seconds.
 
@@ -147,7 +147,7 @@ Studio -> **File -> Publish to Roblox** -> create a new experience, name it, lea
    - Allowed domain: `newgame-ai-proxy.<you>.workers.dev`
 
 ### 6f. Point the game at the Worker
-Ask Claude: *"Set Config.AI.ProxyUrl to https://newgame-ai-proxy.<you>.workers.dev/chat"* (or edit `Config.luau` yourself).
+Ask Claude: *"Set Config.AI.ProxyUrl to https://newgame-ai-proxy.<you>.workers.dev/chat"* (or edit `Config/init.luau` yourself).
 
 ### 6g. Test in Studio
 Secrets work in Studio for your own published place. Run this in the Studio command bar while playing a server (Test -> Start/Server) or have Claude add a ProximityPrompt using `prompts/05-ai-npc.md`:
@@ -181,7 +181,7 @@ These are independent web tools. None need wiring; you generate files and import
 | **Thumbnails** | `cd ../../thumbnails` - see its README. `generate.mjs` needs `OPENAI_API_KEY` in your environment |
 | **Sound** | ElevenLabs/other -> download MP3 -> Asset Manager -> Import (audio is moderated; takes minutes) |
 
-Tip: store asset IDs in `Config.luau` (an `Assets` table) so swapping art is a one-line change.
+Tip: store asset IDs in `Config/init.luau` (an `Assets` table) so swapping art is a one-line change.
 
 ---
 

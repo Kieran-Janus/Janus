@@ -1,8 +1,10 @@
 --!strict
 --[[
 	Cosmetic shop (Config.Shop). Server-authoritative: the client only names an item; the
-	server checks it exists, the price, the player's coins, ownership and VIP, then saves the
-	result in DataService (Owned, Equipped) and dresses the character (shared Cosmetics).
+	server checks it exists, the price (Items.Price: the item's own Price or its rarity's),
+	the player's coins, ownership and VIP, then saves the result in DataService (Owned,
+	Equipped) and dresses the character (shared Cosmetics). CrateOnly and VipOnly items
+	can't be bought here.
 
 	Client -> server:
 	  GetShopState() -> State
@@ -16,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 
@@ -110,15 +113,21 @@ local function onBuy(player: Player, itemId: unknown): (boolean, string, State)
 			"This one comes with " .. Config.Monetization.VipName .. ".",
 			ShopService.State(player)
 	end
+	if item.CrateOnly then
+		return false, "This one only comes from crates.", ShopService.State(player)
+	end
+	-- Price from the item or its rarity (Config.Rarity); nil means it isn't sold for coins.
+	-- Checked before Spend, which errors on a nil amount.
+	local price = Items.Price(item)
+	if price == nil then
+		return false, "That isn't for sale.", ShopService.State(player)
+	end
 	if data.Owned[item.Id] then
 		return false, "You already own it.", ShopService.State(player)
 	end
-	if not DataService.Spend(player, "Coins", item.Price) then
+	if not DataService.Spend(player, "Coins", price) then
 		return false,
-			("You need %d more %s."):format(
-				item.Price - (data.Coins or 0),
-				Config.Economy.CurrencyName
-			),
+			("You need %d more %s."):format(price - (data.Coins or 0), Config.Economy.CurrencyName),
 			ShopService.State(player)
 	end
 	data.Owned[item.Id] = true
