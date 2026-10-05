@@ -6,12 +6,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextService = game:GetService("TextService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
 local Hud = {}
 
 local DETAIL_MAX_SIZE = 15
-local DETAIL_MIN_SIZE = 10
+local DETAIL_MIN_SIZE = 14 -- readable on phones; longer lines end in "..."
 
 function Hud.Mount(gui: ScreenGui)
 	local player = Players.LocalPlayer
@@ -20,7 +21,8 @@ function Hud.Mount(gui: ScreenGui)
 	bar.Name = "Hud"
 	bar.AnchorPoint = Vector2.new(0.5, 0)
 	bar.Position = UDim2.fromScale(0.5, 0.02)
-	bar.Size = UDim2.fromOffset(500, 64)
+	bar.Size = UDim2.fromOffset(520, 64)
+	Layout.Fit(bar)
 
 	local title = Theme.label(Config.Game.Name, 22, bar)
 	title.Size = UDim2.new(1, 0, 0, 36)

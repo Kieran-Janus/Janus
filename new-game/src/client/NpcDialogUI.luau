@@ -14,6 +14,7 @@ local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local ShopUI = require(script.Parent.ShopUI)
+local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
 local NpcDialogUI = {}
@@ -49,6 +50,7 @@ function NpcDialogUI.Mount(gui: ScreenGui)
 	dialog.Position = UDim2.new(0.5, 0, 1, -24)
 	dialog.Size = UDim2.fromOffset(520, 170)
 	dialog.Visible = false
+	Layout.Fit(dialog, true)
 
 	local nameLabel = Theme.label("", 20, dialog)
 	nameLabel.TextColor3 = Theme.Selected
@@ -94,6 +96,7 @@ function NpcDialogUI.Mount(gui: ScreenGui)
 	emoteBar.Position = UDim2.new(0.5, 0, 1, -24)
 	emoteBar.Size = UDim2.fromOffset(560, 60)
 	emoteBar.Visible = false
+	Layout.Fit(emoteBar, true)
 	local layout = Instance.new("UIListLayout")
 	layout.FillDirection = Enum.FillDirection.Horizontal
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center

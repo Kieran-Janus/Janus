@@ -9,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
 local KingHeardUI = {}
@@ -30,6 +31,7 @@ function KingHeardUI.Mount(gui: ScreenGui)
 	banner.AnchorPoint = Vector2.new(0.5, 0.5)
 	banner.Position = UDim2.fromScale(0.5, 0.32)
 	banner.Size = UDim2.fromScale(0.9, 0.14)
+	Layout.Fit(banner)
 	banner.Font = Enum.Font.Creepster
 	banner.TextScaled = true
 	banner.TextColor3 = Color3.fromRGB(255, 120, 30)

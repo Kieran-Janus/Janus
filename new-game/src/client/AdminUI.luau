@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
 local AdminUI = {}
@@ -30,6 +31,7 @@ local function build(gui: ScreenGui): Frame
 	panel.Position = UDim2.new(1, -16, 0.5, 0)
 	panel.Size = UDim2.fromOffset(220, 60 + #COMMANDS * 44 + 40)
 	panel.Visible = false
+	Layout.Fit(panel)
 	local title = Theme.label(("Admin (%s)"):format(Config.Admin.OpenKey.Name), 18, panel)
 	title.Size = UDim2.new(1, 0, 0, 40)
 	local status = Theme.label("", 13, panel)
@@ -85,15 +87,40 @@ function AdminUI.Mount(gui: ScreenGui)
 		end
 		return panel
 	end
-	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed or input.KeyCode ~= Config.Admin.OpenKey then
-			return
-		end
+	local function toggle()
 		local p = ensure()
 		if p then
 			p.Visible = not p.Visible
 		end
+	end
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if processed or input.KeyCode ~= Config.Admin.OpenKey then
+			return
+		end
+		toggle()
 	end)
+	-- Touch screens have no F8: admins also get a small button in the top-right corner.
+	local function addButton()
+		if not player:GetAttribute("Admin") or gui:FindFirstChild("AdminButton") then
+			return
+		end
+		local b = Instance.new("TextButton")
+		b.Name = "AdminButton"
+		b.AnchorPoint = Vector2.new(1, 0)
+		b.Position = UDim2.new(1, -Config.UI.EdgeMargin, 0, Config.UI.PhoneSideTop)
+		b.Size = UDim2.fromOffset(80, 34)
+		b.BackgroundColor3 = Theme.Button
+		b.TextColor3 = Theme.Text
+		b.Font = Theme.Font
+		b.TextSize = 15
+		b.Text = "Admin"
+		b.Visible = Layout.IsTouch()
+		Theme.round(b)
+		b.Parent = gui
+		b.Activated:Connect(toggle)
+	end
+	player:GetAttributeChangedSignal("Admin"):Connect(addButton)
+	addButton()
 end
 
 return AdminUI

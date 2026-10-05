@@ -13,6 +13,7 @@ local TextChatService = game:GetService("TextChatService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
 local VipUI = {}
@@ -28,6 +29,7 @@ function VipUI.Mount(gui: ScreenGui)
 	holder.AnchorPoint = Vector2.new(0.5, 0)
 	holder.Position = UDim2.fromScale(0.5, 0.24)
 	holder.Size = UDim2.fromOffset(200, 96)
+	Layout.Fit(holder)
 	holder.Visible = false
 	local arrow = Theme.label("^", 60, holder)
 	arrow.Font = Enum.Font.GothamBlack

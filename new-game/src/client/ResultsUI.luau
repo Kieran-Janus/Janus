@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
 type ResultRow = {
@@ -27,6 +28,7 @@ function ResultsUI.Mount(gui: ScreenGui)
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
 	panel.Visible = false
+	Layout.Fit(panel)
 
 	local layout = Instance.new("UIListLayout")
 	layout.SortOrder = Enum.SortOrder.LayoutOrder

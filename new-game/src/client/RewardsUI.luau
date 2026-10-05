@@ -13,26 +13,11 @@ local SocialService = game:GetService("SocialService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Layout = require(script.Parent.Layout)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
 
 local RewardsUI = {}
-
-local function sideButton(text: string, offsetFromBottom: number, parent: Instance): TextButton
-	local b = Instance.new("TextButton")
-	b.AnchorPoint = Vector2.new(0, 1)
-	b.Position = UDim2.new(0, 16, 1, -offsetFromBottom)
-	b.Size = UDim2.fromOffset(110, 40)
-	b.BackgroundColor3 = Theme.Button
-	b.TextColor3 = Theme.Text
-	b.Font = Theme.Font
-	b.TextSize = 16
-	b.Text = text
-	b.AutoButtonColor = true
-	b.Parent = parent
-	Theme.round(b)
-	return b
-end
 
 local function toast(gui: ScreenGui, text: string, seconds: number)
 	local frame = Theme.panel(gui)
@@ -40,6 +25,7 @@ local function toast(gui: ScreenGui, text: string, seconds: number)
 	frame.AnchorPoint = Vector2.new(0.5, 0)
 	frame.Position = UDim2.fromScale(0.5, 0.14)
 	frame.Size = UDim2.fromOffset(360, 54)
+	Layout.Fit(frame)
 	local label = Theme.label(text, 20, frame)
 	label.Size = UDim2.fromScale(1, 1)
 	label.TextColor3 = Theme.Selected
@@ -53,7 +39,7 @@ function RewardsUI.Mount(gui: ScreenGui)
 	local redeemCode = Remotes.Function("RedeemCode")
 
 	-- Codes -------------------------------------------------------------------------------------
-	local codesButton = sideButton("Codes", 140, gui)
+	local codesButton = Layout.SideButton("Codes", 3)
 	codesButton.Name = "CodesButton"
 
 	local box = Theme.panel(gui)
@@ -62,6 +48,7 @@ function RewardsUI.Mount(gui: ScreenGui)
 	box.Position = UDim2.fromScale(0.5, 0.5)
 	box.Size = UDim2.fromOffset(340, 170)
 	box.Visible = false
+	Layout.Fit(box)
 	local title = Theme.label("Enter a code", 22, box)
 	title.Size = UDim2.new(1, 0, 0, 40)
 	local input = Instance.new("TextBox")
@@ -143,7 +130,7 @@ function RewardsUI.Mount(gui: ScreenGui)
 
 	-- Invite friends ------------------------------------------------------------------------------
 	if Config.Social.InviteButton then
-		local invite = sideButton("Invite", 190, gui)
+		local invite = Layout.SideButton("Invite", 2)
 		invite.Name = "InviteButton"
 		invite.Activated:Connect(function()
 			local ok, can = pcall(function()

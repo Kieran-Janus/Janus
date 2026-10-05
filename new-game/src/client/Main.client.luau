@@ -9,6 +9,7 @@ local GhostUI = require(script.Parent.GhostUI)
 local HubAmbience = require(script.Parent.HubAmbience)
 local Hud = require(script.Parent.Hud)
 local KingHeardUI = require(script.Parent.KingHeardUI)
+local Layout = require(script.Parent.Layout)
 local MinionFeedback = require(script.Parent.MinionFeedback)
 local NpcDialogUI = require(script.Parent.NpcDialogUI)
 local ResultsUI = require(script.Parent.ResultsUI)
@@ -30,7 +31,8 @@ gui.ResetOnSpawn = false
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-Sounds.Mount() -- first, so every button made below gets click/hover sounds
+Layout.Mount(gui) -- first: side-button column and screen scale the others use
+Sounds.Mount() -- early, so every button made below gets click/hover sounds
 Hud.Mount(gui)
 VoteUI.Mount(gui)
 ResultsUI.Mount(gui)

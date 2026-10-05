@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
 local MinionFeedback = {}
@@ -22,6 +23,7 @@ function MinionFeedback.Mount(gui: ScreenGui)
 	toast.Position = UDim2.fromScale(0.5, 0.16)
 	toast.Size = UDim2.fromOffset(440, 44)
 	toast.Visible = false
+	Layout.Fit(toast)
 	local label = Theme.label("", 18, toast)
 	label.Size = UDim2.new(1, -20, 1, 0)
 	label.Position = UDim2.fromOffset(10, 0)

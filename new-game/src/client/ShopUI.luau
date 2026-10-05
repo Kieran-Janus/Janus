@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Layout = require(script.Parent.Layout)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
 
@@ -84,11 +85,8 @@ function ShopUI.Mount(gui: ScreenGui)
 	local busy = false
 
 	-- Shop button -------------------------------------------------------------------------
-	local shopButton = button("Shop (B)", gui)
+	local shopButton = Layout.SideButton(if Layout.IsPhone() then "Shop" else "Shop (B)", 4)
 	shopButton.Name = "ShopButton"
-	shopButton.AnchorPoint = Vector2.new(0, 1)
-	shopButton.Position = UDim2.new(0, 16, 1, -90)
-	shopButton.Size = UDim2.fromOffset(110, 40)
 	shopButton.BackgroundColor3 = Theme.Selected
 	shopButton.TextSize = 17
 
@@ -99,8 +97,13 @@ function ShopUI.Mount(gui: ScreenGui)
 	panel.BackgroundTransparency = 0.03 -- nearly solid, so the vote panel doesn't show through
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.52)
-	panel.Size = UDim2.new(0.92, 0, 0.8, 0) -- capped below, so it also fits phones
+	-- Phones: nearly full height and shorter cards, so a whole row of cards fits.
+	local compact = Layout.IsPhone()
+	local cardHeight = if compact then 158 else 190
+	local previewHeight = if compact then 72 else 100
+	panel.Size = UDim2.new(0.92, 0, if compact then 0.97 else 0.8, 0) -- capped below
 	panel.Visible = false
+	Layout.Fit(panel)
 	local sizeLimit = Instance.new("UISizeConstraint")
 	sizeLimit.MaxSize = Vector2.new(660, 460)
 	sizeLimit.Parent = panel
@@ -136,7 +139,7 @@ function ShopUI.Mount(gui: ScreenGui)
 	list.BackgroundTransparency = 1
 	list.BorderSizePixel = 0
 	list.Position = UDim2.fromOffset(16, 88)
-	list.Size = UDim2.new(1, -32, 1, -130)
+	list.Size = UDim2.new(1, -32, 1, if compact then -112 else -130)
 	list.ScrollBarThickness = 6
 	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	list.CanvasSize = UDim2.new()
@@ -189,7 +192,7 @@ function ShopUI.Mount(gui: ScreenGui)
 
 	local function renderItems(slot: string)
 		local grid = Instance.new("UIGridLayout")
-		grid.CellSize = UDim2.fromOffset(140, 190)
+		grid.CellSize = UDim2.fromOffset(140, cardHeight)
 		grid.CellPadding = UDim2.fromOffset(10, 10)
 		grid.SortOrder = Enum.SortOrder.LayoutOrder
 		grid.Parent = list
@@ -197,15 +200,15 @@ function ShopUI.Mount(gui: ScreenGui)
 			if item.Slot ~= slot then
 				continue
 			end
-			local frame = card(190)
+			local frame = card(cardHeight)
 			frame.LayoutOrder = index
 			local view = preview(Cosmetics.Preview(item), frame)
 			view.Position = UDim2.fromOffset(8, 8)
-			view.Size = UDim2.new(1, -16, 0, 100)
+			view.Size = UDim2.new(1, -16, 0, previewHeight)
 
 			local name = Theme.label(item.Name, 14, frame)
 			name.TextWrapped = true
-			name.Position = UDim2.fromOffset(6, 110)
+			name.Position = UDim2.fromOffset(6, previewHeight + 10)
 			name.Size = UDim2.new(1, -12, 0, 34)
 
 			local usable = if item.VipOnly then state.Vip else owns(item.Id)

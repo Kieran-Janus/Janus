@@ -12,6 +12,7 @@ local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
 local GhostUI = {}
@@ -39,6 +40,7 @@ function GhostUI.Mount(gui: ScreenGui)
 	panel.Position = UDim2.new(0.5, 0, 1, -24)
 	panel.Size = UDim2.fromOffset(480, 150)
 	panel.Visible = false
+	Layout.Fit(panel, true)
 
 	local title = Theme.label("You were caught! You're a ghost now.", 18, panel)
 	title.Position = UDim2.fromOffset(0, 6)

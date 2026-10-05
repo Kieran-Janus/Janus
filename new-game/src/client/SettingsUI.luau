@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
 local SettingsUI = {}
@@ -34,11 +35,8 @@ function SettingsUI.Mount(gui: ScreenGui)
 	local player = Players.LocalPlayer
 	local setSetting = Remotes.Event("SetSetting")
 
-	local open = button("Settings", gui)
+	local open = Layout.SideButton("Settings", 1)
 	open.Name = "SettingsButton"
-	open.AnchorPoint = Vector2.new(0, 1)
-	open.Position = UDim2.new(0, 16, 1, -240)
-	open.Size = UDim2.fromOffset(110, 40)
 
 	local panel = Theme.panel(gui)
 	panel.Name = "Settings"
@@ -48,6 +46,7 @@ function SettingsUI.Mount(gui: ScreenGui)
 	panel.ZIndex = 10
 	panel.BackgroundTransparency = 0.03
 	panel.Visible = false
+	Layout.Fit(panel)
 
 	local title = Theme.label("Settings", 22, panel)
 	title.Size = UDim2.new(1, 0, 0, 44)

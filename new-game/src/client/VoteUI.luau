@@ -4,6 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
 type Option = { Id: string, Name: string, Votes: number }
@@ -22,6 +23,7 @@ function VoteUI.Mount(gui: ScreenGui)
 	panel.Position = UDim2.new(0.5, 0, 1, -24)
 	panel.Size = UDim2.fromOffset(560, 200)
 	panel.Visible = false
+	Layout.Fit(panel, true)
 
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, 6)
@@ -67,7 +69,7 @@ function VoteUI.Mount(gui: ScreenGui)
 				else Theme.Button
 			button.TextColor3 = Theme.Text
 			button.Font = Theme.Font
-			button.TextSize = 16
+			button.TextSize = 17 -- stays >= 14 px when the panel shrinks to fit a phone
 			button.TextWrapped = true
 			button.Text = ("%s\n%d vote%s"):format(
 				option.Name,

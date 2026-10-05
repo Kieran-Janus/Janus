@@ -460,6 +460,20 @@ local Config = {
 		SettingsCooldown = 0.3, -- per-player spam guard on the Settings toggles
 	},
 
+	-- Screen layout for phones, tablets and PC (src/client/Layout.luau).
+	UI = {
+		ReferenceHeight = 760, -- usable screen height the UI is drawn for; taller screens scale up...
+		MaxScale = 1.35, -- ...to at most this (never down: phones keep full-size, readable text)
+		PhoneMaxHeight = 500, -- a touch screen this short (usable points) gets the phone layout
+		EdgeMargin = 12, -- gap between panels and the screen edge
+		SideButton = { Width = 110, Height = 40, Gap = 8, PhoneWidth = 96, PhoneHeight = 38 },
+		-- On touch screens the side buttons go top-left, above Roblox's thumbstick (bottom-left),
+		-- and panels along the bottom keep this clear of the thumbstick and jump button.
+		PhoneSideTop = 8,
+		TouchBottomSideClear = 130,
+		MinTextSize = 14, -- shrinking text never goes below this
+	},
+
 	Player = {
 		WalkSpeed = 16,
 		SprintSpeed = 24,
