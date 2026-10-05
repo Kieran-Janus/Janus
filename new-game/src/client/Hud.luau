@@ -3,11 +3,15 @@
 -- Reads attributes the server sets; no remotes needed.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Theme = require(script.Parent.Theme)
 
 local Hud = {}
+
+local DETAIL_MAX_SIZE = 15
+local DETAIL_MIN_SIZE = 10
 
 function Hud.Mount(gui: ScreenGui)
 	local player = Players.LocalPlayer
@@ -16,7 +20,7 @@ function Hud.Mount(gui: ScreenGui)
 	bar.Name = "Hud"
 	bar.AnchorPoint = Vector2.new(0.5, 0)
 	bar.Position = UDim2.fromScale(0.5, 0.02)
-	bar.Size = UDim2.fromOffset(460, 64)
+	bar.Size = UDim2.fromOffset(500, 64)
 
 	local title = Theme.label(Config.Game.Name, 22, bar)
 	title.Size = UDim2.new(1, 0, 0, 36)
@@ -25,11 +29,30 @@ function Hud.Mount(gui: ScreenGui)
 	detail.TextColor3 = Theme.Muted
 	detail.Position = UDim2.fromOffset(10, 34)
 	detail.Size = UDim2.new(1, -20, 0, 24)
-	-- Shrink long lines (map + difficulty + counters) to fit instead of spilling out.
-	detail.TextScaled = true
-	local maxSize = Instance.new("UITextSizeConstraint")
-	maxSize.MaxTextSize = 15
-	maxSize.Parent = detail
+	-- One line only: long lines (map + difficulty + counters) shrink to fit, and anything
+	-- still too wide ends in "..." (TextScaled wrapped onto a second, cut-off line instead).
+	detail.TextTruncate = Enum.TextTruncate.AtEnd
+	local function fitDetail()
+		local width = detail.AbsoluteSize.X
+		if width <= 0 then
+			return
+		end
+		local size = DETAIL_MAX_SIZE
+		while
+			size > DETAIL_MIN_SIZE
+			and TextService:GetTextSize(
+					detail.Text,
+					size,
+					detail.Font,
+					Vector2.new(math.huge, math.huge)
+				).X
+				> width
+		do
+			size -= 1
+		end
+		detail.TextSize = size
+	end
+	detail:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitDetail)
 
 	local function refresh()
 		local state = ReplicatedStorage:GetAttribute("State") or "Loading"
@@ -60,6 +83,7 @@ function Hud.Mount(gui: ScreenGui)
 			end
 		end
 		detail.Text = if #parts > 0 then table.concat(parts, "  |  ") else Config.Game.Name
+		fitDetail()
 	end
 
 	for _, name in { "State", "TimeLeft", "MapName", "Difficulty", "Alive", "KingCount" } do

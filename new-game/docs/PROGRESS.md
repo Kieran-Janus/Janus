@@ -43,5 +43,5 @@ Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a not
   - Pass: custom models: test models in ReplicatedStorage.Custom replaced a hat, the King (scaled to 10 studs) and skeletons; scripts inside them were stripped.
   - Fixed: GameUI used Global ZIndexBehavior, so the raised Shop panel (and the King-heard banner) drew over their own text; now Sibling. Shop panel made nearly opaque so the vote panel doesn't show through.
   - Not tested (needs a 2-player local server: Studio Test tab > Clients and Servers > 2 players): ghost modes (Spectate / Haunt / Ghost chat) and haunting, catching with others still alive, friend bonus, voice routing. With one player, being caught ends the round instantly.
-  - For M7 polish: the HUD detail line wraps "The King is coming..." onto a cut-off second line during rounds.
+  - M7 polish done: the HUD detail line stays on one line (bar 500 px wide; text shrinks 15 to 10 px to fit, then ends in "...").
   - Note: the test reset my Studio save (F8 > Reset my save) and redeemed PUMPKIN on it.
