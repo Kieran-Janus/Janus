@@ -2,7 +2,9 @@
 --[[
 	2D sound effects for this player (Config.Sounds), and the Music / Sounds settings.
 
-	Sounds.Play(name)  plays Config.Sounds[name] once (no-op for "" or unknown names).
+	Sounds.Play(name)      plays Config.Sounds[name] once (no-op for "" or unknown names).
+	Sounds.PlaySpec(spec)  plays { SoundId, Volume?, PitchMin?, PitchMax? } once, for
+	                       features that keep their sounds in their own config file.
 	Mount() also wires the automatic ones:
 	  - click and hover on every button in the game UI (anything added to PlayerGui)
 	  - pumpkin pickup (random pitch), coins gained, round start, countdown ticks,
@@ -21,8 +23,17 @@ local Sounds = {}
 
 local effectsGroup: SoundGroup? = nil
 
-function Sounds.Play(name: string)
-	local spec = (Config.Sounds :: any)[name]
+-- A sound description, as in Config.Sounds or a feature's own config file.
+export type Spec = {
+	SoundId: string, -- "rbxassetid://..." ("" = silent)
+	Volume: number?, -- 0-1 (default 0.5)
+	PitchMin: number?, -- random pitch between these each play (default 1)
+	PitchMax: number?,
+}
+
+-- Plays a sound described by `spec` once, in the Effects group (so the Sounds setting
+-- mutes it). Features keep their sound ids in their own config file and call this.
+function Sounds.PlaySpec(spec: Spec)
 	if type(spec) ~= "table" or type(spec.SoundId) ~= "string" or spec.SoundId == "" then
 		return
 	end
@@ -43,6 +54,14 @@ function Sounds.Play(name: string)
 			sound:Destroy()
 		end
 	end)
+end
+
+-- Plays Config.Sounds[name] once (no-op for "" or unknown names).
+function Sounds.Play(name: string)
+	local spec = (Config.Sounds :: any)[name]
+	if type(spec) == "table" then
+		Sounds.PlaySpec(spec)
+	end
 end
 
 local function hookButton(instance: Instance)
