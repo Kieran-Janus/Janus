@@ -3,7 +3,9 @@
 	Ghost screen, shown while this player is Out:
 	  - mode buttons: Spectate / Haunt / Ghost chat (SetGhostMode)
 	  - Haunt mode: a Haunt button (H) with its cooldown
-	  - Spectate mode: camera follows a survivor, with previous/next buttons
+	  - Spectate mode: camera follows a survivor or a King, with previous/next buttons and a
+	    "Watch King" button
+	  - the moment you're caught, a short camera orbit around the King (Config.Ghost.HauntCam)
 ]]
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -85,17 +87,41 @@ function GhostUI.Mount(gui: ScreenGui)
 	prev.Size = UDim2.new(0, 44, 1, 0)
 	local watching = Theme.label("", 16, actionRow)
 	watching.Position = UDim2.fromOffset(52, 0)
-	watching.Size = UDim2.new(1, -104, 1, 0)
+	watching.Size = UDim2.new(1, -226, 1, 0)
+	watching.TextTruncate = Enum.TextTruncate.AtEnd
+	local watchKing = button(Config.Ghost.WatchKingText, actionRow)
+	watchKing.Name = "WatchKing"
+	watchKing.AnchorPoint = Vector2.new(1, 0)
+	watchKing.Position = UDim2.new(1, -52, 0, 0)
+	watchKing.Size = UDim2.new(0, 114, 1, 0)
 	local nextButton = button(">", actionRow)
 	nextButton.AnchorPoint = Vector2.new(1, 0)
 	nextButton.Position = UDim2.fromScale(1, 0)
 	nextButton.Size = UDim2.new(0, 44, 1, 0)
 
 	-- Spectating ---------------------------------------------------------------
-	local target: Player? = nil
+	-- A target is a surviving Player or a King Model.
+	local target: Instance? = nil
 
-	local function survivors(): { Player }
+	local function kings(): { Model }
 		local list = {}
+		local map = workspace:FindFirstChild("Map")
+		if map then
+			for _, child in map:GetChildren() do
+				if child.Name == "PumpkinKing" and child:IsA("Model") then
+					table.insert(list, child)
+				end
+			end
+		end
+		return list
+	end
+
+	-- Everything you can watch: the Kings first, then the survivors.
+	local function targets(): { Instance }
+		local list: { Instance } = {}
+		for _, king in kings() do
+			table.insert(list, king)
+		end
 		for _, other in Players:GetPlayers() do
 			if other:GetAttribute("InRound") and not other:GetAttribute("Out") then
 				table.insert(list, other)
@@ -104,8 +130,15 @@ function GhostUI.Mount(gui: ScreenGui)
 		return list
 	end
 
+	local function label(t: Instance): string
+		if t:IsA("Player") then
+			return "Watching " .. t.DisplayName
+		end
+		return "Watching " .. Config.King.Name
+	end
+
 	local function watch(step: number)
-		local list = survivors()
+		local list = targets()
 		if #list == 0 then
 			target = nil
 			watching.Text = "Nobody left to watch"
@@ -113,14 +146,53 @@ function GhostUI.Mount(gui: ScreenGui)
 		end
 		local index = (target and table.find(list, target)) or 0
 		target = list[(index + step - 1) % #list + 1]
-		watching.Text = "Watching " .. target.DisplayName
+		watching.Text = label(target :: Instance)
 	end
+
+	local function stillWatchable(t: Instance?): boolean
+		if not t or t.Parent == nil then
+			return false
+		end
+		if t:IsA("Player") then
+			return t:GetAttribute("Out") ~= true
+		end
+		return true
+	end
+
+	-- The Humanoid the camera should follow for a target.
+	local function subjectOf(t: Instance?): Humanoid?
+		if not t then
+			return nil
+		end
+		local model = if t:IsA("Player") then t.Character else t
+		return model and model:FindFirstChildOfClass("Humanoid")
+	end
+
+	watchKing.Activated:Connect(function()
+		local camera = workspace.CurrentCamera
+		local best: Model? = nil
+		local bestDistance = math.huge
+		for _, king in kings() do
+			local distance = (king:GetPivot().Position - camera.Focus.Position).Magnitude
+			if distance < bestDistance then
+				best, bestDistance = king, distance
+			end
+		end
+		if best then
+			target = best
+			watching.Text = label(best)
+		else
+			watching.Text = "The King isn't here yet"
+		end
+	end)
 	prev.Activated:Connect(function()
 		watch(-1)
 	end)
 	nextButton.Activated:Connect(function()
 		watch(1)
 	end)
+
+	local hauntCamUntil = 0
 
 	local function restoreCamera()
 		local character = player.Character
@@ -143,9 +215,63 @@ function GhostUI.Mount(gui: ScreenGui)
 	end
 	hauntButton.Activated:Connect(doHaunt)
 
+	-- Haunt cam ----------------------------------------------------------------
+	local function hauntCam()
+		local cfg = Config.Ghost.HauntCam
+		local camera = workspace.CurrentCamera
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not root or not root:IsA("BasePart") then
+			return
+		end
+		local catchSpot = root.Position
+		local focusKing: Model? = nil
+		local nearest = cfg.KingRange
+		for _, king in kings() do
+			local distance = (king:GetPivot().Position - catchSpot).Magnitude
+			if distance <= nearest then
+				focusKing, nearest = king, distance
+			end
+		end
+		hauntCamUntil = os.clock() + cfg.Seconds
+		camera.CameraType = Enum.CameraType.Scriptable
+		local started = os.clock()
+		local offset = camera.CFrame.Position - catchSpot
+		local startAngle = math.atan2(offset.X, offset.Z)
+		local connection: RBXScriptConnection
+		connection = RunService.RenderStepped:Connect(function()
+			local t = (os.clock() - started) / cfg.Seconds
+			if t >= 1 or player:GetAttribute("Out") ~= true then
+				connection:Disconnect()
+				hauntCamUntil = 0
+				camera.CameraType = Enum.CameraType.Custom
+				if player:GetAttribute("GhostMode") ~= "Spectate" then
+					restoreCamera()
+				end
+				return
+			end
+			local focus = if focusKing and focusKing.Parent
+				then focusKing:GetPivot().Position
+				else catchSpot
+			local angle = startAngle + t * cfg.Turns * math.pi * 2
+			local eye = focus
+				+ Vector3.new(
+					math.sin(angle) * cfg.Radius,
+					cfg.Height,
+					math.cos(angle) * cfg.Radius
+				)
+			camera.CFrame = CFrame.lookAt(eye, focus + Vector3.new(0, 3, 0))
+		end)
+	end
+
 	-- Refresh -------------------------------------------------------------------
+	local wasOut = player:GetAttribute("Out") == true
 	local function refresh()
 		local out = player:GetAttribute("Out") == true
+		if out and not wasOut and ReplicatedStorage:GetAttribute("State") == "Playing" then
+			task.spawn(hauntCam)
+		end
+		wasOut = out
 		local mode = player:GetAttribute("GhostMode")
 		panel.Visible = out
 		if not out then
@@ -163,6 +289,7 @@ function GhostUI.Mount(gui: ScreenGui)
 		prev.Visible = mode == "Spectate"
 		nextButton.Visible = mode == "Spectate"
 		watching.Visible = mode == "Spectate"
+		watchKing.Visible = mode == "Spectate"
 
 		if mode == "Haunt" then
 			status.Text = "Fly near the King and haunt it to blur its vision."
@@ -178,7 +305,7 @@ function GhostUI.Mount(gui: ScreenGui)
 		if mode == "GhostChat" then
 			status.Text = "Ghost chat: talk with other ghosts here. The living can't hear you."
 		elseif mode == "Spectate" then
-			status.Text = "Spectating survivors."
+			status.Text = "Spectating: use < > to switch, or Watch King."
 			watch(0)
 		end
 		if mode ~= "Spectate" and target then
@@ -192,12 +319,14 @@ function GhostUI.Mount(gui: ScreenGui)
 		if not panel.Visible then
 			return
 		end
+		if hauntCamUntil > os.clock() then
+			return -- the haunt cam has the camera for a moment
+		end
 		if player:GetAttribute("GhostMode") == "Spectate" then
-			if not target or target.Parent == nil or target:GetAttribute("Out") then
+			if not stillWatchable(target) then
 				watch(1)
 			end
-			local character = target and target.Character
-			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			local humanoid = subjectOf(target)
 			if humanoid and workspace.CurrentCamera.CameraSubject ~= humanoid then
 				local camera = workspace.CurrentCamera
 				camera.CameraSubject = humanoid

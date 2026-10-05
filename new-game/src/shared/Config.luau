@@ -552,6 +552,16 @@ local Config = {
 			SightMultiplier = 0.4, -- King's SightRange is multiplied by this while haunted
 			Cooldown = 15, -- seconds per ghost
 		},
+		-- The moment you're caught: the camera circles the King (or where you were caught if
+		-- no King is near) before the normal ghost controls start.
+		HauntCam = {
+			Seconds = 2,
+			Radius = 16, -- studs from the King
+			Height = 7, -- studs above it
+			Turns = 0.6, -- how far round it goes in that time (1 = a full circle)
+			KingRange = 80, -- use the nearest King within this many studs, else the catch spot
+		},
+		WatchKingText = "Watch King", -- spectate button that jumps the camera to the King
 	},
 
 	-- Proximity voice (VoiceChatService.UseAudioApi = Enabled, EnableDefaultVoice = true).
