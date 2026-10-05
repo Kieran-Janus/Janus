@@ -95,7 +95,8 @@ function commands.ResetDaily(_player, data)
 end
 
 function commands.RebuildHub(_player, _data)
-	HubBuilder.Build()
+	local hub = HubBuilder.Build()
+	HubBuilder.RemoveLoosePieces(hub)
 	return "Hub rebuilt from Config.Hub and custom models (this playtest only)."
 end
 

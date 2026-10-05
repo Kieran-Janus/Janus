@@ -1152,10 +1152,96 @@ function HubBuilder.DisableDefaultSpawn()
 	end
 end
 
+-- Every top-level piece of a built hub carries this attribute, so loose copies left
+-- directly in Workspace (an ungrouped or pasted hub) can be recognised and removed.
+HubBuilder.PieceAttribute = "HubPiece"
+
+-- All Models named "Hub" directly in Workspace.
+function HubBuilder.FindHubs(): { Model }
+	local hubs = {}
+	for _, child in workspace:GetChildren() do
+		if child.Name == "Hub" and child:IsA("Model") then
+			table.insert(hubs, child)
+		end
+	end
+	return hubs
+end
+
+-- Name, class and part positions: two pieces with the same signature are the same object.
+local function signature(instance: Instance): string
+	local count, sum = 0, Vector3.zero
+	local function add(d: Instance)
+		if d:IsA("BasePart") then
+			count += 1
+			sum += d.Position
+		end
+	end
+	add(instance)
+	for _, d in instance:GetDescendants() do
+		add(d)
+	end
+	return ("%s|%s|%d|%.1f,%.1f,%.1f"):format(
+		instance.Name,
+		instance.ClassName,
+		count,
+		sum.X,
+		sum.Y,
+		sum.Z
+	)
+end
+
+--[[
+	Removes hub pieces lying loose in Workspace, outside `keep`:
+	  - anything tagged with PieceAttribute,
+	  - exact copies of one of `keep`'s pieces (same name, class and part positions),
+	  - and, when a whole ungrouped hub is lying around (at least half of `keep`'s piece
+	    names, with the same classes, are loose in Workspace), all of those pieces, even if
+	    they were moved or edited. Older hubs have no tag, hence the last two rules.
+	A single unrelated object that happens to share a name is never removed.
+	Returns how many were removed.
+]]
+function HubBuilder.RemoveLoosePieces(keep: Model): number
+	local exact: { [string]: boolean } = {}
+	local kinds: { [string]: boolean } = {} -- "Name|ClassName" of keep's pieces
+	local pieceCount = 0
+	for _, child in keep:GetChildren() do
+		exact[signature(child)] = true
+		kinds[child.Name .. "|" .. child.ClassName] = true
+		pieceCount += 1
+	end
+
+	local candidates: { Instance } = {}
+	local sameKind: { Instance } = {}
+	local namesSeen: { [string]: boolean } = {}
+	local distinctNames = 0
+	for _, child in workspace:GetChildren() do
+		if child == keep or child:IsA("Terrain") or child:IsA("Camera") then
+			continue
+		end
+		if child:GetAttribute(HubBuilder.PieceAttribute) or exact[signature(child)] then
+			table.insert(candidates, child)
+		elseif kinds[child.Name .. "|" .. child.ClassName] then
+			table.insert(sameKind, child)
+			if not namesSeen[child.Name] then
+				namesSeen[child.Name] = true
+				distinctNames += 1
+			end
+		end
+	end
+	if pieceCount > 0 and distinctNames * 2 >= pieceCount then
+		for _, child in sameKind do
+			table.insert(candidates, child)
+		end
+	end
+	for _, child in candidates do
+		child:Destroy()
+	end
+	return #candidates
+end
+
 function HubBuilder.Build(): Model
 	rng = Random.new(hubCfg.Seed)
-	local existing = workspace:FindFirstChild("Hub")
-	if existing then
+	for _, existing in HubBuilder.FindHubs() do
 		existing:Destroy()
 	end
 	local hub = Instance.new("Model")
@@ -1176,6 +1262,9 @@ function HubBuilder.Build(): Model
 	HubBuilder.ApplyCustomNpcs(hub)
 	buildMusic(hub)
 	hub.PrimaryPart = ground
+	for _, child in hub:GetChildren() do
+		child:SetAttribute(HubBuilder.PieceAttribute, true)
+	end
 
 	hub.Parent = workspace
 	HubBuilder.DisableDefaultSpawn()
