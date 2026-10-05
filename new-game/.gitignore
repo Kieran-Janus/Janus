@@ -7,3 +7,6 @@ sourcemap.json
 .env
 .dev.vars
 node_modules/
+# Preview scenes and images (lune run tests/preview, render.mjs)
+tests/out/
+/out/
