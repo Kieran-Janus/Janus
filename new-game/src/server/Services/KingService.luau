@@ -363,16 +363,19 @@ local function think(
 
 		-- 1. Chase the nearest visible player.
 		local chase: BasePart? = nil
+		local chased: Player? = nil
 		local nearest = math.huge
 		for _, player in Players:GetPlayers() do
 			local root = rootOf(player)
 			if root and isTarget(player) then
 				local distance = (root.Position - king.Root.Position).Magnitude
 				if distance < nearest and canSee(king, root, sight) then
-					chase, nearest = root, distance
+					chase, chased, nearest = root, player, distance
 				end
 			end
 		end
+		-- Who it's chasing (0 = nobody); clients use it for the heartbeat warning.
+		king.Model:SetAttribute("TargetUserId", if chased then chased.UserId else 0)
 
 		if chase then
 			king.Humanoid.WalkSpeed = level.ChaseSpeed

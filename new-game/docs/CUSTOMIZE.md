@@ -19,6 +19,7 @@ Test anything fast in a Studio playtest with **F8** (admin panel): +Coins, Unloc
 | Game name on the HUD | `Config.Game.Name` (the Roblox page name is set in Creator Hub) |
 | Round length, intermission, results time | `Config.Round` |
 | Results screen timings, text, colours | `Config.Results` |
+| "RUN!", heartbeat warning, +1 pop-ups, last-30-seconds, survivors-left | `Config.Juice` |
 | Coins per pumpkin, survivor bonus | `Config.Rewards` |
 | Easy/Hard pumpkins, reward multiplier | `Config.Difficulty.Levels` |
 | King speed, hearing, sight, how many Kings | `Config.King.Difficulty` |

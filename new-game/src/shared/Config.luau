@@ -19,6 +19,33 @@ local Config = {
 		ResultsShowTop = 10, -- rows on the results screen
 	},
 
+	-- Round moments on screen (src/client/RoundJuiceUI.luau). Spooky-cute, never gory.
+	Juice = {
+		Run = { Text = "RUN!", Seconds = 1.8, Color = Color3.fromRGB(255, 120, 30) }, -- when the King appears
+		LastSeconds = {
+			At = 30,
+			Text = "Last 30 seconds!",
+			Seconds = 2.2,
+			Color = Color3.fromRGB(255, 210, 60),
+		},
+		Survivors = { -- when someone is caught
+			Text = "%d survivors left",
+			One = "Only 1 survivor left!",
+			Seconds = 2,
+			Color = Color3.fromRGB(200, 170, 255),
+		},
+		Pickup = { Text = "+%d", Seconds = 0.9, Rise = 3, Color = Color3.fromRGB(255, 160, 40) }, -- floats up from you
+		Heartbeat = { -- red pulse at the screen edges while a King chases you
+			Distance = 45, -- studs; starts at this distance and gets stronger as it closes in
+			Color = Color3.fromRGB(200, 20, 40),
+			MaxOpacity = 0.55, -- strongest edge colour (0-1)
+			SlowBeat = 1.1, -- seconds between beats when far...
+			FastBeat = 0.45, -- ...and when very close
+			SoundId = "rbxassetid://79637236152913", -- per beat ("Heartbeat", Creator Store); "" = none
+			Volume = 0.6,
+		},
+	},
+
 	-- The results screen after each round (src/client/ResultsUI.luau). It stays up for
 	-- Round.ResultsSeconds; Round.ResultsShowTop rows are listed (your own row is always shown).
 	Results = {
