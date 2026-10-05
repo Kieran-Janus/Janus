@@ -30,6 +30,7 @@ local Tags = {
 	ParkourCheckpoint = "ParkourCheckpoint", -- attribute Index
 	ParkourFinish = "ParkourFinish",
 	ParkourHazard = "ParkourHazard", -- touching it sends you back to your last checkpoint
+	ParkourBoard = "ParkourBoard", -- the part showing the fastest climbers (a SurfaceGui)
 	-- Lobby minigames
 	CandyRushStation = "CandyRushStation",
 	CandyRushPad = "CandyRushPad", -- attribute Lane
