@@ -5,11 +5,14 @@
 	(src/client/TutorialUI.luau) shows Boo Guide's tips while it is set.
 	Client -> server: FinishTutorial() when the player taps Skip or sees the last tip.
 	It saves TutorialDone so it never shows again.
+	Off in v2 (Config.Features.Tutorial = false): the remote is still created so nothing
+	waits for it, but no player is ever given the tutorial.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(script.Parent.DataService)
 
@@ -35,7 +38,12 @@ local function onFinish(player: Player)
 end
 
 function TutorialService.Start()
-	Remotes.Event("FinishTutorial").OnServerEvent:Connect(onFinish)
+	-- Created even when the tutorial is off, so a client asking for it never waits forever.
+	local finishTutorial = Remotes.Event("FinishTutorial")
+	if not Config.Features.Tutorial then
+		return
+	end
+	finishTutorial.OnServerEvent:Connect(onFinish)
 	local function onPlayer(player: Player)
 		player:GetAttributeChangedSignal("DataReady"):Connect(function()
 			check(player)

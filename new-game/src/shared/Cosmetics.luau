@@ -23,19 +23,13 @@
 
 local Config = require(script.Parent.Config)
 local CustomAssets = require(script.Parent.CustomAssets)
+local Items = require(script.Parent.Items)
 
 local Cosmetics = {}
 
+-- The shop item with this Id, or nil (same as Items.Get).
 function Cosmetics.Find(id: unknown): any
-	if typeof(id) ~= "string" then
-		return nil
-	end
-	for _, item in Config.Shop.Items do
-		if item.Id == id then
-			return item
-		end
-	end
-	return nil
+	return Items.Get(id)
 end
 
 local function part(m: Model, props: { [string]: any }): Part

@@ -6,8 +6,8 @@
 
 	  Category    Name the model after...                    Used by
 	  Characters  PumpkinKing, SkeletonPatrol, Bat,           KingService, MinionService,
-	              GhostCat, WitchWanda, BooGuide,             HubBuilder (hub NPCs)
-	              PumpkinVendor
+	              GhostCat, PumpkinVendor (the Pumpkin        HubBuilder (hub NPCs)
+	              Shop keeper)
 	  Cosmetics   the shop item Id (Config.Shop.Items),       Cosmetics (hats, pets, skin
 	              e.g. WitchHat, MiniPumpkin, Skeleton        head pieces) and shop previews
 

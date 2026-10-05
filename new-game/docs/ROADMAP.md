@@ -50,7 +50,7 @@ These are the remaining engineering items, roughly by value. Paste one at a time
 8. **Events framework** (`/new-event`) for the Halloween night event.
 
 ## Infinite customisation, in one place
-- Numbers, text, prices, colours, codes, rewards: `src/shared/Config.luau`
+- Numbers, text, prices, colours, codes, rewards: `src/shared/Config/` (`init.luau` plus one file per v2 feature)
 - Looks: models in `ReplicatedStorage > Custom` (or `assets/` in git)
 - Maps: models in `ServerStorage > Maps`
 - UI colours/font: `src/client/Theme.luau`

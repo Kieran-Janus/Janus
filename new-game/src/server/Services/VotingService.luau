@@ -105,8 +105,14 @@ function VotingService.Run(
 	setState: (string, number) -> (),
 	abortIf: () -> boolean
 ): (string?, string?)
-	-- Offer a random subset of maps.
-	local pool = table.clone(Config.Maps.List)
+	-- Offer a random subset of the King Hunt maps (a map's Modes lists the modes it's made
+	-- for; maps without Modes count as King Hunt). Mode playlists replace this in v2.
+	local pool = {}
+	for _, def in Config.Maps.List do
+		if def.Modes == nil or table.find(def.Modes, "KingHunt") then
+			table.insert(pool, def)
+		end
+	end
 	mapOptions = {}
 	for _ = 1, math.min(Config.Voting.MapChoices, #pool) do
 		local def = table.remove(pool, math.random(1, #pool))
