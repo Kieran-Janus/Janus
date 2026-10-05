@@ -26,6 +26,21 @@ function Theme.label(text: string, size: number, parent: Instance): TextLabel
 	return label
 end
 
+-- A rounded button in the game's font. `parent` can be nil (parent it yourself later);
+-- `color` is the background (default Theme.Button).
+function Theme.button(text: string, parent: Instance?, color: Color3?): TextButton
+	local button = Instance.new("TextButton")
+	button.BackgroundColor3 = color or Theme.Button
+	button.TextColor3 = Theme.Text
+	button.Font = Theme.Font
+	button.TextSize = 16
+	button.Text = text
+	button.AutoButtonColor = true
+	Theme.round(button, 8)
+	button.Parent = parent
+	return button
+end
+
 function Theme.panel(parent: Instance): Frame
 	local frame = Instance.new("Frame")
 	frame.BackgroundColor3 = Theme.Background

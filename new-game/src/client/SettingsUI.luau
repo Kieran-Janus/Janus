@@ -1,6 +1,6 @@
 --!strict
 --[[
-	Settings button (above the other side buttons) with Music and Sounds on/off toggles.
+	Settings (a tile in the Menu) with Music and Sounds on/off toggles.
 	The choice is saved on the server (SfxService, SetSetting) and comes back as the player
 	attributes SettingMusic / SettingSounds, which src/client/Sounds.luau applies.
 ]]

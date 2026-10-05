@@ -3,6 +3,8 @@
 -- row of difficulty buttons, with live counts. Shown while the server's vote is open; sends
 -- intent only (the server validates). When only Ready players can vote and you aren't on the
 -- Ready pad, the buttons are greyed out with a hint (Config.Lobby.Ready.Text.VoteHint).
+-- VoteUI.Open() -> boolean   shows the panel again if a vote is open (Menu > Vote); false
+--                            when no vote is open right now.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -25,6 +27,17 @@ local SECTION_HEIGHT = 24 + 52 + 12 -- heading + row + the gaps between them
 local HINT_HEIGHT = 22
 local PADDING = 8
 
+local votePanel: Frame? = nil
+local voteOpen = false
+
+function VoteUI.Open(): boolean
+	if votePanel and voteOpen then
+		votePanel.Visible = true
+		return true
+	end
+	return false
+end
+
 function VoteUI.Mount(gui: ScreenGui)
 	local player = Players.LocalPlayer
 	local castVote = Remotes.Event("CastVote")
@@ -39,6 +52,7 @@ function VoteUI.Mount(gui: ScreenGui)
 	panel.Size = UDim2.fromOffset(560, 200)
 	panel.Visible = false
 	Layout.Fit(panel, true)
+	votePanel = panel
 
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, 6)
@@ -152,7 +166,8 @@ function VoteUI.Mount(gui: ScreenGui)
 			return
 		end
 		current = state
-		if not state.Open then
+		voteOpen = state.Open == true
+		if not voteOpen then
 			table.clear(mine)
 		end
 		render()

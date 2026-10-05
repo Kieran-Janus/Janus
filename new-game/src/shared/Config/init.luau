@@ -459,8 +459,10 @@ local Config = {
 		MaxScale = 1.35, -- ...to at most this (never down: phones keep full-size, readable text)
 		PhoneMaxHeight = 500, -- a touch screen this short (usable points) gets the phone layout
 		EdgeMargin = 12, -- gap between panels and the screen edge
+		-- The old column of Shop / Codes / Invite / Settings buttons, only used when the Menu is
+		-- switched off (Features.Menu = false; the Menu's own sizes are in Config/Menu.luau).
 		SideButton = { Width = 110, Height = 40, Gap = 8, PhoneWidth = 96, PhoneHeight = 38 },
-		-- On touch screens the side buttons go top-left, above Roblox's thumbstick (bottom-left),
+		-- On touch screens that column goes top-left, above Roblox's thumbstick (bottom-left),
 		-- and panels along the bottom keep this clear of the thumbstick and jump button.
 		PhoneSideTop = 8,
 		TouchBottomSideClear = 130,
@@ -787,7 +789,7 @@ local Config = {
 		CurrencyName = "Coins",
 	},
 
-	-- Cosmetic shop (the Pumpkin Shop stall in the lobby, or the Shop button). Prices are in
+	-- Cosmetic shop (the Pumpkin Shop stall in the lobby, or Menu > Shop). Prices are in
 	-- Economy.CurrencyName. Looks are built from Parts by src/shared/Cosmetics.luau from each
 	-- item's Style, so the same code dresses the character (server) and draws the shop previews
 	-- (client).
@@ -1171,7 +1173,7 @@ local Config = {
 	Social = {
 		FriendBonusPercent = 10, -- extra round coins per Roblox friend in the same server...
 		MaxFriendBonusPercent = 50, -- ...up to this
-		InviteButton = true, -- "Invite friends" button on the HUD
+		InviteButton = true, -- "Invite" tile in the Menu (Roblox's invite-friends prompt)
 		FavoritePromptAfterRounds = 1, -- ask to favourite once, after this many finished rounds; 0 = never
 		GroupId = 0, -- your Roblox group (0 = none); members get GroupBonusPercent extra round coins
 		GroupBonusPercent = 10,
