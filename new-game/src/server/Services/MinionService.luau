@@ -22,6 +22,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local MapService = require(script.Parent.MapService)
 local NoiseService = require(script.Parent.NoiseService)
 local PumpkinService = require(script.Parent.PumpkinService)
+local SfxService = require(script.Parent.SfxService)
 local SprintService = require(script.Parent.SprintService)
 
 -- One part of a minion's body, posed relative to the minion's root CFrame every frame.
@@ -54,9 +55,27 @@ type Minion = {
 	Goal: Vector3?,
 	FleeFrom: Vector3?,
 	FleeUntil: number?,
+	-- Sound
+	NextIdle: number?,
 }
 
 local MinionService = {}
+
+local SOUND_FOR_KIND = {
+	SkeletonPatrol = "SkeletonRattle",
+	BatSwarm = "BatSqueak",
+	GhostCat = "CatMeow",
+}
+
+-- The minion's sound (Config.Sounds), played from its first body part.
+local function minionSound(m: { Kind: string, Bodies: { any } })
+	local spec = (Config.Sounds :: any)[SOUND_FOR_KIND[m.Kind] or ""]
+	local body = m.Bodies[1]
+	local piece = body and body.Pieces[1]
+	if spec and piece then
+		SfxService.Play3D(spec, piece.Part)
+	end
+end
 
 local minions: { Minion } = {}
 local folder: Folder? = nil
@@ -397,6 +416,7 @@ local function hit(player: Player, minion: Minion, at: Vector3): boolean
 		task.delay(c.DropSeconds, PumpkinService.Drop, taken)
 	end
 	lastHit[player] = now
+	minionSound(minion)
 	minionHit:FireClient(player, kind, push)
 	return true
 end
@@ -753,6 +773,16 @@ function MinionService.Begin(
 			end
 			if think_ then
 				think(m, now, map, isTarget)
+				-- Now and then a sound on its own, so players hear minions coming.
+				local idle = Config.Sounds
+				if m.NextIdle and now >= m.NextIdle then
+					minionSound(m)
+				end
+				if not m.NextIdle or now >= m.NextIdle then
+					m.NextIdle = now
+						+ idle.MinionIdleMin
+						+ math.random() * (idle.MinionIdleMax - idle.MinionIdleMin)
+				end
 			end
 			pose(m, now)
 		end

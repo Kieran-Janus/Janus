@@ -4,6 +4,7 @@ local Services = script.Parent:WaitForChild("Services")
 
 local DataService = require(Services.DataService)
 local HubService = require(Services.HubService)
+local SfxService = require(Services.SfxService)
 local MapService = require(Services.MapService)
 local NoiseService = require(Services.NoiseService)
 local SprintService = require(Services.SprintService)
@@ -22,7 +23,8 @@ local MonetizationService = require(Services.MonetizationService)
 local RewardsService = require(Services.RewardsService)
 local AdminService = require(Services.AdminService)
 
-HubService.Start() -- first, so the hub spawn exists before characters load
+SfxService.Start() -- first: creates the sound groups the hub music uses
+HubService.Start() -- early, so the hub spawn exists before characters load
 DataService.Start()
 ShopService.Start()
 MonetizationService.Start()

@@ -12,6 +12,7 @@
 ]]
 
 local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -1099,18 +1100,39 @@ function HubBuilder.ApplyCustomNpcs(hub: Model)
 	end
 end
 
-local function buildMusic(hub: Model)
+--[[
+	Hub music (Config.Hub.Music) as a looping, non-positional Sound named "Music" in the hub,
+	in SoundService's "Music" group (players can mute it in Settings). Also run on a hub saved
+	in Studio, so changing the SoundId in Config always takes effect.
+]]
+function HubBuilder.ApplyMusic(hub: Model)
 	local cfg = hubCfg.Music
+	local existing = hub:FindFirstChild("Music")
 	if cfg.SoundId == "" then
+		if existing then
+			existing:Destroy()
+		end
 		return
 	end
-	local sound = Instance.new("Sound")
-	sound.Name = "Music"
+	local sound: Sound
+	if existing and existing:IsA("Sound") then
+		sound = existing
+	else
+		if existing then
+			existing:Destroy()
+		end
+		sound = Instance.new("Sound")
+		sound.Name = "Music"
+		sound.Parent = hub
+	end
 	sound.SoundId = cfg.SoundId
 	sound.Volume = cfg.Volume
 	sound.Looped = true
+	local musicGroup = SoundService:FindFirstChild("Music")
+	if musicGroup and musicGroup:IsA("SoundGroup") then
+		sound.SoundGroup = musicGroup
+	end
 	sound.Playing = true
-	sound.Parent = hub
 end
 
 -- Public ---------------------------------------------------------------------------------
@@ -1276,7 +1298,7 @@ function HubBuilder.Build(): Model
 	buildAmbientParticles(hub)
 	buildNpcs(hub)
 	HubBuilder.ApplyCustomNpcs(hub)
-	buildMusic(hub)
+	HubBuilder.ApplyMusic(hub)
 	hub.PrimaryPart = ground
 	for _, child in hub:GetChildren() do
 		child:SetAttribute(HubBuilder.PieceAttribute, true)

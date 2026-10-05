@@ -13,6 +13,7 @@ local SocialService = game:GetService("SocialService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
 
 local RewardsUI = {}
@@ -116,6 +117,9 @@ function RewardsUI.Mount(gui: ScreenGui)
 			message.Text = tostring(text)
 			message.TextColor3 = if okResult then Theme.Selected else Theme.Muted
 			if okResult then
+				Sounds.Play("CodeRedeemed")
+			end
+			if okResult then
 				input.Text = ""
 			end
 		else
@@ -158,6 +162,7 @@ function RewardsUI.Mount(gui: ScreenGui)
 	-- Daily streak ------------------------------------------------------------------------------
 	Remotes.Event("DailyReward").OnClientEvent:Connect(function(streak: number, coins: number)
 		toast(gui, ("Day %d streak! +%d %s"):format(streak, coins, Config.Economy.CurrencyName), 5)
+		Sounds.Play("DailyReward")
 	end)
 
 	-- Favourite prompt ------------------------------------------------------------------------------

@@ -128,7 +128,8 @@ local Config = {
 					Mist = { Rate = 10, Color = Color3.fromRGB(190, 175, 220) },
 					Leaves = { Rate = 6, Color = Color3.fromRGB(205, 110, 40) },
 				},
-				AmbientSound = { SoundId = "", Volume = 0.35 }, -- e.g. crickets and owls; "" = none
+				-- Crickets loop (Pro Sound Effects, Creator Store); "" = none
+				AmbientSound = { SoundId = "rbxassetid://9112764040", Volume = 0.3 },
 			},
 			{
 				Id = "SpookyMansion",
@@ -210,7 +211,8 @@ local Config = {
 					Wisps = { Rate = 5, Color = Color3.fromRGB(150, 220, 255) },
 					Mist = { Rate = 5, Color = Color3.fromRGB(170, 150, 210) },
 				},
-				AmbientSound = { SoundId = "", Volume = 0.35 }, -- e.g. creaks and wind; "" = none
+				-- "HAUNTED AMBIENCE" (DistroKid, Creator Store); "" = none
+				AmbientSound = { SoundId = "rbxassetid://134980593475246", Volume = 0.3 },
 			},
 		} :: { any }, -- maps differ in shape (each Builder reads its own Layout)
 	},
@@ -306,8 +308,9 @@ local Config = {
 			Banner = "THE KING HEARD YOU!",
 			NearbyText = "The King heard %s!", -- %s = display name
 			BannerSeconds = 2.2,
-			RoarSoundId = "", -- e.g. "rbxassetid://123" from the Creator Store; "" = silent
-			RoarVolume = 1,
+			RoarSoundId = "rbxassetid://133651202885353", -- "Monster Roar" (Creator Store); "" = silent
+			RoarVolume = 0.8,
+			RoarPitch = 1.15, -- a bit higher = more cartoon, less scary
 		},
 		Noise = {
 			MemorySeconds = 6, -- how long a noise stays interesting
@@ -385,6 +388,76 @@ local Config = {
 			EyeColor = Color3.fromRGB(255, 220, 80),
 			Message = "The Ghost Cat swiped a pumpkin! It'll drop it somewhere...",
 		},
+	},
+
+	-- Sound effects. Each one: SoundId ("" = silent), Volume (0-1), optional PitchMin/PitchMax
+	-- (random pitch each play) and, for 3D sounds on a part, RollOffMin/RollOffMax (studs: full
+	-- volume inside Min, silent past Max). All ids are free Creator Store audio; swap any of them.
+	-- Players can turn music and sounds off in Settings (saved). Music = hub music + map
+	-- ambience; Sounds = everything below.
+	Sounds = {
+		-- UI (every button in the game UI)
+		Click = { SoundId = "rbxassetid://87437544236708", Volume = 0.5 },
+		Hover = { SoundId = "rbxassetid://139800881181209", Volume = 0.25 },
+		-- Rewards and round events (only you hear them)
+		PumpkinPickup = {
+			SoundId = "rbxassetid://113730061669739",
+			Volume = 0.6,
+			PitchMin = 0.9,
+			PitchMax = 1.2,
+		},
+		Coins = { SoundId = "rbxassetid://4612374807", Volume = 0.5 },
+		RoundStart = { SoundId = "rbxassetid://17798541626", Volume = 0.6 },
+		CountdownTick = {
+			SoundId = "rbxassetid://134410911353980",
+			Volume = 0.5,
+			LastSeconds = 10, -- ticks during the last this-many seconds of...
+			States = { "Voting", "Intermission", "Playing" }, -- ...these round states
+		},
+		Caught = { SoundId = "rbxassetid://9113854528", Volume = 0.7 },
+		Ghost = { SoundId = "rbxassetid://140334012603496", Volume = 0.6, Delay = 0.5 }, -- after Caught
+		Purchase = { SoundId = "rbxassetid://120891770644830", Volume = 0.6 },
+		DailyReward = { SoundId = "rbxassetid://1841209502", Volume = 0.6 },
+		CodeRedeemed = { SoundId = "rbxassetid://9045119921", Volume = 0.6 },
+		-- 3D, heard by everyone near them (the King's roar is Config.King.Heard.RoarSoundId)
+		KingFootstep = {
+			SoundId = "rbxassetid://140594308250996",
+			Volume = 0.9,
+			PitchMin = 0.55, -- low and heavy
+			PitchMax = 0.65,
+			RollOffMin = 12,
+			RollOffMax = 90,
+			WalkInterval = 0.6, -- seconds between steps while wandering or listening
+			ChaseInterval = 0.32, -- ...and while chasing
+		},
+		SkeletonRattle = {
+			SoundId = "rbxassetid://9120924561",
+			Volume = 0.6,
+			PitchMin = 1.1,
+			PitchMax = 1.4,
+			RollOffMin = 8,
+			RollOffMax = 60,
+		},
+		BatSqueak = {
+			SoundId = "rbxassetid://117491181431951",
+			Volume = 0.5,
+			PitchMin = 1,
+			PitchMax = 1.3,
+			RollOffMin = 8,
+			RollOffMax = 50,
+		},
+		CatMeow = {
+			SoundId = "rbxassetid://134699420140804",
+			Volume = 0.6,
+			PitchMin = 0.95,
+			PitchMax = 1.15,
+			RollOffMin = 8,
+			RollOffMax = 60,
+		},
+		-- Minions also make their sound now and then on their own, so you hear them coming.
+		MinionIdleMin = 5, -- seconds between idle sounds per minion (random in this range)
+		MinionIdleMax = 11,
+		SettingsCooldown = 0.3, -- per-player spam guard on the Settings toggles
 	},
 
 	Player = {
@@ -480,7 +553,7 @@ local Config = {
 		},
 
 		Music = {
-			SoundId = "", -- e.g. "rbxassetid://123"; empty = no music (pick one from the Creator Store)
+			SoundId = "rbxassetid://122867483102494", -- "Haunted Carousel" (DistroKid); "" = no music
 			Volume = 0.25,
 		},
 
@@ -976,6 +1049,7 @@ local Config = {
 			Daily = { Streak = 0, Last = 0 }, -- login streak and the os.time() of the last claim
 			RoundsPlayed = 0,
 			FavoritePrompted = false,
+			Settings = { Music = true, Sounds = true }, -- the Settings panel's toggles
 		},
 	},
 

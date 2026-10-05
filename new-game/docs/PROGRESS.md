@@ -45,3 +45,11 @@ Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a not
   - Not tested (needs a 2-player local server: Studio Test tab > Clients and Servers > 2 players): ghost modes (Spectate / Haunt / Ghost chat) and haunting, catching with others still alive, friend bonus, voice routing. With one player, being caught ends the round instantly.
   - M7 polish done: the HUD detail line stays on one line (bar 500 px wide; text shrinks 15 to 10 px to fit, then ends in "...").
   - Note: the test reset my Studio save (F8 > Reset my save) and redeemed PUMPKIN on it.
+
+## Overnight list (6 Oct)
+- **Task 1, Sounds: done.** `Config.Sounds` holds every sound (SoundId, Volume, optional PitchMin/PitchMax, RollOffMin/RollOffMax for 3D). Hub music `Config.Hub.Music`, map ambience `Config.Maps.List[i].AmbientSound`, King roar `Config.King.Heard.RoarSoundId` are filled in. All ids are free Creator Store audio (Pro Sound Effects, APM, DistroKid and public uploads), each checked to load in Studio. Client: `src/client/Sounds.luau` (UI click/hover on every button, pickup with random pitch, coins, round-start gong, last-10-second ticks in Voting/Intermission/Playing, caught + ghost whoosh, purchase, daily, code). Server: `SfxService` (3D King footsteps that speed up when chasing, roar, skeleton rattle / bat squeak / cat meow on hits and now and then on their own). Settings button: Music and Sounds on/off, saved per player (`Config.Data.Template.Settings`). Tested solo in Studio: every sound fired, settings saved across rejoin, Output clean.
+
+## Needs Kieran
+- **Listen to the sounds.** I could check that every sound loads but not hear them. Play a round with sound on and swap any you don't like in `Config.Sounds` (and Hub.Music, Maps AmbientSound, King.Heard.RoarSoundId).
+- **Rojo plugin was disconnected** after Studio restarted, so I synced scripts into Studio through Rojo's local API. Reconnect the Rojo plugin (Plugins > Rojo > Connect) when you're back and save the place.
+- **2-player tests:** the Studio connection can only start solo playtests. Multiplayer checks (3D sounds heard by others, ghost modes, friend bonus, voice) need Test > Clients and Servers > 2 players.

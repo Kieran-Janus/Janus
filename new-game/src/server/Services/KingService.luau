@@ -25,6 +25,7 @@ local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local MapService = require(script.Parent.MapService)
 local NoiseService = require(script.Parent.NoiseService)
+local SfxService = require(script.Parent.SfxService)
 
 type Level = {
 	Count: number,
@@ -270,17 +271,13 @@ local function announceHeard(king: King, player: Player)
 			end
 		end
 	end
-	if cfg.RoarSoundId ~= "" then
-		local roar = Instance.new("Sound")
-		roar.SoundId = cfg.RoarSoundId
-		roar.Volume = cfg.RoarVolume
-		roar.RollOffMaxDistance = 200
-		roar.Parent = king.Root
-		roar:Play()
-		roar.Ended:Once(function()
-			roar:Destroy()
-		end)
-	end
+	SfxService.Play3D({
+		SoundId = cfg.RoarSoundId,
+		Volume = cfg.RoarVolume,
+		PitchMin = cfg.RoarPitch,
+		RollOffMin = 20,
+		RollOffMax = 200,
+	}, king.Root)
 end
 
 local function canSee(king: King, target: BasePart, range: number): boolean
@@ -464,6 +461,7 @@ function KingService.Begin(
 					animateRig(king.Humanoid)
 				end
 				king.Root:SetNetworkOwner(nil) -- server physics, so clients can't move it
+				SfxService.StartFootsteps(king.Model, king.Root)
 				-- Touching any part of the King catches, as well as the CatchRange check below.
 				for _, part in king.Model:GetDescendants() do
 					if part:IsA("BasePart") then

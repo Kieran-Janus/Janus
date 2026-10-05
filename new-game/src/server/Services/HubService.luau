@@ -52,6 +52,7 @@ function HubService.Start()
 	if hub then
 		-- A hub saved in Studio still picks up custom NPC models (docs/CUSTOMIZE.md).
 		HubBuilder.ApplyCustomNpcs(hub)
+		HubBuilder.ApplyMusic(hub)
 	else
 		hub = HubBuilder.Build()
 	end

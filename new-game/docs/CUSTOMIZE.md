@@ -34,6 +34,8 @@ Test anything fast in a Studio playtest with **F8** (admin panel): +Coins, Unloc
 | Daily streak rewards | `Config.Daily.Rewards` |
 | Friend/group bonus, invite button, favourite prompt | `Config.Social` |
 | Map lighting and ambient sound | `Config.Maps.List[i].Lighting`, `.AmbientSound` |
+| Sound effects (clicks, pickups, King footsteps, minions, rewards) | `Config.Sounds` (SoundId "" = silent) |
+| Hub music, King roar | `Config.Hub.Music`, `Config.King.Heard.RoarSoundId` |
 | UI colours and font | `src/client/Theme.luau` |
 | Character/NPC/hat/pet/skin looks | A model in `ReplicatedStorage > Custom` (below) |
 | A whole map | A model in `ServerStorage > Maps` (below) |

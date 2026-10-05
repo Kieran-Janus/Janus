@@ -72,6 +72,13 @@ function ZoneLighting.Mount()
 	ambience.Looped = true
 	ambience.Volume = 0
 	ambience.Parent = SoundService
+	-- Map ambience counts as music for the Settings toggle.
+	task.spawn(function()
+		local group = SoundService:WaitForChild("Music", 30)
+		if group and group:IsA("SoundGroup") then
+			ambience.SoundGroup = group
+		end
+	end)
 
 	local current: any = false -- false = nothing applied yet, nil = hub
 	task.spawn(function()

@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
 
 local ShopUI = {}
@@ -240,7 +241,10 @@ function ShopUI.Mount(gui: ScreenGui)
 				action.BackgroundColor3 = Theme.Selected
 				action.Activated:Connect(function()
 					act(function()
-						local _, text, new = buyItem:InvokeServer(item.Id)
+						local bought, text, new = buyItem:InvokeServer(item.Id)
+						if bought then
+							Sounds.Play("Purchase")
+						end
 						setState(new)
 						message.Text = tostring(text)
 					end)
