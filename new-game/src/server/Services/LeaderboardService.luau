@@ -45,8 +45,13 @@ local function total(player: Player): number
 	return if data then data.PumpkinsCollected or 0 else 0
 end
 
+-- Studio's local-server test players have user ids of 0 or below: never on the board.
+local function isRealUser(userId: number): boolean
+	return userId > 0
+end
+
 local function save(player: Player)
-	if not store or not dirty[player] then
+	if not store or not dirty[player] or not isRealUser(player.UserId) then
 		return
 	end
 	dirty[player] = nil
@@ -71,7 +76,7 @@ local function collect(): { Entry }
 		if ok then
 			for _, item in page do
 				local userId = tonumber(item.key)
-				if userId then
+				if userId and isRealUser(userId) then
 					byUser[userId] = item.value
 				end
 			end
@@ -80,7 +85,7 @@ local function collect(): { Entry }
 	-- Online players' live totals (newer than the store until the next save).
 	for _, player in Players:GetPlayers() do
 		local amount = total(player)
-		if amount > 0 then
+		if amount > 0 and isRealUser(player.UserId) then
 			byUser[player.UserId] = math.max(byUser[player.UserId] or 0, amount)
 		end
 	end
