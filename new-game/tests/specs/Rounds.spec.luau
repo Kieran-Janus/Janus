@@ -1,114 +1,121 @@
---!strict
 -- Game modes, playlists (src/shared/Playlists.luau) and the Ready pad maths
--- (ReadyService.Inside): the pure parts of the round loop.
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- (ReadyService.Inside): the pure parts of the round loop. (modules.spec plays a whole round
+-- with a player standing on the hub's Ready pad.)
 
-return function(t: any)
-	local Config = require(ReplicatedStorage.Shared.Config) :: any
-	local Playlists = require(ReplicatedStorage.Shared.Playlists) :: any
+local T = require("../harness/Test")
+local Runtime = require("../harness/Runtime")
 
-	-- Runs fn with some feature switches changed, then puts them back.
-	local function withFeatures(changes: { [string]: boolean }, fn: () -> ())
-		local saved = {}
-		for name, value in changes do
-			saved[name] = Config.Features[name]
-			Config.Features[name] = value
-		end
-		local ok, err = pcall(fn)
-		for name, value in saved do
-			Config.Features[name] = value
-		end
-		if not ok then
-			error(err, 0)
-		end
+local describe, it, expect = T.describe, T.it, T.expect
+
+local rt = Runtime.new()
+local CFrame, Vector3 = rt.env.CFrame, rt.env.Vector3
+local typeof = Runtime.typeof
+local ReplicatedStorage = rt.game:GetService("ReplicatedStorage")
+local Config = rt:require("ReplicatedStorage.Shared.Config")
+local Playlists = rt:require("ReplicatedStorage.Shared.Playlists")
+
+-- Runs fn with some feature switches changed, then puts them back.
+local function withFeatures(changes: { [string]: boolean }, fn: () -> ())
+	local saved = {}
+	for name, value in changes do
+		saved[name] = Config.Features[name]
+		Config.Features[name] = value
 	end
-
-	local function ids(list: { any }): string
-		local out = {}
-		for _, playlist in list do
-			table.insert(out, playlist.Id)
-		end
-		return table.concat(out, ",")
+	local ok, err = pcall(fn)
+	for name, value in saved do
+		Config.Features[name] = value
 	end
+	if not ok then
+		error(err, 0)
+	end
+end
 
-	t.test("every mode has its settings and a module in src/server/Modes", function()
+local function ids(list: { any }): string
+	local out = {}
+	for _, playlist in list do
+		table.insert(out, playlist.Id)
+	end
+	return table.concat(out, ",")
+end
+
+describe("Config.Modes", function()
+	it("gives every mode its settings and a module in src/server/Modes", function()
+		local folder = rt:find("ServerScriptService.Server.Modes")
 		local count = 0
 		for id, mode in Config.Modes.List do
 			count += 1
-			t.eq(type(mode.Name), "string", id .. ".Name")
-			t.eq(type(mode.Description), "string", id .. ".Description")
-			t.eq(type(mode.MinPlayers), "number", id .. ".MinPlayers")
-			t.ok(mode.MinPlayers >= 1, id .. ".MinPlayers is at least 1")
-			t.eq(type(mode.UsesDifficulty), "boolean", id .. ".UsesDifficulty")
-			t.ok(Config.Features[mode.Feature] ~= nil, id .. ": Config.Features." .. mode.Feature)
-			t.ok(table.find(Config.Modes.Order, id), id .. " is in Config.Modes.Order")
-			local module = t.Server.Modes:FindFirstChild(id)
-			t.ok(module and module:IsA("ModuleScript"), "src/server/Modes/" .. id .. ".luau")
-			local source = t.readFile("src/server/Modes/" .. id .. ".luau")
-			t.ok(source and source:find("function %w+%.Run%("), id .. " has a Run function")
+			expect(mode.Name).toBeA("string")
+			expect(mode.Description).toBeA("string")
+			expect(mode.MinPlayers).toBeA("number")
+			expect(mode.MinPlayers).toBeGreaterThanOrEqual(1)
+			expect(mode.UsesDifficulty).toBeA("boolean")
+			if Config.Features[mode.Feature] == nil then
+				error(("%s: Config.Features.%s doesn't exist"):format(id, tostring(mode.Feature)))
+			end
+			expect(Config.Modes.Order).toContain(id)
+			local module = folder:FindFirstChild(id)
+			if not (module and module:IsA("ModuleScript")) then
+				error(("src/server/Modes/%s.luau doesn't exist"):format(id))
+			end
+			expect(rt:source(module)).toMatch("function %w+%.Run%(")
 		end
-		t.eq(count, #Config.Modes.Order, "Order lists every mode once")
-		t.ok(Config.Modes.List[Config.Modes.FallbackMode], "FallbackMode is a real mode")
-		t.ok(Config.Modes.VoteChoices >= 1, "VoteChoices")
-		t.eq(Config.Modes.List.KingHunt.UsesDifficulty, true, "King Hunt keeps the difficulty vote")
+		expect(#Config.Modes.Order).toBe(count)
+		expect(Config.Modes.List[Config.Modes.FallbackMode]).toBeTruthy()
+		expect(Config.Modes.VoteChoices).toBeGreaterThanOrEqual(1)
+		expect(Config.Modes.List.KingHunt.UsesDifficulty).toBe(true)
 	end)
+end)
 
-	t.test("playlist lookups", function()
-		t.eq(Playlists.Get("KingHuntPatch").Map, "PumpkinPatch")
-		t.eq(Playlists.Get("Nope"), nil)
-		t.eq(Playlists.MinPlayers(Playlists.Get("KingHuntPatch")), 1)
-		t.eq(Playlists.MinPlayers(Playlists.Get("HideSeekFarm")), 2)
+describe("Playlists", function()
+	it("looks playlists up", function()
+		expect(Playlists.Get("KingHuntPatch").Map).toBe("PumpkinPatch")
+		expect(Playlists.Get("Nope")).toBeNil()
+		expect(Playlists.MinPlayers(Playlists.Get("KingHuntPatch"))).toBe(1)
+		expect(Playlists.MinPlayers(Playlists.Get("HideSeekFarm"))).toBe(2)
 		-- A playlist can ask for more players than its mode, never fewer.
-		t.eq(
-			Playlists.MinPlayers({
-				Id = "X",
-				Mode = "HideSeek",
-				Map = "PumpkinFarm",
-				Name = "X",
-				MinPlayers = 1,
-			}),
-			2
-		)
-		t.eq(
-			Playlists.MinPlayers({
-				Id = "X",
-				Mode = "KingHunt",
-				Map = "PumpkinPatch",
-				Name = "X",
-				MinPlayers = 6,
-			}),
-			6
-		)
-		t.eq(Playlists.UsesDifficulty(Playlists.Get("KingHuntMansion")), true)
-		t.eq(Playlists.UsesDifficulty(Playlists.Get("ScareMaze")), false)
-		t.eq(Playlists.ModeName("KingHunt"), Config.Modes.List.KingHunt.Name)
-		t.eq(Playlists.ForMap("SpookyMansion", "KingHunt").Id, "KingHuntMansion")
+		expect(Playlists.MinPlayers({
+			Id = "X",
+			Mode = "HideSeek",
+			Map = "PumpkinFarm",
+			Name = "X",
+			MinPlayers = 1,
+		})).toBe(2)
+		expect(Playlists.MinPlayers({
+			Id = "X",
+			Mode = "KingHunt",
+			Map = "PumpkinPatch",
+			Name = "X",
+			MinPlayers = 6,
+		})).toBe(6)
+		expect(Playlists.UsesDifficulty(Playlists.Get("KingHuntMansion"))).toBe(true)
+		expect(Playlists.UsesDifficulty(Playlists.Get("ScareMaze"))).toBe(false)
+		expect(Playlists.ModeName("KingHunt")).toBe(Config.Modes.List.KingHunt.Name)
+		expect(Playlists.ForMap("SpookyMansion", "KingHunt").Id).toBe("KingHuntMansion")
 		-- No King Hunt playlist on the Hedge Maze: a made-up one so it can still be played.
 		local madeUp = Playlists.ForMap("HedgeMaze", "KingHunt")
-		t.eq(madeUp.Mode, "KingHunt")
-		t.eq(madeUp.Map, "HedgeMaze")
-		t.eq(Playlists.ForMap("HedgeMaze").Mode, "HideSeek")
+		expect(madeUp.Mode).toBe("KingHunt")
+		expect(madeUp.Map).toBe("HedgeMaze")
+		expect(Playlists.ForMap("HedgeMaze").Mode).toBe("HideSeek")
 	end)
 
-	t.test("the vote only offers switched-on modes that fit the ready players", function()
+	it("only offers switched-on modes that fit the ready players", function()
 		withFeatures({ KingHunt = true, HideSeek = false, ScareMaze = false }, function()
-			t.eq(ids(Playlists.Available(1)), "KingHuntPatch,KingHuntMansion")
-			t.eq(ids(Playlists.Available(8)), "KingHuntPatch,KingHuntMansion")
-			t.eq(ids(Playlists.Offer(1, 3)), "KingHuntPatch,KingHuntMansion")
+			expect(ids(Playlists.Available(1))).toBe("KingHuntPatch,KingHuntMansion")
+			expect(ids(Playlists.Available(8))).toBe("KingHuntPatch,KingHuntMansion")
+			expect(ids(Playlists.Offer(1, 3))).toBe("KingHuntPatch,KingHuntMansion")
 		end)
 		withFeatures({ KingHunt = true, HideSeek = true, ScareMaze = true }, function()
-			t.eq(
-				ids(Playlists.Available(1)),
-				"KingHuntPatch,KingHuntMansion",
-				"1 player: King Hunt only"
-			)
-			t.eq(#Playlists.Available(2), 5, "2 players: everything")
+			-- 1 player: King Hunt only; 2 players: everything.
+			expect(ids(Playlists.Available(1))).toBe("KingHuntPatch,KingHuntMansion")
+			expect(#Playlists.Available(2)).toBe(5)
 			for _ = 1, 20 do
 				local offer = Playlists.Offer(4, 3)
-				t.eq(#offer, 3, "VoteChoices picks")
+				expect(#offer).toBe(3)
 				local seen = {}
 				for _, playlist in offer do
-					t.ok(not seen[playlist.Id], "no playlist offered twice")
+					if seen[playlist.Id] then
+						error(playlist.Id .. " was offered twice")
+					end
 					seen[playlist.Id] = true
 				end
 			end
@@ -116,82 +123,98 @@ return function(t: any)
 		withFeatures({ KingHunt = false, HideSeek = true, ScareMaze = false }, function()
 			-- Not enough players for Hide & Seek and King Hunt is off: still one choice.
 			local offer = Playlists.Offer(1, 3)
-			t.eq(#offer, 1)
-			t.eq(offer[1].Mode, Config.Modes.FallbackMode)
-			t.eq(ids(Playlists.Offer(2, 3)), "HideSeekFarm,HideSeekHedgeMaze")
+			expect(#offer).toBe(1)
+			expect(offer[1].Mode).toBe(Config.Modes.FallbackMode)
+			expect(ids(Playlists.Offer(2, 3))).toBe("HideSeekFarm,HideSeekHedgeMaze")
 		end)
 		withFeatures({ KingHunt = false, HideSeek = false, ScareMaze = false }, function()
-			t.eq(#Playlists.Enabled(), 0)
-			t.eq(ids(Playlists.Offer(10, 3)), "KingHuntPatch", "everything off: fallback")
+			-- Everything off: the fallback.
+			expect(#Playlists.Enabled()).toBe(0)
+			expect(ids(Playlists.Offer(10, 3))).toBe("KingHuntPatch")
 		end)
 	end)
+end)
 
-	t.test("Ready pad: flat pad, edges and height", function()
-		local ReadyService = require(t.Server.Services.ReadyService) :: any
-		local inside = ReadyService.Inside
+describe("Ready pad", function()
+	local ReadyService = rt:require("ServerScriptService.Server.Services.ReadyService")
+	local inside = ReadyService.Inside
+
+	it("counts a flat pad's middle, edges and jumps", function()
 		local pad = CFrame.new(0, 0.5, 0)
 		local size = Vector3.new(10, 1, 10)
-		t.ok(inside(Vector3.new(0, 3.5, 0), pad, size, "Block", 1, 12), "standing in the middle")
-		t.ok(inside(Vector3.new(5.8, 3.5, -5.8), pad, size, "Block", 1, 12), "feet over the corner")
-		t.ok(not inside(Vector3.new(6.5, 3.5, 0), pad, size, "Block", 1, 12), "next to the pad")
-		t.ok(inside(Vector3.new(0, 12.9, 0), pad, size, "Block", 1, 12), "jumping")
-		t.ok(not inside(Vector3.new(0, 13.5, 0), pad, size, "Block", 1, 12), "far above")
-		t.ok(not inside(Vector3.new(0, -2, 0), pad, size, "Block", 1, 12), "under the floor")
+		expect(inside(Vector3.new(0, 3.5, 0), pad, size, "Block", 1, 12)).toBe(true) -- middle
+		expect(inside(Vector3.new(5.8, 3.5, -5.8), pad, size, "Block", 1, 12)).toBe(true) -- corner
+		expect(inside(Vector3.new(6.5, 3.5, 0), pad, size, "Block", 1, 12)).toBe(false) -- beside it
+		expect(inside(Vector3.new(0, 12.9, 0), pad, size, "Block", 1, 12)).toBe(true) -- jumping
+		expect(inside(Vector3.new(0, 13.5, 0), pad, size, "Block", 1, 12)).toBe(false) -- far above
+		expect(inside(Vector3.new(0, -2, 0), pad, size, "Block", 1, 12)).toBe(false) -- under it
 	end)
 
-	t.test("Ready pad: turned, round and ball pads", function()
-		local ReadyService = require(t.Server.Services.ReadyService) :: any
-		local inside = ReadyService.Inside
+	it("handles turned, round and ball pads", function()
 		-- A long thin pad turned 45 degrees: along it is inside, straight along world X isn't.
 		local turned = CFrame.new(0, 0.5, 0) * CFrame.Angles(0, math.rad(45), 0)
 		local long = Vector3.new(10, 1, 2)
 		local along = turned.RightVector * 4 + Vector3.new(0, 3, 0)
-		t.ok(inside(along, turned, long, "Block", 1, 12), "along the turned pad")
-		t.ok(not inside(Vector3.new(4, 3, 0), turned, long, "Block", 1, 12), "off the turned pad")
+		expect(inside(along, turned, long, "Block", 1, 12)).toBe(true)
+		expect(inside(Vector3.new(4, 3, 0), turned, long, "Block", 1, 12)).toBe(false)
 		-- A round pad: a cylinder stood up (its length axis X points up), 12 studs across.
 		local round = CFrame.new(0, 0.5, 0) * CFrame.Angles(0, 0, math.rad(90))
 		local disc = Vector3.new(1, 12, 12)
-		t.ok(inside(Vector3.new(5, 3, 0), round, disc, "Cylinder", 1, 12), "on the disc")
-		t.ok(not inside(Vector3.new(5.5, 3, 5.5), round, disc, "Cylinder", 1, 12), "past the rim")
-		t.ok(
-			inside(Vector3.new(5.5, 3, 5.5), round, disc, "Block", 1, 12),
-			"(a square pad would count it)"
-		)
+		expect(inside(Vector3.new(5, 3, 0), round, disc, "Cylinder", 1, 12)).toBe(true)
+		expect(inside(Vector3.new(5.5, 3, 5.5), round, disc, "Cylinder", 1, 12)).toBe(false)
+		-- (a square pad would count it)
+		expect(inside(Vector3.new(5.5, 3, 5.5), round, disc, "Block", 1, 12)).toBe(true)
 		-- A ball.
 		local ball = Vector3.new(8, 8, 8)
-		t.ok(inside(Vector3.new(4.5, 6, 0), CFrame.new(), ball, "Ball", 1, 12), "on the ball")
-		t.ok(
-			not inside(Vector3.new(5.5, 2, 0), CFrame.new(), ball, "Ball", 1, 12),
-			"beside the ball"
-		)
+		expect(inside(Vector3.new(4.5, 6, 0), CFrame.new(), ball, "Ball", 1, 12)).toBe(true)
+		expect(inside(Vector3.new(5.5, 2, 0), CFrame.new(), ball, "Ball", 1, 12)).toBe(false)
 	end)
 
-	t.test("Ready pad switched off: everyone is ready (no players in tests)", function()
-		local ReadyService = require(t.Server.Services.ReadyService) :: any
-		t.eq(ReadyService.Needed(), math.max(1, Config.Lobby.Ready.MinReady))
+	it("counts the hub's built pad (the hub section and the Ready pad agree)", function()
+		local HubBuilder = rt:require("ServerScriptService.Server.Hub.HubBuilder")
+		local hub = HubBuilder.Build()
+		local CollectionService = rt.game:GetService("CollectionService")
+		local pads = CollectionService:GetTagged("ReadyPad")
+		expect(#pads).toBe(1)
+		local pad = pads[1]
+		expect(pad:IsDescendantOf(hub)).toBe(true)
+		local cfg = Config.Lobby.Ready
+		local function on(position): boolean
+			return inside(position, pad.CFrame, pad.Size, "Block", cfg.EdgeMargin, cfg.PadHeight)
+		end
+		-- A character's root is about 3 studs above its feet.
+		local top = pad.Position + Vector3.new(0, pad.Size.Y / 2, 0)
+		expect(on(top + Vector3.new(0, 3, 0))).toBe(true)
+		expect(on(top + Vector3.new(pad.Size.X / 2 - 0.5, 3, 0))).toBe(true)
+		expect(on(top + Vector3.new(pad.Size.X / 2 + cfg.EdgeMargin + 2, 3, 0))).toBe(false)
+		hub:Destroy()
+	end)
+
+	it("makes everyone ready when switched off (no players here)", function()
+		expect(ReadyService.Needed()).toBe(math.max(1, Config.Lobby.Ready.MinReady))
 		withFeatures({ ReadyPad = false }, function()
 			ReadyService.Start() -- returns straight away
-			t.eq(ReadyService.PadsActive(), false)
-			t.eq(ReadyService.Count(), 0)
+			expect(ReadyService.PadsActive()).toBe(false)
+			expect(ReadyService.Count()).toBe(0)
 		end)
-		t.eq(ReplicatedStorage:GetAttribute("ReadyNeeded"), ReadyService.Needed())
+		expect(ReplicatedStorage:GetAttribute("ReadyNeeded")).toBe(ReadyService.Needed())
 	end)
 
-	t.test("Ready pad and spectate settings", function()
+	it("has its settings and the spectate settings", function()
 		local ready = Config.Lobby.Ready
 		for _, key in { "MinReady", "CheckSeconds", "PadHeight", "EdgeMargin", "LeaveGraceSeconds" } do
-			t.eq(type(ready[key]), "number", "Lobby.Ready." .. key)
+			expect(ready[key]).toBeA("number")
 		end
 		for _, key in
 			{ "Count", "StandOnPad", "YoureReady", "NextRound", "ReadyNextRound", "VoteHint" }
 		do
-			t.eq(type(ready.Text[key]), "string", "Lobby.Ready.Text." .. key)
+			expect(ready.Text[key]).toBeA("string")
 		end
 		local spectate = Config.Lobby.Spectate
 		for _, list in { spectate.NextKeys, spectate.PreviousKeys } do
-			t.ok(#list > 0, "at least one key")
+			expect(#list).toBeGreaterThan(0)
 			for _, key in list do
-				t.eq(typeof(key), "EnumItem")
+				expect(typeof(key)).toBe("EnumItem")
 			end
 		end
 		for _, key in
@@ -206,10 +229,73 @@ return function(t: any)
 				"WatchButton",
 			}
 		do
-			t.eq(type(spectate.Text[key]), "string", "Lobby.Spectate.Text." .. key)
+			expect(spectate.Text[key]).toBeA("string")
 		end
 		for _, key in { "CancelledSeconds", "ErrorWaitSeconds", "SafetyLimitSeconds" } do
-			t.eq(type(Config.Round[key]), "number", "Round." .. key)
+			expect(Config.Round[key]).toBeA("number")
 		end
 	end)
-end
+end)
+
+describe("A round with two players, one on the Ready pad", function()
+	local server = Runtime.new()
+	local ServerConfig = server:require("ReplicatedStorage.Shared.Config")
+	local RS = server.game:GetService("ReplicatedStorage")
+	local ready, lobby
+
+	it("takes only the player on the pad into the round", function()
+		local ok, err = server:runScript("ServerScriptService.Server.Main")
+		if not ok then
+			error(err, 0)
+		end
+		server:advance(1)
+		ready = server:addPlayer({ Name = "OnThePad" })
+		lobby = server:addPlayer({ Name = "InTheLobby" })
+		server:advance(2)
+		local pad = server.game:GetService("CollectionService"):GetTagged("ReadyPad")[1]
+		ready.Character:PivotTo(pad.CFrame + server.env.Vector3.new(0, pad.Size.Y / 2 + 3, 0))
+		local r = ServerConfig.Round
+		local waited = 0
+		while
+			RS:GetAttribute("State") ~= "Playing"
+			and waited < ServerConfig.Voting.Seconds + r.IntermissionSeconds + 30
+		do
+			server:advance(1)
+			waited += 1
+		end
+		expect(RS:GetAttribute("State")).toBe("Playing")
+		expect(ready:GetAttribute("InRound")).toBe(true)
+		expect(lobby:GetAttribute("InRound")).never.toBe(true)
+		expect(lobby:GetAttribute("Ready")).toBe(false)
+	end)
+
+	it("streams the map to the lobby player who spectates, not to the one playing", function()
+		local remote = server:find("ReplicatedStorage.Remotes.SpectateFocus")
+		server:fireServer(remote, lobby, true)
+		server:fireServer(remote, ready, true)
+		server:fireServer(remote, lobby, "yes please") -- wrong type: ignored
+		local map = server.workspace:FindFirstChild("Map")
+		expect(map).toBeInstanceOf("Model")
+		expect(lobby.ReplicationFocus).toBe(map:FindFirstChild("Floor", true))
+		expect(ready.ReplicationFocus).toBeNil()
+	end)
+
+	it("sends the player back to the lobby, not ready, and stops the streaming", function()
+		local r = ServerConfig.Round
+		local waited = 0
+		while
+			RS:GetAttribute("State") ~= "Waiting for players"
+			and waited < r.Duration + r.ResultsSeconds + 30
+		do
+			server:advance(1)
+			waited += 1
+		end
+		expect(RS:GetAttribute("State")).toBe("Waiting for players")
+		expect(ready:GetAttribute("InRound")).never.toBe(true)
+		expect(ready:GetAttribute("Ready")).toBe(false)
+		expect(lobby.ReplicationFocus).toBeNil()
+		server:removePlayer(ready)
+		server:removePlayer(lobby)
+		server:advance(2)
+	end)
+end)

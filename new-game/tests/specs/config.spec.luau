@@ -115,7 +115,7 @@ describe("Config.Shop", function()
 end)
 
 describe("Config.Npcs", function()
-	it("gives every NPC an Id, a Kind and a Vector3 Offset", function()
+	it("gives every NPC an Id, a Kind and a place (a lobby Zone or a Vector3 Offset)", function()
 		expect(#Config.Npcs.List).toBeGreaterThan(0)
 		local seen = {}
 		for i, npc in Config.Npcs.List do
@@ -127,7 +127,19 @@ describe("Config.Npcs", function()
 			end
 			seen[npc.Id] = true
 			expect(npc.Kind).toBeA("string")
-			expect(npc.Offset).toBeA("Vector3")
+			if npc.Zone ~= nil then
+				expect(npc.Zone).toBeA("string")
+				if not Config.Lobby.Zones[npc.Zone] then
+					error(
+						("%s has Zone %q, which isn't in Config.Lobby.Zones"):format(
+							npc.Id,
+							npc.Zone
+						)
+					)
+				end
+			else
+				expect(npc.Offset).toBeA("Vector3")
+			end
 		end
 	end)
 

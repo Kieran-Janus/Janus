@@ -16,8 +16,8 @@
 
 	hub      HubBuilder.Build() with Config.Hub.Lighting, plus the terrain it fills
 	map      MapService.Load(<MapId>) (its builder, or ServerStorage.Maps) with the map's Lighting
-	section  src/server/Hub/Sections/<Name>.luau: Build(hub, Config.Lobby.Zones[<Name>]) into an
-	         empty hub Model, with Config.Hub.Lighting
+	section  src/server/Hub/Sections/<Name>.luau: Build(hub, HubLayout.Zone(<Name>)) into an
+	         empty hub Model, with Config.Hub.Lighting (the zone HubBuilder gives every section)
 	Terrain:Fill* calls are recorded by the harness (not simulated) and exported as shapes.
 ]]
 
@@ -136,7 +136,9 @@ else
 		fail(("no section %s (sections: %s)"):format(tostring(name), table.concat(names, ", ")))
 	end
 	local hub = rt:create("Model", { Name = "Hub" }, rt.workspace)
-	rt:require(module).Build(hub, Config.Lobby.Zones[name])
+	-- The same zone HubBuilder.BuildSection passes: { Name, CFrame, Size } from Config.Lobby.Zones.
+	local HubLayout = rt:require("ServerScriptService.Server.Hub.HubLayout")
+	rt:require(module).Build(hub, HubLayout.Zone(name))
 	table.insert(roots, hub)
 	lighting = Config.Hub.Lighting
 end

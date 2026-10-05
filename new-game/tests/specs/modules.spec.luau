@@ -66,6 +66,16 @@ describe("server boot", function()
 		end)
 		local Config = server:require("ReplicatedStorage.Shared.Config")
 		local player = server:addPlayer({ Name = "Tester" })
+		-- The hub has a Ready pad (tag ReadyPad): nobody plays until they stand on it.
+		local pads = server.game:GetService("CollectionService"):GetTagged("ReadyPad")
+		expect(#pads).toBeGreaterThan(0)
+		server:advance(Config.Voting.Seconds + 5)
+		expect(states).never.toContain("Playing")
+		expect(player:GetAttribute("Ready")).toBe(false)
+		local pad = pads[1]
+		player.Character:PivotTo(pad.CFrame + server.env.Vector3.new(0, pad.Size.Y / 2 + 3, 0))
+		server:advance(Config.Lobby.Ready.CheckSeconds + 0.5)
+		expect(player:GetAttribute("Ready")).toBe(true)
 		-- Voting + intermission + the round + results, with some slack.
 		local r = Config.Round
 		server:advance(
@@ -73,6 +83,9 @@ describe("server boot", function()
 		)
 		expect(states).toContain("Playing")
 		expect(states).toContain("Results")
+		-- Back in the lobby after the round, and not ready until they step on the pad again.
+		expect(states[#states]).toBe("Waiting for players")
+		expect(player:GetAttribute("Ready")).toBe(false)
 		expect(player:GetAttribute("DataReady")).toBe(true)
 		server:removePlayer(player)
 		server:advance(5)
@@ -117,5 +130,30 @@ describe("client modules", function()
 			table.insert(names, child.Name)
 		end
 		T.note("PlayerGui: " .. table.concat(names, ", "))
+	end)
+
+	it("puts every panel's button into the Menu as a tile", function()
+		local gui = client.game:GetService("Players").LocalPlayer.PlayerGui.GameUI
+		local ids = {}
+		for _, child in gui.Menu.Tiles:GetChildren() do
+			local id = child:GetAttribute("MenuTile")
+			if id then
+				table.insert(ids, id)
+			end
+		end
+		-- MenuTiles' own tiles, and the panels' Layout.SideButton tiles.
+		for _, id in { "Skins", "Vote", "Spectate", "Vip", "Shop", "Settings", "Codes", "Invite" } do
+			expect(ids).toContain(id)
+		end
+		table.sort(ids)
+		T.note("tiles: " .. table.concat(ids, ", "))
+		-- The Vote tile with no vote open keeps the Menu open and says when voting starts.
+		local MenuUI = client:require("StarterPlayer.StarterPlayerScripts.Client.MenuUI")
+		MenuUI.Open()
+		client:fire(gui.Menu.Tiles.VoteTile, "Activated")
+		expect(MenuUI.IsOpen()).toBe(true)
+		expect(gui.Menu.Message.Text).toBeA("string")
+		expect(gui.Menu.Message.Text).never.toBe("")
+		MenuUI.Close()
 	end)
 end)

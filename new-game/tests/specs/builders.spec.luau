@@ -72,11 +72,17 @@ describe("HubBuilder", function()
 	end)
 
 	it("has a spawn pad and every NPC with a prompt", function()
-		expect(hub:FindFirstChild("Spawn")).toBeInstanceOf("SpawnLocation")
-		local npcs = hub:FindFirstChild("Npcs")
-		expect(npcs).toBeInstanceOf("Folder")
+		-- The spawn and NPCs are found the way the game finds them: by tag / NpcId, wherever
+		-- they sit in the hub (an NPC with a Zone stands in that section, e.g. Hub.Shop).
+		local CollectionService = rt.game:GetService("CollectionService")
+		local spawns = CollectionService:GetTagged("HubSpawn")
+		expect(#spawns).toBe(1)
+		expect(spawns[1]).toBeInstanceOf("SpawnLocation")
+		expect(spawns[1]:IsDescendantOf(hub)).toBe(true)
+		expect(hub:FindFirstChild("Npcs")).toBeInstanceOf("Folder")
+		local Npcs = rt:require("ServerScriptService.Server.Hub.Npcs")
 		for _, def in Config.Npcs.List do
-			local npc = npcs:FindFirstChild(def.Id)
+			local npc = Npcs.Find(hub, def.Id)
 			expect(npc).toBeInstanceOf("Model")
 			local prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true)
 			expect(prompt).toBeTruthy()
@@ -145,19 +151,25 @@ describe("HubBuilder with custom NPC models (ReplicatedStorage.Custom.Characters
 				model.Parent = folder
 			end
 		end
-		local hub = rt:require("ServerScriptService.Server.Hub.HubBuilder").Build()
-		local plaza = Config.Hub.Center.Y + 1
+		local HubBuilder = rt:require("ServerScriptService.Server.Hub.HubBuilder")
+		local Npcs = rt:require("ServerScriptService.Server.Hub.Npcs")
+		local hub = HubBuilder.Build()
+		-- HubService does this on every start (also on a hub saved in the place).
+		HubBuilder.ApplyCustomNpcs(hub)
 		for _, def in Config.Npcs.List do
 			local height = Config.Custom.Heights[def.Id]
-			local npc = hub.Npcs:FindFirstChild(def.Id)
+			local npc = Npcs.Find(hub, def.Id)
 			local look = npc:FindFirstChild("Look")
-			if height then
+			-- Only people can be swapped (the shopkeeper); boards and screens keep their look.
+			if height and def.Kind == "Vendor" then
 				swapped += 1
 				expect(look).toBeInstanceOf("Model")
+				expect(npc:FindFirstChild("Keeper")).toBeNil()
 				local box, size = look:GetBoundingBox()
 				expect(size.Y).toBeNear(height, 1e-3)
-				expect(box.Position.Y - size.Y / 2).toBeNear(plaza, 1e-3)
-				local spot = Config.Hub.Center + def.Offset
+				-- Feet on the KeeperSpot, behind the stall's counter.
+				local spot = npc:FindFirstChild("KeeperSpot").Position
+				expect(box.Position.Y - size.Y / 2).toBeNear(spot.Y, 1e-3)
 				local flat = Vector3.new(box.Position.X - spot.X, 0, box.Position.Z - spot.Z)
 				expect(flat.Magnitude).toBeLessThan(1)
 				expect(npc:FindFirstChild("PromptAnchor")).toBeInstanceOf("BasePart")

@@ -1,11 +1,24 @@
---!strict
 -- The top-left Menu: Config.Menu is complete, side buttons become the right tiles, the tile
--- grid fits every screen, and the Menu button never covers the Hud (src/client/MenuLogic.luau).
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- grid fits every screen, the Menu button never covers the Hud (src/client/MenuLogic.luau),
+-- and the mounted Menu adds, replaces, opens and closes tiles (src/client/MenuUI.luau).
+-- (modules.spec checks the real tiles after Main.client.luau runs against a server.)
+
+local T = require("../harness/Test")
+local Runtime = require("../harness/Runtime")
+
+local describe, it, expect = T.describe, T.it, T.expect
+
+local client = Runtime.new({ client = true })
+local Vector2 = client.env.Vector2
+local typeof = Runtime.typeof
+local Config = client:require("ReplicatedStorage.Shared.Config")
+local folder = client:find("StarterPlayer.StarterPlayerScripts.Client")
+local MenuLogic = client:require(folder.MenuLogic)
+local margin = Config.UI.EdgeMargin
 
 -- The Hud as src/client/Hud.luau draws it: 520 x 64 at the top middle (Position 0.5, 0.02),
 -- shrunk by Layout.Fit when it doesn't fit. Returns left, top, width, height in UI units.
-local function hudRect(screen: Vector2, margin: number): (number, number, number, number)
+local function hudRect(screen: any, margin: number): (number, number, number, number)
 	local width, height = 520, 64
 	local s = math.min(1, (screen.X - 2 * margin) / width, (screen.Y - 2 * margin) / height)
 	s = math.max(s, 0.3)
@@ -27,7 +40,7 @@ local function overlaps(
 end
 
 -- Screen sizes in UI units: phones upright and sideways, tablets, PC.
-local SCREENS = {
+local SCREENS: { any } = {
 	Vector2.new(360, 640),
 	Vector2.new(320, 480),
 	Vector2.new(568, 320),
@@ -40,22 +53,23 @@ local SCREENS = {
 	Vector2.new(1422, 760),
 }
 
-return function(t: any)
-	local Config = require(ReplicatedStorage.Shared.Config) :: any
-	local MenuLogic = require(t.Client.MenuLogic) :: any
-	local margin = Config.UI.EdgeMargin
-
-	t.test("every Menu tile line is complete", function()
+describe("Config.Menu", function()
+	it("has a complete line for every tile", function()
 		local seen = {}
 		for _, tile in Config.Menu.Tiles do
-			t.eq(type(tile.Id), "string", "tile Id")
-			t.ok(not seen[tile.Id], tile.Id .. " is listed twice")
+			expect(tile.Id).toBeA("string")
+			if seen[tile.Id] then
+				error(tile.Id .. " is listed twice")
+			end
 			seen[tile.Id] = true
-			t.ok(type(tile.Text) == "string" and tile.Text ~= "", tile.Id .. " has Text")
-			t.eq(type(tile.Icon), "string", tile.Id .. " Icon")
-			t.ok(tile.Color == nil or typeof(tile.Color) == "Color3", tile.Id .. " Color")
+			expect(tile.Text).toBeA("string")
+			expect(tile.Text).never.toBe("")
+			expect(tile.Icon).toBeA("string")
+			if tile.Color ~= nil then
+				expect(typeof(tile.Color)).toBe("Color3")
+			end
 			if tile.Feature ~= nil then
-				t.eq(type(Config.Features[tile.Feature]), "boolean", tile.Id .. " Feature")
+				expect(Config.Features[tile.Feature]).toBeA("boolean")
 			end
 		end
 		for _, id in
@@ -73,30 +87,38 @@ return function(t: any)
 				"EasterEggs",
 			}
 		do
-			t.ok(seen[id], id .. " is in Config.Menu.Tiles")
+			if not seen[id] then
+				error(id .. " is not in Config.Menu.Tiles")
+			end
 		end
 	end)
 
-	t.test("Menu settings are sensible", function()
+	it("has sensible settings", function()
 		local p = Config.Menu.Panel
-		t.ok(p.TileMinWidth <= p.TileMaxWidth, "TileMinWidth <= TileMaxWidth")
-		t.ok(p.MaxColumns >= 1, "MaxColumns")
-		t.ok(p.TileTextSize >= Config.UI.MinTextSize, "tile text is readable")
-		t.ok(Config.Menu.Button.TextSize >= Config.UI.MinTextSize, "button text is readable")
-		t.ok(Config.Menu.Button.IconWidth <= Config.Menu.Button.Width, "the icon is smaller")
-		t.eq(typeof(Config.Menu.Key), "EnumItem", "Key")
-		for _, key in { "KeyHint", "NoVote", "NoVoteNoPad", "RoundRunning", "Parkour", "EasterEggs" } do
-			t.eq(type(Config.Menu.Text[key]), "string", "Text." .. key)
+		expect(p.TileMinWidth).toBeLessThanOrEqual(p.TileMaxWidth)
+		expect(p.MaxColumns).toBeGreaterThanOrEqual(1)
+		expect(p.TileTextSize).toBeGreaterThanOrEqual(Config.UI.MinTextSize) -- readable
+		expect(Config.Menu.Button.TextSize).toBeGreaterThanOrEqual(Config.UI.MinTextSize)
+		expect(Config.Menu.Button.IconWidth).toBeLessThanOrEqual(Config.Menu.Button.Width)
+		expect(typeof(Config.Menu.Key)).toBe("EnumItem")
+		for _, key in
+			{ "KeyHint", "NoVote", "NoVoteNoPad", "RoundRunning", "Parkour", "EasterEggs" }
+		do
+			expect(Config.Menu.Text[key]).toBeA("string")
 		end
-		t.ok(Config.Menu.Text.KeyHint:format("M", "B"), "KeyHint takes two key names")
-		t.ok(Config.Menu.Text.Parkour:format(100, "Coins"), "Parkour takes coins and a name")
-		t.ok(Config.Menu.Text.EasterEggs:format(1, 5), "EasterEggs takes two numbers")
+		expect(Config.Menu.Text.KeyHint:format("M", "B")).toBeA("string") -- two key names
+		expect(Config.Menu.Text.Parkour:format(100, "Coins")).toBeA("string") -- coins and a name
+		expect(Config.Menu.Text.EasterEggs:format(1, 5)).toBeA("string") -- two numbers
+		-- The Spectate tile shows in the same round state lobby spectating works in.
+		expect(Config.Menu.SpectateStates).toContain("Playing")
 	end)
+end)
 
-	t.test("side buttons become their listed tiles", function()
-		t.eq(MenuLogic.TileId("Shop (B)"), "Shop")
-		t.eq(MenuLogic.TileId("Shop"), "Shop")
-		t.eq(MenuLogic.TileId("  Settings"), "Settings")
+describe("MenuLogic", function()
+	it("turns side buttons into their listed tiles", function()
+		expect(MenuLogic.TileId("Shop (B)")).toBe("Shop")
+		expect(MenuLogic.TileId("Shop")).toBe("Shop")
+		expect(MenuLogic.TileId("  Settings")).toBe("Settings")
 		-- Every Layout.SideButton("...") in the client code matches a Config.Menu.Tiles line,
 		-- so it gets its words, icon and place from there.
 		local ids = {}
@@ -105,19 +127,20 @@ return function(t: any)
 		end
 		local found = 0
 		for _, file in { "ShopUI", "SettingsUI", "RewardsUI" } do
-			local source = t.readFile("src/client/" .. file .. ".luau")
-			t.ok(source, file)
-			for call in (source :: string):gmatch("Layout%.SideButton(%b())") do
+			local source = client:source(folder:FindFirstChild(file))
+			for call in source:gmatch("Layout%.SideButton(%b())") do
 				for text in call:gmatch('"([^"]+)"') do
 					found += 1
-					t.ok(ids[MenuLogic.TileId(text)], ('"%s" (%s) has a tile line'):format(text, file))
+					if not ids[MenuLogic.TileId(text)] then
+						error(('"%s" (%s) has no Config.Menu.Tiles line'):format(text, file))
+					end
 				end
 			end
 		end
-		t.ok(found >= 4, "found the Shop, Settings, Codes and Invite buttons")
+		expect(found).toBeGreaterThanOrEqual(4) -- the Shop, Settings, Codes and Invite buttons
 	end)
 
-	t.test("Config.Menu.Tiles sets a tile's words and place", function()
+	it("takes a tile's words and place from Config.Menu.Tiles", function()
 		local listed = MenuLogic.Resolve("Settings", "Something else", 1)
 		local index = 0
 		for i, tile in Config.Menu.Tiles do
@@ -125,65 +148,150 @@ return function(t: any)
 				index = i
 			end
 		end
-		t.eq(listed.Order, index)
-		t.eq(listed.Label, Config.Menu.Tiles[index].Text)
-		t.eq(listed.Hidden, false)
+		expect(listed.Order).toBe(index)
+		expect(listed.Label).toBe(Config.Menu.Tiles[index].Text)
+		expect(listed.Hidden).toBe(false)
 		local other = MenuLogic.Resolve("CandyRushTest", "Candy Rush", 3, "🍬")
-		t.eq(other.Label, "Candy Rush")
-		t.eq(other.Icon, "🍬")
-		t.ok(other.Order > #Config.Menu.Tiles, "unlisted tiles go after the listed ones")
+		expect(other.Label).toBe("Candy Rush")
+		expect(other.Icon).toBe("🍬")
+		expect(other.Order).toBeGreaterThan(#Config.Menu.Tiles) -- unlisted tiles go last
 		local crates = MenuLogic.Resolve("Crates", "Crates", 3)
-		t.eq(crates.Feature, "Crates", "the Crates tile follows its feature switch")
+		expect(crates.Feature).toBe("Crates") -- the Crates tile follows its feature switch
 	end)
 
-	t.test("the tile grid fits every screen", function()
+	it("fits the tile grid on every screen", function()
 		local p = Config.Menu.Panel
 		for _, screen in SCREENS do
 			for _, count in { 1, 6, 11, 20 } do
 				local grid = MenuLogic.Grid(screen, count)
 				local where = ("%dx%d, %d tiles"):format(screen.X, screen.Y, count)
-				t.ok(grid.Width <= screen.X - 2 * margin, "width fits " .. where)
-				t.ok(grid.Height <= screen.Y - 2 * margin, "height fits " .. where)
-				t.ok(grid.Height <= p.MaxHeight, "height capped " .. where)
-				t.ok(grid.Columns >= 1 and grid.Columns <= p.MaxColumns, "columns " .. where)
-				t.ok(grid.Cell <= p.TileMaxWidth, "tile width " .. where)
+				local function check(ok: boolean, what: string)
+					if not ok then
+						error(what .. " at " .. where)
+					end
+				end
+				check(grid.Width <= screen.X - 2 * margin, "too wide")
+				check(grid.Height <= screen.Y - 2 * margin, "too tall")
+				check(grid.Height <= p.MaxHeight, "taller than MaxHeight")
+				check(grid.Columns >= 1 and grid.Columns <= p.MaxColumns, "bad column count")
+				check(grid.Cell <= p.TileMaxWidth, "tiles too wide")
 				if grid.Columns > 1 then
-					t.ok(grid.Cell >= p.TileMinWidth, "tiles not too narrow " .. where)
+					check(grid.Cell >= p.TileMinWidth, "tiles too narrow")
 				end
 			end
 		end
 		-- An upright 360-wide phone still gets 3 tiles per row.
-		t.ok(MenuLogic.Grid(Vector2.new(360, 640), 11).Columns >= 3, "3 per row at 360 wide")
+		expect(MenuLogic.Grid(Vector2.new(360, 640), 11).Columns).toBeGreaterThanOrEqual(3)
 	end)
 
-	t.test("the Menu button never covers the Hud", function()
+	it("never puts the Menu button over the Hud", function()
 		local b = Config.Menu.Button
 		local alone = MenuLogic.ButtonPlace(nil, nil)
-		t.eq(alone.Mode, "Full", "no Hud yet: the whole button")
-		t.eq(alone.Y, b.Top)
+		expect(alone.Mode).toBe("Full") -- no Hud yet: the whole button
+		expect(alone.Y).toBe(b.Top)
 		for _, screen in SCREENS do
 			local hx, hy, hw, hh = hudRect(screen, margin)
 			local spot = MenuLogic.ButtonPlace(hx, hy + hh)
 			local where = ("%dx%d (%s)"):format(screen.X, screen.Y, spot.Mode)
-			t.ok(
-				not overlaps(spot.X, spot.Y, spot.Width, spot.Height, hx, hy, hw, hh),
-				"button clear of the Hud at " .. where
-			)
-			t.ok(spot.X + spot.Width <= screen.X and spot.Y + spot.Height <= screen.Y, where)
+			if overlaps(spot.X, spot.Y, spot.Width, spot.Height, hx, hy, hw, hh) then
+				error("the button covers the Hud at " .. where)
+			end
+			if not (spot.X + spot.Width <= screen.X and spot.Y + spot.Height <= screen.Y) then
+				error("the button is off screen at " .. where)
+			end
 		end
 		-- PC: the whole button at the top.
-		local hx, hy, hw, hh = hudRect(Vector2.new(1366, 700), margin)
+		local hx, hy, _, hh = hudRect(Vector2.new(1366, 700), margin)
 		local pc = MenuLogic.ButtonPlace(hx, hy + hh)
-		t.eq(pc.Mode, "Full")
-		t.eq(pc.Y, b.Top)
+		expect(pc.Mode).toBe("Full")
+		expect(pc.Y).toBe(b.Top)
 		-- A sideways phone: just the icon, still at the top.
-		hx, hy, hw, hh = hudRect(Vector2.new(667, 339), margin)
+		hx, hy, _, hh = hudRect(Vector2.new(667, 339), margin)
 		local phone = MenuLogic.ButtonPlace(hx, hy + hh)
-		t.eq(phone.Mode, "Icon")
-		t.eq(phone.Y, b.Top)
+		expect(phone.Mode).toBe("Icon")
+		expect(phone.Y).toBe(b.Top)
 		-- An upright 360-wide phone: the Hud fills the top, so the button goes below it.
-		hx, hy, hw, hh = hudRect(Vector2.new(360, 640), margin)
+		hx, hy, _, hh = hudRect(Vector2.new(360, 640), margin)
 		local upright = MenuLogic.ButtonPlace(hx, hy + hh)
-		t.ok(upright.Y >= hy + hh, "below the Hud")
+		expect(upright.Y).toBeGreaterThanOrEqual(hy + hh)
 	end)
-end
+end)
+
+describe("MenuUI (mounted)", function()
+	local rt = Runtime.new({ client = true })
+	local Client = rt:find("StarterPlayer.StarterPlayerScripts.Client")
+	local MenuUI = rt:require(Client.MenuUI)
+	local clicks = 0
+	-- A tile added before Mount waits and appears once the Menu exists.
+	MenuUI.AddTile({
+		Id = "TestTile",
+		Label = "First",
+		Order = 50,
+		OnClick = function()
+			clicks += 1
+		end,
+	})
+	local gui = rt:create("ScreenGui", { Name = "GameUI" })
+	rt:require(Client.Layout).Mount(gui)
+	rt:require(Client.PanelManager).Mount(gui)
+	MenuUI.Mount(gui)
+
+	local function tilesWith(id: string): { any }
+		local list = {}
+		for _, child in gui.Menu.Tiles:GetChildren() do
+			if child:GetAttribute("MenuTile") == id then
+				table.insert(list, child)
+			end
+		end
+		return list
+	end
+
+	it("builds the button and the closed panel", function()
+		expect(gui:FindFirstChild("MenuButton")).toBeInstanceOf("TextButton")
+		expect(gui.Menu.Visible).toBe(false)
+		expect(MenuUI.IsOpen()).toBe(false)
+		expect(#tilesWith("TestTile")).toBe(1)
+	end)
+
+	it("opens, toggles and closes", function()
+		MenuUI.Open()
+		expect(MenuUI.IsOpen()).toBe(true)
+		MenuUI.Toggle()
+		expect(MenuUI.IsOpen()).toBe(false)
+		rt:triggerAction("ToggleMenu") -- the M key
+		expect(MenuUI.IsOpen()).toBe(true)
+		MenuUI.Close()
+		expect(MenuUI.IsOpen()).toBe(false)
+	end)
+
+	it("closes when a tile is clicked, and replaces a tile with the same Id", function()
+		MenuUI.Open()
+		rt:fire(tilesWith("TestTile")[1], "Activated")
+		expect(clicks).toBe(1)
+		expect(MenuUI.IsOpen()).toBe(false)
+		MenuUI.AddTile({
+			Id = "TestTile",
+			Label = "Second",
+			KeepOpen = true,
+			OnClick = function()
+				clicks += 10
+				MenuUI.ShowMessage("kept open")
+			end,
+		})
+		local list = tilesWith("TestTile")
+		expect(#list).toBe(1)
+		MenuUI.Open()
+		rt:fire(list[1], "Activated")
+		expect(clicks).toBe(11)
+		expect(MenuUI.IsOpen()).toBe(true) -- KeepOpen
+		expect(gui.Menu.Message.Text).toBe("kept open")
+		MenuUI.Close()
+	end)
+
+	it("turns a Layout.SideButton into a tile", function()
+		local Layout = rt:require(Client.Layout)
+		local button = Layout.SideButton("Settings", 1)
+		expect(button:GetAttribute("MenuTile")).toBe("Settings")
+		expect(button:IsDescendantOf(gui.Menu)).toBe(true)
+	end)
+end)

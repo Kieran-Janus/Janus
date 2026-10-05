@@ -157,15 +157,15 @@ const PARTS = [
       { t: "Start the Rojo server inside new-game/ and leave it running. It prints Listening on port 34872.", cmd: "wally install\nrojo serve" },
       { t: "In Studio open Plugins, Rojo, Connect. Accept the first sync." }
     ],
-    check: "Explorer shows ServerScriptService > Server > Main and ReplicatedStorage > Shared > Config. For solo testing set Round.MinPlayers = 1 in Config.luau, press Play, and a state bar shows at the top." },
+    check: "Explorer shows ServerScriptService > Server > Main and ReplicatedStorage > Shared > Config. Press Play, stand on the glowing Ready pad in the lobby (Config.Lobby.Ready.MinReady = 1 lets you play alone), and a state bar shows at the top." },
 
   { id: "p4", title: "Connect Claude Code to your files", tag: ["paid", "Needs Claude plan"],
     why: "Claude reads CLAUDE.md for the project rules and edits your Luau directly.",
     steps: [
       { t: "Open a second terminal tab (leave rojo serve running) and start Claude in the game folder.", cmd: "cd janus/new-game\nclaude" },
-      { t: "Test it with a tiny change: ask Claude to set Round.MinPlayers to 1 and IntermissionSeconds to 5." }
+      { t: "Test it with a tiny change: ask Claude to set Round.IntermissionSeconds to 3." }
     ],
-    check: "The change shows up in Studio under ReplicatedStorage.Shared.Config within a second. Press Play and the round starts after 5 seconds." },
+    check: "The change shows up in Studio under ReplicatedStorage.Shared.Config within a second. Press Play, stand on the Ready pad, and after the vote the round starts 3 seconds later." },
 
   { id: "p5", title: "Connect Claude to live Studio (MCP)", tag: ["free", "No extra charge found"],
     why: "This lets Claude inspect the running game, read errors and playtest. Use Roblox's built-in MCP server. The older open-source one is no longer maintained.",

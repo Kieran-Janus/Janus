@@ -31,9 +31,12 @@ an event handler, a Script), even if the test itself didn't notice.
 | `config.spec` | Shop items: unique Ids, known Slot, a Rarity from `Config.Rarity.Order`, `Items.Price` = own Price or the rarity price, Style.Kind; NPCs: Id, Kind, Offset, prompt; maps: unique ids, builder module exists, sizes, all Lighting groups, a Modes list of real modes; playlists point at a map made for their mode; lobby zones have Offset + Size and don't overlap; codes only give real items. |
 | `Core.spec` | v2 foundation: feature switches, the v2 maps and playlists, rarity prices, `Items` helpers, the Pumpkin Shop replacing the witch, v2 save fields, `Lobby` zone maths, `Tags`. |
 | `Startup.spec` | The `ORDER` lists in `Main.server.luau` / `Main.client.luau` name real modules once each (GameService last, MenuUI first); the placeholder services and UIs start / mount with their feature off and on. |
+| `Rounds.spec` | Every mode in `Config.Modes` has its settings and a `src/server/Modes/<Id>.luau` with `Run`; `Playlists` lookups and which playlists the vote offers for a ready count and feature switches; `ReadyService.Inside` for flat, turned, round and ball pads, and against the pad the hub actually builds; a two-player round where only the player on the pad plays, the other can spectate (`SpectateFocus` streams the map to them, not to the player in the round), and everyone ends back in the lobby, not ready. |
+| `Hub.spec` | `HubBuilder` builds every section, tag (HubSpawn, ReadyPad, ReadySign, ShopKeeper) and readable group; decorations stay out of the zones; palette roles, sync and repaint; `HubService` builds, rebuilds an old hub, keeps and repairs a Locked one; custom shopkeeper checks; custom props; `Bake` (hub, lock, maps; a baked map loads where the built one did); the Ready sign text. |
+| `Menu.spec` | `Config.Menu` lines are complete; `MenuLogic` (side buttons to tiles, tile grid on every screen size, the Menu button never covers the Hud); the mounted `MenuUI` adds, replaces, opens, closes and turns `Layout.SideButton` into tiles. |
 | `builders.spec` | `HubBuilder.Build()` and every map builder in `src/server/Maps` run, make parts with finite, positive sizes, are deterministic; custom NPC models in `ReplicatedStorage.Custom.Characters` are scaled and placed; `MapService.Load` finds floor, spawns and random floor points (raycasts hit real geometry). Notes how many Ball parts have unequal sides (Roblox renders those as spheres). |
 | `cosmetics.spec` | Every shop item: `Cosmetics.Preview`, `Cosmetics.Build` (pivot at the design origin), `Cosmetics.Wear` / `TakeOff` on a character, skins restore the avatar, a custom model in `ReplicatedStorage.Custom.Cosmetics` replaces the placeholder and is scaled. |
-| `modules.spec` | Every ModuleScript requires cleanly (server, shared, client); `Main.server.luau` boots and plays a whole round with a player in it; `Main.client.luau` boots against what the server replicated. A `[Main] X failed to ...` warning (Main catches failing services and UIs) fails the test. |
+| `modules.spec` | Every ModuleScript requires cleanly (server, shared, client); `Main.server.luau` boots, waits while nobody stands on the hub's Ready pad, then plays a whole round once a player steps on it and sends them back to the lobby; `Main.client.luau` boots against what the server replicated and the Menu gets every tile. A `[Main] X failed to ...` warning (Main catches failing services and UIs) fails the test. |
 | `harness.spec` | Self-tests of the harness (geometry, raycasts, scheduler, signals, services). If these fail, don't trust the others. |
 
 ## Writing a spec
@@ -113,7 +116,8 @@ node /tmp/claude-0/render/render.mjs tests/out/hub.json tests/out/hub --views ov
 
 - `hub` runs `HubBuilder.Build()`; `map` runs `MapService.Load(id)` (the map's builder, or a model
   in `ServerStorage.Maps`); `section` builds `Sections/<Name>` into an empty hub Model with
-  `Build(hub, Config.Lobby.Zones[<Name>])` (it errors clearly while that folder doesn't exist).
+  `Build(hub, HubLayout.Zone(<Name>))`, the same zone `HubBuilder` gives every section (the
+  Shop section is only the mat under the stall: the shopkeeper is an NPC, see `Hub/Npcs.luau`).
 - Lighting comes from `Config.Hub.Lighting` or the map's `Lighting`; the terrain is the
   `Terrain:Fill*` calls the harness recorded (`Air` fills are exported but not drawn).
 - The exporter is `/tmp/claude-0/render/export.luau` by default; point `--exporter <path>` or

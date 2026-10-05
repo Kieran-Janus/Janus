@@ -1,50 +1,57 @@
---!strict
 -- The lobby: HubBuilder builds every section, tag and readable group; decorations stay out of
 -- the zones; HubService keeps/rebuilds/repairs saved hubs; the custom shopkeeper checks; prop
 -- overrides; palette sync; Bake; the Ready sign text.
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local CollectionService = game:GetService("CollectionService")
-local ServerStorage = game:GetService("ServerStorage")
 
-return function(t: any)
-	local Config = require(ReplicatedStorage.Shared.Config) :: any
-	local Tags = require(ReplicatedStorage.Shared.Tags) :: any
-	local Lobby = require(ReplicatedStorage.Shared.Lobby) :: any
-	local Kit = require(t.Server.Build.Kit) :: any
-	local HubBuilder = require(t.Server.Hub.HubBuilder) :: any
-	local HubLayout = require(t.Server.Hub.HubLayout) :: any
-	local HubPalette = require(t.Server.Hub.HubPalette) :: any
-	local Npcs = require(t.Server.Hub.Npcs) :: any
-	local HubService = require(t.Server.Services.HubService) :: any
-	local MapService = require(t.Server.Services.MapService) :: any
-	local Bake = require(t.Server.Tools.Bake) :: any
-	local ReadySign = require(t.Client.ReadySign) :: any
+local T = require("../harness/Test")
+local Runtime = require("../harness/Runtime")
 
-	local function tagged(tag: string, root: any): { any }
+local describe, it, expect = T.describe, T.it, T.expect
+
+-- A fresh fake game with the lobby modules loaded (each HubService test starts clean).
+local function world()
+	local rt = Runtime.new()
+	local w = {
+		rt = rt,
+		Vector3 = rt.env.Vector3,
+		CFrame = rt.env.CFrame,
+		Color3 = rt.env.Color3,
+		CollectionService = rt.game:GetService("CollectionService"),
+		ServerStorage = rt.game:GetService("ServerStorage"),
+		Config = rt:require("ReplicatedStorage.Shared.Config"),
+		Tags = rt:require("ReplicatedStorage.Shared.Tags"),
+		Lobby = rt:require("ReplicatedStorage.Shared.Lobby"),
+		Kit = rt:require("ServerScriptService.Server.Build.Kit"),
+		HubBuilder = rt:require("ServerScriptService.Server.Hub.HubBuilder"),
+		HubLayout = rt:require("ServerScriptService.Server.Hub.HubLayout"),
+		HubPalette = rt:require("ServerScriptService.Server.Hub.HubPalette"),
+		Npcs = rt:require("ServerScriptService.Server.Hub.Npcs"),
+		HubService = rt:require("ServerScriptService.Server.Services.HubService"),
+		MapService = rt:require("ServerScriptService.Server.Services.MapService"),
+		Bake = rt:require("ServerScriptService.Server.Tools.Bake"),
+	}
+	-- Everything under `root` with `tag`.
+	function w.tagged(tag: string, root: any): { any }
 		local list = {}
-		for _, instance in CollectionService:GetTagged(tag) do
+		for _, instance in w.CollectionService:GetTagged(tag) do
 			if instance:IsDescendantOf(root) then
 				table.insert(list, instance)
 			end
 		end
 		return list
 	end
-
-	local function currentHub(): any
-		return t.workspace:FindFirstChild("Hub")
+	function w.hub(): any
+		return rt.workspace:FindFirstChild("Hub")
 	end
-
-	local function clearWorkspace()
-		for _, child in t.workspace:GetChildren() do
-			if not child:IsA("Terrain") then
+	function w.clear()
+		for _, child in rt.workspace:GetChildren() do
+			if not child:IsA("Terrain") and not child:IsA("Camera") then
 				child:Destroy()
 			end
 		end
 	end
-
 	-- A shop prompt (NpcId of an NPC that opens the shop) under one of the ShopKeeper parts.
-	local function shopPromptIn(hub: any): any
-		for _, keeper in tagged(Tags.ShopKeeper, hub) do
+	function w.shopPrompt(hub: any): any
+		for _, keeper in w.tagged(w.Tags.ShopKeeper, hub) do
 			local list = keeper:GetDescendants()
 			table.insert(list, keeper)
 			for _, d in list do
@@ -55,20 +62,31 @@ return function(t: any)
 		end
 		return nil
 	end
-
-	local function colorNear(a: Color3, b: Color3): boolean
-		return math.abs(a.R - b.R) < 0.01
-			and math.abs(a.G - b.G) < 0.01
-			and math.abs(a.B - b.B) < 0.01
+	-- Puts `model` into ReplicatedStorage.Custom.<category>; returns a function that takes it out.
+	function w.custom(category: string, model: any): () -> ()
+		local folder = rt:find("ReplicatedStorage.Custom." .. category)
+		model.Parent = folder
+		return function()
+			model:Destroy()
+		end
 	end
+	return w
+end
 
-	t.test("the hub builds with every section, tag and readable group", function()
-		clearWorkspace()
-		local hub = HubBuilder.Build()
-		t.eq(hub.Parent, t.workspace)
-		t.eq(hub.Name, "Hub")
-		t.eq(hub:GetAttribute("BuildVersion"), Config.Hub.BuildVersion)
-		t.eq(hub:GetAttribute("Locked"), nil, "a built hub is not locked")
+local function colorNear(a: any, b: any): boolean
+	return math.abs(a.R - b.R) < 0.01 and math.abs(a.G - b.G) < 0.01 and math.abs(a.B - b.B) < 0.01
+end
+
+describe("HubBuilder", function()
+	local w = world()
+	local Config, Tags, Lobby = w.Config, w.Tags, w.Lobby
+
+	it("builds every section, tag and readable group", function()
+		local hub = w.HubBuilder.Build()
+		expect(hub.Parent).toBe(w.rt.workspace)
+		expect(hub.Name).toBe("Hub")
+		expect(hub:GetAttribute("BuildVersion")).toBe(Config.Hub.BuildVersion)
+		expect(hub:GetAttribute("Locked")).toBeNil() -- a built hub is not locked
 		for _, name in
 			{
 				"Plaza",
@@ -83,9 +101,10 @@ return function(t: any)
 				"Decor",
 			}
 		do
-			t.ok(hub:FindFirstChild(name), "Hub." .. name)
+			if not hub:FindFirstChild(name) then
+				error("no Hub." .. name)
+			end
 		end
-		local decor = hub.Decor
 		for _, name in
 			{
 				"ClockTower",
@@ -106,44 +125,44 @@ return function(t: any)
 				"Paths",
 			}
 		do
-			t.ok(decor:FindFirstChild(name), "Hub.Decor." .. name)
+			if not hub.Decor:FindFirstChild(name) then
+				error("no Hub.Decor." .. name)
+			end
 		end
-		t.eq(#tagged(Tags.HubSpawn, hub), 1, "one HubSpawn")
-		t.ok(tagged(Tags.HubSpawn, hub)[1]:IsA("SpawnLocation"), "the spawn is a SpawnLocation")
-		local pads = tagged(Tags.ReadyPad, hub)
-		t.eq(#pads, 1, "one ReadyPad")
-		t.ok(pads[1]:IsA("BasePart"))
-		t.ok(Lobby.InZone(pads[1].CFrame.Position, "ReadyArea"), "the pad is in its zone")
-		t.near(pads[1].CFrame.UpVector, Vector3.yAxis, 1e-4, "the pad lies flat (Y up)")
-		t.eq(#tagged(Tags.ReadySign, hub), 1, "one ReadySign")
-		local sign = tagged(Tags.ReadySign, hub)[1]
-		t.ok(sign:FindFirstChild("Title", true), "the sign has a Title label")
-		t.ok(sign:FindFirstChild("Status", true), "the sign has a Status label")
-		t.ok(shopPromptIn(hub), "a ShopKeeper with a working shop prompt")
-		local vendor = hub.Shop:FindFirstChild("PumpkinVendor")
-		t.ok(vendor, "the shopkeeper stands in the Shop section")
-		t.ok(vendor:HasTag(Tags.ShopKeeper), "the vendor model is tagged ShopKeeper")
-		t.ok(
-			Lobby.InZone(vendor.KeeperSpot.CFrame.Position, "Shop"),
-			"the keeper is in the Shop zone"
+		local spawns = w.tagged(Tags.HubSpawn, hub)
+		expect(#spawns).toBe(1)
+		expect(spawns[1]).toBeInstanceOf("SpawnLocation")
+		local pads = w.tagged(Tags.ReadyPad, hub)
+		expect(#pads).toBe(1)
+		expect(pads[1]).toBeInstanceOf("BasePart")
+		expect(Lobby.InZone(pads[1].Position, "ReadyArea")).toBe(true)
+		expect(pads[1].CFrame.UpVector).toBeNear(w.Vector3.yAxis, 1e-4) -- lies flat (Y up)
+		local signs = w.tagged(Tags.ReadySign, hub)
+		expect(#signs).toBe(1)
+		expect(signs[1]:FindFirstChild("Title", true)).toBeInstanceOf("TextLabel")
+		expect(signs[1]:FindFirstChild("Status", true)).toBeInstanceOf("TextLabel")
+		expect(w.shopPrompt(hub)).toBeInstanceOf("ProximityPrompt")
+		local vendor = hub.Shop:FindFirstChild("PumpkinVendor") -- in the Shop section
+		expect(vendor).toBeInstanceOf("Model")
+		expect(vendor:HasTag(Tags.ShopKeeper)).toBe(true)
+		expect(Lobby.InZone(vendor.KeeperSpot.Position, "Shop")).toBe(true)
+		expect(vendor:FindFirstChild("Keeper")).toBeInstanceOf("Model")
+		expect(vendor:FindFirstChild("Stall")).toBeInstanceOf("Model")
+		-- The name floats above the awning.
+		expect(vendor.TagAnchor.Position.Y).toBeGreaterThan(
+			vendor.Stall.AwningStripe.Position.Y + 1
 		)
-		t.ok(vendor:FindFirstChild("Keeper"), "built keeper")
-		t.ok(vendor:FindFirstChild("Stall"), "stall")
-		local tag = vendor.TagAnchor
-		t.ok(
-			tag.CFrame.Y > vendor.Stall.AwningStripe.CFrame.Y + 1,
-			"the name floats above the awning"
-		)
-		t.ok(Npcs.Find(hub, "VotingBoard"), "voting board")
-		t.ok(hub.Npcs:FindFirstChild("VotingBoard"), "the voting board stays in Hub.Npcs")
+		expect(w.Npcs.Find(hub, "VotingBoard")).toBeInstanceOf("Model")
+		expect(hub.Npcs:FindFirstChild("VotingBoard")).toBeInstanceOf("Model")
 		for _, d in hub:GetDescendants() do
-			t.ok(d.Name ~= "WitchWanda" and d.Name ~= "BooGuide", "no retired NPC: " .. d.Name)
+			if d.Name == "WitchWanda" or d.Name == "BooGuide" then
+				error("retired NPC in the hub: " .. d:GetFullName())
+			end
 		end
 	end)
 
-	t.test("decorations stay out of the lobby zones", function()
-		clearWorkspace()
-		local hub = HubBuilder.Build()
+	it("keeps decorations out of the lobby zones", function()
+		local hub = w.HubBuilder.Build()
 		local checked = 0
 		for _, d in hub.Decor:GetDescendants() do
 			if d:IsA("Model") and d:GetAttribute("PropName") then
@@ -151,26 +170,30 @@ return function(t: any)
 				if name == "Cobweb" then
 					continue -- hung on a lamp, tree or tower that was already checked
 				end
-				t.ok(not HubLayout.Blocked(d:GetPivot().Position, 0), name .. " inside a zone")
+				if w.HubLayout.Blocked(d:GetPivot().Position, 0) then
+					error(name .. " is inside a zone: " .. d:GetFullName())
+				end
 				checked += 1
 			elseif d:IsA("BasePart") and d.Name == "PathStone" then
-				t.ok(not HubLayout.Blocked(d.CFrame.Position, 0), "path stone inside a zone")
+				if w.HubLayout.Blocked(d.Position, 0) then
+					error("a path stone is inside a zone")
+				end
 			end
 		end
-		t.ok(checked > 50, "props were checked")
+		expect(checked).toBeGreaterThan(50)
 		local lamps = 0
 		for _, child in hub.Decor.Lamps:GetChildren() do
 			if child:GetAttribute("PropName") == "Lamppost" then
 				lamps += 1
 			end
 		end
-		t.ok(lamps < Config.Hub.Lampposts.Count, "the lamp in the Parkour zone was left out")
-		t.ok(lamps > Config.Hub.Lampposts.Count / 2, "most lamps are there")
+		-- The lamp in the Parkour zone was left out; most lamps are there.
+		expect(lamps).toBeLessThan(Config.Hub.Lampposts.Count)
+		expect(lamps).toBeGreaterThan(Config.Hub.Lampposts.Count / 2)
 	end)
 
-	t.test("every PaletteRole names a palette colour and the part has that colour", function()
-		clearWorkspace()
-		local hub = HubBuilder.Build()
+	it("gives every PaletteRole part its palette colour", function()
+		local hub = w.HubBuilder.Build()
 		local roles = 0
 		for _, d in hub:GetDescendants() do
 			local role = d:GetAttribute("PaletteRole")
@@ -178,238 +201,221 @@ return function(t: any)
 				continue
 			end
 			roles += 1
-			t.ok(
-				Config.Hub.Palette[role],
-				"unknown PaletteRole " .. tostring(role) .. " on " .. d.Name
-			)
-			local expected = Kit.roleColor(Config.Hub.Palette, role, d:GetAttribute("PaletteShade"))
-			t.ok(colorNear(d.Color, expected), d:GetFullName() .. " has its palette colour")
+			if not Config.Hub.Palette[role] then
+				error(("unknown PaletteRole %s on %s"):format(tostring(role), d:GetFullName()))
+			end
+			local expected =
+				w.Kit.roleColor(Config.Hub.Palette, role, d:GetAttribute("PaletteShade"))
+			if not colorNear(d.Color, expected) then
+				error(d:GetFullName() .. " doesn't have its palette colour")
+			end
 		end
-		t.ok(roles > 200, "parts carry roles")
-		t.eq(Config.Hub.Colors, Config.Hub.Palette, "Colors is the old name for Palette")
+		expect(roles).toBeGreaterThan(200)
+		expect(Config.Hub.Colors).toBe(Config.Hub.Palette) -- Colors is the old name
 	end)
 
-	t.test("palette sync repaints only the roles that changed", function()
-		clearWorkspace()
-		local hub = HubBuilder.Build()
-		t.eq(HubPalette.Sync(hub), 0, "nothing changed yet")
+	it("repaints only the palette roles that changed", function()
+		local hub = w.HubBuilder.Build()
+		expect(w.HubPalette.Sync(hub)).toBe(0) -- nothing changed yet
 		local stone = hub.ReadyArea.ReadyPad
-		local handPainted = Color3.new(1, 0, 0)
+		local handPainted = w.Color3.new(1, 0, 0)
 		stone.Color = handPainted
 		local wood = hub.Shop.PumpkinVendor.Stall.Counter
 		local old = Config.Hub.Palette.Wood
-		Config.Hub.Palette.Wood = Color3.fromRGB(10, 200, 10)
-		local changed = HubPalette.Sync(hub)
-		t.ok(changed > 10, "the wood parts were repainted")
-		t.ok(colorNear(wood.Color, Config.Hub.Palette.Wood), "the counter is the new wood colour")
-		t.ok(colorNear(stone.Color, handPainted), "a hand-painted stone part keeps its colour")
-		t.eq(HubPalette.Sync(hub), 0, "a second sync changes nothing")
+		Config.Hub.Palette.Wood = w.Color3.fromRGB(10, 200, 10)
+		local ok, err = pcall(function()
+			expect(w.HubPalette.Sync(hub)).toBeGreaterThan(10) -- the wood parts
+			expect(colorNear(wood.Color, Config.Hub.Palette.Wood)).toBe(true)
+			expect(colorNear(stone.Color, handPainted)).toBe(true) -- hand-painted stone kept
+			expect(w.HubPalette.Sync(hub)).toBe(0) -- a second sync changes nothing
+		end)
 		Config.Hub.Palette.Wood = old
-		t.ok(HubPalette.Repaint(hub) > 0, "Repaint brings everything back")
-		t.ok(colorNear(stone.Color, Kit.roleColor(Config.Hub.Palette, "Stone", 0.35)))
-	end)
-
-	t.test("HubService builds a hub when there is none and the spawn is found by tag", function()
-		clearWorkspace()
-		HubService.Start()
-		local hub = currentHub()
-		t.ok(hub, "a hub was built")
-		t.eq(hub:GetAttribute("BuildVersion"), Config.Hub.BuildVersion)
-		local spawn = tagged(Tags.HubSpawn, hub)[1]
-		t.near(
-			MapService.LobbyCFrame().Position,
-			spawn.CFrame.Position + Vector3.new(0, Config.Maps.SpawnHeight, 0),
-			1e-3,
-			"the lobby spot is the tagged spawn"
+		if not ok then
+			error(err, 0)
+		end
+		expect(w.HubPalette.Repaint(hub)).toBeGreaterThan(0) -- Repaint brings everything back
+		expect(colorNear(stone.Color, w.Kit.roleColor(Config.Hub.Palette, "Stone", 0.35))).toBe(
+			true
 		)
-		t.ok(HubService.Screen("Leaderboard"), "the leaderboard screen is found")
-		t.ok(HubService.Screen("VotingBoard"), "the voting board screen is found")
 	end)
 
-	t.test("an old unlocked hub is rebuilt; an old Locked hub is kept and repaired", function()
-		clearWorkspace()
-		local old = Instance.new("Model")
-		old.Name = "Hub"
+	it("builds a fallback hub with a spawn and a Ready pad", function()
+		w.clear()
+		local hub = w.HubBuilder.BuildFallback()
+		expect(hub:GetAttribute("Fallback")).toBe(true)
+		expect(hub:GetAttribute("BuildVersion")).toBeNil() -- the next start tries again
+		expect(#w.tagged(Tags.HubSpawn, hub)).toBe(1)
+		expect(#w.tagged(Tags.ReadyPad, hub)).toBe(1)
+		w.HubService.EnsureRequired(hub)
+		expect(w.shopPrompt(hub)).toBeInstanceOf("ProximityPrompt") -- EnsureRequired adds it
+	end)
+end)
+
+describe("HubService", function()
+	it("builds a hub when there is none, and the spawn is found by tag", function()
+		local w = world()
+		w.HubService.Start()
+		local hub = w.hub()
+		expect(hub).toBeInstanceOf("Model")
+		expect(hub:GetAttribute("BuildVersion")).toBe(w.Config.Hub.BuildVersion)
+		local spawn = w.tagged(w.Tags.HubSpawn, hub)[1]
+		expect(w.MapService.LobbyCFrame().Position).toBeNear(
+			spawn.Position + w.Vector3.new(0, w.Config.Maps.SpawnHeight, 0),
+			1e-3
+		)
+		expect(w.HubService.Screen("Leaderboard")).toBeTruthy()
+		expect(w.HubService.Screen("VotingBoard")).toBeTruthy()
+	end)
+
+	it("rebuilds an old unlocked hub", function()
+		local w = world()
+		local old = w.rt:create("Model", { Name = "Hub" })
 		old:SetAttribute("Marker", "old")
 		old:SetAttribute("BuildVersion", 1)
-		old.Parent = t.workspace
-		HubService.Start()
-		local hub = currentHub()
-		t.eq(hub:GetAttribute("Marker"), nil, "rebuilt")
-		t.eq(hub:GetAttribute("BuildVersion"), Config.Hub.BuildVersion)
-
-		clearWorkspace()
-		local locked = Instance.new("Model")
-		locked.Name = "Hub"
-		locked:SetAttribute("Locked", true)
-		local ground = Instance.new("Part")
-		ground.Name = "Ground"
-		ground.Parent = locked
-		local oldSpawn = Instance.new("SpawnLocation")
-		oldSpawn.Name = "Spawn"
-		oldSpawn.CFrame = CFrame.new(5, 2, 5)
-		oldSpawn.Parent = locked
-		local npcs = Instance.new("Folder")
-		npcs.Name = "Npcs"
-		npcs.Parent = locked
-		for _, id in { "WitchWanda", "BooGuide" } do
-			local m = Instance.new("Model")
-			m.Name = id
-			m.Parent = npcs
-		end
-		locked.Parent = t.workspace
-		HubService.Start()
-		hub = currentHub()
-		t.eq(hub:GetAttribute("Locked"), true, "the Locked hub was kept")
-		t.eq(hub:GetAttribute("BuildVersion"), nil, "and not rebuilt")
-		t.eq(npcs:FindFirstChild("WitchWanda"), nil, "Witch Wanda removed")
-		t.eq(npcs:FindFirstChild("BooGuide"), nil, "Boo Guide removed")
-		t.ok(oldSpawn:HasTag(Tags.HubSpawn), "the old spawn was tagged, not replaced")
-		t.eq(#tagged(Tags.HubSpawn, hub), 1, "still one spawn")
-		t.eq(#tagged(Tags.ReadyPad, hub), 1, "the Ready pad was put back")
-		t.ok(shopPromptIn(hub), "the shopkeeper was put back")
-		t.ok(Lobby.InZone(tagged(Tags.ReadyPad, hub)[1].CFrame.Position, "ReadyArea"))
+		old.Parent = w.rt.workspace
+		w.HubService.Start()
+		local hub = w.hub()
+		expect(hub:GetAttribute("Marker")).toBeNil()
+		expect(hub:GetAttribute("BuildVersion")).toBe(w.Config.Hub.BuildVersion)
 	end)
 
-	t.test("a Locked current hub gets a deleted pad, spawn and shop prompt back", function()
-		clearWorkspace()
-		local hub = HubBuilder.Build()
+	it("keeps an old Locked hub and repairs it", function()
+		local w = world()
+		local Tags = w.Tags
+		local locked = w.rt:create("Model", { Name = "Hub" })
+		locked:SetAttribute("Locked", true)
+		w.rt:create("Part", { Name = "Ground" }, locked)
+		local oldSpawn =
+			w.rt:create("SpawnLocation", { Name = "Spawn", CFrame = w.CFrame.new(5, 2, 5) }, locked)
+		local npcs = w.rt:create("Folder", { Name = "Npcs" }, locked)
+		for _, id in { "WitchWanda", "BooGuide" } do
+			w.rt:create("Model", { Name = id }, npcs)
+		end
+		locked.Parent = w.rt.workspace
+		w.HubService.Start()
+		local hub = w.hub()
+		expect(hub).toBe(locked)
+		expect(hub:GetAttribute("Locked")).toBe(true)
+		expect(hub:GetAttribute("BuildVersion")).toBeNil() -- not rebuilt
+		expect(npcs:FindFirstChild("WitchWanda")).toBeNil()
+		expect(npcs:FindFirstChild("BooGuide")).toBeNil()
+		expect(oldSpawn:HasTag(Tags.HubSpawn)).toBe(true) -- tagged, not replaced
+		expect(#w.tagged(Tags.HubSpawn, hub)).toBe(1)
+		expect(#w.tagged(Tags.ReadyPad, hub)).toBe(1) -- the Ready pad was put back
+		expect(w.shopPrompt(hub)).toBeInstanceOf("ProximityPrompt") -- and the shopkeeper
+		expect(w.Lobby.InZone(w.tagged(Tags.ReadyPad, hub)[1].Position, "ReadyArea")).toBe(true)
+	end)
+
+	it("gives a Locked current hub its deleted pad, spawn and shop prompt back", function()
+		local w = world()
+		local Tags = w.Tags
+		local hub = w.HubBuilder.Build()
 		hub:SetAttribute("Locked", true)
-		tagged(Tags.ReadyPad, hub)[1]:Destroy()
-		tagged(Tags.HubSpawn, hub)[1]:Destroy()
+		w.tagged(Tags.ReadyPad, hub)[1]:Destroy()
+		w.tagged(Tags.HubSpawn, hub)[1]:Destroy()
 		local vendor = hub.Shop.PumpkinVendor
 		vendor.PromptAnchor:Destroy()
-		HubService.Start()
-		t.eq(currentHub():GetAttribute("Locked"), true)
-		t.eq(#tagged(Tags.ReadyPad, hub), 1, "pad back")
-		t.eq(#tagged(Tags.ReadySign, hub), 1, "the sign was still there, so only one")
-		t.eq(#tagged(Tags.HubSpawn, hub), 1, "spawn back")
-		t.ok(shopPromptIn(hub), "shop prompt back")
-		t.ok(vendor:FindFirstChild("PromptAnchor"), "on the existing stall, not a second one")
+		w.HubService.Start()
+		expect(w.hub():GetAttribute("Locked")).toBe(true)
+		expect(#w.tagged(Tags.ReadyPad, hub)).toBe(1)
+		expect(#w.tagged(Tags.ReadySign, hub)).toBe(1) -- the sign was still there: only one
+		expect(#w.tagged(Tags.HubSpawn, hub)).toBe(1)
+		expect(w.shopPrompt(hub)).toBeInstanceOf("ProximityPrompt")
+		expect(vendor:FindFirstChild("PromptAnchor")).toBeInstanceOf("BasePart") -- same stall
 		local vendors = 0
 		for _, d in hub:GetDescendants() do
 			if d:IsA("Model") and d:GetAttribute("NpcId") == "PumpkinVendor" then
 				vendors += 1
 			end
 		end
-		t.eq(vendors, 1, "one vendor")
+		expect(vendors).toBe(1)
 	end)
 
-	t.test("any part tagged ShopKeeper becomes a shop entrance", function()
-		clearWorkspace()
-		local hub = Instance.new("Model")
-		hub.Name = "Hub"
+	it("makes any part tagged ShopKeeper a shop entrance", function()
+		local w = world()
+		local hub = w.rt:create("Model", { Name = "Hub" })
 		hub:SetAttribute("Locked", true)
-		local sign = Instance.new("Part")
-		sign.Name = "MyShopSign"
-		sign:AddTag(Tags.ShopKeeper)
-		sign.Parent = hub
-		hub.Parent = t.workspace
-		HubService.EnsureRequired(hub)
+		local sign = w.rt:create("Part", { Name = "MyShopSign" }, hub)
+		sign:AddTag(w.Tags.ShopKeeper)
+		hub.Parent = w.rt.workspace
+		w.HubService.EnsureRequired(hub)
 		local prompt = sign:FindFirstChildWhichIsA("ProximityPrompt")
-		t.ok(prompt, "the tagged part got a prompt")
-		t.eq(prompt:GetAttribute("NpcId"), "PumpkinVendor")
-		t.eq(Npcs.Find(hub, "PumpkinVendor"), nil, "no second shop was built")
+		expect(prompt).toBeInstanceOf("ProximityPrompt")
+		expect(prompt:GetAttribute("NpcId")).toBe("PumpkinVendor")
+		expect(w.Npcs.Find(hub, "PumpkinVendor")).toBeNil() -- no second shop was built
 	end)
+end)
 
-	t.test("the fallback hub has a spawn and a Ready pad", function()
-		clearWorkspace()
-		local hub = HubBuilder.BuildFallback()
-		t.eq(hub:GetAttribute("Fallback"), true)
-		t.eq(hub:GetAttribute("BuildVersion"), nil, "the next start tries the full hub again")
-		t.eq(#tagged(Tags.HubSpawn, hub), 1)
-		t.eq(#tagged(Tags.ReadyPad, hub), 1)
-		HubService.EnsureRequired(hub)
-		t.ok(shopPromptIn(hub), "EnsureRequired adds the shop")
-	end)
-
-	-- Custom models in a fake ReplicatedStorage.Custom.
-	local function customFolder(category: string, model: any): any
-		local root = Instance.new("Folder")
-		root.Name = "Custom"
-		local folder = Instance.new("Folder")
-		folder.Name = category
-		folder.Parent = root
-		model.Parent = folder
-		return root
-	end
-
-	local function block(size: Vector3, transparency: number?): any
-		local m = Instance.new("Model")
-		m.Name = "PumpkinVendor"
-		local p = Instance.new("Part")
-		p.Name = "Body"
-		p.Size = size
-		p.CFrame = CFrame.new(0, size.Y / 2, 0)
-		p.Transparency = transparency or 0
-		p.Parent = m
+describe("Custom models", function()
+	-- A one-part model standing on the origin.
+	local function block(w, size: any, transparency: number?): any
+		local m = w.rt:create("Model", { Name = "PumpkinVendor" })
+		w.rt:create("Part", {
+			Name = "Body",
+			Size = size,
+			CFrame = w.CFrame.new(0, size.Y / 2, 0),
+			Transparency = transparency or 0,
+		}, m)
 		return m
 	end
 
-	t.test("a custom shopkeeper is only used when it passes the checks", function()
+	it("only uses a custom shopkeeper that passes the checks", function()
+		local w = world()
+		local Config, Vector3 = w.Config, w.Vector3
 		local cases = {
 			{
 				Name = "too small (KeepSize)",
-				Model = block(Vector3.new(1, 1, 1)),
+				Size = Vector3.new(1, 1, 1),
 				Keep = true,
 				Used = false,
 			},
-			{
-				Name = "invisible",
-				Model = block(Vector3.new(2, 6, 2), 1),
-				Keep = false,
-				Used = false,
-			},
-			{ Name = "a good one", Model = block(Vector3.new(2, 6, 2)), Keep = false, Used = true },
+			{ Name = "invisible", Size = Vector3.new(2, 6, 2), Transparency = 1, Used = false },
+			{ Name = "a good one", Size = Vector3.new(2, 6, 2), Used = true },
 		}
 		for _, case in cases do
-			clearWorkspace()
+			w.clear()
+			local model = block(w, case.Size, case.Transparency)
 			if case.Keep then
-				case.Model:SetAttribute("KeepSize", true)
+				model:SetAttribute("KeepSize", true)
 			end
-			t.setCustom(customFolder("Characters", case.Model))
-			local hub = HubBuilder.Build()
-			local vendor = Npcs.Find(hub, "PumpkinVendor")
-			Npcs.ApplyCustom(hub)
-			t.eq(vendor:FindFirstChild("Look") ~= nil, case.Used, case.Name .. ": custom used")
-			t.eq(
-				vendor:FindFirstChild("Keeper") ~= nil,
-				not case.Used,
-				case.Name .. ": built keeper"
-			)
+			local remove = w.custom("Characters", model)
+			local hub = w.HubBuilder.Build()
+			local vendor = w.Npcs.Find(hub, "PumpkinVendor")
+			w.Npcs.ApplyCustom(hub)
+			remove()
+			local used = vendor:FindFirstChild("Look") ~= nil
+			if used ~= case.Used then
+				error(("%s: custom used = %s"):format(case.Name, tostring(used)))
+			end
+			expect(vendor:FindFirstChild("Keeper") ~= nil).toBe(not case.Used)
 			if case.Used then
-				local look = vendor.Look
-				local body = look.Body
-				local spot = vendor.KeeperSpot.CFrame
-				t.near(body.CFrame.Y - body.Size.Y / 2, spot.Y, 0.05, "feet on the KeeperSpot")
-				t.near(
-					body.Size.Y,
-					Config.Custom.Heights.PumpkinVendor,
-					0.05,
-					"scaled to its height"
-				)
-				t.ok(vendor:FindFirstChild("TagAnchor"), "the name anchor stays above the awning")
+				local body = vendor.Look.Body
+				local spot = vendor.KeeperSpot.Position
+				expect(body.Position.Y - body.Size.Y / 2).toBeNear(spot.Y, 0.05) -- feet on the spot
+				expect(body.Size.Y).toBeNear(Config.Custom.Heights.PumpkinVendor, 0.05)
+				expect(vendor:FindFirstChild("TagAnchor")).toBeInstanceOf("BasePart")
 			end
 		end
-
-		-- Only the stall was moved in Studio: the custom keeper still stands behind its counter.
-		clearWorkspace()
-		t.setCustom(customFolder("Characters", block(Vector3.new(2, 6, 2))))
-		local hub = HubBuilder.Build()
-		local vendor = Npcs.Find(hub, "PumpkinVendor")
-		local stall = vendor.Stall
-		stall:PivotTo(stall:GetPivot() * CFrame.new(6, 0, 0))
-		Npcs.ApplyCustom(hub)
-		local behindCounter = stall:GetPivot() * CFrame.new(0, 0, 0.5)
-		local body = vendor.Look.Body
-		t.near(body.CFrame.X, behindCounter.X, 0.05, "the keeper followed the stall (x)")
-		t.near(body.CFrame.Z, behindCounter.Z, 0.05, "the keeper followed the stall (z)")
-		t.setCustom(nil)
 	end)
 
-	t.test("custom props replace every copy, at build time and in a saved hub", function()
-		clearWorkspace()
-		local hub = HubBuilder.Build()
+	it("keeps the custom shopkeeper behind the counter when only the stall was moved", function()
+		local w = world()
+		local remove = w.custom("Characters", block(w, w.Vector3.new(2, 6, 2)))
+		local hub = w.HubBuilder.Build()
+		local vendor = w.Npcs.Find(hub, "PumpkinVendor")
+		local stall = vendor.Stall
+		stall:PivotTo(stall:GetPivot() * w.CFrame.new(6, 0, 0))
+		w.Npcs.ApplyCustom(hub)
+		remove()
+		local behindCounter = stall:GetPivot() * w.CFrame.new(0, 0, 0.5)
+		local body = vendor.Look.Body
+		expect(body.Position.X).toBeNear(behindCounter.X, 0.05)
+		expect(body.Position.Z).toBeNear(behindCounter.Z, 0.05)
+	end)
+
+	it("replaces every copy of a custom prop, at build time and in a saved hub", function()
+		local w = world()
+		local hub = w.HubBuilder.Build()
 		local function count(customOnly: boolean): number
 			local n = 0
 			for _, d in hub:GetDescendants() do
@@ -422,62 +428,83 @@ return function(t: any)
 			return n
 		end
 		local total = count(false)
-		t.ok(total > 20, "jack-o-lanterns everywhere")
-		local lantern = Instance.new("Model")
-		lantern.Name = "JackOLantern"
-		local ball = Instance.new("Part")
-		ball.Name = "Ball"
-		ball.Size = Vector3.new(4, 4, 4)
-		ball.Parent = lantern
-		t.setCustom(customFolder("Props", lantern))
-		local swapped = Kit.applyCustomProps(hub)
-		t.eq(swapped, total, "every built jack-o-lantern was swapped")
-		t.eq(count(true), total, "and they are all custom now")
-		t.eq(Kit.applyCustomProps(hub), 0, "running it again changes nothing")
-
-		clearWorkspace()
-		hub = HubBuilder.Build()
-		t.eq(count(true), count(false), "a fresh build uses the custom one straight away")
-		t.setCustom(nil)
+		expect(total).toBeGreaterThan(20)
+		local lantern = w.rt:create("Model", { Name = "JackOLantern" })
+		w.rt:create("Part", { Name = "Ball", Size = w.Vector3.new(4, 4, 4) }, lantern)
+		local remove = w.custom("Props", lantern)
+		expect(w.Kit.applyCustomProps(hub)).toBe(total) -- every built one was swapped
+		expect(count(true)).toBe(total)
+		expect(w.Kit.applyCustomProps(hub)).toBe(0) -- running it again changes nothing
+		hub = w.HubBuilder.Build()
+		expect(count(true)).toBe(count(false)) -- a fresh build uses it straight away
+		remove()
 	end)
+end)
 
-	t.test("Bake builds the hub and maps for hand editing", function()
-		clearWorkspace()
+describe("Bake", function()
+	it("builds the hub and maps for hand editing", function()
+		local w = world()
+		local Bake, Config, ServerStorage = w.Bake, w.Config, w.ServerStorage
 		local hub = Bake.Hub()
-		t.ok(hub and hub.Parent == t.workspace, "baked hub in Workspace")
-		t.eq(hub:GetAttribute("BuildVersion"), Config.Hub.BuildVersion)
+		expect(hub).toBeInstanceOf("Model")
+		expect(hub.Parent).toBe(w.rt.workspace)
+		expect(hub:GetAttribute("BuildVersion")).toBe(Config.Hub.BuildVersion)
 		Bake.Lock()
-		t.eq(hub:GetAttribute("Locked"), true)
-		t.eq(Bake.Hub(), nil, "a Locked hub is not replaced")
-		local replaced = Bake.Hub(true)
-		t.ok(replaced, "Hub(true) replaces it")
-		t.ok(ServerStorage:FindFirstChild("HubBackup"), "the old hub is kept as a backup")
-		t.eq(#Bake.Repair(), 0, "nothing to repair on a fresh hub")
-		t.ok(Bake.Repaint() >= 0)
+		expect(hub:GetAttribute("Locked")).toBe(true)
+		expect(Bake.Hub()).toBeNil() -- a Locked hub is not replaced
+		expect(Bake.Hub(true)).toBeInstanceOf("Model") -- Hub(true) replaces it
+		expect(ServerStorage:FindFirstChild("HubBackup")).toBeInstanceOf("Model") -- old one kept
+		expect(#Bake.Repair()).toBe(0) -- nothing to repair on a fresh hub
+		expect(Bake.Repaint()).toBeGreaterThanOrEqual(0)
 
 		local map = Bake.Map("PumpkinFarm")
-		t.ok(map, "baked map")
-		t.eq(map.Parent, ServerStorage.Maps)
-		t.near(map.WorldPivot.Position, Config.Maps.Origin, 1e-4, "pivot at the map origin")
-		t.ok(map:FindFirstChild("Floor"), "it has its Floor")
+		expect(map).toBeInstanceOf("Model")
+		expect(map.Parent).toBe(ServerStorage.Maps)
+		expect(map.WorldPivot.Position).toBeNear(Config.Maps.Origin, 1e-4) -- pivot at the origin
+		expect(map:FindFirstChild("Floor")).toBeInstanceOf("BasePart")
 		Bake.Map("PumpkinFarm")
-		t.ok(ServerStorage.Maps:FindFirstChild("PumpkinFarm_Backup"), "the older copy is kept")
-		t.eq(Bake.Map("NoSuchMap"), nil)
+		expect(ServerStorage.Maps:FindFirstChild("PumpkinFarm_Backup")).toBeInstanceOf("Model")
+		expect(Bake.Map("NoSuchMap")).toBeNil()
 	end)
 
-	t.test("the Ready sign text", function()
+	it("loads a baked map in the same place as the built one", function()
+		local w = world()
+		local built = w.MapService.Load("PumpkinPatch")
+		local builtFloor = built.Floor.CFrame
+		local builtSpawns = #built.Spawns
+		w.MapService.Unload()
+		w.Bake.Map("PumpkinPatch")
+		local baked = w.MapService.Load("PumpkinPatch")
+		expect(baked.Id).toBe("PumpkinPatch")
+		expect(baked.Model:GetAttribute("BakedFrom")).toBeA("string") -- the ServerStorage copy
+		expect(baked.Floor.CFrame).toBeNear(builtFloor, 1e-3)
+		expect(#baked.Spawns).toBe(builtSpawns)
+		w.MapService.Unload()
+	end)
+end)
+
+describe("ReadySign", function()
+	local client = Runtime.new({ client = true })
+	local Config = client:require("ReplicatedStorage.Shared.Config")
+	local ReadySign = client:require("StarterPlayer.StarterPlayerScripts.Client.ReadySign")
+
+	it("shows the count and the round state", function()
 		local sign = Config.Hub.ReadyArea.Sign
 		local title, status = ReadySign.Text(nil, nil, nil, false)
-		t.eq(title, sign.TitleWaiting)
-		t.eq(status, Config.Lobby.Ready.PadText)
+		expect(title).toBe(sign.TitleWaiting)
+		expect(status).toBe(Config.Lobby.Ready.PadText)
 		title, status = ReadySign.Text(1, 2, "Voting", false)
-		t.eq(title, "READY 1 / 2")
-		t.eq(status, sign.States.Voting)
+		expect(title).toBe("READY 1 / 2")
+		expect(status).toBe(sign.States.Voting)
 		title = ReadySign.Text(3, 2, "Playing", false)
-		t.eq(title, "READY 3", "enough players: just the count")
+		expect(title).toBe("READY 3") -- enough players: just the count
 		local _, mine = ReadySign.Text(1, 2, "Voting", true)
-		t.eq(mine, sign.YouAreReady)
+		expect(mine).toBe(sign.YouAreReady)
 		local _, other = ReadySign.Text(0, 1, "Some New State", false)
-		t.eq(other, "Some New State", "unknown states are shown as they are")
+		expect(other).toBe("Some New State") -- unknown states are shown as they are
+		-- Every state GameService sets has its own line.
+		for _, state in { "Waiting for players", "Voting", "Intermission", "Playing", "Results" } do
+			expect(sign.States[state]).toBeA("string")
+		end
 	end)
-end
+end)
