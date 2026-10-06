@@ -820,5 +820,10 @@ describe("Hide & Seek through the real round loop", function()
 		server:advance(0.5)
 		local _, answer = server:invokeServer(admin, players[1], "StartRoundNow")
 		expect(answer).toMatch("already")
+		-- The round used the forced pick up; pressing again moves on to the other map.
+		server:advance(2) -- past the admin panel's cooldown
+		local _, again = server:invokeServer(admin, players[1], "ForceHideSeek")
+		expect(again).toMatch("Hide")
+		expect(again == message).toBe(false)
 	end)
 end)

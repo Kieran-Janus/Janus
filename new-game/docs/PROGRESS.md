@@ -12,7 +12,7 @@ The `/next-milestone` command reads this file. Update the Status column when a m
 | M6 | Shop, pumpkin currency, saving, VIP pass and products | blocked | create gamepass/product IDs in Creator Hub |
 | V1 | Verify the overnight cloud work in Studio (run `/verify`): skins tab, custom models, codes, daily streak, invite, F8 admin panel, anti-teleport pumpkins | done | 2-player test (see notes) |
 | M7 | UI polish, thumbnails and icon, security audit, playtest | in progress | upload thumbnails, friends playtest |
-| V2 | v2 update: Ready pad, 3 modes and 5 maps, lobby redesign, parkour, Candy Rush, Web Scour, secret pumpkins, rarity prices, 126 skins and crates, top-left Menu, witch/Boo Guide/tutorial removed, Pumpkin Vendor fix (see `docs/V2-CHANGES.md`) | in progress: built and tested offline, needs a Studio check (`/verify-v2`) | yes: 2-player test, phone check, Robux ids |
+| V2 | v2 update: Ready pad, 3 modes and 5 maps, lobby redesign, parkour, Candy Rush, Web Scour, secret pumpkins, rarity prices, 126 skins and crates, top-left Menu, witch/Boo Guide/tutorial removed, Pumpkin Vendor fix (see `docs/V2-CHANGES.md`) | in progress: solo Studio check passed (6 Oct, 3 fixes); 2-player and phone checks to do | yes: 2-player test, phone check, Robux ids |
 | Launch | Set the experience public on 20 October | todo | yes: only the owner does this |
 
 Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a note below).
@@ -68,29 +68,31 @@ Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a not
 - **Studio save was reset during testing** (F8 > Reset my save): your test Coins, owned items and codes are back to a new player.
 - **2-player tests:** the Studio connection can only start solo playtests. Multiplayer checks (3D sounds heard by others, ghost modes, friend bonus, voice) need Test > Clients and Servers > 2 players.
 
-## v2 (5-6 Oct, cloud session, not yet run in Studio)
+## v2 (5-6 Oct, cloud session; first Studio check 6 Oct)
 Spec: `docs/V2-SPEC.md`. Plain-English guide: `docs/V2-CHANGES.md`. Every feature below was built, reviewed, fixed and tested **offline** (the Lune suite, 1,100+ tests, plus scene renders in `docs/screenshots/`). None has been played in Roblox Studio yet: run `/verify-v2` and change each status to `verified in Studio` (or note what failed).
 
 | Feature | Switch (`Config.Features`) | Status |
 | --- | --- | --- |
-| Config split into `src/shared/Config/` (one file per feature), feature switches | | built + tested offline |
-| Pumpkin Vendor fix: `ShopKeeper` tag, spawn / Ready pad / shopkeeper always put back, custom keeper checks | | built + tested offline, needs a Studio check |
-| Witch Wanda, Boo Guide and the tutorial removed (Pumpkin Shop is the only shopkeeper) | `Tutorial` (off) | built + tested offline, needs a Studio check |
-| Ready pad, playlist vote, back to the lobby after a round | `ReadyPad` | built + tested offline, needs a Studio check |
+| Config split into `src/shared/Config/` (one file per feature), feature switches | | verified in Studio (Parkour, CandyRush, Crates, Menu, ReadyPad switched off and on cleanly) |
+| Pumpkin Vendor fix: `ShopKeeper` tag, spawn / Ready pad / shopkeeper always put back, custom keeper checks | | verified in Studio (the owner's custom PumpkinVendor has no visible parts, so the built keeper is used) |
+| Witch Wanda, Boo Guide and the tutorial removed (Pumpkin Shop is the only shopkeeper) | `Tutorial` (off) | verified in Studio |
+| Ready pad, playlist vote, back to the lobby after a round | `ReadyPad` | verified in Studio solo; 2-player check to do |
 | Lobby spectating (Menu > Spectate, Watch the round) | `LobbySpectate` | built + tested offline, needs a 2-player Studio check |
-| Game modes framework (King Hunt moved into `Modes/KingHunt.luau`) | `KingHunt` | built + tested offline, needs a Studio check |
-| Pumpkin Hide & Seek + Pumpkin Farm and Hedge Maze maps | `HideSeek` | built + tested offline, needs a 2-player Studio check |
-| ScareMaze + cornfield maze map | `ScareMaze` | built + tested offline, needs a 3-player Studio check (Haunters) |
-| Lobby redesign (town square, prop kit, round Ready pad, shop stall) | | built + tested offline, needs a Studio look (Lighting > Technology = Future) |
-| Lobby editing: zones, sections, Bake, Locked, BuildVersion, palette, props override | | built + tested offline, needs a Studio check |
-| Parkour "Spooky Sky Climb" | `Parkour` | built + tested offline, needs a Studio check (difficulty for kids) |
-| Candy Rush | `CandyRush` | built + tested offline, needs a 2-player Studio check |
-| Web Scour | `WebScour` | built + tested offline, needs a Studio check |
-| Secret pumpkins (11 Easter eggs) | `EasterEggs` | built + tested offline, needs a Studio check (egg placement) |
-| Rarity prices (125 / 500 / 1,000 / 100,000), 5 coins per pumpkin | | built + tested offline |
-| 126 skins (120 crate skins in 6 themes), CRAZY effects, paged Skins tab | `SkinEffects` | built + tested offline, needs a Studio look (R15, R6, layered clothes) |
-| 10 crates with odds preview, coin and Robux crates, region rule | `Crates`, `RobuxCrates` | built + tested offline, needs a Studio check; Robux needs product ids |
-| Top-left Menu in the top bar, side buttons moved into it, one panel at a time | `Menu` | built + tested offline, needs a Studio and phone check |
+| Game modes framework (King Hunt moved into `Modes/KingHunt.luau`) | `KingHunt` | verified in Studio (both maps) |
+| Pumpkin Hide & Seek + Pumpkin Farm and Hedge Maze maps | `HideSeek` | verified in Studio solo (fixed: the force button now reaches Hedge Maze); 2-player check to do |
+| ScareMaze + cornfield maze map | `ScareMaze` | verified in Studio solo (freeze, OUT when still, escape); Haunters need a 3-player check |
+| Lobby redesign (town square, prop kit, round Ready pad, shop stall) | | verified in Studio (Lighting = Future) |
+| Lobby editing: zones, sections, Bake, Locked, BuildVersion, palette, props override | | verified in Studio (Bake.Hub, BuildVersion 4, 3,877 parts, 83 lights) |
+| Parkour "Spooky Sky Climb" | `Parkour` | verified in Studio; difficulty for kids needs a human try |
+| Candy Rush | `CandyRush` | verified in Studio solo; 2-player race to do |
+| Web Scour | `WebScour` | verified in Studio |
+| Secret pumpkins (11 Easter eggs) | `EasterEggs` | verified in Studio (all 11 reachable) |
+| Rarity prices (125 / 500 / 1,000 / 100,000), 5 coins per pumpkin | | verified in Studio |
+| 126 skins (120 crate skins in 6 themes), CRAZY effects, paged Skins tab | `SkinEffects` | verified in Studio (R15; R6 not checked) |
+| 10 crates with odds preview, coin and Robux crates, region rule | `Crates`, `RobuxCrates` | verified in Studio; Robux needs product ids |
+| Top-left Menu in the top bar, side buttons moved into it, one panel at a time | `Menu` | verified in Studio (fixed: blank button, clicks in first person); phone check to do |
 | Review fixes: Hide & Seek fair play, anti-teleport, saved-lobby repair, phone layouts, safer Robux receipts, saved Web Scour cooldown | | built + tested offline |
+
+**Studio check, 6 Oct 2026 (`/verify-v2`, solo part):** every solo step passed or was fixed. Fixed: the Menu button drew over its own icon and word (a blank orange box); "Hide & Seek: force next round" never moved on to Hedge Maze once a round had used the first pick; panels couldn't be clicked with the camera zoomed into first person (PanelManager now shows a Modal button while a panel is open); selene 0.27.1 couldn't read the current Roblox standard library (now 0.29.0, 6 style warnings tidied). Still to do: the 2-player test (Ready pad voting, spectating, Hide & Seek, Candy Rush race, Web Scour together), ScareMaze Haunters (3 players) and phone/tablet layouts. To watch: in Candy Rush your own character can stand between the camera and your lane, and a click that lands on your avatar doesn't count.
 
 Owner steps for v2: `git pull`, `rokit install`, restart `rojo serve`, set Lighting > Technology = Future, press Play, run `/verify-v2`; then the Robux ids for VIP, coin packs and crates (`docs/V2-CHANGES.md` > "Robux setup").

@@ -244,7 +244,7 @@ function CrateUI.Mount(gui: ScreenGui)
 	panel.BackgroundTransparency = 0.03
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.52)
-	panel.Size = UDim2.new(if compact then 0.96 else 0.92, 0, if compact then 0.97 else 0.84, 0)
+	panel.Size = UDim2.fromScale(if compact then 0.96 else 0.92, if compact then 0.97 else 0.84)
 	panel.Visible = false
 	panel.ClipsDescendants = true
 	Layout.Fit(panel)
@@ -684,7 +684,7 @@ function CrateUI.Mount(gui: ScreenGui)
 			pinned.BackgroundTransparency = 1
 			pinned.AnchorPoint = Vector2.new(0, 1)
 			pinned.Position = UDim2.fromScale(0, 1)
-			pinned.Size = UDim2.new(0, sideWidth, 0, buttonsHeight)
+			pinned.Size = UDim2.fromOffset(sideWidth, buttonsHeight)
 			pinned.Parent = previewView
 			local pinnedList = Instance.new("UIListLayout")
 			pinnedList.SortOrder = Enum.SortOrder.LayoutOrder
