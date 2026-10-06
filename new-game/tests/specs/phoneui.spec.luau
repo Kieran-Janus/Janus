@@ -13,7 +13,15 @@ local Dom = require("../harness/Dom")
 
 local describe, it, expect = T.describe, T.it, T.expect
 
-local REMOTE_FUNCTIONS = { "GetShopState", "BuyItem", "EquipItem", "OpenCrate", "ParkourRequest" }
+local REMOTE_FUNCTIONS = {
+	"GetShopState",
+	"BuyItem",
+	"EquipItem",
+	"OpenCrate",
+	"ParkourRequest",
+	"AdminCommand",
+	"GetAdminCommands",
+}
 local REMOTE_EVENTS = {
 	"ShopState",
 	"CrateResult",
@@ -415,5 +423,20 @@ describe("Buy buttons in view on a short phone screen", function()
 		expect(card.Buttons.Equip).toBeInstanceOf("TextButton")
 		p.gui.Crates.Visible = false
 		p.rt:advance(0.1)
+	end)
+end)
+
+describe("The owner panel on a phone", function()
+	it("gives admins an Admin button instead of F8, and it opens the panel", function()
+		local p = screen(749, 309, true)
+		p.player:SetAttribute("Admin", true)
+		p.rt:require(p.Client.AdminUI).Mount(p.gui)
+		local button = p.gui:FindFirstChild("AdminButton")
+		expect(button).toBeInstanceOf("TextButton")
+		expect(button.Visible).toBe(true)
+		p.rt:fire(button, "Activated")
+		expect(p.gui.Admin.Visible).toBe(true)
+		p.rt:fire(button, "Activated")
+		expect(p.gui.Admin.Visible).toBe(false)
 	end)
 end)

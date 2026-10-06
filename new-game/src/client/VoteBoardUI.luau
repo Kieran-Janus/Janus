@@ -129,22 +129,25 @@ function VoteBoardUI.Mount()
 
 	local function render()
 		clear()
-		text("Voting Board", 0, 0.16, Config.Hub.Colors.Orange)
+		local words = Config.Npcs.BoardText
+		text(words.Title, 0, 0.16, Config.Hub.Colors.Orange)
 		local state = current
 		if state and state.Open then
 			-- Only Ready players can vote (when the server says so): the others get a hint.
 			if state.ReadyOnly and player:GetAttribute("Ready") ~= true then
 				text(Config.Lobby.Ready.Text.VoteHint, 1, 0.1, Theme.Selected)
 			else
-				text("Pick the next game", 1, 0.1, Theme.Muted)
+				text(words.Pick, 1, 0.1, Theme.Muted)
 			end
 			row("Map", state.Maps, 2)
 			if #state.Difficulties > 0 then
-				text("Easy or Hard?", 3, 0.1, Theme.Muted)
+				text(words.Difficulty, 3, 0.1, Theme.Muted)
 				row("Difficulty", state.Difficulties, 4)
 			end
 		else
-			local roundState = ReplicatedStorage:GetAttribute("State") or "Waiting"
+			local raw = ReplicatedStorage:GetAttribute("State")
+			local waiting = raw == nil or raw == "Waiting for players"
+			local roundState = raw or "Waiting"
 			local parts = {}
 			for _, name in { "ModeName", "MapName", "Difficulty" } do
 				local value = ReplicatedStorage:GetAttribute(name)
@@ -156,7 +159,7 @@ function VoteBoardUI.Mount()
 			if #parts > 0 then
 				text(table.concat(parts, "  |  "), 2, 0.14, Theme.Muted)
 			end
-			text("The next vote opens between rounds.", 3, 0.12, Theme.Muted)
+			text(if waiting then words.SignWaiting else words.SignRound, 3, 0.12, Theme.Muted)
 		end
 	end
 

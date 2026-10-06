@@ -898,12 +898,17 @@ local Config = {
 	-- src/shared/Config.luau and src/server/Hub/HubBuilder.luau).
 	Npcs = {
 		InteractCooldown = 0.5,
-		-- The Voting Board's first line, from what the game is doing right now (%s = the round's
-		-- state, e.g. "Playing").
+		-- The Voting Board: its dialog's first line (from what the game is doing right now; %s =
+		-- the round's state, e.g. "Playing") and the words on the board itself.
 		BoardText = {
 			Voting = "Voting is open right now! Tap a choice on the board or on the vote panel.",
 			Waiting = "No vote yet: stand on the Ready pad and a vote opens.",
 			Round = "Right now: %s. The next vote opens after this round.",
+			Title = "Voting Board",
+			Pick = "Pick the next game",
+			Difficulty = "Easy or Hard?",
+			SignWaiting = "Stand on the Ready pad to start a vote.",
+			SignRound = "The next vote opens after this round.",
 		},
 		List = {
 			{
