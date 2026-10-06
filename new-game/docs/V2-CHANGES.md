@@ -143,19 +143,20 @@ No picture: they are hidden on purpose.
 - Each pumpkin you collect in King Hunt is worth **5 coins**.
 - Shop cards show a coloured rarity tag. VIP items are still free with VIP.
 
-### 126 skins and 10 crates
+### 630 skins and 34 crates
 ![The Mystery Crates stand next to the Pumpkin Shop](screenshots/lobby-crates.png)
 
-- **126 skins**: the 6 classic skins plus 120 new crate skins in 6 themes (Pumpkin, Candy, Spooky, Graveyard, Monster, Moonlight). Each theme has 20: 12 Common, 5 Uncommon, 2 Rare and 1 CRAZY.
+- **About 630 skins**: the 6 classic skins, 120 crate skins in the 6 classic themes (Pumpkin, Candy, Spooky, Graveyard, Monster, Moonlight: 12 Common, 5 Uncommon, 2 Rare, 1 CRAZY each) and 507 more in 24 new themes (Vampire Castle, Zombie Town, Haunted Carnival, Mummy Tomb, Werewolf Woods, Mad Scientist Lab, Ghost Ship, Bat Cave, Spider Lair, Skeleton Crew, Cursed Toys, Scarecrow Farm, Haunted Hotel, Monster Disco, Black Cat Alley, Goblin Market, Swamp Creatures, Witch's Brew, Alien Abduction, Frosty Fright, Graveyard Party, Candy Factory, Phantom Theatre, Autumn Leaves: 13 Common, 5 Uncommon, 3 Rare each), with 18 new head pieces. No two skins look the same.
+- **Exactly 10 CRAZY skins**: the six classic ones, the Tormented Tower's, and three **ONE IN A MILLION** skins (Night Lord Supreme, Disco Demon, Star Voyager): a 0.0001% chance in their own crate, each with its own animated effect (a blood moon with bats, a disco ball with light beams, a flying saucer beaming you up). Unboxing any CRAZY skin is announced to the whole server, with an extra-big rainbow banner for the one-in-a-million ones.
 - The rarer the skin, the fancier it looks. Common: colours, materials and patterns. Uncommon: plus a head piece. Rare: plus a glow and floating particles. CRAZY: plus a rainbow shimmer and pieces orbiting around you.
-- The Skins tab has pages and filters (owned, rarity, theme).
-- **10 crates** on the **MYSTERY CRATES** stand next to the Pumpkin Shop, and in **Menu > Crates**:
-  - 6 themed crates (one per theme), 300 coins each.
-  - 4 rarity crates: Common 100, Uncommon 400, Rare 800, CRAZY 80,000 coins.
-- **Odds** for every themed crate: Common 70%, Uncommon 24.9%, Rare 5%, CRAZY 0.1%. Skins of the same rarity share that chance equally.
+- The Skins tab has pages and filters (owned, rarity, and a theme dropdown with all 30 themes).
+- **34 crates** in **Menu > Crates**, on tabs (Classic, Monsters, Haunted Places, Creepy Critters, Sweet & Silly, By Rarity) with pages. The **MYSTERY CRATES** stand next to the Pumpkin Shop shows the 6 classic ones and the rarity crates.
+  - 30 themed crates (one per theme), 600 coins each (doubled).
+  - 4 rarity crates: Common 100, Uncommon 400, Rare 800, CRAZY 80,000 coins (just under the shop price of their rarity).
+- **Odds** for every themed crate: Common 73.48%, Uncommon 24%, Rare 2.5%, CRAZY 0.02% (Rare and CRAZY are rarer than before). Skins of the same rarity share that chance equally.
 - **Odds preview**: before you open a crate, the panel shows every skin in it and its exact chance. Roblox requires this for paid random items.
-- Opening it: a strip of cards spins and slows down on your skin. The server picks the skin before the animation starts, so it's yours even if you close the panel.
-- A skin you already own gives coins back (30, 125, 250 or 25,000 by rarity).
+- **Open x1, x5 or x10**: the server rolls them all at once and takes the coins in one go. A strip of cards spins and slows down on each skin; **Space** (or **Skip**) jumps to the result and then to the next crate. **Quick open** skips the strips and shows every result on one page, the best one highlighted. The server picks the skins before the animation starts, so they're yours even if you close the panel.
+- A skin you already own ALWAYS gives coins back ("Duplicate! +X coins back": 60, 250, 500 or 50,000 by rarity).
 - **Robux crates**: each crate can also be bought with Robux once you paste its product id into Config (see [Robux setup](#robux-setup)). Until then its Robux button says "Coming soon".
 - **The region rule**: in some countries, Roblox doesn't allow paid random items. The game asks Roblox about each player (this is called `PolicyService`). Those players can't open **any** crate, even with coins, because coins can be bought with Robux. They see a short message and can still buy every skin straight from the Shop at its rarity price. In Studio, crates stay open so you can test them.
 - Every crate skin is also for sale directly in the Shop at its rarity price.
@@ -484,7 +485,7 @@ Things that are not done, or need your eyes in Studio:
 - **ScareMaze with 2 players has no Haunters** (Haunters need 3+). The scares move on the server, so they may look a little choppy on slow connections.
 - **Hide & Seek**: hiders' invisible bodies can still bump into decoy pumpkins.
 - **Anti-cheat**: a very slow fly upwards on the parkour still passes the speed check (the 45-second minimum time stops instant wins). A Candy Rush auto-clicker could be about twice as fast as a person; coins are still capped. General speed hacks are possible in every Roblox game; pickups and rewards check speed.
-- **Crates**: the region check and real Robux purchases can only be tested on the published game. There is no "X unboxed a CRAZY skin!" announcement yet.
+- **Crates**: the region check and real Robux purchases can only be tested on the published game. 
 - **Skins**: the 6 classic skins don't have the new rarity effects. The Menu's Skins tile opens all skins (not "owned only").
 - **Phones**: the full lobby is about 4,230 parts and 88 lights (the phone budget is 4,300 parts and 90 lights). That is inside the phone budget the tests check, but check the frame rate on a real phone.
 - **Saves are not session-locked yet** (planned before any trading, see `docs/ROADMAP.md`).

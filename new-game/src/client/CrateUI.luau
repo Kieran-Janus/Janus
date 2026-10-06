@@ -23,6 +23,7 @@
 	                              crate preview's "Buy in the Shop" button uses it)
 ]]
 
+local ContextActionService = game:GetService("ContextActionService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -56,6 +57,8 @@ export type Result = {
 	Reel: { string }?,
 	WinIndex: number?,
 	Paid: string?,
+	OneInAMillion: boolean?,
+	Results: { Result }?, -- every result, when several crates were opened at once
 }
 
 type Net = {
@@ -111,6 +114,30 @@ local function asResult(value: unknown): Result?
 		end
 		if r.Reel[r.WinIndex] ~= r.ItemId then
 			return nil
+		end
+		-- Several at once: every one must be a proper result too.
+		if r.Results ~= nil then
+			if type(r.Results) ~= "table" or #r.Results < 1 or #r.Results > 10 then
+				return nil
+			end
+			for _, one in r.Results do
+				if
+					type(one) ~= "table"
+					or one.Ok ~= true
+					or type(one.ItemId) ~= "string"
+					or type(one.Reel) ~= "table"
+					or type(one.WinIndex) ~= "number"
+					or one.Reel[one.WinIndex] ~= one.ItemId
+				then
+					return nil
+				end
+				if type(one.Message) ~= "string" then
+					one.Message = ""
+				end
+				if type(one.CrateId) ~= "string" then
+					one.CrateId = r.CrateId
+				end
+			end
 		end
 	end
 	if type(r.Message) ~= "string" then
@@ -236,6 +263,12 @@ function CrateUI.Mount(gui: ScreenGui)
 	local skipConnection: RBXScriptConnection? = nil
 	local burstConnection: RBXScriptConnection? = nil
 	local revealStop: () -> () = function() end
+	local queue: { Result } = {} -- results of a multi-open still to be shown
+	local quickOpen = cfg.QuickOpen.Default -- the "Quick open" switch: no strip, all results at once
+	local lastCount = 1 -- how many were opened last time (Open another opens as many)
+	local listCategory: string? = nil -- the tab and page of the crate list
+	local listPage = 1
+	local skipNow: (() -> ())? = nil -- jumps the spinning strip to its result
 
 	-- Panel ---------------------------------------------------------------------------------
 	local panel = Theme.panel(gui)
@@ -300,6 +333,7 @@ function CrateUI.Mount(gui: ScreenGui)
 	local listView = view("List")
 	local previewView = view("Preview")
 	local openView = view("Opening")
+	local resultsView = view("Results") -- quick open: every result on one page
 
 	local function setMessage(value: string, important: boolean?)
 		message.Text = value
@@ -447,12 +481,14 @@ function CrateUI.Mount(gui: ScreenGui)
 	-- Forward declarations (the views call each other).
 	local showList: () -> ()
 	local showPreview: (crate: CrateOdds.Crate) -> ()
-	local openWithCoins: (crate: CrateOdds.Crate) -> ()
+	local openWithCoins: (crate: CrateOdds.Crate, count: number?) -> ()
+	local showResults: (all: { Result }) -> ()
+	local playNext: () -> ()
 	local openWithRobux: (crate: CrateOdds.Crate) -> ()
 	local playResult: (result: Result) -> ()
 
 	local function showOnly(which: Frame)
-		for _, v in { listView, previewView, openView } do
+		for _, v in { listView, previewView, openView, resultsView } do
 			v.Visible = v == which
 		end
 	end
@@ -529,16 +565,78 @@ function CrateUI.Mount(gui: ScreenGui)
 		end)
 	end
 
+	-- The crates on one tab (Config.Crates.Categories; a crate with no Category is on the first).
+	local function categoryOf(crate: CrateOdds.Crate): string
+		return crate.Category or cfg.Categories[1]
+	end
+	local function cratesIn(category: string): { CrateOdds.Crate }
+		local list = {}
+		for _, crate in CrateOdds.List() do
+			if categoryOf(crate) == category then
+				table.insert(list, crate)
+			end
+		end
+		return list
+	end
+
+	-- A tab per category along the top, one page of crate cards, and Prev / Next at the bottom.
 	showList = function()
 		current = nil
 		clear(listView)
 		showOnly(listView)
 		defaultMessage()
+		local category = listCategory or cfg.Categories[1]
+		if #cratesIn(category) == 0 then
+			category = categoryOf(CrateOdds.List()[1] or ({} :: any))
+		end
+		local tabs = Instance.new("ScrollingFrame")
+		tabs.Name = "Categories"
+		tabs.BackgroundTransparency = 1
+		tabs.BorderSizePixel = 0
+		tabs.Size = UDim2.new(1, 0, 0, 34)
+		tabs.ScrollBarThickness = 3
+		tabs.ScrollingDirection = Enum.ScrollingDirection.X
+		tabs.AutomaticCanvasSize = Enum.AutomaticSize.X
+		tabs.CanvasSize = UDim2.new()
+		tabs.Parent = listView
+		local tabList = Instance.new("UIListLayout")
+		tabList.FillDirection = Enum.FillDirection.Horizontal
+		tabList.Padding = UDim.new(0, 6)
+		tabList.SortOrder = Enum.SortOrder.LayoutOrder
+		tabList.Parent = tabs
+		for i, name in cfg.Categories do
+			if #cratesIn(name) == 0 then
+				continue
+			end
+			local tab = button(name, tabs, if name == category then Theme.Selected else nil)
+			tab.Name = "Tab" .. i
+			tab:SetAttribute("Category", name)
+			tab.LayoutOrder = i
+			tab.TextSize = 14
+			tab.TextWrapped = false
+			tab.AutomaticSize = Enum.AutomaticSize.X
+			tab.Size = UDim2.new(0, 0, 1, -6)
+			local tabPad = Instance.new("UIPadding")
+			tabPad.PaddingLeft = UDim.new(0, 10)
+			tabPad.PaddingRight = UDim.new(0, 10)
+			tabPad.Parent = tab
+			tab.Activated:Connect(function()
+				listCategory = name
+				listPage = 1
+				showList()
+			end)
+		end
+
+		local crates = cratesIn(category)
+		local perPage = math.max(1, if compact then cfg.PhonePageSize else cfg.PageSize)
+		local pages = math.max(1, math.ceil(#crates / perPage))
+		listPage = math.clamp(listPage, 1, pages)
 		local scroller = Instance.new("ScrollingFrame")
 		scroller.Name = "Crates"
 		scroller.BackgroundTransparency = 1
 		scroller.BorderSizePixel = 0
-		scroller.Size = UDim2.fromScale(1, 1)
+		scroller.Position = UDim2.fromOffset(0, 38)
+		scroller.Size = UDim2.new(1, 0, 1, -(38 + 36))
 		scroller.ScrollBarThickness = 6
 		scroller.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		scroller.CanvasSize = UDim2.new()
@@ -552,9 +650,40 @@ function CrateUI.Mount(gui: ScreenGui)
 		pad.PaddingTop = UDim.new(0, 4)
 		pad.PaddingLeft = UDim.new(0, 4)
 		pad.Parent = scroller
-		for i, crate in CrateOdds.List() do
-			crateCard(scroller, crate, i)
+		local first = (listPage - 1) * perPage + 1
+		for i = first, math.min(#crates, first + perPage - 1) do
+			crateCard(scroller, crates[i], i)
 		end
+
+		local pager = Instance.new("Frame")
+		pager.Name = "Pager"
+		pager.BackgroundTransparency = 1
+		pager.AnchorPoint = Vector2.new(0.5, 1)
+		pager.Position = UDim2.fromScale(0.5, 1)
+		pager.Size = UDim2.fromOffset(260, 32)
+		pager.Visible = pages > 1
+		pager.Parent = listView
+		local prev = button("<", pager)
+		prev.Name = "Prev"
+		prev.Size = UDim2.fromOffset(60, 32)
+		local pageLabel = label(text.Page:format(listPage, pages), 15, pager)
+		pageLabel.Name = "Page"
+		pageLabel.Position = UDim2.fromOffset(66, 0)
+		pageLabel.Size = UDim2.fromOffset(128, 32)
+		local nextButton = button(">", pager)
+		nextButton.Name = "Next"
+		nextButton.Position = UDim2.fromOffset(200, 0)
+		nextButton.Size = UDim2.fromOffset(60, 32)
+		prev.Activated:Connect(function()
+			listCategory = category
+			listPage = if listPage > 1 then listPage - 1 else pages
+			showList()
+		end)
+		nextButton.Activated:Connect(function()
+			listCategory = category
+			listPage = if listPage < pages then listPage + 1 else 1
+			showList()
+		end)
 	end
 
 	-- Preview view: every skin and its chance ---------------------------------------------------
@@ -632,7 +761,9 @@ function CrateUI.Mount(gui: ScreenGui)
 			local share = odds[rarity]
 			if share then
 				local level = rarityLevel(rarity)
-				local shown = ("%.3f"):format(share):gsub("0+$", ""):gsub("%.$", "")
+				local shown = if share > 0 and share < 0.001
+					then CrateOdds.Format(share):gsub("%%$", "")
+					else ("%.3f"):format(share):gsub("0+$", ""):gsub("%.$", "")
 				table.insert(
 					parts,
 					('<font color="#%s">%s %s%%</font>'):format(hex(level.Color), level.Name, shown)
@@ -653,6 +784,7 @@ function CrateUI.Mount(gui: ScreenGui)
 
 	showPreview = function(crate: CrateOdds.Crate)
 		current = crate
+		listCategory = categoryOf(crate) -- (Back returns to its tab)
 		clear(previewView)
 		showOnly(previewView)
 		defaultMessage()
@@ -661,7 +793,7 @@ function CrateUI.Mount(gui: ScreenGui)
 
 		-- Left: the crate, its odds and the buttons (scrolls on short screens). On phones the
 		-- buttons are pinned under the scrolling part instead, so they are always in view.
-		local buttonsHeight = (if closed ~= true then 40 + 6 else 0) + 32
+		local buttonsHeight = (if closed ~= true then (40 + 6) + (34 + 6) else 0) + 32
 		local side = Instance.new("ScrollingFrame")
 		side.Name = "Side"
 		side.BackgroundTransparency = 1
@@ -732,22 +864,38 @@ function CrateUI.Mount(gui: ScreenGui)
 			layout.Parent = f
 			return f
 		end
+		-- Open x1 / x5 / x10 for coins (Config.Crates.Open.Counts), then Robux and Quick open.
 		local buyRow = row(5, 40)
 		buyRow.Name = "Buy"
 		buyRow.Visible = closed ~= true
+		local extras = row(6, 34)
+		extras.Name = "Extras"
+		extras.Visible = closed ~= true
 		local price = CrateOdds.CoinPrice(crate)
 		local robuxOn = Config.Features.RobuxCrates
 		local half = UDim2.new(0.5, -3, 1, 0)
+		local counts = cfg.Open.Counts
+		local buyLayout = buyRow:FindFirstChildOfClass("UIListLayout")
+		if buyLayout then
+			buyLayout.SortOrder = Enum.SortOrder.LayoutOrder -- x1, x5, x10 in Config order
+		end
 		if price then
-			local openButton = button(text.OpenCoins:format(commas(price)), buyRow, Theme.Selected)
-			openButton.Name = "OpenCoins"
-			openButton.Size = if robuxOn then half else UDim2.fromScale(1, 1)
-			if closed == nil then
-				disable(openButton, text.Checking)
-			else
-				openButton.Activated:Connect(function()
-					openWithCoins(crate)
-				end)
+			for order, count in counts do
+				local words = if count == 1
+					then text.OpenCoins:format(commas(price))
+					else text.OpenMany:format(count, commas(price * count))
+				local openButton = button(words, buyRow, Theme.Selected)
+				openButton.Name = if count == 1 then "OpenCoins" else "OpenCoins" .. count
+				openButton.LayoutOrder = order
+				openButton.TextSize = 13
+				openButton.Size = UDim2.new(1 / #counts, -4, 1, 0)
+				if closed == nil then
+					disable(openButton, text.Checking)
+				else
+					openButton.Activated:Connect(function()
+						openWithCoins(crate, count)
+					end)
+				end
 			end
 		end
 		if robuxOn then
@@ -755,10 +903,11 @@ function CrateUI.Mount(gui: ScreenGui)
 			local robux = crate.Robux
 			local robuxButton = button(
 				text.OpenRobux:format(if robux then robux.SuggestedRobux else 0),
-				buyRow,
+				extras,
 				Color3.fromRGB(40, 150, 70)
 			)
 			robuxButton.Name = "OpenRobux"
+			robuxButton.TextSize = 13
 			robuxButton.Size = if price then half else UDim2.fromScale(1, 1)
 			if id == 0 then
 				disable(robuxButton, text.ComingSoon)
@@ -771,7 +920,22 @@ function CrateUI.Mount(gui: ScreenGui)
 				end)
 			end
 		end
-		local navRow = row(6, 32)
+		if price then
+			local quick = button("", extras)
+			quick.Name = "QuickOpen"
+			quick.TextSize = 13
+			quick.Size = if robuxOn then half else UDim2.fromScale(1, 1)
+			local function showSwitch()
+				quick.Text = (if quickOpen then "☑ " else "☐ ") .. text.QuickOpen
+				quick.BackgroundColor3 = if quickOpen then Theme.Selected else Theme.Button
+			end
+			showSwitch()
+			quick.Activated:Connect(function()
+				quickOpen = not quickOpen
+				showSwitch()
+			end)
+		end
+		local navRow = row(7, 32)
 		navRow.Name = "Nav"
 		local back = button(text.Back, navRow)
 		back.Name = "Back"
@@ -971,6 +1135,7 @@ function CrateUI.Mount(gui: ScreenGui)
 	end
 
 	local function stopSpin()
+		skipNow = nil
 		if spinConnection then
 			spinConnection:Disconnect()
 			spinConnection = nil
@@ -1219,21 +1384,35 @@ function CrateUI.Mount(gui: ScreenGui)
 		end)
 
 		local crate = CrateOdds.Get(result.CrateId)
-		local again = button(text.OpenAnother, buttons, Theme.Selected)
-		again.Name = "OpenAnother"
-		again.Size = third
-		again.TextSize = 14
-		again.Visible = crate ~= nil and restriction() == false
-		again.Activated:Connect(function()
-			if not crate then
-				return
-			end
-			if lastPaid == "Robux" or not CrateOdds.CoinPrice(crate) then
-				openWithRobux(crate)
-			else
-				openWithCoins(crate)
-			end
-		end)
+		if #queue > 0 then
+			-- More crates from the same open are waiting: Next (or Space) plays the next one.
+			local nextButton = button(text.Next:format(#queue), buttons, Theme.Selected)
+			nextButton.Name = "Next"
+			nextButton.Size = third
+			nextButton.TextSize = 14
+			nextButton.Activated:Connect(function()
+				playNext()
+			end)
+		else
+			local again = button(text.OpenAnother, buttons, Theme.Selected)
+			again.Name = "OpenAnother"
+			again.Size = third
+			again.TextSize = 14
+			again.Visible = crate ~= nil and restriction() == false
+			again.Activated:Connect(function()
+				if not crate then
+					return
+				end
+				if lastPaid == "Robux" or not CrateOdds.CoinPrice(crate) then
+					openWithRobux(crate)
+				else
+					openWithCoins(crate, lastCount)
+				end
+			end)
+		end
+		if result.OneInAMillion then
+			newsLabel.Text = text.OneInAMillion .. "  " .. newsLabel.Text
+		end
 		local back = button(text.Back, buttons)
 		back.Name = "Back"
 		back.Size = third
@@ -1278,7 +1457,10 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 		reveal.Visible = false
 		showOnly(openView)
-		status.Text = ("%s..."):format(if crate then crate.Name else text.Title)
+		status.Text = ("%s...%s"):format(
+			if crate then crate.Name else text.Title,
+			if Layout.IsTouch() then "" else "   " .. text.SkipHint
+		)
 		setMessage("")
 		reelIds = table.clone(result.Reel)
 		stripCards = {}
@@ -1319,9 +1501,15 @@ function CrateUI.Mount(gui: ScreenGui)
 			end)
 		end
 		skip.Visible = true
-		skipConnection = skip.Activated:Connect(function()
+		skipNow = function()
 			if spinConnection then
 				finished()
+			end
+		end
+		skipConnection = skip.Activated:Connect(function()
+			local fn = skipNow
+			if fn then
+				fn()
 			end
 		end)
 		spinConnection = RunService.Heartbeat:Connect(function()
@@ -1362,7 +1550,15 @@ function CrateUI.Mount(gui: ScreenGui)
 		end)
 	end
 
-	openWithCoins = function(crate: CrateOdds.Crate)
+	-- The next result of a multi-open (spins its strip).
+	playNext = function()
+		local result = table.remove(queue, 1)
+		if result then
+			playResult(result)
+		end
+	end
+
+	openWithCoins = function(crate: CrateOdds.Crate, countIn: number?)
 		local n = net
 		if busy or not n then
 			return
@@ -1375,11 +1571,13 @@ function CrateUI.Mount(gui: ScreenGui)
 			defaultMessage()
 			return
 		end
+		local count = countIn or 1
 		busy = true
+		lastCount = count
 		setMessage(text.Checking)
 		task.spawn(function()
 			local ok, value = pcall(function()
-				return n.Open:InvokeServer(crate.Id)
+				return n.Open:InvokeServer(crate.Id, if count > 1 then count else nil)
 			end)
 			local result = if ok then asResult(value) else nil
 			if not result then
@@ -1395,8 +1593,191 @@ function CrateUI.Mount(gui: ScreenGui)
 			if not panel.Visible then
 				panel.Visible = true
 			end
-			playResult(result)
+			local all = result.Results or { result }
+			for _, one in all do
+				if one.ItemId then
+					owned[one.ItemId] = true
+				end
+			end
+			if quickOpen then
+				showResults(all)
+			else
+				queue = table.clone(all)
+				playNext()
+			end
 		end)
+	end
+
+	-- Quick open: every result on one page. Rarity colours, duplicates with their coins back,
+	-- and the best one highlighted.
+	showResults = function(all: { Result })
+		stopSpin()
+		stopBurst()
+		revealStop()
+		revealStop = function() end
+		busy = false
+		unseen = nil
+		queue = {}
+		clear(resultsView)
+		showOnly(resultsView)
+		local first = all[1]
+		local crate = if first then CrateOdds.Get(first.CrateId) else nil
+		-- The best: the highest rarity (a one-in-a-million beats everything), the first of them.
+		local function rank(r: Result): number
+			local index = table.find(Config.Rarity.Order, r.Rarity or Config.Rarity.Default) or 1
+			return index + (if r.OneInAMillion then 10 else 0)
+		end
+		local best = 1
+		for i, r in all do
+			if rank(r) > rank(all[best]) then
+				best = i
+			end
+		end
+		local bestLevel = rarityLevel(all[best] and all[best].Rarity)
+		if bestLevel.Rainbow then
+			Sounds.PlaySpec(cfg.Sounds.Crazy)
+		elseif all[best] and all[best].Rarity == "Rare" then
+			Sounds.PlaySpec(cfg.Sounds.Rare)
+		else
+			Sounds.PlaySpec(cfg.Sounds.Reveal)
+		end
+
+		local heading = label(text.Results:format(#all), 20, resultsView)
+		heading.Name = "Heading"
+		heading.Size = UDim2.new(1, 0, 0, 28)
+		local grid = Instance.new("ScrollingFrame")
+		grid.Name = "Items"
+		grid.BackgroundTransparency = 1
+		grid.BorderSizePixel = 0
+		grid.Position = UDim2.fromOffset(0, 32)
+		grid.Size = UDim2.new(1, 0, 1, -(32 + 42))
+		grid.ScrollBarThickness = 6
+		grid.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		grid.CanvasSize = UDim2.new()
+		grid.Parent = resultsView
+		local columns =
+			math.max(1, if compact then cfg.QuickOpen.PhoneColumns else cfg.QuickOpen.Columns)
+		local layout = Instance.new("UIGridLayout")
+		layout.CellSize = UDim2.new(1 / columns, -8, 0, if compact then 128 else 150)
+		layout.CellPadding = UDim2.fromOffset(8, 8)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Parent = grid
+		local pad = Instance.new("UIPadding")
+		pad.PaddingTop = UDim.new(0, 4)
+		pad.PaddingLeft = UDim.new(0, 4)
+		pad.Parent = grid
+		local coinsBack = 0
+		for i, r in all do
+			local item = Items.Get(r.ItemId)
+			local level = rarityLevel(r.Rarity)
+			local card = Instance.new("Frame")
+			card.Name = "Result" .. i
+			card.LayoutOrder = i
+			card.BackgroundColor3 = Color3.fromRGB(36, 30, 50)
+			card.Parent = grid
+			Theme.round(card, 8)
+			local stroke = Instance.new("UIStroke")
+			stroke.Name = "RarityBorder"
+			stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			stroke.Color = level.Color
+			stroke.Thickness = if i == best then 5 else 2.5
+			stroke.Parent = card
+			if level.Rainbow then
+				stroke.Color = Color3.new(1, 1, 1)
+				local gradient = Instance.new("UIGradient")
+				gradient.Color = rainbowSequence()
+				gradient.Parent = stroke
+			end
+			local art = Instance.new("Frame")
+			art.Name = "Art"
+			art.BackgroundTransparency = 1
+			art.Position = UDim2.fromOffset(4, 4)
+			art.Size = UDim2.new(1, -8, 1, -64)
+			art.Parent = card
+			if item then
+				lazy(art, function()
+					return Cosmetics.Preview(item)
+				end)
+			end
+			local name = label(r.ItemName or (item and item.Name) or "?", 14, card)
+			name.Name = "ItemName"
+			name.AnchorPoint = Vector2.new(0, 1)
+			name.Position = UDim2.new(0, 3, 1, -40)
+			name.Size = UDim2.new(1, -6, 0, 20)
+			name.TextTruncate = Enum.TextTruncate.AtEnd
+			local rarityText =
+				label(if r.OneInAMillion then text.OneInAMillion else level.Name, 13, card)
+			rarityText.Name = "Rarity"
+			rarityText.TextColor3 = level.Color:Lerp(Color3.new(1, 1, 1), 0.2)
+			rarityText.AnchorPoint = Vector2.new(0, 1)
+			rarityText.Position = UDim2.new(0, 3, 1, -22)
+			rarityText.Size = UDim2.new(1, -6, 0, 18)
+			local news = label(
+				if r.Duplicate then text.DuplicateShort:format(r.Refund or 0) else text.New,
+				13,
+				card
+			)
+			news.Name = "News"
+			news.TextColor3 = if r.Duplicate then Theme.Selected else Color3.fromRGB(140, 235, 140)
+			news.AnchorPoint = Vector2.new(0, 1)
+			news.Position = UDim2.new(0, 3, 1, -4)
+			news.Size = UDim2.new(1, -6, 0, 18)
+			if r.Duplicate then
+				coinsBack += r.Refund or 0
+			end
+			if i == best then
+				card.BackgroundColor3 = level.Color:Lerp(Color3.fromRGB(36, 30, 50), 0.6)
+				local tag = label(text.Best, 14, card)
+				tag.Name = "Best"
+				tag.ZIndex = 3
+				tag.TextColor3 = Color3.fromRGB(255, 225, 90)
+				tag.TextStrokeTransparency = 0.2
+				tag.Position = UDim2.fromOffset(6, 4)
+				tag.Size = UDim2.new(1, -12, 0, 18)
+				tag.TextXAlignment = Enum.TextXAlignment.Left
+			end
+		end
+
+		local footer = Instance.new("Frame")
+		footer.Name = "Footer"
+		footer.BackgroundTransparency = 1
+		footer.AnchorPoint = Vector2.new(0, 1)
+		footer.Position = UDim2.fromScale(0, 1)
+		footer.Size = UDim2.new(1, 0, 0, 36)
+		footer.Parent = resultsView
+		local refunds = label(
+			if coinsBack > 0 then text.CoinsBack:format(coinsBack, currency) else "",
+			14,
+			footer
+		)
+		refunds.Name = "CoinsBack"
+		refunds.TextColor3 = Theme.Selected
+		refunds.TextXAlignment = Enum.TextXAlignment.Left
+		refunds.Size = UDim2.new(1, -230, 1, 0)
+		local again = button(text.OpenAnother, footer, Theme.Selected)
+		again.Name = "OpenAnother"
+		again.AnchorPoint = Vector2.new(1, 0)
+		again.Position = UDim2.new(1, -112, 0, 0)
+		again.Size = UDim2.fromOffset(110, 36)
+		again.Visible = crate ~= nil and restriction() == false
+		again.Activated:Connect(function()
+			if crate then
+				openWithCoins(crate, lastCount)
+			end
+		end)
+		local back = button(text.Back, footer)
+		back.Name = "Back"
+		back.AnchorPoint = Vector2.new(1, 0)
+		back.Position = UDim2.fromScale(1, 0)
+		back.Size = UDim2.fromOffset(104, 36)
+		back.Activated:Connect(function()
+			if crate then
+				showPreview(crate)
+			else
+				showList()
+			end
+		end)
+		setMessage(if coinsBack > 0 then text.CoinsBack:format(coinsBack, currency) else "")
 	end
 
 	openWithRobux = function(crate: CrateOdds.Crate)
@@ -1456,6 +1837,10 @@ function CrateUI.Mount(gui: ScreenGui)
 			showReveal(pending)
 			return
 		end
+		if #queue > 0 and not crate then
+			playNext() -- the rest of a multi-open
+			return
+		end
 		if crate then
 			showPreview(crate)
 		else
@@ -1466,10 +1851,39 @@ function CrateUI.Mount(gui: ScreenGui)
 	close.Activated:Connect(function()
 		panel.Visible = false
 	end)
+	-- Space (Config.Crates.Open.SkipKey) skips the spinning strip, then goes on to the next crate
+	-- of a multi-open. Only while the panel is open (so it doesn't stop you jumping otherwise).
+	local SKIP_ACTION = "CrateSkip"
+	local function onSkipKey(
+		_name: string,
+		state: Enum.UserInputState,
+		_input: InputObject
+	): Enum.ContextActionResult
+		if state ~= Enum.UserInputState.Begin or not openView.Visible then
+			return Enum.ContextActionResult.Pass
+		end
+		local fn = skipNow
+		if fn then
+			fn()
+			return Enum.ContextActionResult.Sink
+		elseif reveal.Visible and #queue > 0 then
+			playNext()
+			return Enum.ContextActionResult.Sink
+		end
+		return Enum.ContextActionResult.Pass
+	end
 	panel:GetPropertyChangedSignal("Visible"):Connect(function()
 		if panel.Visible then
+			ContextActionService:BindActionAtPriority(
+				SKIP_ACTION,
+				onSkipKey,
+				false,
+				Enum.ContextActionPriority.High.Value,
+				cfg.Open.SkipKey
+			)
 			return
 		end
+		ContextActionService:UnbindAction(SKIP_ACTION)
 		-- Free the 3D previews while the panel is closed.
 		stopSpin()
 		stopBurst()
@@ -1487,6 +1901,7 @@ function CrateUI.Mount(gui: ScreenGui)
 			child:Destroy()
 		end
 		clear(reveal)
+		clear(resultsView)
 		reveal.Visible = false
 	end)
 

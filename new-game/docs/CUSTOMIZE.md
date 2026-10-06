@@ -269,7 +269,7 @@ The price comes from the item's `Rarity` (`src/shared/Config/Rarity.luau`). To g
 Skins are removed cleanly when unequipped: the player's own avatar comes back.
 
 ### Crate skins: add or change a skin
-The 120 crate skins live in `src/shared/Config/Skins/`, one file per theme: `Pumpkin.luau`, `Candy.luau`, `Spooky.luau`, `Graveyard.luau`, `Monster.luau`, `Moonlight.luau`. Each has 20 skins: 12 Common, 5 Uncommon, 2 Rare and 1 CRAZY. Every style option (colours, materials, patterns, head pieces, glow, auras, CRAZY effects) is explained at the top of `Pumpkin.luau`.
+The crate skins (about 630 with the classic ones) live in `src/shared/Config/Skins/`, one file per theme (30 themes). The six classic themes (`Pumpkin`, `Candy`, `Spooky`, `Graveyard`, `Monster`, `Moonlight`) have 20 skins each: 12 Common, 5 Uncommon, 2 Rare and 1 CRAZY. The 24 newer themes (`VampireCastle`, `ZombieTown`, `HauntedCarnival`, `MummyTomb`, `WerewolfWoods`, `MadScientistLab`, `GhostShip`, `BatCave`, `SpiderLair`, `SkeletonCrew`, `CursedToys`, `ScarecrowFarm`, `HauntedHotel`, `MonsterDisco`, `BlackCatAlley`, `GoblinMarket`, `SwampCreatures`, `WitchsBrew`, `AlienAbduction`, `FrostyFright`, `GraveyardParty`, `CandyFactory`, `PhantomTheatre`, `AutumnLeaves`) have 21 each: 13 Common, 5 Uncommon and 3 Rare, and three of them one ONE IN A MILLION CRAZY skin. There are exactly 10 CRAZY skins in the game (the six classic ones, the Tormented Tower's and the three one-in-a-million ones). The tests check that no two skins look the same. Every style option (colours, materials, patterns, head pieces, glow, auras, CRAZY effects) is explained at the top of `Pumpkin.luau`.
 
 **Add a skin:**
 1. Open the theme file, e.g. `src/shared/Config/Skins/Candy.luau`.
@@ -277,12 +277,13 @@ The 120 crate skins live in `src/shared/Config/Skins/`, one file per theme: `Pum
 3. Give it a new `Id` that starts with the theme (`Candy_BubbleGum`) and a `Name`.
 4. Set its `Rarity` and change its `Style` colours.
 5. Save. It is in the Shop (at its rarity price) and in that theme's crate straight away. The crate odds update by themselves: skins of one rarity share that rarity's chance.
-6. The offline tests (`lune run tests/run`) check that every theme has exactly 12 Common, 5 Uncommon, 2 Rare and 1 CRAZY, so after adding a skin they report the new count. That's expected: ask Claude Code to update the count in `tests/specs/skins.spec.luau`, or use `/add-skin`, which does it for you. (Changing an existing skin's look and name keeps the counts.)
+6. The offline tests (`lune run tests/run`) check how many skins of each rarity every theme has, so after adding a skin they report the new count. That's expected: ask Claude Code to update the count in `tests/specs/skins.spec.luau`, or use `/add-skin`, which does it for you. (Changing an existing skin's look and name keeps the counts.)
 
 **Change a skin:** change its `Name` or anything in `Style` freely. **Never change an `Id`** once the game is live: it is saved in players' data.
 
 **Rules worth knowing:**
-- How rarities should look: Common = colours, materials and an accent; Uncommon = + a head piece; Rare = + glow and particles (`Glow`, `Aura`); CRAZY = everything + `Crazy = { Rainbow, Pulse, Orbit }`.
+- How rarities should look: Common = colours, materials and an accent; Uncommon = + a head piece; Rare = + glow and particles (`Glow`, `Aura`); CRAZY = everything + `Crazy = { Rainbow, Pulse, Orbit }`, and optionally its own animated `Effect` (`Torment`, `BloodMoon`, `DiscoInferno`, `UfoBeam`: `src/client/SkinEffects.luau`, numbers in `Skins/Settings.luau` > `Effects.Special`).
+- The Skins tab of the shop has a theme dropdown (the "All themes" chip) with all 30 themes.
 - `CrateOnly = true` keeps a skin out of the Shop (crates only). `Price = 300` gives it its own price.
 - `Crate = "CandyCrate"` on one skin puts it in a different crate than its theme's.
 - **New theme:** copy a theme file, rename it and every `Id` in it, then add a line to `Themes` in `Skins/Settings.luau` (its `Id` is the file name, `Crate` is the crate it drops from). Add that crate too (see "Crates").
@@ -298,11 +299,19 @@ A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
 Mystery crates give a random skin. Everything about them is in `src/shared/Config/Crates.luau`
 (switch them off with `Config.Features.Crates = false`, or only the Robux ones with
 `Config.Features.RobuxCrates = false`).
-- **Odds**: `Odds = { Common = 70, Uncommon = 24.9, Rare = 5, Crazy = 0.1 }` is the chance (in
+- **Odds**: `Odds = { Common = 73.48, Uncommon = 24, Rare = 2.5, Crazy = 0.02 }` is the chance (in
   percent) of each rarity. The skins of one rarity share it equally, so in the Pumpkin Crate each
-  of the 12 Commons has 5.833% and its one CRAZY skin 0.100%. Keep the total at 100. One crate can
-  have its own `Odds`.
-- **Prices**: each crate's `Price` (coins). A Robux price is set in Creator Hub: make a Developer
+  of the 12 Commons has 6.123% and its one CRAZY skin 0.020%. Keep the total at 100. One crate can
+  have its own `Odds`. Rare and CRAZY were made rarer in the big skin update.
+- **ONE IN A MILLION**: a skin with its own `Odds` (in its theme file: `Odds = 0.0001`) has exactly
+  that chance (0.0001% = 1 open in a million) and the rest of the crate shares the other 99.9999%;
+  the preview shows "0.0001%". These skins (`OneInAMillion = true`: Night Lord Supreme in Vampire
+  Castle, Disco Demon in Monster Disco, Star Voyager in Alien Abduction) are never in the CRAZY Crate.
+  Anyone unboxing a CRAZY skin is announced to the whole server (an extra-big banner for these),
+  words in `Text.AnnounceCrazy` / `Text.AnnounceMillion`, switch: `AnnounceCrazy`.
+- **Prices**: each crate's `Price` (coins): 600 for themed crates (doubled in the big skin update),
+  the rarity crates stay just under the shop price of their rarity (the comment at the top of
+  `Crates.luau` explains why). A Robux price is set in Creator Hub: make a Developer
   Product (Monetization > Developer Products) and paste its id into that crate's
   `Robux.ProductId`. Until then the button says "Coming soon".
 - **Which skins are inside**: a skin is in a crate when its `Crate` is that crate's Id (the theme
@@ -313,9 +322,18 @@ Mystery crates give a random skin. Everything about them is in `src/shared/Confi
   the lobby is rebuilt (F8 > Rebuild hub, or `Bake.Hub()`). A lobby saved in your place keeps its
   stand: copy one of its `<CrateId>Display` models and set the `CrateId` attribute of its
   `CratePrompt` part to the new Id.
-- **Duplicates**: a skin you already own pays back `DuplicateRefund` coins (`Config/Rarity.luau`).
+- **Duplicates**: a skin you already own ALWAYS pays back `DuplicateRefund` coins (`Config/Rarity.luau`:
+  60, 250, 500 or 50,000, about half the shop price); the reveal says "Duplicate! +X coins back".
+- **Open several**: `Open.Counts` (x1, x5, x10). The server rolls them all in one request and takes
+  the coins in one go. While a strip spins, Space (`Open.SkipKey`) or the Skip button jumps to the
+  result, then on to the next crate. **Quick open** (a switch on the crate page, `QuickOpen`) skips
+  the strips: every result on one page, rarity colours, duplicates with their coins back, the best
+  one highlighted.
+- **Tabs and pages**: Menu > Crates has a tab per `Categories` entry (each crate's `Category`), and
+  `PageSize` (`PhonePageSize` on phones) crates per page.
 - **The crate stand** next to the Pumpkin Shop (`src/server/Hub/Sections/CrateStand.luau`, in
-  `Config.Lobby.Zones.Crates`): every crate on a plinth with an "Open" prompt. Each prompt sits on
+  `Config.Lobby.Zones.Crates`): the rarity crates and the themed crates in `Stand.Themed` (there
+  isn't room for all 30) on plinths with an "Open" prompt. Each prompt sits on
   an invisible part tagged `CrateDisplay` with the attribute `CrateId`: move or copy them in
   Studio, or tag any part of your own. Your own crate look: a model named after the crate's Id
   (e.g. `PumpkinCrate`) in `ReplicatedStorage > Custom > Props`.

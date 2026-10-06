@@ -21,7 +21,8 @@ local Tags = rt:require("ReplicatedStorage.Shared.Tags")
 local CollectionService = rt.game:GetService("CollectionService")
 
 local THEMES = { "Pumpkin", "Candy", "Spooky", "Graveyard", "Monster", "Moonlight" }
-local COUNTS = { Common = 12, Uncommon = 5, Rare = 2, Crazy = 1 }
+local COUNTS = { Common = 12, Uncommon = 5, Rare = 2, Crazy = 1 } -- the six classic themes
+local NEWER_COUNTS = { Common = 13, Uncommon = 5, Rare = 3, Crazy = 0 } -- the 24 newer themes (+ one in a million in 3)
 local CLASSIC = { "Skeleton", "PumpkinHead", "Zombie", "Ghost", "Mummy", "KingSkin" }
 
 -- Every Style key a skin may use (a typo here would silently do nothing in game).
@@ -82,7 +83,7 @@ local function noWarnings(fn: () -> ())
 end
 
 describe("Skin catalogue", function()
-	it("has the six themes, each with its crate", function()
+	it("has every theme (the six classic ones too), each with its crate", function()
 		local ids = {}
 		for _, theme in Config.Skins.Themes do
 			table.insert(ids, theme.Id)
@@ -95,30 +96,100 @@ describe("Skin catalogue", function()
 		end
 	end)
 
-	it("has 120 crate skins: 20 per theme, 12 Common, 5 Uncommon, 2 Rare, 1 CRAZY", function()
-		expect(#crateSkins()).toBe(#Config.Skins.Themes * 20)
-		for _, theme in Config.Skins.Themes do
-			local counts = { Common = 0, Uncommon = 0, Rare = 0, Crazy = 0 }
-			for _, item in crateSkins() do
-				if item.Theme == theme.Id then
-					counts[item.Rarity] += 1
+	it(
+		"has about 630 skins: 6 classic themes of 20, 24 newer themes of 21 (+3 one in a million)",
+		function()
+			expect(#Config.Skins.Themes).toBe(30)
+			local million = 0
+			for _, theme in Config.Skins.Themes do
+				local classic = table.find(THEMES, theme.Id) ~= nil
+				local counts = { Common = 0, Uncommon = 0, Rare = 0, Crazy = 0 }
+				local hasMillion = false
+				for _, item in crateSkins() do
+					if item.Theme == theme.Id then
+						if item.OneInAMillion then
+							hasMillion = true
+							million += 1
+						else
+							counts[item.Rarity] += 1
+						end
+					end
 				end
-			end
-			for rarity, want in COUNTS do
-				if counts[rarity] ~= want then
-					error(
-						("%s has %d %s skins, wants %d"):format(
-							theme.Id,
-							counts[rarity],
-							rarity,
-							want
+				local want = if classic then COUNTS else NEWER_COUNTS
+				for rarity, n in want do
+					if counts[rarity] ~= n then
+						error(
+							("%s has %d %s skins, wants %d"):format(
+								theme.Id,
+								counts[rarity],
+								rarity,
+								n
+							)
 						)
-					)
+					end
+				end
+				expect(#Items.ByCrate(theme.Crate)).toBe(
+					(if classic then 20 else 21) + (if hasMillion then 1 else 0)
+				)
+			end
+			expect(million).toBe(3)
+			local total = #skins() + 1 -- (+ the Tormented Tower's own skin)
+			expect(total).toBeGreaterThanOrEqual(600)
+			expect(total).toBeLessThanOrEqual(660)
+			T.note(total, "skins in the game")
+		end
+	)
+
+	it("has exactly 10 CRAZY skins, 3 of them ONE IN A MILLION", function()
+		local crazy, million = 0, 0
+		for _, item in Config.Shop.Items do
+			if Items.Rarity(item) == "Crazy" then
+				crazy += 1
+				if item.OneInAMillion then
+					million += 1
+					expect(item.Odds).toBe(0.0001)
+					expect(type(item.Style.Crazy.Effect)).toBe("string") -- its own animated effect
 				end
 			end
-			expect(#Items.ByCrate(theme.Crate)).toBe(20)
 		end
-		T.note(#skins(), "skins in the shop")
+		expect(crazy).toBe(10)
+		expect(million).toBe(3)
+	end)
+
+	it("makes every skin look clearly different (no two share a look)", function()
+		local function c(v: any): string
+			return if typeof(v) == "Color3"
+				then ("%d,%d,%d"):format(v.R * 255 + 0.5, v.G * 255 + 0.5, v.B * 255 + 0.5)
+				else tostring(v)
+		end
+		local seen: { [string]: string } = {}
+		for _, item in Config.Shop.Items do
+			if item.Slot ~= "Skin" then
+				continue
+			end
+			local s = item.Style
+			local accent = s.Accent or {}
+			local pattern = accent.Pattern
+			if type(pattern) == "table" then
+				pattern = table.concat(pattern, "+")
+			end
+			local key = table.concat({
+				tostring(s.Head),
+				c(s.HeadColor),
+				c(s.HeadColor2),
+				c(s.BodyColor),
+				c(s.TorsoColor),
+				c(s.ArmsColor),
+				c(s.LegsColor),
+				tostring(s.Material),
+				c(accent.Color),
+				tostring(pattern),
+			}, "|")
+			if seen[key] then
+				error(("%s and %s look the same"):format(seen[key], item.Id))
+			end
+			seen[key] = item.Id
+		end
 	end)
 
 	it("gives every crate skin a unique theme-prefixed PascalCase Id and a unique Name", function()
@@ -744,10 +815,13 @@ describe("ShopUI Skins tab", function()
 
 	it("filters by rarity, theme and Owned", function()
 		client:fire(panel.Filters.RarityCrazyFilter, "Activated")
-		expect(#cards()).toBe(#CConfig.Skins.Themes) -- one CRAZY skin per theme
+		expect(#cards()).toBe(9) -- the CRAZY skins on sale (the tower's is hidden until won)
 		client:fire(panel.Filters.RarityAnyFilter, "Activated")
-		client:fire(panel.Filters.ThemeFilter, "Activated") -- All -> Classic
-		client:fire(panel.Filters.ThemeFilter, "Activated") -- Classic -> Pumpkin
+		-- The theme chip opens a dropdown of every theme.
+		client:fire(panel.Filters.ThemeFilter, "Activated")
+		expect(panel.ThemeMenu.Visible).toBe(true)
+		client:fire(panel.ThemeMenu.Theme_Pumpkin, "Activated")
+		expect(panel.ThemeMenu.Visible).toBe(false)
 		local shown = cards()
 		expect(#shown).toBe(math.min(20, CConfig.Skins.Shop.PageSize))
 		client:fire(panel.Filters.OwnedFilter, "Activated")

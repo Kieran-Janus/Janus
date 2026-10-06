@@ -551,11 +551,62 @@ function ShopUI.Mount(gui: ScreenGui)
 	CrateUI.SetShopOpener(function(wanted: CrateUI.ShopFilters)
 		ShopUI.Open("Skin", { Theme = wanted.Theme, Rarity = wanted.Rarity })
 	end)
+	-- The theme chip opens a dropdown of every theme (there are 30), each with its colour.
+	local themeMenu = Instance.new("ScrollingFrame")
+	themeMenu.Name = "ThemeMenu"
+	themeMenu.Visible = false
+	themeMenu.ZIndex = 20
+	themeMenu.BackgroundColor3 = Theme.Background
+	themeMenu.BorderSizePixel = 0
+	themeMenu.Position = UDim2.fromOffset(16, 118)
+	themeMenu.Size = UDim2.new(0, 240, 1, -130)
+	themeMenu.ScrollBarThickness = 6
+	themeMenu.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	themeMenu.CanvasSize = UDim2.new()
+	themeMenu.Parent = panel
+	Theme.round(themeMenu, 8)
+	local menuList = Instance.new("UIListLayout")
+	menuList.SortOrder = Enum.SortOrder.LayoutOrder
+	menuList.Padding = UDim.new(0, 4)
+	menuList.Parent = themeMenu
+	local menuPad = Instance.new("UIPadding")
+	menuPad.PaddingTop = UDim.new(0, 6)
+	menuPad.PaddingLeft = UDim.new(0, 6)
+	menuPad.Parent = themeMenu
+	local themeColours: { [string]: Color3 } = {}
+	for _, theme in Config.Skins.Themes do
+		themeColours[theme.Id] = theme.Color
+	end
+	for i, id in themeIds do
+		local option = button(themeNames[id] or id, themeMenu)
+		option.Name = "Theme_" .. id
+		option.LayoutOrder = i
+		option.ZIndex = 21
+		option.TextSize = 14
+		option.TextXAlignment = Enum.TextXAlignment.Left
+		option.Size = UDim2.new(1, -14, 0, 30)
+		local optionPad = Instance.new("UIPadding")
+		optionPad.PaddingLeft = UDim.new(0, 28)
+		optionPad.Parent = option
+		local swatch = Instance.new("Frame")
+		swatch.Name = "Swatch"
+		swatch.ZIndex = 22
+		swatch.BorderSizePixel = 0
+		swatch.AnchorPoint = Vector2.new(0, 0.5)
+		swatch.Position = UDim2.new(0, -20, 0.5, 0)
+		swatch.Size = UDim2.fromOffset(14, 14)
+		swatch.BackgroundColor3 = themeColours[id] or Theme.Muted
+		swatch.Parent = option
+		Theme.round(swatch, 7)
+		option.Activated:Connect(function()
+			filters.Theme = id
+			page = 1
+			themeMenu.Visible = false
+			render()
+		end)
+	end
 	themeChip.Activated:Connect(function()
-		local index = table.find(themeIds, filters.Theme) or 1
-		filters.Theme = themeIds[index % #themeIds + 1]
-		page = 1
-		render()
+		themeMenu.Visible = not themeMenu.Visible
 	end)
 
 	local function styleChips()
@@ -568,8 +619,11 @@ function ShopUI.Mount(gui: ScreenGui)
 			b.TextColor3 = if selected or id == ANY then Theme.Text else colour
 		end
 		themeChip.Visible = tab == "Skin"
+		if tab ~= "Skin" then
+			themeMenu.Visible = false
+		end
 		cratesChip.Visible = tab == "Skin" and Config.Features.Crates
-		themeChip.Text = (themeNames[filters.Theme] or filters.Theme) .. "  >"
+		themeChip.Text = (themeNames[filters.Theme] or filters.Theme) .. "  ▼"
 		local themeColour: Color3? = nil
 		for _, theme in Config.Skins.Themes do
 			if theme.Id == filters.Theme then

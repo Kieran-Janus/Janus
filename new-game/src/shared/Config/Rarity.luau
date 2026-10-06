@@ -7,7 +7,10 @@
 	  Price            coins to buy an item of this rarity in the shop (an item with its own
 	                   Price uses that instead)
 	  Color            colour of the rarity tag and the crate reveal
-	  DuplicateRefund  coins you get back when a crate gives you something you already own
+	  DuplicateRefund  coins you get back when a crate gives you something you already own:
+	                   always, about half the shop price (crates cost 600 since the big skin
+	                   update, so a duplicate Common still gives 10% of the crate back, and a
+	                   duplicate Rare almost the whole crate)
 	To make every Rare cheaper, change Levels.Rare.Price; every Rare item follows.
 	Don't rename the ids (Common, Uncommon, ...): items and saves use them.
 ]]
@@ -20,26 +23,26 @@ return {
 			Name = "Common",
 			Price = 125,
 			Color = Color3.fromRGB(150, 175, 140), -- soft grey-green
-			DuplicateRefund = 30,
+			DuplicateRefund = 60,
 		},
 		Uncommon = {
 			Name = "Uncommon",
 			Price = 500,
 			Color = Color3.fromRGB(70, 150, 255), -- blue
-			DuplicateRefund = 125,
+			DuplicateRefund = 250,
 		},
 		Rare = {
 			Name = "Rare",
 			Price = 1000,
 			Color = Color3.fromRGB(175, 90, 255), -- purple
-			DuplicateRefund = 250,
+			DuplicateRefund = 500,
 		},
 		Crazy = {
 			Name = "CRAZY",
 			Price = 100000,
 			Color = Color3.fromRGB(255, 60, 200), -- hot pink
 			Rainbow = true, -- the tag cycles through rainbow colours where the UI supports it
-			DuplicateRefund = 25000,
+			DuplicateRefund = 50000,
 		},
 	},
 }

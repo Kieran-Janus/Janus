@@ -537,6 +537,21 @@ Dom.define("BindableFunction", {
 	end,
 })
 
+-- A client calling the server. In a client runtime a test can play the server by setting the
+-- remote's OnServerInvoke (called with the local player); without one the call is only
+-- recorded and returns nothing.
+Dom.define("RemoteFunction", {
+	InvokeServer = function(self, ...)
+		local w = world(self)
+		w:recordCall("RemoteFunction", "InvokeServer", self, ...)
+		local callback = Dom.callback(self, "OnServerInvoke")
+		if callback and w.localPlayer then
+			return callback(w.localPlayer, ...)
+		end
+		return nil
+	end,
+})
+
 -- Debris ------------------------------------------------------------------------------------------
 
 Dom.define("Debris", {

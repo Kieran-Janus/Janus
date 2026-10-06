@@ -5,7 +5,10 @@
 
 	An item's chance = its rarity's odds / how many items of that rarity the crate has. A
 	rarity the crate has no items of is left out and the others are scaled up to fill 100%,
-	so the chances always add up to exactly what players are shown.
+	so the chances always add up to exactly what players are shown. An item with its own Odds
+	(percent, e.g. the one-in-a-million skins: Odds = 0.0001) gets exactly that chance; the
+	rest of the crate shares what is left by rarity. Items with OneInAMillion = true are only
+	in their own themed crate, never in a rarity crate.
 
 	CrateOdds.Get(id) -> crate?            the Config.Crates.List entry with that Id
 	CrateOdds.List() -> { crate }          every crate that has at least one item, in order
@@ -18,7 +21,7 @@
 	CrateOdds.Reel(crate, winnerId, rng, cards, winIndex) -> { itemId }
 	                                       the opening animation's strip: random picks from
 	                                       the crate with the winner at winIndex
-	CrateOdds.Format(percent) -> string    "0.100%"
+	CrateOdds.Format(percent) -> string    "0.100%", or "0.0001%" for tiny chances
 	CrateOdds.CoinPrice(crate) -> number?  coins to open it (nil = not sold for coins)
 	CrateOdds.ProductId(crate) -> number   its Robux Developer Product id (0 = not for sale)
 	CrateOdds.ByProductId(id) -> crate?    the crate a Developer Product opens
@@ -80,6 +83,7 @@ function CrateOdds.Items(crate: Crate): { any }
 		end
 		local mine = item.Crate == crate.Id
 		local byRarity = rarity ~= nil
+			and not item.OneInAMillion
 			and Items.Rarity(item) == rarity
 			and type(item.Crate) == "string"
 			and listed[item.Crate] == true
@@ -132,24 +136,70 @@ local function scaledOdds(crate: Crate, counts: { [string]: number }): { [string
 	return out
 end
 
+-- An item's own fixed chance (percent) in `crate`, or nil. Only in its own themed crate.
+local function fixedOdds(crate: Crate, item: any): number?
+	local odds = item.Odds
+	if type(odds) == "number" and odds > 0 and item.Crate == crate.Id then
+		return odds
+	end
+	return nil
+end
+
+-- The items sharing the crate by rarity (no fixed Odds), and the percent they share.
+local function shared(crate: Crate, items: { any }): ({ any }, number)
+	local rest = {}
+	local fixedTotal = 0
+	for _, item in items do
+		local fixed = fixedOdds(crate, item)
+		if fixed then
+			fixedTotal += fixed
+		else
+			table.insert(rest, item)
+		end
+	end
+	return rest, math.max(0, 100 - fixedTotal)
+end
+
 function CrateOdds.RarityOdds(crate: Crate): { [string]: number }
-	return scaledOdds(crate, countByRarity(CrateOdds.Items(crate)))
+	local items = CrateOdds.Items(crate)
+	local rest, share = shared(crate, items)
+	local odds = scaledOdds(crate, countByRarity(rest))
+	for rarity, percent in odds do
+		odds[rarity] = percent * share / 100
+	end
+	-- Fixed-odds items count towards their rarity's total.
+	for _, item in items do
+		local fixed = fixedOdds(crate, item)
+		if fixed then
+			local rarity = Items.Rarity(item)
+			odds[rarity] = (odds[rarity] or 0) + fixed
+		end
+	end
+	return odds
 end
 
 function CrateOdds.Chances(crate: Crate): { Chance }
 	local items = CrateOdds.Items(crate)
-	local counts = countByRarity(items)
+	local rest, share = shared(crate, items)
+	local counts = countByRarity(rest)
 	local odds = scaledOdds(crate, counts)
 	local out: { Chance } = {}
-	-- Highest rarity first (CRAZY at the top), Config order inside a rarity.
+	-- Highest rarity first (CRAZY at the top), Config order inside a rarity; fixed-odds items
+	-- (the one-in-a-million skins) first of all.
+	for _, item in items do
+		local fixed = fixedOdds(crate, item)
+		if fixed then
+			table.insert(out, { Item = item, Rarity = Items.Rarity(item), Chance = fixed })
+		end
+	end
 	for i = #Config.Rarity.Order, 1, -1 do
 		local rarity = Config.Rarity.Order[i]
-		local share = odds[rarity]
-		if not share then
+		local percent = odds[rarity]
+		if not percent then
 			continue
 		end
-		local each = share / counts[rarity]
-		for _, item in items do
+		local each = percent * share / 100 / counts[rarity]
+		for _, item in rest do
 			if Items.Rarity(item) == rarity then
 				table.insert(out, { Item = item, Rarity = rarity, Chance = each })
 			end
@@ -203,6 +253,11 @@ function CrateOdds.Reel(
 end
 
 function CrateOdds.Format(percent: number): string
+	if percent > 0 and percent < 0.001 then
+		-- Tiny chances show every digit that matters: "0.0001%", never "0.000%".
+		local digits = ("%.6f"):format(percent):gsub("0+$", "")
+		return digits .. "%"
+	end
 	return ("%.3f%%"):format(percent)
 end
 

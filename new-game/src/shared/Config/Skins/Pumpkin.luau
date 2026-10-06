@@ -26,7 +26,10 @@
 	                  CatHead, WitchHood, CauldronHat, SpiderCrown, PotionHead, SkinSkull,
 	                  MummyHead, ZombieHead, TombstoneHead, VampireHead, LanternHead,
 	                  FrankenHead, EyeballHead, WolfHead, FuzzyHead, BlobHead, MoonHead,
-	                  OwlHead, ToadstoolHead, StarHead, MothHead
+	                  OwlHead, ToadstoolHead, StarHead, MothHead, ClownHead, PharaohHead,
+	                  MadHair, CaptainHat, TeddyHead, BellhopHat, DiscoAfro, GoblinHead,
+	                  FrogHead, AlienHead, SnowmanHead, PhantomMask, AcornHead, PartyHat,
+	                  GumballHead
 	    HeadColor2    the head piece's second colour (hat, wrapper, inner ears...)
 	    HeadColor3    a third colour (only GentlemanGourd's hat band)
 	    GlowColor     the head piece's glowing bits (carved face, eyes, flame, potion)
@@ -42,7 +45,7 @@
 	                  Pulse: the glow pulses;  Orbit: pieces flying around you (Pumpkins,
 	                  Candies, Ghosts, Bones, Eyes, Stars, Bats), Count of them
 	                  CRAZY heads are one per crate: MegaGourd, SugarStorm, PhantomKing,
-	                  StarSkull, GloopMonster, MoonCrown
+	                  StarSkull, GloopMonster, MoonCrown, NightLord, DiscoDemon, StarVoyager
 	How each rarity should look: Common = colours, materials and an accent; Uncommon = + a
 	head piece; Rare = + glow and particles; CRAZY = everything + rainbow + orbiting pieces.
 ]]

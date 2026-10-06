@@ -7,12 +7,18 @@
 	before they open it (a Roblox rule for paid random items).
 
 	HOW A CRATE PICKS A SKIN
-	  1. It picks a rarity using the crate's Odds (percent: Common 70 means 70 in 100 opens).
+	  1. It picks a rarity using the crate's Odds (percent: Common 73.48 means 73.48 in 100 opens).
 	  2. It picks one skin of that rarity from the crate, every skin equally likely.
 	  So one skin's chance = its rarity's odds / how many skins of that rarity the crate has.
-	  Pumpkin Crate: 12 Commons share 70% (5.833% each), 5 Uncommons share 24.9% (4.980%
-	  each), 2 Rares share 5% (2.500% each) and its one CRAZY skin has 0.100%.
-	  A rarity with no skins in a crate is skipped and the others grow to fill 100%.
+	  Pumpkin Crate: 12 Commons share 73.48% (6.123% each), 5 Uncommons share 24% (4.800%
+	  each), 2 Rares share 2.5% (1.250% each) and its one CRAZY skin has 0.020%.
+	  A rarity with no skins in a crate is skipped and the others grow to fill 100% (the newer
+	  crates have no ordinary CRAZY skin, so their 13 Commons, 5 Uncommons and 3 Rares share it).
+	  ONE IN A MILLION: a skin with its own Odds (in its theme file, e.g. Odds = 0.0001) has
+	  exactly that chance (0.0001% = 1 open in a million), and the rest of the crate shares the
+	  other 99.9999%. These skins (OneInAMillion = true) are never in the CRAZY Crate.
+	  Rare and CRAZY were made rarer in the big skin update (Rare 5% -> 2.5%, CRAZY 0.1% ->
+	  0.02%), so they stay special now that there are about 630 skins.
 
 	WHICH SKINS ARE IN A CRATE
 	  Themed crates: every skin whose Crate is that crate's Id (the theme files in
@@ -45,13 +51,19 @@
 	  Robux      { ProductId = 0, SuggestedRobux = 49 }
 	  Rarity     (rarity crates only) the rarity it gives, 100% of the time
 	  Odds       (optional) this crate's own odds instead of the ones below
-	Prices (themed crates): one open is worth about 362 coins on average at shop prices
-	(0.70 x 125 + 0.249 x 500 + 0.05 x 1000 + 0.001 x 100000), or about 262 without the very
-	rare CRAZY skin. 300 coins (about two rounds of pumpkins) is a fair gamble for a new player,
-	and once you own most Commons, duplicates pay some coins back (Config/Rarity.luau,
-	DuplicateRefund), so collecting the last skins of a theme in the shop is still worth it.
+	  Category   (optional) its tab in Menu > Crates (Categories below)
+	Prices (themed crates): 600 coins, double the old 300, since there are now 30 crates and the
+	best skins are much rarer: a crate is a gamble for the rare and the one-in-a-million skins,
+	not the cheap way to get Commons (buy those in the shop for 125). One open is worth about
+	257 coins at shop prices (0.7348 x 125 + 0.24 x 500 + 0.025 x 1000 + 0.0002 x 100000), and
+	EVERY duplicate pays coins back (Config/Rarity.luau, DuplicateRefund: about half the shop
+	price), so a crate never leaves you empty-handed.
 	Rarity crates cost a bit less than buying one skin of that rarity in the shop (125, 500,
-	1000, 100000), because you don't get to choose which skin you get.
+	1000, 100000), because you don't get to choose which skin you get. They were NOT doubled:
+	doubled they would cost more than the shop.
+	OPEN SEVERAL AT ONCE: Open.Counts (x1, x5, x10). The server rolls them all in one request
+	and takes the coins in one go. QuickOpen skips the spinning strip and shows every result
+	on one page.
 ]]
 
 export type RobuxInfo = { ProductId: number, SuggestedRobux: number }
@@ -68,6 +80,7 @@ export type Crate = {
 	Robux: RobuxInfo?,
 	Rarity: string?,
 	Odds: { [string]: number }?,
+	Category: string?, -- which tab of Menu > Crates it is on (Categories below)
 }
 
 local rgb = Color3.fromRGB
@@ -75,9 +88,37 @@ local rgb = Color3.fromRGB
 return {
 	-- The chance of each rarity (percent) for every crate without its own Odds. Must add up
 	-- to 100. Rarity names are the ones in Config/Rarity.luau.
-	Odds = { Common = 70, Uncommon = 24.9, Rare = 5, Crazy = 0.1 } :: { [string]: number },
+	Odds = { Common = 73.48, Uncommon = 24, Rare = 2.5, Crazy = 0.02 } :: { [string]: number },
 
 	RequestCooldown = 1, -- seconds between two crate opens by the same player
+	-- Open several at once: the buttons on a crate's page (each costs Count x Price, taken in one
+	-- go). The server rolls them all in one request (RequestCooldown still applies).
+	Open = {
+		Counts = { 1, 5, 10 },
+		SkipKey = Enum.KeyCode.Space, -- jumps straight to the result while the strip spins
+	},
+	-- Quick open: a switch on the crate page. On = no spinning strip: every result at once on one
+	-- page, in a grid with rarity colours, duplicates marked with their coins back and the best
+	-- skin highlighted.
+	QuickOpen = {
+		Default = false, -- the switch's starting position
+		Columns = 5, -- results per row (phones use PhoneColumns)
+		PhoneColumns = 3,
+	},
+	-- The tabs of Menu > Crates (each crate's Category). A crate with no Category goes on the
+	-- first tab. Crates per page = PageSize (PhonePageSize on phones).
+	Categories = {
+		"Classic",
+		"Monsters",
+		"Haunted Places",
+		"Creepy Critters",
+		"Sweet & Silly",
+		"By Rarity",
+	},
+	PageSize = 8,
+	PhonePageSize = 6,
+	-- A server-wide announcement when anyone unboxes a CRAZY skin (Config.Announce has the looks).
+	AnnounceCrazy = true,
 	-- After winning one of these rarities the save is written straight away (other wins are
 	-- saved by the normal autosave, Config.Data.AutosaveSeconds).
 	SaveRightAway = { Rare = true, Crazy = true } :: { [string]: boolean },
@@ -145,6 +186,15 @@ return {
 	-- saved in the place keeps the stand it was built with.
 	Stand = {
 		SignText = "MYSTERY CRATES",
+		-- The themed crates on the stand (it has room for six; every crate is in Menu > Crates).
+		Themed = {
+			"PumpkinCrate",
+			"CandyCrate",
+			"SpookyCrate",
+			"GraveyardCrate",
+			"MonsterCrate",
+			"MoonlightCrate",
+		},
 		CrateSize = 2.6, -- studs, the crate box
 		PromptDistance = 9, -- how close you must be to see "Open <crate>"
 		Bob = 0.35, -- how far the crates float up and down (0 = they sit still)
@@ -164,7 +214,19 @@ return {
 		Chances = "What's inside",
 		Owned = "Owned",
 		New = "NEW!",
-		Duplicate = "Duplicate! +%d %s", -- coins, currency name
+		Duplicate = "Duplicate! +%d %s back", -- coins, currency name
+		DuplicateShort = "Duplicate! +%d", -- on a small result card
+		OpenMany = "x%d  %s", -- the open buttons: count, price
+		QuickOpen = "Quick open",
+		SkipHint = "Space = skip",
+		Next = "Next (%d left)", -- after a reveal, when several were opened
+		Results = "You opened %d crates!",
+		Best = "BEST!",
+		CoinsBack = "Duplicates paid back %d %s",
+		Page = "%d / %d",
+		OneInAMillion = "ONE IN A MILLION!",
+		AnnounceCrazy = "%s unboxed the CRAZY skin %s!", -- player, skin
+		AnnounceMillion = "%s unboxed %s: a ONE IN A MILLION skin!!!",
 		Equip = "Equip now",
 		Wearing = "Wearing it!",
 		OpenAnother = "Open another",
@@ -194,8 +256,9 @@ return {
 			Trim = rgb(92, 52, 24),
 			Glow = rgb(255, 220, 110),
 			Topper = "Pumpkins",
-			Price = 300,
-			Robux = { ProductId = 0, SuggestedRobux = 49 },
+			Category = "Classic",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
 		},
 		{
 			Id = "CandyCrate",
@@ -205,8 +268,9 @@ return {
 			Trim = rgb(255, 245, 250),
 			Glow = rgb(140, 240, 255),
 			Topper = "Candies",
-			Price = 300,
-			Robux = { ProductId = 0, SuggestedRobux = 49 },
+			Category = "Classic",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
 		},
 		{
 			Id = "SpookyCrate",
@@ -216,8 +280,9 @@ return {
 			Trim = rgb(40, 28, 60),
 			Glow = rgb(170, 255, 140),
 			Topper = "Ghosts",
-			Price = 300,
-			Robux = { ProductId = 0, SuggestedRobux = 49 },
+			Category = "Classic",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
 		},
 		{
 			Id = "GraveyardCrate",
@@ -227,8 +292,9 @@ return {
 			Trim = rgb(60, 58, 66),
 			Glow = rgb(130, 255, 200),
 			Topper = "Bones",
-			Price = 300,
-			Robux = { ProductId = 0, SuggestedRobux = 49 },
+			Category = "Classic",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
 		},
 		{
 			Id = "MonsterCrate",
@@ -238,8 +304,9 @@ return {
 			Trim = rgb(70, 40, 110),
 			Glow = rgb(255, 240, 90),
 			Topper = "Eyes",
-			Price = 300,
-			Robux = { ProductId = 0, SuggestedRobux = 49 },
+			Category = "Classic",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
 		},
 		{
 			Id = "MoonlightCrate",
@@ -249,8 +316,300 @@ return {
 			Trim = rgb(225, 230, 255),
 			Glow = rgb(190, 220, 255),
 			Topper = "Stars",
-			Price = 300,
-			Robux = { ProductId = 0, SuggestedRobux = 49 },
+			Category = "Classic",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+
+		-- THE NEWER THEMED CRATES (in Menu > Crates; the lobby stand shows the ones in Stand.Themed).
+		-- Three of them hold a ONE IN A MILLION skin (its own Odds in its theme file).
+		{
+			Id = "VampireCastleCrate",
+			Name = "Vampire Castle Crate",
+			Blurb = "Capes, fangs and candlelit halls. Holds a ONE IN A MILLION skin!",
+			Color = rgb(150, 20, 40),
+			Trim = rgb(30, 15, 30),
+			Glow = rgb(255, 80, 100),
+			Topper = "Bats",
+			Category = "Monsters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "ZombieTownCrate",
+			Name = "Zombie Town Crate",
+			Blurb = "Shuffling neighbours who really like brains.",
+			Color = rgb(110, 150, 80),
+			Trim = rgb(80, 60, 50),
+			Glow = rgb(220, 255, 120),
+			Topper = "Eyes",
+			Category = "Monsters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "WerewolfWoodsCrate",
+			Name = "Werewolf Woods Crate",
+			Blurb = "Howls, flannel and a very full moon.",
+			Color = rgb(120, 85, 60),
+			Trim = rgb(40, 70, 45),
+			Glow = rgb(230, 230, 255),
+			Topper = "Stars",
+			Category = "Monsters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "MummyTombCrate",
+			Name = "Mummy Tomb Crate",
+			Blurb = "Wrapped, golden and a little bit cursed.",
+			Color = rgb(225, 200, 140),
+			Trim = rgb(40, 70, 170),
+			Glow = rgb(255, 215, 90),
+			Topper = "Gem",
+			Category = "Monsters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "SkeletonCrewCrate",
+			Name = "Skeleton Crew Crate",
+			Blurb = "A rattling pirate crew, bones and all.",
+			Color = rgb(240, 235, 215),
+			Trim = rgb(40, 50, 100),
+			Glow = rgb(255, 220, 120),
+			Topper = "Bones",
+			Category = "Monsters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "SwampCreaturesCrate",
+			Name = "Swamp Creatures Crate",
+			Blurb = "Croaks, bubbles and mud between your toes.",
+			Color = rgb(60, 140, 120),
+			Trim = rgb(90, 80, 50),
+			Glow = rgb(160, 255, 120),
+			Topper = "Eyes",
+			Category = "Monsters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "GoblinMarketCrate",
+			Name = "Goblin Market Crate",
+			Blurb = "Shady deals from the greenest traders.",
+			Color = rgb(110, 170, 60),
+			Trim = rgb(120, 80, 50),
+			Glow = rgb(255, 210, 80),
+			Topper = "Gem",
+			Category = "Monsters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "HauntedCarnivalCrate",
+			Name = "Haunted Carnival Crate",
+			Blurb = "Step right up... if you dare.",
+			Color = rgb(220, 40, 50),
+			Trim = rgb(255, 210, 50),
+			Glow = rgb(120, 255, 240),
+			Topper = "Candies",
+			Category = "Haunted Places",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "HauntedHotelCrate",
+			Name = "Haunted Hotel Crate",
+			Blurb = "Check in any time. Never check out.",
+			Color = rgb(150, 20, 40),
+			Trim = rgb(220, 180, 80),
+			Glow = rgb(255, 240, 180),
+			Topper = "Ghosts",
+			Category = "Haunted Places",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "GhostShipCrate",
+			Name = "Ghost Ship Crate",
+			Blurb = "A phantom crew sailing through the mist.",
+			Color = rgb(40, 70, 110),
+			Trim = rgb(190, 160, 110),
+			Glow = rgb(140, 255, 240),
+			Topper = "Ghosts",
+			Category = "Haunted Places",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "PhantomTheatreCrate",
+			Name = "Phantom Theatre Crate",
+			Blurb = "Masks, curtains and a ghostly encore.",
+			Color = rgb(160, 20, 40),
+			Trim = rgb(225, 185, 80),
+			Glow = rgb(255, 245, 200),
+			Topper = "Stars",
+			Category = "Haunted Places",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "GraveyardPartyCrate",
+			Name = "Graveyard Party Crate",
+			Blurb = "The dead really know how to party.",
+			Color = rgb(255, 110, 190),
+			Trim = rgb(70, 70, 80),
+			Glow = rgb(255, 230, 90),
+			Topper = "Bones",
+			Category = "Haunted Places",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "MadScientistLabCrate",
+			Name = "Mad Scientist Lab Crate",
+			Blurb = "Bubbling beakers and crackling coils.",
+			Color = rgb(235, 240, 245),
+			Trim = rgb(60, 170, 255),
+			Glow = rgb(140, 255, 90),
+			Topper = "Gem",
+			Category = "Haunted Places",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "BatCaveCrate",
+			Name = "Bat Cave Crate",
+			Blurb = "Echoes, crystals and upside-down naps.",
+			Color = rgb(70, 60, 90),
+			Trim = rgb(150, 140, 130),
+			Glow = rgb(200, 150, 255),
+			Topper = "Bats",
+			Category = "Creepy Critters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "SpiderLairCrate",
+			Name = "Spider Lair Crate",
+			Blurb = "Eight legs, many eyes, lots of webs.",
+			Color = rgb(40, 30, 50),
+			Trim = rgb(230, 230, 240),
+			Glow = rgb(150, 255, 80),
+			Topper = "Eyes",
+			Category = "Creepy Critters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "BlackCatAlleyCrate",
+			Name = "Black Cat Alley Crate",
+			Blurb = "Nine lives of midnight mischief.",
+			Color = rgb(30, 25, 40),
+			Trim = rgb(150, 70, 55),
+			Glow = rgb(160, 255, 90),
+			Topper = "Eyes",
+			Category = "Creepy Critters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "ScarecrowFarmCrate",
+			Name = "Scarecrow Farm Crate",
+			Blurb = "Straw, crows and a field full of pumpkins.",
+			Color = rgb(230, 200, 110),
+			Trim = rgb(180, 50, 40),
+			Glow = rgb(255, 180, 70),
+			Topper = "Pumpkins",
+			Category = "Creepy Critters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "AlienAbductionCrate",
+			Name = "Alien Abduction Crate",
+			Blurb = "Beamed up from far away. Holds a ONE IN A MILLION skin!",
+			Color = rgb(120, 230, 90),
+			Trim = rgb(200, 205, 215),
+			Glow = rgb(90, 240, 255),
+			Topper = "Stars",
+			Category = "Creepy Critters",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "CursedToysCrate",
+			Name = "Cursed Toys Crate",
+			Blurb = "Toys that play with you when the lights go out.",
+			Color = rgb(240, 140, 180),
+			Trim = rgb(80, 150, 240),
+			Glow = rgb(255, 230, 120),
+			Topper = "Stars",
+			Category = "Sweet & Silly",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "MonsterDiscoCrate",
+			Name = "Monster Disco Crate",
+			Blurb = "Funky beats and glitter. Holds a ONE IN A MILLION skin!",
+			Color = rgb(160, 60, 255),
+			Trim = rgb(255, 210, 60),
+			Glow = rgb(255, 120, 230),
+			Topper = "Stars",
+			Category = "Sweet & Silly",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "CandyFactoryCrate",
+			Name = "Candy Factory Crate",
+			Blurb = "Fresh off the sugary conveyor belt.",
+			Color = rgb(255, 140, 200),
+			Trim = rgb(140, 240, 200),
+			Glow = rgb(255, 245, 140),
+			Topper = "Candies",
+			Category = "Sweet & Silly",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "WitchsBrewCrate",
+			Name = "Witch's Brew Crate",
+			Blurb = "Bubble, bubble, a brand-new look.",
+			Color = rgb(100, 40, 140),
+			Trim = rgb(30, 25, 35),
+			Glow = rgb(130, 255, 100),
+			Topper = "Stars",
+			Category = "Sweet & Silly",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "FrostyFrightCrate",
+			Name = "Frosty Fright Crate",
+			Blurb = "A chilly scare from the snowy north.",
+			Color = rgb(140, 200, 255),
+			Trim = rgb(240, 245, 255),
+			Glow = rgb(200, 250, 255),
+			Topper = "Stars",
+			Category = "Sweet & Silly",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
+		},
+		{
+			Id = "AutumnLeavesCrate",
+			Name = "Autumn Leaves Crate",
+			Blurb = "Crunchy leaves, cosy scarves and acorns.",
+			Color = rgb(230, 130, 40),
+			Trim = rgb(110, 75, 45),
+			Glow = rgb(255, 210, 90),
+			Topper = "Pumpkins",
+			Category = "Sweet & Silly",
+			Price = 600,
+			Robux = { ProductId = 0, SuggestedRobux = 79 },
 		},
 
 		-- RARITY CRATES (every crate skin of one rarity, from every theme) ---------------------
@@ -263,6 +622,7 @@ return {
 			Trim = rgb(70, 80, 66),
 			Glow = rgb(235, 255, 225),
 			Topper = "Gem",
+			Category = "By Rarity",
 			Price = 100,
 			Robux = { ProductId = 0, SuggestedRobux = 19 },
 		},
@@ -275,6 +635,7 @@ return {
 			Trim = rgb(30, 50, 110),
 			Glow = rgb(190, 230, 255),
 			Topper = "Gem",
+			Category = "By Rarity",
 			Price = 400,
 			Robux = { ProductId = 0, SuggestedRobux = 69 },
 		},
@@ -287,6 +648,7 @@ return {
 			Trim = rgb(60, 25, 100),
 			Glow = rgb(255, 210, 255),
 			Topper = "Gem",
+			Category = "By Rarity",
 			Price = 800,
 			Robux = { ProductId = 0, SuggestedRobux = 129 },
 		},
@@ -299,6 +661,7 @@ return {
 			Trim = rgb(255, 215, 70),
 			Glow = rgb(255, 255, 255),
 			Topper = "Gem",
+			Category = "By Rarity",
 			Price = 80000,
 			-- Optional: leave ProductId at 0 to keep this one coins-only.
 			Robux = { ProductId = 0, SuggestedRobux = 1999 },

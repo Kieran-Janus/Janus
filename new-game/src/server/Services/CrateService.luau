@@ -12,12 +12,17 @@
 	crate panel to hide its buy buttons.
 
 	Client -> server:
-	  OpenCrate(crateId) -> Result        opens a crate for its coin Price
+	  OpenCrate(crateId, count?) -> Result opens `count` crates (one of Config.Crates.Open.Counts,
+	                                      default 1) for count x its coin Price, taken in one go;
+	                                      the server rolls them all. Result.Results lists every
+	                                      result when count > 1 (Result itself is the first).
 	Server -> client:
 	  CrateResult(Result)                 a crate opened some other way (Robux purchase, F8
 	                                      free crate): the panel plays the opening for it
 	Result = { Ok, Message, CrateId, ItemId?, ItemName?, Rarity?, Duplicate?, Refund?, Reel?,
 	           WinIndex?, Paid? } (Reel: item ids for the spinning strip, Reel[WinIndex] = ItemId)
+	A CRAZY skin unboxed any way is announced to the whole server (AnnounceService; "Huge" for a
+	ONE IN A MILLION skin) while Config.Crates.AnnounceCrazy is on.
 
 	Robux crates: MonetizationService's ProcessReceipt calls CrateService.Grant for products
 	that are a crate's Robux.ProductId (and undoes it if the save fails).
@@ -43,6 +48,7 @@ local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local AdminService = require(script.Parent.AdminService)
+local AnnounceService = require(script.Parent.AnnounceService)
 local DataService = require(script.Parent.DataService)
 local ShopService = require(script.Parent.ShopService)
 
@@ -58,6 +64,8 @@ export type Result = {
 	Reel: { string }?,
 	WinIndex: number?,
 	Paid: string?, -- "Coins", "Robux" or "Free"
+	OneInAMillion: boolean?,
+	Results: { Result }?, -- every result, when several crates were opened at once
 }
 
 local CrateService = {}
@@ -198,7 +206,17 @@ function CrateService.Grant(
 		Reel = CrateOdds.Reel(crate, item.Id, rng, reel.Cards, winIndex),
 		WinIndex = winIndex,
 		Paid = paid,
+		OneInAMillion = if item.OneInAMillion then true else nil,
 	}
+	-- A CRAZY skin: the whole server hears about it (extra big for a one-in-a-million one).
+	if rarity == "Crazy" and Config.Crates.AnnounceCrazy then
+		local t = text()
+		local words = if item.OneInAMillion then t.AnnounceMillion else t.AnnounceCrazy
+		AnnounceService.All(
+			words:format(player.DisplayName, item.Name),
+			if item.OneInAMillion then "Huge" else "Big"
+		)
+	end
 	local function undo()
 		if duplicate then
 			if refund > 0 then
@@ -224,11 +242,19 @@ local function saveIfRare(player: Player, result: Result)
 	end
 end
 
-local function onOpen(player: Player, crateId: unknown): Result
+local function onOpen(player: Player, crateId: unknown, countIn: unknown): Result
 	local t = text()
 	local id = if typeof(crateId) == "string" and #crateId <= 64 then crateId else ""
 	if not Config.Features.Crates then
 		return fail(id, t.Closed)
+	end
+	-- How many at once: only the counts the crate page offers (x1, x5, x10).
+	local count = 1
+	if countIn ~= nil then
+		if typeof(countIn) ~= "number" or not table.find(Config.Crates.Open.Counts, countIn) then
+			return fail(id, t.NoCrate)
+		end
+		count = countIn :: number
 	end
 	local now = os.clock()
 	if now - (lastOpen[player] or -math.huge) < Config.Crates.RequestCooldown then
@@ -250,17 +276,41 @@ local function onOpen(player: Player, crateId: unknown): Result
 	if not data then
 		return fail(id, t.NotLoaded)
 	end
-	if not DataService.Spend(player, "Coins", price) then
-		return fail(id, t.NoCoins:format(price - (data.Coins or 0), Config.Economy.CurrencyName))
+	local total = price * count
+	if not DataService.Spend(player, "Coins", total) then
+		return fail(id, t.NoCoins:format(total - (data.Coins or 0), Config.Economy.CurrencyName))
 	end
-	local result = CrateService.Grant(player, crate, "Coins")
-	if not result then
-		DataService.Add(player, "Coins", price) -- nothing was given: give the coins back
+	local results: { Result } = {}
+	for _ = 1, count do
+		local result = CrateService.Grant(player, crate, "Coins")
+		if not result then
+			break
+		end
+		table.insert(results, result)
+	end
+	if #results < count then
+		-- Some weren't given (an empty crate): give their coins back.
+		DataService.Add(player, "Coins", price * (count - #results))
+	end
+	local first = results[1]
+	if not first then
 		return fail(id, t.NoCrate)
 	end
-	saveIfRare(player, result)
+	-- One save for the batch if anything in it was Rare or better.
+	for _, result in results do
+		if result.Rarity and Config.Crates.SaveRightAway[result.Rarity] then
+			saveIfRare(player, result)
+			break
+		end
+	end
 	ShopService.Push(player)
-	return result
+	if count > 1 then
+		-- (A copy of the first: a table that contains itself can't be sent to the client.)
+		local batch = table.clone(first)
+		batch.Results = results
+		return batch
+	end
+	return first
 end
 
 -- The crate stand -------------------------------------------------------------------------

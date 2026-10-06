@@ -39,10 +39,10 @@ describe("Config.Crates and CrateOdds", function()
 
 	it("has the default odds, adding up to 100", function()
 		local odds = Config.Crates.Odds
-		expect(odds.Common).toBe(70)
-		expect(odds.Uncommon).toBe(24.9)
-		expect(odds.Rare).toBe(5)
-		expect(odds.Crazy).toBe(0.1)
+		expect(odds.Common).toBe(73.48)
+		expect(odds.Uncommon).toBe(24)
+		expect(odds.Rare).toBe(2.5) -- rarer since the big skin update (was 5)
+		expect(odds.Crazy).toBe(0.02) -- (was 0.1)
 		local total = 0
 		for _, v in odds do
 			total += v
@@ -111,34 +111,83 @@ describe("Config.Crates and CrateOdds", function()
 		expect(seen).toEqual({ Common = 12, Uncommon = 5, Rare = 2, Crazy = 1 })
 		local chances = CrateOdds.Chances(pumpkin)
 		expect(chances[1].Rarity).toBe("Crazy") -- highest rarity first
-		expect(CrateOdds.Format(chances[1].Chance)).toBe("0.100%")
+		expect(CrateOdds.Format(chances[1].Chance)).toBe("0.020%")
 		for _, c in chances do
 			local expected = Config.Crates.Odds[c.Rarity] / seen[c.Rarity]
 			expect(c.Chance).toBeNear(expected, 1e-9)
 		end
-		expect(CrateOdds.Format(70 / 12)).toBe("5.833%")
-		expect(CrateOdds.Format(24.9 / 5)).toBe("4.980%")
+		expect(CrateOdds.Format(73.48 / 12)).toBe("6.123%")
+		expect(CrateOdds.Format(24 / 5)).toBe("4.800%")
+		expect(CrateOdds.Format(0.0001)).toBe("0.0001%") -- tiny chances show every digit
+		expect(CrateOdds.Format(0.00025)).toBe("0.00025%")
 	end)
 
-	it("fills rarity crates with only their rarity, from every theme", function()
-		for _, rarity in Config.Rarity.Order do
-			local crate = CrateOdds.Get(rarity .. "Crate")
-			local chances = CrateOdds.Chances(crate)
-			local themes = {}
-			for _, c in chances do
-				expect(c.Rarity).toBe(rarity)
-				expect(Items.Rarity(c.Item)).toBe(rarity)
-				expect(c.Chance).toBeNear(100 / #chances, 1e-9)
-				themes[c.Item.Theme] = true
-			end
-			for _, theme in Config.Skins.Themes do
-				if not themes[theme.Id] then
-					error(("%s has nothing from the %s theme"):format(crate.Id, theme.Id))
+	it(
+		"fills rarity crates with only their rarity, from every theme (never a one-in-a-million)",
+		function()
+			for _, rarity in Config.Rarity.Order do
+				local crate = CrateOdds.Get(rarity .. "Crate")
+				local chances = CrateOdds.Chances(crate)
+				local themes = {}
+				for _, c in chances do
+					expect(c.Rarity).toBe(rarity)
+					expect(Items.Rarity(c.Item)).toBe(rarity)
+					expect(c.Chance).toBeNear(100 / #chances, 1e-9)
+					expect(c.Item.OneInAMillion).toBeFalsy()
+					themes[c.Item.Theme] = true
+				end
+				for _, theme in Config.Skins.Themes do
+					-- (the newer themes have no ordinary CRAZY skin)
+					local has = false
+					for _, item in Config.Shop.Items do
+						if
+							item.Theme == theme.Id
+							and Items.Rarity(item) == rarity
+							and not item.OneInAMillion
+						then
+							has = true
+						end
+					end
+					if has and not themes[theme.Id] then
+						error(("%s has nothing from the %s theme"):format(crate.Id, theme.Id))
+					end
 				end
 			end
+			-- The CRAZY Crate: the six classic CRAZY skins (not the tower's, not the one-in-a-million).
+			expect(#CrateOdds.Chances(CrateOdds.Get("CrazyCrate"))).toBe(6)
 		end
-		expect(#CrateOdds.Chances(CrateOdds.Get("CrazyCrate"))).toBe(#Config.Skins.Themes)
-	end)
+	)
+
+	it(
+		"gives the ONE IN A MILLION skins exactly 0.0001% in their own crate, and every crate 100%",
+		function()
+			local million = {}
+			for _, item in Config.Shop.Items do
+				if item.OneInAMillion then
+					table.insert(million, item)
+				end
+			end
+			expect(#million).toBe(3)
+			for _, item in million do
+				expect(Items.Rarity(item)).toBe("Crazy")
+				local crate = CrateOdds.Get(item.Crate)
+				local found = nil
+				local total = 0
+				for _, c in CrateOdds.Chances(crate) do
+					total += c.Chance
+					if c.Item == item then
+						found = c
+					end
+				end
+				expect(found).toBeTruthy()
+				expect(found.Chance).toBe(0.0001)
+				expect(CrateOdds.Format(found.Chance)).toBe("0.0001%")
+				expect(total).toBeNear(100, 1e-9)
+				-- Shown first, above the Rares.
+				expect(CrateOdds.Chances(crate)[1].Item).toBe(item)
+			end
+		end
+	)
 
 	it("scales the odds up when a crate has no items of a rarity", function()
 		local crate = {
@@ -316,7 +365,7 @@ describe("CrateService (coins)", function()
 		expect(result.Duplicate).toBe(false)
 		expect(result.Refund).toBe(0)
 		expect(data.Owned[result.ItemId]).toBe(true)
-		expect(data.Coins).toBe(before - 300)
+		expect(data.Coins).toBe(before - 600)
 		expect(data.Crates.Opened).toBe(1)
 		expect(#result.Reel).toBe(Config.Crates.Reel.Cards)
 		expect(result.Reel[result.WinIndex]).toBe(result.ItemId)
@@ -327,7 +376,7 @@ describe("CrateService (coins)", function()
 		for _, item in Items.ByCrate("GraveyardCrate") do
 			data.Owned[item.Id] = true
 		end
-		data.Coins = 300
+		data.Coins = 600
 		local result = w.open(player, "GraveyardCrate")
 		expect(result.Ok).toBe(true)
 		expect(result.Duplicate).toBe(true)
@@ -365,6 +414,84 @@ describe("CrateService (coins)", function()
 			expect(result.Ok).toBe(true)
 			expect(result.Rarity).toBe("Rare")
 		end
+	end)
+
+	it(
+		"opens x5 and x10 in one request: one payment, every result, duplicates paid back",
+		function()
+			local remote = w.rt:find("ReplicatedStorage.Remotes.OpenCrate")
+			local function openMany(crateId: string, count: number): any
+				w.rt:advance(Config.Crates.RequestCooldown + 0.1)
+				return w.rt:invokeServer(remote, player, crateId, count)
+			end
+			data.Coins = 10 * 600
+			local opened = data.Crates.Opened
+			local batch = openMany("PumpkinCrate", 10)
+			expect(batch.Ok).toBe(true)
+			expect(#batch.Results).toBe(10)
+			expect(batch.Results[1].ItemId).toBe(batch.ItemId)
+			local refunds = 0
+			for _, r in batch.Results do
+				expect(r.Ok).toBe(true)
+				expect(r.Reel[r.WinIndex]).toBe(r.ItemId)
+				expect(data.Owned[r.ItemId]).toBe(true)
+				expect(r.Results).toBeNil() -- (no table inside itself: it couldn't be sent)
+				if r.Duplicate then
+					expect(r.Refund).toBeGreaterThan(0) -- a duplicate ALWAYS pays coins back
+					refunds += r.Refund
+				end
+			end
+			expect(data.Coins).toBe(refunds)
+			expect(data.Crates.Opened).toBe(opened + 10)
+			-- A count the page doesn't offer, or not enough coins for all of them: nothing happens.
+			data.Coins = 3000
+			expect(openMany("PumpkinCrate", 7).Ok).toBe(false)
+			local poor = openMany("PumpkinCrate", 10)
+			expect(poor.Ok).toBe(false)
+			expect(poor.Message).toMatch("more")
+			expect(data.Coins).toBe(3000)
+			local five = openMany("PumpkinCrate", 5)
+			expect(#five.Results).toBe(5)
+			local back = 0
+			for _, r in five.Results do
+				back += r.Refund or 0
+			end
+			expect(data.Coins).toBe(back)
+		end
+	)
+
+	it("tells the whole server about a CRAZY unbox (extra big for a one in a million)", function()
+		local function announcements(): { any }
+			local list = {}
+			for _, call in w.rt:calls("RemoteEvent", "FireAllClients") do
+				if call.instance.Name == "Announce" then
+					table.insert(list, call.args[1])
+				end
+			end
+			return list
+		end
+		data.Coins = 400000
+		local crazy = w.open(player, "CrazyCrate")
+		expect(crazy.Rarity).toBe("Crazy")
+		local said = announcements()
+		expect(said[#said].Text).toBe(
+			Config.Crates.Text.AnnounceCrazy:format(player.DisplayName, crazy.ItemName)
+		)
+		expect(said[#said].Style).toBe("Big")
+		-- A one-in-a-million skin (made certain for this test).
+		local million = Items.Get("VampireCastle_NightLordSupreme")
+		expect(million.OneInAMillion).toBe(true)
+		local odds = million.Odds
+		million.Odds = 100
+		local lucky = w.open(player, "VampireCastleCrate")
+		million.Odds = odds
+		expect(lucky.ItemId).toBe(million.Id)
+		expect(lucky.OneInAMillion).toBe(true)
+		said = announcements()
+		expect(said[#said].Text).toBe(
+			Config.Crates.Text.AnnounceMillion:format(player.DisplayName, million.Name)
+		)
+		expect(said[#said].Style).toBe("Huge")
 	end)
 
 	it("opens nothing while crates are switched off", function()
@@ -436,7 +563,7 @@ describe("CrateService (paid random items rule)", function()
 		local decision = w.rt:purchase(player, 4242)
 		crate.Robux.ProductId = 0
 		expect(decision.Name).toBe("PurchaseGranted")
-		expect(data.Coins).toBe(before + 300)
+		expect(data.Coins).toBe(before + 600)
 		local after = 0
 		for _ in data.Owned do
 			after += 1
@@ -643,38 +770,45 @@ describe("Crate stand (lobby)", function()
 	local Lobby = rt:require("ReplicatedStorage.Shared.Lobby")
 	local HubBuilder = rt:require("ServerScriptService.Server.Hub.HubBuilder")
 
-	it("puts every crate on the stand with an Open prompt, inside the Crates zone", function()
-		local hub = HubBuilder.Build()
-		local stand = hub:FindFirstChild("CrateStand")
-		expect(stand).toBeInstanceOf("Model")
-		local CS = rt.game:GetService("CollectionService")
-		local found = {}
-		for _, holder in CS:GetTagged(Tags.CrateDisplay) do
-			expect(holder:IsDescendantOf(stand)).toBe(true)
-			local id = holder:GetAttribute("CrateId")
-			local prompt = holder:FindFirstChildOfClass("ProximityPrompt")
-			expect(prompt).toBeInstanceOf("ProximityPrompt")
-			expect(prompt:GetAttribute("CrateId")).toBe(id)
-			found[id] = true
-			expect(Lobby.InZone(holder.Position, "Crates")).toBe(true)
-			local crate = rt:require("ReplicatedStorage.Shared.CrateOdds").Get(id)
-			expect(prompt.ActionText).toBe(Config.Crates.Text.Prompt:format(crate.Name))
-		end
-		for _, crate in Config.Crates.List do
-			if not found[crate.Id] then
-				error("no " .. crate.Id .. " on the stand")
+	it(
+		"puts the rarity crates and Stand.Themed on the stand with an Open prompt, inside the Crates zone",
+		function()
+			local hub = HubBuilder.Build()
+			local stand = hub:FindFirstChild("CrateStand")
+			expect(stand).toBeInstanceOf("Model")
+			local CS = rt.game:GetService("CollectionService")
+			local found = {}
+			for _, holder in CS:GetTagged(Tags.CrateDisplay) do
+				expect(holder:IsDescendantOf(stand)).toBe(true)
+				local id = holder:GetAttribute("CrateId")
+				local prompt = holder:FindFirstChildOfClass("ProximityPrompt")
+				expect(prompt).toBeInstanceOf("ProximityPrompt")
+				expect(prompt:GetAttribute("CrateId")).toBe(id)
+				found[id] = true
+				expect(Lobby.InZone(holder.Position, "Crates")).toBe(true)
+				local crate = rt:require("ReplicatedStorage.Shared.CrateOdds").Get(id)
+				expect(prompt.ActionText).toBe(Config.Crates.Text.Prompt:format(crate.Name))
 			end
-			expect(stand:FindFirstChild(crate.Id .. "Display")).toBeInstanceOf("Model")
-		end
-		for _, d in stand:GetDescendants() do
-			if d:IsA("BasePart") and d.Transparency < 1 then
-				if not Lobby.InZone(d.Position, "Crates", 1) then
-					error(d:GetFullName() .. " sticks out of the Crates zone")
+			for _, crate in Config.Crates.List do
+				local shown = crate.Rarity ~= nil
+					or table.find(Config.Crates.Stand.Themed, crate.Id) ~= nil
+				if shown and not found[crate.Id] then
+					error("no " .. crate.Id .. " on the stand")
+				end
+				if not shown and found[crate.Id] then
+					error(crate.Id .. " is on the stand but not in Stand.Themed")
 				end
 			end
+			for _, d in stand:GetDescendants() do
+				if d:IsA("BasePart") and d.Transparency < 1 then
+					if not Lobby.InZone(d.Position, "Crates", 1) then
+						error(d:GetFullName() .. " sticks out of the Crates zone")
+					end
+				end
+			end
+			expect(stand.SignBoard.Board:FindFirstChild("Lettering")).toBeTruthy()
 		end
-		expect(stand.SignBoard.Board:FindFirstChild("Lettering")).toBeTruthy()
-	end)
+	)
 
 	it("adds a prompt to any part tagged CrateDisplay, and builds nothing when off", function()
 		local CrateService = rt:require("ServerScriptService.Server.Services.CrateService")
@@ -708,13 +842,40 @@ describe("CrateUI (client)", function()
 	local panel = gui:FindFirstChild("Crates")
 	local _ = player
 
-	it("lists every crate", function()
+	it("lists every crate on its tab, a page at a time", function()
 		me:SetAttribute("CratesRestricted", false)
 		CrateUI.Open()
 		expect(panel.Visible).toBe(true)
-		local cards = panel.Body.List.Crates
+		local seen = {}
+		local tabs = {}
+		for _, tab in panel.Body.List.Categories:GetChildren() do
+			if tab:IsA("TextButton") then
+				table.insert(tabs, tab:GetAttribute("Category"))
+			end
+		end
+		expect(#tabs).toBe(#CConfig.Crates.Categories)
+		for _, name in tabs do
+			for _, tab in panel.Body.List.Categories:GetChildren() do
+				if tab:IsA("TextButton") and tab:GetAttribute("Category") == name then
+					client:fire(tab, "Activated")
+				end
+			end
+			for _ = 1, 4 do -- every page (Next wraps round)
+				local perPage = 0
+				for _, card in panel.Body.List.Crates:GetChildren() do
+					if card:IsA("TextButton") then
+						seen[card.Name] = true
+						perPage += 1
+					end
+				end
+				expect(perPage).toBeLessThanOrEqual(CConfig.Crates.PageSize)
+				client:fire(panel.Body.List.Pager.Next, "Activated")
+			end
+		end
 		for _, crate in CConfig.Crates.List do
-			expect(cards:FindFirstChild(crate.Id)).toBeInstanceOf("TextButton")
+			if not seen[crate.Id] then
+				error("no card for " .. crate.Id)
+			end
 		end
 	end)
 
@@ -732,10 +893,17 @@ describe("CrateUI (client)", function()
 			count += 1
 		end
 		expect(count).toBe(20)
-		expect(preview.Items:FindFirstChild("Pumpkin_PumpkinSpice").Chance.Text).toBe("5.833%")
+		expect(preview.Items:FindFirstChild("Pumpkin_PumpkinSpice").Chance.Text).toBe("6.123%")
 		expect(preview.Side.Buy.Visible).toBe(true)
-		expect(preview.Side.Buy.OpenCoins.Text).toMatch("300")
-		expect(preview.Side.Buy.OpenRobux.Text).toBe(CConfig.Crates.Text.ComingSoon)
+		expect(preview.Side.Buy.OpenCoins.Text).toMatch("600")
+		expect(preview.Side.Buy.OpenCoins5.Text).toMatch("3,000")
+		expect(preview.Side.Buy.OpenCoins10.Text).toMatch("6,000")
+		expect(preview.Side.Extras.OpenRobux.Text).toBe(CConfig.Crates.Text.ComingSoon)
+		expect(preview.Side.Extras.QuickOpen.Text).toMatch(CConfig.Crates.Text.QuickOpen)
+		-- A one-in-a-million skin shows its exact chance.
+		CrateUI.Open("VampireCastleCrate")
+		expect(panel.Body.Preview.Items.VampireCastle_NightLordSupreme.Chance.Text).toBe("0.0001%")
+		CrateUI.Open("PumpkinCrate")
 	end)
 
 	it("hides the buy buttons from restricted players", function()
@@ -795,6 +963,106 @@ describe("CrateUI (client)", function()
 		})
 		client:advance(0.5)
 		expect(panel.Body.Opening.Reveal.Visible).toBe(true) -- still showing the last one
+		panel.Visible = false
+		client:advance(0.1)
+	end)
+
+	-- A pretend server answer for opening 10 Pumpkin Crates: one Rare, the rest Commons, every
+	-- other one a duplicate.
+	local function batchOf10(): any
+		local results = {}
+		for i = 1, 10 do
+			local id = if i == 4 then "Pumpkin_SirGourdington" else "Pumpkin_PumpkinSpice"
+			local reel = {}
+			for k = 1, 32 do
+				reel[k] = "Pumpkin_PumpkinSpice"
+			end
+			reel[28] = id
+			results[i] = {
+				Ok = true,
+				Message = "",
+				CrateId = "PumpkinCrate",
+				ItemId = id,
+				ItemName = if i == 4 then "Sir Gourdington" else "Pumpkin Spice",
+				Rarity = if i == 4 then "Uncommon" else "Common",
+				Duplicate = i % 2 == 0,
+				Refund = if i % 2 == 0 then 60 else 0,
+				Reel = reel,
+				WinIndex = 28,
+				Paid = "Coins",
+			}
+		end
+		local batch = table.clone(results[1])
+		batch.Results = results
+		return batch
+	end
+	local asked: { any } = {}
+	local openRemote = client:find("ReplicatedStorage.Remotes.OpenCrate")
+	openRemote.OnServerInvoke = function(_player, crateId, count)
+		table.insert(asked, { crateId, count })
+		return batchOf10()
+	end
+
+	it("opens x10: one request, then each strip in turn (Next, Space or Skip)", function()
+		me:SetAttribute("CratesRestricted", false)
+		CrateUI.Open("PumpkinCrate")
+		client:advance(0.1)
+		client:fire(panel.Body.Preview.Side.Buy.OpenCoins10, "Activated")
+		client:advance(0.2)
+		expect(#asked).toBe(1)
+		expect(asked[1][1]).toBe("PumpkinCrate")
+		expect(asked[1][2]).toBe(10)
+		local opening = panel.Body.Opening
+		expect(opening.Visible).toBe(true)
+		-- Skip: straight to the result.
+		client:fire(opening.Skip, "Activated")
+		client:advance(CConfig.Crates.Reel.RevealDelay + 0.2)
+		expect(opening.Reveal.Visible).toBe(true)
+		local card = opening.Reveal.Card
+		expect(card.Buttons.Next.Text).toBe(CConfig.Crates.Text.Next:format(9))
+		-- Next: the second crate (a duplicate: its coins back are shown).
+		client:fire(card.Buttons.Next, "Activated")
+		client:advance(0.1)
+		expect(opening.Reveal.Visible).toBe(false)
+		client:fire(opening.Skip, "Activated")
+		client:advance(CConfig.Crates.Reel.RevealDelay + 0.2)
+		expect(opening.Reveal.Card.News.Text).toBe(
+			CConfig.Crates.Text.Duplicate:format(60, CConfig.Economy.CurrencyName)
+		)
+		expect(opening.Reveal.Card.Buttons.Next.Text).toBe(CConfig.Crates.Text.Next:format(8))
+		panel.Visible = false
+		client:advance(0.1)
+	end)
+
+	it("Quick open: every result on one page, duplicates marked, the best highlighted", function()
+		CrateUI.Open("PumpkinCrate")
+		client:advance(0.1)
+		local side = panel.Body.Preview.Side
+		client:fire(side.Extras.QuickOpen, "Activated")
+		expect(side.Extras.QuickOpen.Text).toMatch("☑")
+		client:advance(CConfig.Crates.RequestCooldown)
+		client:fire(side.Buy.OpenCoins10, "Activated")
+		client:advance(0.2)
+		local results = panel.Body.Results
+		expect(results.Visible).toBe(true)
+		expect(panel.Body.Opening.Visible).toBe(false)
+		expect(results.Heading.Text).toBe(CConfig.Crates.Text.Results:format(10))
+		local cards = 0
+		for _, child in results.Items:GetChildren() do
+			if child:IsA("Frame") then
+				cards += 1
+			end
+		end
+		expect(cards).toBe(10)
+		expect(results.Items.Result4:FindFirstChild("Best")).toBeTruthy() -- the Uncommon
+		expect(results.Items.Result1:FindFirstChild("Best")).toBeNil()
+		expect(results.Items.Result2.News.Text).toBe(CConfig.Crates.Text.DuplicateShort:format(60))
+		expect(results.Items.Result1.News.Text).toBe(CConfig.Crates.Text.New)
+		expect(results.Footer.CoinsBack.Text).toBe(
+			CConfig.Crates.Text.CoinsBack:format(5 * 60, CConfig.Economy.CurrencyName)
+		)
+		client:fire(results.Footer.Back, "Activated")
+		expect(panel.Body.Preview.Visible).toBe(true)
 		panel.Visible = false
 		client:advance(0.1)
 	end)

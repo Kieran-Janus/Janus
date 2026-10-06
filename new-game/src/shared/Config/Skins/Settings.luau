@@ -71,6 +71,151 @@ return {
 			Crate = "MoonlightCrate",
 			Color = Color3.fromRGB(110, 150, 255),
 		},
+		-- The 24 newer themes (each 21 skins, three of them with a ONE IN A MILLION CRAZY skin).
+		{
+			Id = "VampireCastle",
+			Name = "Vampire Castle",
+			Crate = "VampireCastleCrate",
+			Color = Color3.fromRGB(170, 20, 40),
+		},
+		{
+			Id = "ZombieTown",
+			Name = "Zombie Town",
+			Crate = "ZombieTownCrate",
+			Color = Color3.fromRGB(110, 150, 80),
+		},
+		{
+			Id = "HauntedCarnival",
+			Name = "Haunted Carnival",
+			Crate = "HauntedCarnivalCrate",
+			Color = Color3.fromRGB(220, 40, 50),
+		},
+		{
+			Id = "MummyTomb",
+			Name = "Mummy Tomb",
+			Crate = "MummyTombCrate",
+			Color = Color3.fromRGB(225, 200, 140),
+		},
+		{
+			Id = "WerewolfWoods",
+			Name = "Werewolf Woods",
+			Crate = "WerewolfWoodsCrate",
+			Color = Color3.fromRGB(120, 85, 60),
+		},
+		{
+			Id = "MadScientistLab",
+			Name = "Mad Scientist Lab",
+			Crate = "MadScientistLabCrate",
+			Color = Color3.fromRGB(120, 255, 80),
+		},
+		{
+			Id = "GhostShip",
+			Name = "Ghost Ship",
+			Crate = "GhostShipCrate",
+			Color = Color3.fromRGB(140, 230, 220),
+		},
+		{
+			Id = "BatCave",
+			Name = "Bat Cave",
+			Crate = "BatCaveCrate",
+			Color = Color3.fromRGB(110, 60, 160),
+		},
+		{
+			Id = "SpiderLair",
+			Name = "Spider Lair",
+			Crate = "SpiderLairCrate",
+			Color = Color3.fromRGB(130, 220, 60),
+		},
+		{
+			Id = "SkeletonCrew",
+			Name = "Skeleton Crew",
+			Crate = "SkeletonCrewCrate",
+			Color = Color3.fromRGB(240, 235, 215),
+		},
+		{
+			Id = "CursedToys",
+			Name = "Cursed Toys",
+			Crate = "CursedToysCrate",
+			Color = Color3.fromRGB(240, 140, 180),
+		},
+		{
+			Id = "ScarecrowFarm",
+			Name = "Scarecrow Farm",
+			Crate = "ScarecrowFarmCrate",
+			Color = Color3.fromRGB(230, 200, 110),
+		},
+		{
+			Id = "HauntedHotel",
+			Name = "Haunted Hotel",
+			Crate = "HauntedHotelCrate",
+			Color = Color3.fromRGB(150, 20, 40),
+		},
+		{
+			Id = "MonsterDisco",
+			Name = "Monster Disco",
+			Crate = "MonsterDiscoCrate",
+			Color = Color3.fromRGB(255, 60, 180),
+		},
+		{
+			Id = "BlackCatAlley",
+			Name = "Black Cat Alley",
+			Crate = "BlackCatAlleyCrate",
+			Color = Color3.fromRGB(150, 255, 80),
+		},
+		{
+			Id = "GoblinMarket",
+			Name = "Goblin Market",
+			Crate = "GoblinMarketCrate",
+			Color = Color3.fromRGB(110, 170, 60),
+		},
+		{
+			Id = "SwampCreatures",
+			Name = "Swamp Creatures",
+			Crate = "SwampCreaturesCrate",
+			Color = Color3.fromRGB(60, 140, 120),
+		},
+		{
+			Id = "WitchsBrew",
+			Name = "Witch's Brew",
+			Crate = "WitchsBrewCrate",
+			Color = Color3.fromRGB(100, 40, 140),
+		},
+		{
+			Id = "AlienAbduction",
+			Name = "Alien Abduction",
+			Crate = "AlienAbductionCrate",
+			Color = Color3.fromRGB(120, 230, 90),
+		},
+		{
+			Id = "FrostyFright",
+			Name = "Frosty Fright",
+			Crate = "FrostyFrightCrate",
+			Color = Color3.fromRGB(140, 200, 255),
+		},
+		{
+			Id = "GraveyardParty",
+			Name = "Graveyard Party",
+			Crate = "GraveyardPartyCrate",
+			Color = Color3.fromRGB(255, 110, 190),
+		},
+		{
+			Id = "CandyFactory",
+			Name = "Candy Factory",
+			Crate = "CandyFactoryCrate",
+			Color = Color3.fromRGB(255, 140, 200),
+		},
+		{
+			Id = "PhantomTheatre",
+			Name = "Phantom Theatre",
+			Crate = "PhantomTheatreCrate",
+			Color = Color3.fromRGB(160, 20, 40),
+		},
+		{
+			Id = "AutumnLeaves",
+			Name = "Autumn Leaves",
+			Crate = "AutumnLeavesCrate",
+			Color = Color3.fromRGB(230, 130, 40),
+		},
 	} :: { Theme },
 
 	-- Rare and CRAZY skins glow. A skin's Glow = { Color = ..., Brightness = 2, Range = 12 }
@@ -196,6 +341,37 @@ return {
 				BoltColor = Color3.fromRGB(255, 40, 60),
 				BoltEvery = 0.8, -- seconds between lightning flashes
 				BoltSeconds = 0.15, -- how long a flash lasts
+			},
+			-- ONE IN A MILLION: Night Lord Supreme. A blood-red moon rises behind you, a ring of
+			-- little bats circles it and red mist drifts up.
+			BloodMoon = {
+				MoonSize = 3.2, -- studs across
+				MoonHeight = 3.4, -- studs above your middle (and a little behind you)
+				MoonColor = Color3.fromRGB(220, 20, 40),
+				Bats = 6,
+				BatColor = Color3.fromRGB(25, 10, 25),
+				Seconds = 2.2, -- one lap of the bats round the moon
+				Mist = 6, -- red mist puffs rising round your feet
+				MistColor = Color3.fromRGB(200, 30, 50),
+			},
+			-- ONE IN A MILLION: Disco Demon. A mirror ball spins over your head and coloured
+			-- light beams sweep the floor round you.
+			DiscoInferno = {
+				BallSize = 1.6,
+				BallHeight = 4.2,
+				Beams = 6,
+				BeamLength = 7,
+				Seconds = 3, -- one turn of the beams
+				FloorRing = 4.5, -- studs: the radius of the glowing dance-floor ring at your feet
+			},
+			-- ONE IN A MILLION: Star Voyager. A little flying saucer hovers above you and beams
+			-- you up with a glowing cone of light, with tiny stars swirling up inside it.
+			UfoBeam = {
+				SaucerWidth = 4,
+				SaucerHeight = 5.2,
+				Seconds = 2.6, -- one turn of the saucer
+				BeamColor = Color3.fromRGB(120, 255, 230),
+				Sparks = 8,
 			},
 		},
 	},

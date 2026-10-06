@@ -46,6 +46,8 @@ an event handler, a Script), even if the test itself didn't notice.
 | `candyrush.spec` | Candy Rush: the rules (lanes, candy spots, the winner, coins and daily cap), the stand the hub builds, whole races on the server (two players, a forfeit, a solo run, the admin test, a player leaving) and the client screen. |
 | `webscour.spec` | Web Scour: `WebScourRules`, the Spider Grove section (every hiding spot on a web strand), whole hunts against the real `WebScourService` (start at the lantern, catch critters, rejected catches, coins, best time, cooldowns (the coin cooldown is saved, so a new server doesn't skip it), two hunters, leavers, the F8 command) and `WebScourUI`. |
 | `dances.spec` | Photo Spot dances: the `Config.Dances` list, every `DanceMoves` pose (finite, moving), joints on R15, R6 and the newer AnimationConstraint rigs, `DanceService` (only at the Photo Spot, real dances only, cooldown, walking off or "" stops it, switched off) and the client animating every dancing character. |
+| `skineffects.spec` | The special animated skin effects (`Torment`, `BloodMoon`, `DiscoInferno`, `UfoBeam`): every effect a skin names exists, builds, moves round a character and cleans up. |
+| `headpieces.spec` | The 18 newer head pieces: they build with any colours, fit round a head, differ from each other, and the CRAZY ones have rainbow parts. |
 | `tower.spec` | The Tormented Tower course (`Config.TowerParkour.Course`, `TowerLogic`): every jump makeable with the parkour jump maths (a piece hanging over a jump cuts it short), the Sprint jumps really need sprinting, 3 checkpoints and every kind of trap, inside the leaning walls and under the roof. |
 | `towerrun.spec` | The tower in the game: the hollow clock tower and its tagged pieces (motors on spinners and cogs, nothing solid in the way even after `HubSolid`), a solid custom `ClockTower` model made walk-through with inner walls, the exclusive Tormented Soul skin (never sold, in no crate), `TowerService` (start, checkpoints in order, falls, slime, anti-teleport, the minimum time, the skin given once, the server-wide announcement, F8 buttons, vanishing platforms) and `TowerUI`. |
 | `eggs.spec` | Easter eggs: `EasterEggRules`, the egg list, placing eggs next to their anchors in the built hub, collecting them through the real `EasterEggService` (button, touch, distance, rounds, once only, coins, toast, admin reset, F8 'Reset my save' keeps receipts) and `EasterEggUI`. |
@@ -181,7 +183,9 @@ definitions file luau-lsp uses).
 - **No real players or network.** Players are instances made by `rt:addPlayer`. Server and
   client are separate runtimes; nothing replicates unless you call `rt:replicateFrom`.
   `FireClient`/`FireServer` are only recorded; simulate the other side with
-  `rt:fireServer` / `rt:invokeServer`.
+  `rt:fireServer` / `rt:invokeServer`. In a client runtime, a test can stand in for the server by
+  setting a RemoteFunction's `OnServerInvoke`: the client's `InvokeServer` then calls it (with the
+  local player).
 - **Events never fire by themselves**, except the ones the harness simulates: structural ones
   (`ChildAdded`, `Destroying`, `Changed`, `AttributeChanged`, CollectionService signals),
   `RunService` per-frame events while time advances (only when something is connected),

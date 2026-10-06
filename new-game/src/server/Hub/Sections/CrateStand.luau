@@ -225,8 +225,13 @@ function CrateStand.Build(hub: Model, _zone: Zone): Model
 	-- a stadium), so every crate can be seen from the plaza.
 	local front: { CrateOdds.Crate } = {}
 	local back: { CrateOdds.Crate } = {}
+	local shown = cfg.Themed -- (the stand has room for a few themed crates: the rest are in Menu > Crates)
 	for _, crate in CrateOdds.List() do
-		table.insert(if crate.Rarity then back else front, crate)
+		if crate.Rarity then
+			table.insert(back, crate)
+		elseif not shown or table.find(shown, crate.Id) then
+			table.insert(front, crate)
+		end
 	end
 	local size = cfg.CrateSize
 	local function row(
