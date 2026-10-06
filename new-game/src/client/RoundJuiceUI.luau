@@ -16,6 +16,7 @@ local SoundService = game:GetService("SoundService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Layout = require(script.Parent.Layout)
 local Spectate = require(script.Parent.Spectate)
 local Theme = require(script.Parent.Theme)
 
@@ -88,6 +89,8 @@ function RoundJuiceUI.Mount(gui: ScreenGui)
 	pop.TextStrokeTransparency = 0.3
 	pop.Visible = false
 	pop.ZIndex = 12
+	-- On short phone screens both move down together, clear of the top bar.
+	Layout.KeepBelowHud({ banner, pop })
 	local popToken = 0
 	local function showPop(text: string, color: Color3, seconds: number)
 		popToken += 1

@@ -33,7 +33,9 @@ return {
 		PadHeight = 12, -- studs above the pad's top that still count as standing on it (jumping is fine)
 		EdgeMargin = 1, -- studs past the pad's edge that still count (feet hanging over the side)
 		LeaveGraceSeconds = 1, -- stepping off for less than this doesn't un-ready you (wobbles, jumps)
-		VoteOnlyReady = true, -- true = only ready players can vote (others see the vote greyed out)
+		-- true = only ready players can vote (others see the vote greyed out; on phones they
+		-- only see the "stand on the pad" hint, so the vote doesn't cover a small screen)
+		VoteOnlyReady = true,
 		PadText = "Stand here to play!",
 		Text = { -- shown on the top bar and the vote panel
 			Count = "Ready: %d/%d", -- ready players / players needed

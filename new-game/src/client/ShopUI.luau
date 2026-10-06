@@ -148,13 +148,18 @@ function ShopUI.Mount(gui: ScreenGui)
 	panel.BackgroundTransparency = 0.03 -- nearly solid, so the vote panel doesn't show through
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.52)
-	-- Phones: nearly full height and shorter cards, so a whole row of cards fits.
+	-- Phones: nearly full height and shorter cards, so a whole row of cards fits (on the
+	-- shortest phones the cards get even shorter: see fitCards).
 	local compact = Layout.IsPhone()
 	local cardHeight = if compact then 158 else 190
 	local previewHeight = if compact then 72 else 100
+	local PHONE_CARD_HEIGHT = cardHeight
+	local CARD_PARTS = 86 -- a phone card's height without its 3D preview (name, button, gaps)
+	local MIN_PREVIEW = 30
 	local pageSize =
 		math.max(1, if compact then skinSettings.PhonePageSize else skinSettings.PageSize)
-	panel.Size = UDim2.new(0.92, 0, if compact then 0.97 else 0.8, 0) -- capped below
+	local panelHeight = if compact then 0.97 else 0.8 -- of the screen
+	panel.Size = UDim2.new(0.92, 0, panelHeight, 0) -- capped below
 	panel.Visible = false
 	Layout.Fit(panel)
 	local sizeLimit = Instance.new("UISizeConstraint")
@@ -673,6 +678,23 @@ function ShopUI.Mount(gui: ScreenGui)
 		end
 	end
 
+	-- Phones: the first row of cards always fits in the list, Buy / Equip button included
+	-- (on the shortest phones the list is shorter than a card, so the 3D preview shrinks).
+	-- `around` = the panel's height that isn't the list.
+	local function fitCards(around: number)
+		if not compact then
+			return
+		end
+		local screenHeight = Layout.Screen().Y
+		if screenHeight <= 0 then
+			return -- (not laid out yet)
+		end
+		local listHeight = math.min(screenHeight * panelHeight, sizeLimit.MaxSize.Y) - around
+		cardHeight =
+			math.clamp(math.floor(listHeight - 10), CARD_PARTS + MIN_PREVIEW, PHONE_CARD_HEIGHT)
+		previewHeight = cardHeight - CARD_PARTS
+	end
+
 	-- Everything for the current tab (cards are rebuilt; use updateButtons for state changes).
 	render = function()
 		coinsLabel.Text = ("%d %s"):format(state.Coins, currency)
@@ -683,8 +705,10 @@ function ShopUI.Mount(gui: ScreenGui)
 		filterBar.Visible = items and state.Ready
 		pager.Visible = items and state.Ready
 		local top = if filterBar.Visible then 122 else 88
+		local bottom = if compact then 40 else 42
 		list.Position = UDim2.fromOffset(16, top)
-		list.Size = UDim2.new(1, -32, 1, -(top + (if compact then 40 else 42)))
+		list.Size = UDim2.new(1, -32, 1, -(top + bottom))
+		fitCards(top + bottom)
 		clearCards()
 		if not state.Ready then
 			local wait = Theme.label("Loading your bag...", 16, list)

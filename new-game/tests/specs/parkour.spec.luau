@@ -641,4 +641,33 @@ describe("ParkourUI", function()
 		client:advance(Config.Parkour.Screen.FinishSeconds + 1)
 		expect(gui.ParkourFinish.Visible).toBe(false)
 	end)
+
+	it("keeps one refresh loop when the panel is closed and opened again quickly", function()
+		local tile
+		for _, child in gui.Menu.Tiles:GetChildren() do
+			if child:GetAttribute("MenuTile") == "Parkour" then
+				tile = child
+			end
+		end
+		client:fire(tile, "Activated")
+		client:advance(10) -- (the other tests' timers run out first)
+		local waiting = client.scheduler:pending()
+		for _ = 1, 3 do
+			client:fire(gui.ParkourPanel.CloseButton, "Activated")
+			client:advance(0.2)
+			client:fire(tile, "Activated")
+			client:advance(0.2)
+		end
+		expect(gui.ParkourPanel.Visible).toBe(true)
+		expect(client.scheduler:pending()).toBe(waiting) -- (a loop each time before the fix)
+		-- Closed for longer than a second: the loop stops, and opening starts it again.
+		client:fire(gui.ParkourPanel.CloseButton, "Activated")
+		client:advance(1.5)
+		expect(client.scheduler:pending()).toBe(waiting - 1)
+		client:fire(tile, "Activated")
+		client:advance(0.2)
+		expect(client.scheduler:pending()).toBe(waiting)
+		client:fire(gui.ParkourPanel.CloseButton, "Activated")
+		client:advance(1.5)
+	end)
 end)

@@ -101,6 +101,8 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 	teamHint.Position = UDim2.new(0.5, 0, 0.28, 44)
 	teamHint.Size = UDim2.new(0.92, 0, 0, 30)
 	teamHint.TextWrapped = true
+	-- On short phone screens they move down together, clear of the top bar and the pill.
+	Layout.KeepBelowHud({ teamTitle, teamHint }, pill)
 
 	-- ESCAPED! / You stopped! / +1 catch!
 	local message = shout("Message", 46, root)

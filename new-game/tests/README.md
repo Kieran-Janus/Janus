@@ -47,6 +47,7 @@ an event handler, a Script), even if the test itself didn't notice.
 | `hideseek.spec` | Pumpkin Hide & Seek: `HideSeekRules`, its two maps (Pumpkin Farm, Hedge Maze: every maze cell reaches the seeker hut) and whole rounds of `Modes/HideSeek.luau` with fake players (roles, the pumpkin disguise, the candy gun's server checks, tagging, leaving, results). |
 | `scaremaze.spec` | ScareMaze: the rules (teams, the keep-moving rule, scores), the map (a way from the entrance to the exit, traps along it, tags) and a whole round on the real map with three players (one escapes, one stands still, one Haunter BOOs). |
 | `mazegen.spec` | `MazeGen`: every maze is fully connected, rooms are open, wall runs match the walls. |
+| `phoneui.spec` | Phone layouts on a 640 x 302 screen (the harness has no GUI layout, so the spec sets the screen and Hud sizes itself): banners and the easter egg toast stay under the Hud (`Layout.KeepBelowHud`), the results, vote, spectate and Secret Pumpkins panels fit at full size, players who can't vote see only the hint, shop cards and the crate's Open buttons are in view without scrolling, and the crate strip builds 3D pictures only once it slows down. |
 | `harness.spec` | Self-tests of the harness (geometry, raycasts, scheduler, signals, services). If these fail, don't trust the others. |
 
 ## Writing a spec

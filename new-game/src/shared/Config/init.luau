@@ -156,7 +156,10 @@ local Config = {
 		CountUpSeconds = 1.6, -- coins count from 0 to the total in this long
 		CoinSoundEvery = 0.12, -- coin sound while your coins count up, at most this often
 		SpotlightSpinSeconds = 6, -- one turn of the glow behind the MVP's headshot
-		MaxListHeight = 300, -- rows scroll past this many pixels
+		-- Rows scroll past this many UI units (or sooner, when the screen is too short to
+		-- show the whole panel: the rows scroll instead of the panel and its text shrinking).
+		MaxListHeight = 300,
+		PhoneMvpHeight = 56, -- phones get a slimmer MVP spotlight (the full one is 112 tall)
 		Text = {
 			Title = "Round over!",
 			Mvp = "MVP",
@@ -474,6 +477,10 @@ local Config = {
 		PhoneSideTop = 8,
 		TouchBottomSideClear = 130,
 		MinTextSize = 14, -- shrinking text never goes below this
+		-- Banners and big messages placed part-way down the screen (round, minigame and easter
+		-- egg pop-ups) move down on short phone screens so they never cover the bar at the top
+		-- (the Hud): they keep at least this many UI units under it.
+		BelowHudGap = 8,
 	},
 
 	Player = {

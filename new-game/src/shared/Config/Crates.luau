@@ -90,6 +90,10 @@ return {
 		PhoneCardWidth = 92,
 		CardGap = 8,
 		RevealDelay = 0.4, -- pause between the strip stopping and the big reveal
+		-- The cards get their 3D skin picture once the strip slows down to this many cards a
+		-- second (while it whizzes past they show the name and rarity colour). Building a 3D
+		-- picture for every card at full speed made phones stutter. Higher = pictures sooner.
+		PreviewSpeed = 4,
 	},
 
 	-- Roblox's paid random items rule (PolicyService): players in a region where paid random

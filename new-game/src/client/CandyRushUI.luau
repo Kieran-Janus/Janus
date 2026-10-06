@@ -295,6 +295,7 @@ function CandyRushUI.Mount(gui: ScreenGui)
 	countdownStroke.Parent = countdown
 	local countdownScale = Instance.new("UIScale")
 	countdownScale.Parent = countdown
+	Layout.KeepBelowHud({ countdown }) -- (on short phone screens 0.3 is on the bar at the top)
 
 	local function popText(value: string, seconds: number?)
 		countdown.Text = value
@@ -342,6 +343,7 @@ function CandyRushUI.Mount(gui: ScreenGui)
 	bannerLine.Size = UDim2.new(1, -24, 0.45, -8)
 	local bannerScale = Instance.new("UIScale")
 	bannerScale.Parent = banner
+	Layout.KeepBelowHud({ banner })
 
 	-- Showing a state ---------------------------------------------------------------------------
 	local current: State? = nil

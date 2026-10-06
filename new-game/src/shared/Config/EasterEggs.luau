@@ -89,7 +89,8 @@ return {
 		Ghost = "👻",
 		Missing = "❓", -- an egg you haven't found yet
 	} :: { [string]: string },
-	Panel = { Width = 440, Height = 400, RowHeight = 46 }, -- the list's size in UI units
+	-- The list's size in UI units (smaller screens get a smaller panel whose list scrolls).
+	Panel = { Width = 440, Height = 400, RowHeight = 46 },
 	Text = {
 		Toast = "Easter egg found! +%d %s (%d/%d)", -- coins, currency, found, total
 		ToastTitle = "%s", -- the egg's Name, above the line above

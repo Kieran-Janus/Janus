@@ -368,6 +368,20 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 	end
 
+	-- A list's 3D preview that has scrolled this far (pixels) out of view is taken down again
+	-- (and built again if it comes back), so a big crate like the Common Crate never keeps
+	-- dozens of 3D models alive at once.
+	local KEEP_DISTANCE = 400
+	local function unbuildView(entry: LazyView)
+		entry.Stop()
+		entry.Stop = function() end
+		entry.Built = false
+		local viewport = entry.Holder:FindFirstChild("Preview")
+		if viewport then
+			viewport:Destroy()
+		end
+	end
+
 	-- A few previews per check, so scrolling never stutters.
 	local nextLazy = 0
 	RunService.Heartbeat:Connect(function()
@@ -381,11 +395,18 @@ function CrateUI.Mount(gui: ScreenGui)
 		nextLazy = now + 0.1
 		local made = 0
 		for _, entry in lazyViews do
-			if made >= 3 then
-				break
-			end
-			if not entry.Built then
-				local scroller = entry.Holder:FindFirstAncestorWhichIsA("ScrollingFrame")
+			local scroller = entry.Holder:FindFirstAncestorWhichIsA("ScrollingFrame")
+			if entry.Built then
+				-- (only in a laid-out scrolling list: the reel's cards are never taken down)
+				if
+					scroller
+					and scroller.AbsoluteSize.X > 0
+					and scroller.AbsoluteSize.Y > 0
+					and not inView(entry.Holder, scroller, KEEP_DISTANCE)
+				then
+					unbuildView(entry)
+				end
+			elseif made < 3 then
 				local clip: GuiObject = scroller or body
 				if inView(entry.Holder, clip, 60) then
 					buildView(entry)
@@ -636,13 +657,18 @@ function CrateUI.Mount(gui: ScreenGui)
 		showOnly(previewView)
 		defaultMessage()
 		local sideWidth = if compact then 168 else 214
+		local closed = restriction()
 
-		-- Left: the crate, its odds and the buttons (scrolls on short screens).
+		-- Left: the crate, its odds and the buttons (scrolls on short screens). On phones the
+		-- buttons are pinned under the scrolling part instead, so they are always in view.
+		local buttonsHeight = (if closed ~= true then 40 + 6 else 0) + 32
 		local side = Instance.new("ScrollingFrame")
 		side.Name = "Side"
 		side.BackgroundTransparency = 1
 		side.BorderSizePixel = 0
-		side.Size = UDim2.new(0, sideWidth, 1, 0)
+		side.Size = if compact
+			then UDim2.new(0, sideWidth, 1, -(buttonsHeight + 6))
+			else UDim2.new(0, sideWidth, 1, 0)
 		side.ScrollBarThickness = 4
 		side.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		side.CanvasSize = UDim2.new()
@@ -651,12 +677,27 @@ function CrateUI.Mount(gui: ScreenGui)
 		list.SortOrder = Enum.SortOrder.LayoutOrder
 		list.Padding = UDim.new(0, 6)
 		list.Parent = side
+		local buttonsParent: Instance = side
+		if compact then
+			local pinned = Instance.new("Frame")
+			pinned.Name = "Buttons"
+			pinned.BackgroundTransparency = 1
+			pinned.AnchorPoint = Vector2.new(0, 1)
+			pinned.Position = UDim2.fromScale(0, 1)
+			pinned.Size = UDim2.new(0, sideWidth, 0, buttonsHeight)
+			pinned.Parent = previewView
+			local pinnedList = Instance.new("UIListLayout")
+			pinnedList.SortOrder = Enum.SortOrder.LayoutOrder
+			pinnedList.Padding = UDim.new(0, 6)
+			pinnedList.Parent = pinned
+			buttonsParent = pinned
+		end
 
 		local art = Instance.new("Frame")
 		art.Name = "Art"
 		art.BackgroundTransparency = 1
 		art.LayoutOrder = 1
-		art.Size = UDim2.new(1, -8, 0, if compact then 84 else 120)
+		art.Size = UDim2.new(1, -8, 0, if compact then 72 else 120)
 		art.Parent = side
 		lazy(art, function()
 			return CrateArt.Preview(crate)
@@ -684,14 +725,13 @@ function CrateUI.Mount(gui: ScreenGui)
 			f.BackgroundTransparency = 1
 			f.LayoutOrder = order
 			f.Size = UDim2.new(1, -8, 0, height)
-			f.Parent = side
+			f.Parent = buttonsParent
 			local layout = Instance.new("UIListLayout")
 			layout.FillDirection = Enum.FillDirection.Horizontal
 			layout.Padding = UDim.new(0, 6)
 			layout.Parent = f
 			return f
 		end
-		local closed = restriction()
 		local buyRow = row(5, 40)
 		buyRow.Name = "Buy"
 		buyRow.Visible = closed ~= true
@@ -1081,23 +1121,32 @@ function CrateUI.Mount(gui: ScreenGui)
 			{ Scale = 1 }
 		):Play()
 
+		local gap = if compact then 2 else 4
 		local list = Instance.new("UIListLayout")
 		list.SortOrder = Enum.SortOrder.LayoutOrder
 		list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-		list.Padding = UDim.new(0, if compact then 2 else 4)
+		list.Padding = UDim.new(0, gap)
 		list.Parent = card
 		local pad = Instance.new("UIPadding")
 		pad.PaddingTop = UDim.new(0, 8)
+		pad.PaddingBottom = UDim.new(0, 8)
 		pad.PaddingLeft = UDim.new(0, 10)
 		pad.PaddingRight = UDim.new(0, 10)
 		pad.Parent = card
 
+		-- The picture gets the room the lines and buttons below it leave (at most its usual
+		-- size), so the buttons always fit on the card, even on the shortest phones.
+		local below = 26 + 20 + 20 + 36 + 4 * gap -- name, rarity, news, buttons and the gaps
 		local art = Instance.new("Frame")
 		art.Name = "Art"
 		art.BackgroundTransparency = 1
 		art.LayoutOrder = 1
-		art.Size = UDim2.new(1, 0, 0, if compact then 92 else 140)
+		art.Size = UDim2.new(1, 0, 1, -below)
 		art.Parent = card
+		local artLimit = Instance.new("UISizeConstraint")
+		artLimit.MinSize = Vector2.new(0, 36)
+		artLimit.MaxSize = Vector2.new(math.huge, if compact then 92 else 140)
+		artLimit.Parent = art
 		if item then
 			local ok, model = pcall(Cosmetics.Preview, item)
 			if ok and model then
@@ -1294,10 +1343,15 @@ function CrateUI.Mount(gui: ScreenGui)
 					Sounds.PlaySpec(cfg.Sounds.Tick)
 				end
 			end
+			-- (only once it has slowed down: Config.Crates.Reel.PreviewSpeed)
+			local speed = (finish - start) * 4 * (1 - u) ^ 3 / duration / step -- cards a second
 			local made = 0
 			for i = math.max(1, centre - 3), math.min(#stripCards, centre + 3) do
+				if made >= 2 or speed > reelCfg.PreviewSpeed then
+					break
+				end
 				local art = stripCards[i]:FindFirstChild("Art")
-				if made < 2 and art and not art:FindFirstChild("Preview") then
+				if art and not art:FindFirstChild("Preview") then
 					reelPreview(i)
 					made += 1
 				end
