@@ -13,7 +13,8 @@
 	  Crates.luau      crates and their odds
 	  Menu.luau        the top-left menu tiles
 	  Maps/<Id>.luau   one file per round map (added to Maps.List below)
-	  Skins/           crate skins, one file per theme (added to Shop.Items below)
+	  Skins/           crate skins, one file per theme (added to Shop.Items below), and
+	                   Skins/Settings.luau (Config.Skins: themes, glow, auras, CRAZY effects)
 	Everything is still read the same way: Config.Features.Parkour, Config.Lobby.Zones, ...
 ]]
 
@@ -66,6 +67,7 @@ local Config = {
 	ScareMaze = require(script.ScareMaze),
 	Rarity = require(script.Rarity),
 	Crates = require(script.Crates),
+	Skins = require(script.Skins.Settings),
 	Menu = require(script.Menu),
 
 	Game = {
