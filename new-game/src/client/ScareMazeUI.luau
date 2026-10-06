@@ -155,8 +155,14 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 	boo.Font = Enum.Font.GothamBlack
 	boo.TextSize = 30
 	boo.AnchorPoint = Vector2.new(1, 1)
-	-- On phones it sits above the jump button.
-	boo.Position = if touch then UDim2.new(1, -20, 1, -170) else UDim2.new(1, -30, 1, -30)
+	-- On phones it sits above the jump button. Roblox's jump button is bigger and higher on
+	-- screens whose short side is over 500 pixels (tablets, big phones), so BOO goes higher there.
+	local camera = workspace.CurrentCamera
+	local viewport = if camera then camera.ViewportSize else Vector2.new(1280, 720)
+	local bigJump = math.min(viewport.X, viewport.Y) > 500
+	boo.Position = if touch
+		then UDim2.new(1, -20, 1, if bigJump then -235 else -170)
+		else UDim2.new(1, -30, 1, -30)
 	boo.Size = UDim2.fromOffset(if touch then 100 else 116, if touch then 100 else 116)
 	boo.Visible = false
 	-- Round: Theme.button already gave it a UICorner, make that one a circle.
