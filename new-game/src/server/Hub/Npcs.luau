@@ -2,6 +2,7 @@
 --[[
 	Lobby NPCs and interactive props from Config.Npcs.List: the Pumpkin Shop (Vendor), the
 	Voting Board (Board), the Leaderboard Gravestone (Gravestone) and the Photo Spot.
+	Their parts (how they look) are built by src/server/Hub/NpcLooks.luau.
 
 	Each NPC is a Model named after its Id with the attributes NpcId and DisplayName. An NPC
 	with a Zone stands in the middle of that lobby zone, inside the section model of the same
@@ -22,7 +23,7 @@
 	Npcs.Build(def, hub) -> Model?      builds one NPC into the hub
 	Npcs.BuildAll(hub)
 	Npcs.Find(hub, id) -> Model?        the NPC model, wherever it was moved inside the hub
-	Npcs.Spot(def) -> CFrame            where the NPC stands, facing the hub centre
+	Npcs.Spot(def) -> CFrame            where the NPC stands, facing the hub centre (or def.LookAt)
 	Npcs.AttachPrompt(def, m, cf) -> BasePart   a PromptAnchor with the prompt, in front of cf
 	Npcs.AddPrompt(def, anchor) -> ProximityPrompt
 	Npcs.ShopDefs() -> { NpcDef }       NPCs that open the shop
@@ -37,6 +38,7 @@ local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Kit = require(script.Parent.Parent.Build.Kit)
 local HubLayout = require(script.Parent.HubLayout)
+local NpcLooks = require(script.Parent.NpcLooks)
 
 type NpcDef = Config.NpcDef
 
@@ -44,29 +46,12 @@ local Npcs = {}
 
 local hubCfg = Config.Hub
 local paint = Kit.painter(hubCfg.Palette)
-local part = paint.part
-local wedge = paint.wedge
 local holder = Kit.holder
 local model = Kit.model
-local upright = Kit.upright
 local color = paint.color
 
 local function nameTag(text: string, adornee: BasePart, height: number): BillboardGui
 	return Kit.nameTag(text, adornee, height, color("Glow"), hubCfg.NameTagDistance)
-end
-
-local function jackOLantern(cf: CFrame, size: number, parent: Instance): Model
-	return Kit.prop("JackOLantern", cf, parent, size * 1.2, function()
-		return Kit.jackOLantern(cf, size, hubCfg.Palette :: any, parent)
-	end)
-end
-
-local function cobweb(cf: CFrame, size: number, parent: Instance): Model
-	return Kit.prop("Cobweb", cf, parent, size, function()
-		local web = Kit.cobweb(cf, size, color("Bone"), parent)
-		Kit.setRole(web, "Bone")
-		return web
-	end, { Anchor = "Center" })
 end
 
 -- Builders: (cf = the NPC's spot on the plaza, facing the centre; m = its model) -> the part
@@ -77,73 +62,15 @@ end
 -- How far behind the NPC's spot the keeper stands (behind the counter).
 local KEEPER_OFFSET = CFrame.new(0, 0, 0.5)
 
+-- The stall and the keeper are drawn in Hub/NpcLooks.luau.
 local function buildStall(cf: CFrame, parent: Instance): Model
-	local stall = model("Stall", parent)
-	part({
-		Name = "Counter",
-		Size = Vector3.new(10, 3, 3),
-		CFrame = cf * CFrame.new(0, 1.5, -2.5),
-		PaletteRole = "Wood",
-		Material = Enum.Material.WoodPlanks,
-	}, stall)
-	for _, x in { -4.6, 4.6 } do
-		for _, z in { -3.8, 2.5 } do
-			part({
-				Name = "Post",
-				Size = Vector3.new(0.5, 8, 0.5),
-				CFrame = cf * CFrame.new(x, 4, z),
-				PaletteRole = "Wood",
-			}, stall)
-		end
-	end
-	for i = 0, 6 do
-		part({
-			Name = "AwningStripe",
-			Size = Vector3.new(1.45, 0.3, 7.5),
-			CFrame = cf
-				* CFrame.new(-4.35 + i * 1.45, 8.4, -0.6)
-				* CFrame.Angles(math.rad(-14), 0, 0),
-			PaletteRole = if i % 2 == 0 then "Orange" else "Purple",
-			Material = Enum.Material.Fabric,
-		}, stall)
-	end
-	for i = 0, 2 do
-		jackOLantern(cf * CFrame.new(-3 + i * 3, 3, -2.5), 1.3, stall)
-	end
-	return stall
+	return NpcLooks.Stall(cf, parent)
 end
 
 local function buildKeeper(spot: CFrame, parent: Instance): Model
-	-- A pumpkin-headed farmer. A custom PumpkinVendor model (Custom > Characters) replaces
-	-- just this, standing on KeeperSpot (Npcs.ApplyCustom).
-	local keeper = model("Keeper", parent)
-	part({
-		Name = "Body",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(4, 2.4, 2.4),
-		CFrame = upright(spot * CFrame.new(0, 2.5, 0)),
-		PaletteRole = "Cloth",
-		Material = Enum.Material.Fabric,
-	}, keeper)
-	local headCf = spot * CFrame.new(0, 6, 0)
-	local head = part({
-		Name = "Head",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(3.4, 3, 3.4),
-		CFrame = headCf,
-		PaletteRole = "Orange",
-	}, keeper)
-	Kit.carvedFace(headCf, 3, color("Glow"), keeper)
-	part({
-		Name = "Hat",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.3, 4.4, 4.4),
-		CFrame = upright(spot * CFrame.new(0, 7.4, 0)),
-		PaletteRole = "Straw",
-		Material = Enum.Material.Fabric,
-	}, keeper)
-	keeper.PrimaryPart = head
-	return keeper
+	-- A custom PumpkinVendor model (Custom > Characters) replaces just this, standing on
+	-- KeeperSpot (Npcs.ApplyCustom).
+	return NpcLooks.Keeper(spot, parent)
 end
 
 -- The top of everything you can see in `root` (world Y), or `fallback`.
@@ -153,7 +80,7 @@ local function visibleTop(root: Instance, fallback: number): number
 end
 
 local function buildVendor(cf: CFrame, m: Model, def: NpcDef): BasePart
-	local stall = Kit.prop("VendorStall", cf, m, 10, function()
+	local stall = Kit.prop("VendorStall", cf, m, 21, function()
 		return buildStall(cf, m)
 	end)
 	local spot = cf * KEEPER_OFFSET
@@ -171,126 +98,25 @@ end
 -- Voting Board ---------------------------------------------------------------------------------
 
 local function buildBoard(cf: CFrame, m: Model, def: NpcDef): BasePart
-	for _, x in { -5.5, 5.5 } do
-		part({
-			Name = "Post",
-			Size = Vector3.new(0.8, 12, 0.8),
-			CFrame = cf * CFrame.new(x, 6, 0.3),
-			PaletteRole = "Wood",
-			Material = Enum.Material.Wood,
-		}, m)
-	end
-	part({
-		Name = "Backing",
-		Size = Vector3.new(11.5, 8, 0.6),
-		CFrame = cf * CFrame.new(0, 7, 0),
-		PaletteRole = "Wood",
-		Material = Enum.Material.WoodPlanks,
-	}, m)
 	-- The Screen's front face carries the live vote SurfaceGui (rendered by each client).
-	local screen = part({
-		Name = "Screen",
-		Size = Vector3.new(10.5, 7, 0.2),
-		CFrame = cf * CFrame.new(0, 7, -0.4),
-		PaletteRole = "Dark",
-	}, m)
-	local roof = wedge({
-		Name = "Roof",
-		Size = Vector3.new(13, 1.5, 1.5),
-		CFrame = cf * CFrame.new(0, 11.8, -0.3),
-		PaletteRole = "Purple",
-	}, m)
-	jackOLantern(cf * CFrame.new(-6.5, 0, -1), 1.8, m)
-	jackOLantern(cf * CFrame.new(6.5, 0, -1), 1.8, m)
-	nameTag(def.DisplayName, roof, 2.5)
+	local screen, top = NpcLooks.Board(cf, m, def.DisplayName)
+	nameTag(def.DisplayName, top, 4)
 	return screen
 end
 
 -- Leaderboard Gravestone ------------------------------------------------------------------------
 
 local function buildGravestone(cf: CFrame, m: Model, def: NpcDef): BasePart
-	local slab = part({
-		Name = "Slab",
-		Size = Vector3.new(10, 9, 1.6),
-		CFrame = cf * CFrame.new(0, 5.5, 0),
-		PaletteRole = "Stone",
-		Material = Enum.Material.Slate,
-	}, m)
-	part({
-		Name = "Arch",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1.6, 10, 10),
-		CFrame = cf * CFrame.new(0, 10, 0) * CFrame.Angles(0, math.rad(90), 0),
-		PaletteRole = "Stone",
-		Material = Enum.Material.Slate,
-	}, m)
-	part({
-		Name = "Plinth",
-		Size = Vector3.new(12, 1, 3.5),
-		CFrame = cf * CFrame.new(0, 0.5, 0),
-		PaletteRole = "Stone",
-		PaletteShade = 0.3,
-		Material = Enum.Material.Slate,
-	}, m)
 	-- The Screen's front face carries the top-collectors SurfaceGui (filled by the server).
-	local screen = part({
-		Name = "Screen",
-		Size = Vector3.new(8.6, 10.5, 0.2),
-		CFrame = cf * CFrame.new(0, 7.2, -0.85),
-		PaletteRole = "Stone",
-		PaletteShade = 0.45,
-		Material = Enum.Material.Slate,
-	}, m)
-	for _, x in { -6, 6 } do
-		part({
-			Name = "CandleWax",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(1.6, 0.8, 0.8),
-			CFrame = upright(cf * CFrame.new(x, 1.8, -1.2)),
-			PaletteRole = "Bone",
-		}, m)
-		local flame = part({
-			Name = "CandleFlame",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(0.4, 0.7, 0.4),
-			CFrame = cf * CFrame.new(x, 3, -1.2),
-			PaletteRole = "Glow",
-			Material = Enum.Material.Neon,
-			CanCollide = false,
-		}, m)
-		Kit.light(flame, color("Glow"), 10, 1, true):SetAttribute("PaletteRole", "Glow")
-	end
-	cobweb(cf * CFrame.new(-4.4, 13, -0.85), hubCfg.Cobwebs.Size * 0.6, m)
-	nameTag(def.DisplayName, slab, 9.5)
+	local screen, slab = NpcLooks.Gravestone(cf, m)
+	nameTag(def.DisplayName, slab, 13)
 	return screen
 end
 
 -- Photo Spot --------------------------------------------------------------------------------------
 
 local function buildPhotoSpot(cf: CFrame, m: Model, _def: NpcDef): BasePart
-	local cfg = hubCfg.PhotoSpot
-	local stage = part({
-		Name = "Stage",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1, 14, 14),
-		CFrame = upright(cf * CFrame.new(0, 1.5, 0)),
-		PaletteRole = "Purple",
-	}, m)
-	local backdrop = part({
-		Name = "Backdrop",
-		Size = Vector3.new(16, 10, 0.6),
-		CFrame = cf * CFrame.new(0, 6, 6.5),
-		PaletteRole = "Dark",
-		PaletteShade = -0.08,
-	}, m)
-	Kit.surfaceText(backdrop, cfg.Sign, color("Orange"), Enum.NormalId.Front)
-	-- Arch of little jack-o-lanterns over the front of the stage.
-	local count = 11
-	for i = 0, count - 1 do
-		local a = math.pi * (i / (count - 1))
-		jackOLantern(cf * CFrame.new(math.cos(a) * 7.5, 1 + math.sin(a) * 9, -6), 1.4, m)
-	end
-	return stage
+	return NpcLooks.PhotoSpot(cf, m)
 end
 
 local builders: { [string]: (CFrame, Model, NpcDef) -> BasePart } = {
@@ -316,7 +142,16 @@ function Npcs.Spot(def: NpcDef): CFrame
 		return HubLayout.Zone(zoneName).CFrame
 	end
 	local offset = def.Offset or Vector3.zero
-	return HubLayout.FacingCenter(HubLayout.At(offset + Vector3.new(0, 1, 0)))
+	local position = HubLayout.At(offset + Vector3.new(0, 1, 0))
+	local lookAt = def.LookAt
+	if lookAt then
+		local target = HubLayout.At(lookAt)
+		local flat = Vector3.new(target.X - position.X, 0, target.Z - position.Z)
+		if flat.Magnitude > 0.1 then
+			return CFrame.lookAt(position, position + flat)
+		end
+	end
+	return HubLayout.FacingCenter(position)
 end
 
 function Npcs.ShopDefs(): { NpcDef }

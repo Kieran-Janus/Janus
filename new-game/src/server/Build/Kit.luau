@@ -12,6 +12,14 @@
 	Props: Kit.prop(name, cframe, parent, size?, build) swaps a decoration for a model in
 	ReplicatedStorage.Custom.Props with the same name (every copy at once), else builds it.
 
+	Shapes: Roblox always draws a Ball part as a perfect sphere (its smallest side wins), so
+	Kit.part turns a Ball with unequal sides into a Block with a SpecialMesh "Oval" (MeshType
+	Sphere), which stretches to the part's size: real ovals for pumpkins, eggs, mounds and
+	flames. (A mesh doesn't change how the part collides: it bumps like its box.)
+	Kit.rounded makes a rounded cylinder (SpecialMesh Head) for posts, drums and pads.
+
+	Small decorations cast no shadow (cheaper on phones): see SMALL_DECOR below.
+
 	Client animation hooks (src/client/HubAmbience.luau), used by the hub and the maps:
 	  tag "HubFloat"   on Models that bob (attributes BobHeight, Phase)
 	  tag "HubFlicker" on PointLights that flicker
@@ -76,14 +84,55 @@ local function apply(instance: Instance, props: Props, palette: ColorPalette?)
 	end
 end
 
+-- Decorations no bigger than this (studs, longest side) cast no shadow: you never notice
+-- their shadows, and every shadow caster costs a little on phones.
+local SMALL_DECOR = 4
+
+-- True for a Size Roblox can't draw as a Ball (its sides are not all the same).
+function Kit.isOval(size: any): boolean
+	if typeof(size) ~= "Vector3" then
+		return false
+	end
+	return math.abs(size.X - size.Y) > 1e-3 or math.abs(size.Y - size.Z) > 1e-3
+end
+
+-- Gives `p` a SpecialMesh that fills its box (MeshType Sphere = oval, Head = rounded cylinder
+-- standing along Y, Cylinder = cylinder along X). Returns the mesh.
+function Kit.mesh(p: BasePart, meshType: Enum.MeshType, name: string?): SpecialMesh
+	local mesh = Instance.new("SpecialMesh")
+	mesh.Name = name or "Shape"
+	mesh.MeshType = meshType
+	mesh.Parent = p
+	return mesh
+end
+
 function Kit.part(props: Props, parent: Instance, palette: ColorPalette?): Part
 	local p = Instance.new("Part")
 	p.Anchored = true
 	p.TopSurface = Enum.SurfaceType.Smooth
 	p.BottomSurface = Enum.SurfaceType.Smooth
 	p.Material = Enum.Material.SmoothPlastic
-	apply(p, props, palette)
+	-- A Ball with unequal sides would be drawn as a plain sphere: make it a real oval.
+	local oval = props.Shape == Enum.PartType.Ball and Kit.isOval(props.Size)
+	if oval then
+		local copy = table.clone(props)
+		copy.Shape = Enum.PartType.Block
+		apply(p, copy, palette)
+		Kit.mesh(p, Enum.MeshType.Sphere, "Oval")
+	else
+		apply(p, props, palette)
+	end
 	p.Parent = parent
+	return p
+end
+
+--[[
+	A rounded cylinder standing up (SpecialMesh Head): Size = (diameter, height, diameter).
+	Chunky, toy-like posts, drums, stones and pads. Collides like its box.
+]]
+function Kit.rounded(props: Props, parent: Instance, palette: ColorPalette?): Part
+	local p = Kit.part(props, parent, palette)
+	Kit.mesh(p, Enum.MeshType.Head, "Rounded")
 	return p
 end
 
@@ -114,6 +163,26 @@ function Kit.decor(props: Props, parent: Instance, palette: ColorPalette?): Part
 	p.CanCollide = false
 	p.CanQuery = false
 	p.CanTouch = false
+	Kit.noShadowIfSmall(p)
+	return p
+end
+
+-- Small, glowing or see-through parts cast no shadow.
+function Kit.noShadowIfSmall(p: BasePart)
+	local size = p.Size
+	if
+		math.max(size.X, size.Y, size.Z) <= SMALL_DECOR
+		or p.Material == Enum.Material.Neon
+		or p.Transparency >= 0.5
+	then
+		p.CastShadow = false
+	end
+end
+
+-- A rounded cylinder (Kit.rounded) that is only for looks.
+function Kit.roundedDecor(props: Props, parent: Instance, palette: ColorPalette?): Part
+	local p = Kit.decor(props, parent, palette)
+	Kit.mesh(p, Enum.MeshType.Head, "Rounded")
 	return p
 end
 
@@ -121,7 +190,10 @@ export type Painter = {
 	part: (props: Props, parent: Instance) -> Part,
 	decor: (props: Props, parent: Instance) -> Part,
 	wedge: (props: Props, parent: Instance) -> WedgePart,
+	rounded: (props: Props, parent: Instance) -> Part,
+	roundedDecor: (props: Props, parent: Instance) -> Part,
 	color: (role: string, shade: number?) -> Color3,
+	palette: ColorPalette,
 }
 
 -- part/decor/wedge that colour themselves from `palette` by PaletteRole.
@@ -136,9 +208,16 @@ function Kit.painter(palette: ColorPalette): Painter
 		wedge = function(props: Props, parent: Instance): WedgePart
 			return Kit.wedge(props, parent, palette)
 		end,
+		rounded = function(props: Props, parent: Instance): Part
+			return Kit.rounded(props, parent, palette)
+		end,
+		roundedDecor = function(props: Props, parent: Instance): Part
+			return Kit.roundedDecor(props, parent, palette)
+		end,
 		color = function(role: string, shade: number?): Color3
 			return Kit.roleColor(palette, role, shade) or Color3.new(1, 0, 1)
 		end,
+		palette = palette,
 	}
 end
 
@@ -365,61 +444,242 @@ function Kit.float(m: Model, bob: number, rng: Random)
 	CollectionService:AddTag(m, "HubFloat")
 end
 
--- Glowing carved face on the front of a ball of diameter `size` (front = cf.LookVector).
-function Kit.carvedFace(cf: CFrame, size: number, glow: Color3, parent: Instance)
-	local r = size / 2
+-- Ovals and ribbed pumpkins -------------------------------------------------------------------
+
+-- One oval making up a body: where it sits (relative to the body's centre) and half its size.
+export type Oval = { CFrame: CFrame, Semi: Vector3 }
+
+-- The far point where a ray from `o` along `d` leaves the oval (in the oval's own space).
+local function exitDistance(o: Vector3, d: Vector3, semi: Vector3): number?
+	local ox, oy, oz = o.X / semi.X, o.Y / semi.Y, o.Z / semi.Z
+	local dx, dy, dz = d.X / semi.X, d.Y / semi.Y, d.Z / semi.Z
+	local a = dx * dx + dy * dy + dz * dz
+	local b = 2 * (ox * dx + oy * dy + oz * dz)
+	local c = ox * ox + oy * oy + oz * oz - 1
+	local disc = b * b - 4 * a * c
+	if a <= 0 or disc < 0 then
+		return nil
+	end
+	return (-b + math.sqrt(disc)) / (2 * a)
+end
+
+--[[
+	How far in front of the body's centre its surface is at (x, y) on the face (front = -Z):
+	the frontmost of `ovals`. Used to stick carved faces onto round and ribbed bodies.
+]]
+function Kit.frontDepth(ovals: { Oval }, x: number, y: number): number
+	local best = 0
+	local forward = Vector3.new(0, 0, -1)
+	for _, oval in ovals do
+		local o = oval.CFrame:PointToObjectSpace(Vector3.new(x, y, 0))
+		local d = oval.CFrame:VectorToObjectSpace(forward)
+		local t = exitDistance(o, d, oval.Semi)
+		if t and t > best then
+			best = t
+		end
+	end
+	return best
+end
+
+--[[
+	A ribbed pumpkin body centred on `cf`: an oval core plus `ribs` long ovals turned around the
+	middle (each makes two bulges, so 3 ribs = 6 bulges, 4 = 8). size = (width, height, width).
+	The core (named "Pumpkin") gets `props` (Color or PaletteRole, CanCollide...) and is a shade
+	darker so the grooves look deep; the ribs are only for looks. Returns the core and the
+	ovals (for Kit.frontDepth / Kit.carvedFace).
+]]
+function Kit.pumpkinBody(
+	cf: CFrame,
+	size: Vector3,
+	ribs: number,
+	props: Props,
+	parent: Instance,
+	palette: ColorPalette?
+): (Part, { Oval })
+	local coreSize = Vector3.new(size.X * 0.84, size.Y * 0.97, size.Z * 0.84)
+	local baseShade = if typeof(props.PaletteShade) == "number" then props.PaletteShade else 0
+	local coreProps = table.clone(props)
+	coreProps.Name = "Pumpkin"
+	coreProps.Shape = Enum.PartType.Ball
+	coreProps.Size = coreSize
+	coreProps.CFrame = cf
+	coreProps.PaletteShade = baseShade + 0.12
+	if typeof(props.Color) == "Color3" then
+		coreProps.Color = Kit.shade(props.Color, 0.12)
+	end
+	local core = Kit.part(coreProps, parent, palette)
+	if not core.CanCollide then
+		Kit.noShadowIfSmall(core)
+	end
+	local ovals: { Oval } = { { CFrame = CFrame.identity, Semi = coreSize / 2 } }
+	local count = math.max(ribs, 0)
+	for i = 0, count - 1 do
+		local turn = CFrame.Angles(0, i * math.pi / count, 0)
+		local ribSize = Vector3.new(size.X * 0.56, size.Y, size.Z)
+		local shade = baseShade + (if i % 2 == 0 then 0 else 0.05)
+		Kit.decor({
+			Name = "Rib",
+			Shape = Enum.PartType.Ball,
+			Size = ribSize,
+			CFrame = cf * turn,
+			Material = props.Material or Enum.Material.SmoothPlastic,
+			Color = if typeof(props.Color) == "Color3"
+				then Kit.shade(props.Color, shade - baseShade)
+				else nil,
+			PaletteRole = props.PaletteRole,
+			PaletteShade = shade,
+		}, parent, palette)
+		table.insert(ovals, { CFrame = turn, Semi = ribSize / 2 })
+	end
+	return core, ovals
+end
+
+export type FaceOptions = {
+	Ovals: { Oval }?, -- the body's shape (default: one oval of `size`)
+	Detail: string?, -- "Full" (eyes, nose, grin) or "Simple" (eyes and a mouth)
+}
+
+--[[
+	A glowing carved face on the front (cf.LookVector) of a body centred on `cf`. `size` is the
+	body's diameter (a number) or its oval size (width, height, depth). Every piece sits on the
+	surface, turned to follow its curve.
+]]
+function Kit.carvedFace(
+	cf: CFrame,
+	size: number | Vector3,
+	glow: Color3,
+	parent: Instance,
+	options: FaceOptions?
+)
+	local box: Vector3 = if typeof(size) == "Vector3" then size else Vector3.one * (size :: number)
+	local semi = box / 2
+	local ovals: { Oval } = if options and options.Ovals
+		then options.Ovals
+		else { { CFrame = CFrame.identity, Semi = semi } }
+	local full = not (options and options.Detail == "Simple")
+	local w, h = box.X, box.Y
+	local thick = math.max(math.min(w, h) * 0.06, 0.08)
+	-- A spot on the surface at (x, y), facing out of it.
 	local function onSurface(x: number, y: number): CFrame
-		local z = math.sqrt(math.max(r * r - x * x - y * y, 0))
-		return cf * CFrame.new(x, y, -z + 0.05)
+		local depth = Kit.frontDepth(ovals, x, y)
+		local pos = Vector3.new(x, y, -(depth - thick * 0.3))
+		local normal = Vector3.new(
+			x / (semi.X * semi.X),
+			y / (semi.Y * semi.Y),
+			-math.max(depth, 0.01) / (semi.Z * semi.Z)
+		).Unit
+		return cf * CFrame.lookAt(pos, pos + normal)
+	end
+	local function glowing(props: Props): Props
+		props.Color = glow
+		props.PaletteRole = "Glow"
+		props.Material = Enum.Material.Neon
+		props.CanCollide = false
+		props.CanQuery = false
+		props.CanTouch = false
+		props.CastShadow = false
+		return props
 	end
 	for _, side in { -1, 1 } do
 		-- Triangle eyes: a wedge turned so its triangle faces forward.
-		Kit.wedge({
-			Name = "Eye",
-			Size = Vector3.new(0.1, size * 0.18, size * 0.16),
-			CFrame = onSurface(side * r * 0.35, r * 0.25)
-				* CFrame.Angles(0, math.rad(90 * side), 0),
-			Color = glow,
-			PaletteRole = "Glow",
-			Material = Enum.Material.Neon,
-			CanCollide = false,
-		}, parent)
+		Kit.wedge(
+			glowing({
+				Name = "Eye",
+				Size = Vector3.new(thick, h * 0.2, w * 0.17),
+				CFrame = onSurface(side * w * 0.17, h * 0.12)
+					* CFrame.Angles(0, math.rad(90 * side), 0),
+			}),
+			parent
+		)
 	end
-	Kit.part({
-		Name = "Mouth",
-		Size = Vector3.new(size * 0.45, size * 0.1, 0.1),
-		CFrame = onSurface(0, -r * 0.3),
-		Color = glow,
-		PaletteRole = "Glow",
-		Material = Enum.Material.Neon,
-		CanCollide = false,
-	}, parent)
+	if full then
+		Kit.wedge(
+			glowing({
+				Name = "Nose",
+				Size = Vector3.new(thick, h * 0.09, w * 0.07),
+				CFrame = onSurface(0, -h * 0.02) * CFrame.Angles(0, math.rad(90), 0),
+			}),
+			parent
+		)
+		-- A grin: a middle and two ends turned up.
+		Kit.part(
+			glowing({
+				Name = "Mouth",
+				Size = Vector3.new(w * 0.2, h * 0.08, thick),
+				CFrame = onSurface(0, -h * 0.2),
+			}),
+			parent
+		)
+		for _, side in { -1, 1 } do
+			Kit.part(
+				glowing({
+					Name = "Mouth",
+					Size = Vector3.new(w * 0.13, h * 0.07, thick),
+					CFrame = onSurface(side * w * 0.15, -h * 0.165)
+						* CFrame.Angles(0, 0, math.rad(side * 28)),
+				}),
+				parent
+			)
+		end
+	else
+		Kit.part(
+			glowing({
+				Name = "Mouth",
+				Size = Vector3.new(w * 0.36, h * 0.09, thick),
+				CFrame = onSurface(0, -h * 0.18),
+			}),
+			parent
+		)
+	end
 end
 
 export type Palette = { Orange: Color3, Green: Color3, Glow: Color3 }
 
--- A carved, glowing pumpkin sitting on `cf` (front = cf.LookVector).
-function Kit.jackOLantern(cf: CFrame, size: number, colors: Palette, parent: Instance): Model
+export type LanternOptions = {
+	Light: boolean?, -- a flickering PointLight inside (default true; the neon face glows anyway)
+	Ribs: number?, -- 3 (6 bulges, default) or 4 (8 bulges)
+	Detail: string?, -- "Full" face (default) or "Simple"
+}
+
+--[[
+	A carved, glowing, ribbed pumpkin sitting on `cf` (front = cf.LookVector); `size` is its
+	height. Model "JackOLantern": the core ("Pumpkin", collides, the PrimaryPart), ribs, a
+	curly stem and the face.
+]]
+function Kit.jackOLantern(
+	cf: CFrame,
+	size: number,
+	colors: Palette,
+	parent: Instance,
+	options: LanternOptions?
+): Model
 	local m = Kit.model("JackOLantern", parent)
-	local body = Kit.part({
-		Name = "Pumpkin",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(size * 1.15, size, size * 1.15),
-		CFrame = cf * CFrame.new(0, size / 2, 0),
+	local body = Vector3.new(size * 1.22, size, size * 1.22)
+	local centre = cf * CFrame.new(0, size / 2, 0)
+	local ribs = if options and options.Ribs then options.Ribs else 3
+	local core, ovals = Kit.pumpkinBody(centre, body, ribs, {
 		Color = colors.Orange,
 		PaletteRole = "Orange",
 	}, m)
-	Kit.part({
+	Kit.decor({
 		Name = "Stem",
 		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(size * 0.3, size * 0.18, size * 0.18),
-		CFrame = Kit.upright(cf * CFrame.new(0, size + size * 0.1, 0)),
-		Color = colors.Green,
+		Size = Vector3.new(size * 0.32, size * 0.16, size * 0.16),
+		CFrame = Kit.upright(
+			cf * CFrame.new(0, size * 1.05, 0) * CFrame.Angles(math.rad(14), 0, math.rad(10))
+		),
+		Color = Kit.shade(colors.Green, 0.25),
 		PaletteRole = "Green",
+		PaletteShade = 0.25,
 	}, m)
-	Kit.carvedFace(cf * CFrame.new(0, size / 2, 0), size, colors.Glow, m)
-	Kit.light(body, colors.Glow, size * 4, 1.2, true):SetAttribute("PaletteRole", "Glow")
-	m.PrimaryPart = body
+	Kit.carvedFace(centre, body, colors.Glow, m, {
+		Ovals = ovals,
+		Detail = if options and options.Detail then options.Detail else "Full",
+	})
+	if not (options and options.Light == false) then
+		Kit.light(core, colors.Glow, size * 4, 1.2, true):SetAttribute("PaletteRole", "Glow")
+	end
+	m.PrimaryPart = core
 	return m
 end
 

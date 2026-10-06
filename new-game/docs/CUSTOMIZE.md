@@ -194,6 +194,17 @@ Add a third map: add an entry to `Config.Maps.List` (Id, Name, SpawnFolder = "Sp
 ## The hub
 `Config.Hub` controls the plaza size, colours, lighting, decorations, music and photo spot emotes. After changing it, try it with F8 > **Rebuild hub** (that playtest only). To make it stick, raise `Config.Hub.BuildVersion` by one: the next time the game starts, a saved hub with a lower number is rebuilt (unless it is Locked, see below).
 
+What's where (positions are studs from the middle: x = east/west, z = south/north):
+- `Spawn`: the round stone players appear on (south), and the spot they look at (`LookAt`).
+- `ReadyArea`: the glowing rune circle, its standing stones, the pumpkin arch and the "PLAY!" banner. Move the circle with `Config.Lobby.Zones.ReadyArea`.
+- `ShopStall`: the big "PUMPKIN SHOP" sign, the chalkboard, how many goodies sit on the shelves.
+- `Plaza`: the promenade ring round the cauldron, path width, cracks, puddles, fallen leaves.
+- `Signposts`: which areas get paths and signs, and what the signs say (only while that area's switch in `Config.Features` is on).
+- `ClockTower`, `Cauldron`, `Lampposts`, `Bunting`, `JackOLanterns`, `Candles`, `Benches`, `Graveyard`, `DeadTrees`, `Clutter`, `Polish` (terrain, forest, mansion, statue, pumpkin patch, fence): one block each, with a comment on every number.
+- `Budget`: the most parts and lights the whole lobby should have, so it stays smooth on phones (the tests check it).
+
+**Lighting (do this once):** select **Lighting** in the Explorer and set **Technology** to **Future** in the Properties window. Scripts are not allowed to change it, and it makes the lamps, lanterns and candles glow with soft light. Everything else (sky with a big moon and stars, clouds, haze, colours, bloom, depth of field) comes from `Config.Hub.Lighting`.
+
 ---
 
 ## Editing the lobby and maps by hand
@@ -215,7 +226,8 @@ The lobby ("Spooky Town Square", `Workspace.Hub`) and the round maps are built b
 4. Edit it. In the Explorer it is grouped into Models with readable names:
    - `Plaza` (the ground), `Spawn`, `Npcs` (Voting Board, Leaderboard, Photo Spot),
    - one Model per lobby area: `ReadyArea`, `Shop` (with the `PumpkinVendor` stall), `Parkour`, `CandyRush`, `WebScour`, `EasterEggs`,
-   - `Decor`: everything that is only for looks (`ClockTower`, `Cauldron`, `Lamps`, `Bunting`, `JackOLanterns`, `Candles`, `Graveyard`, `Trees`, `Forest`, `HauntedMansion`, `KingStatue`, `PumpkinPatch`, `OldGraves`, `Fence`, `Paths`, `Ambience`). Delete or move any of it freely.
+   - `Plaza`: `Ground`, the `Promenade` ring, the `Dais` the cauldron stands on, `Walkways`, `Curb` and small `Details` (cracks, puddles, leaves),
+   - `Decor`: everything that is only for looks (`ClockTower`, `Cauldron`, `Lamps`, `PathLamps`, `Bunting`, `JackOLanterns`, `Candles`, `Benches`, `Graveyard`, `Trees`, `Clutter`, `Signposts`, `Forest`, `HauntedMansion`, `KingStatue`, `PumpkinPatch`, `OldGraves`, `Fence`, `Paths`, `Ambience`). Delete or move any of it freely.
 5. Lock it: `require(game.ServerScriptService.Server.Tools.Bake).Lock()`
 6. Save the place (Ctrl+S). Your lobby lives in the place file, not in git, so keep a backup: right-click `Workspace.Hub` > **Save to File...**
 
@@ -236,7 +248,7 @@ The game finds the parts that *do* something by their **tag**, not their name or
 
 | Tag | What it does | Tips |
 | --- | --- | --- |
-| `ReadyPad` | Players standing on it join the next round | The square stone in `ReadyArea`. Ctrl+D a copy to make a second pad. The glowing ring is just decoration. |
+| `ReadyPad` | Players standing on it join the next round | The round stone in `ReadyArea` (square or round pads both work). Ctrl+D a copy to make a second pad. The glowing runes on top are just decoration. |
 | `ReadySign` | Shows "READY 2 / 4" and what the round is doing | An invisible part in `ReadyArea` holding the floating sign. Move it anywhere. |
 | `HubSpawn` | Where players appear in the lobby and come back after a round | The `Spawn` pad. |
 | `ShopKeeper` | Opens the Pumpkin Shop | On the `PumpkinVendor` stall. Tag **any** part `ShopKeeper` and it opens the shop too (a "Shop" prompt is added). |
@@ -244,14 +256,28 @@ The game finds the parts that *do* something by their **tag**, not their name or
 Other features add their own tags (parkour checkpoints, Candy Rush pads, Easter eggs...): the list, with what each one needs, is at the top of `src/shared/Tags.luau`.
 
 ### Colours: the palette
-The lobby's colours are in `Config.Hub.Palette` (the `hubPalette` list at the top of `src/shared/Config/init.luau`): `Ground`, `Stone`, `Wood`, `Iron`, `Bone`, `Orange`, `Purple`, `Green`, `Glow`, `Gold`, `Cloth`, `Straw`, `Dark`.
+The lobby's colours are in `Config.Hub.Palette` (the `hubPalette` list at the top of `src/shared/Config/init.luau`): `Ground`, `Stone`, `Wood`, `Iron`, `Bone`, `Orange`, `Purple`, `Green`, `Glow`, `Gold`, `Cloth`, `Straw`, `Dark`, `Teal` (the Ready runes, mushrooms), `Foliage` (tree leaves), `Path` (paths and the promenade).
 - Each painted part has the attribute **PaletteRole** (which colour it uses) and sometimes **PaletteShade** (0.3 = 30% darker, -0.2 = 20% lighter).
 - Change a colour in the palette and every part with that role follows the next time you press Play, even in a Locked lobby. To keep it in your place too, run `Bake.Repaint()` in edit mode and save.
 - Recoloured one part by hand? It keeps your colour until you change that palette colour. To keep it for good, delete its `PaletteRole` attribute.
 - To paint one of your own parts from the palette, give it a `PaletteRole` attribute (a string, e.g. `Wood`).
 
 ### Swap a decoration everywhere: props
-Put a model in `ReplicatedStorage > Custom > Props` named exactly after the decoration, and **every copy** in the lobby uses it: `JackOLantern`, `Lamppost`, `DeadTree`, `Gravestone`, `Candle`, `Cobweb`, `KingStatue`, `ClockTower`, `Cauldron`, `VendorStall`, `ReadyPadArch`.
+Put a model in `ReplicatedStorage > Custom > Props` named exactly after the decoration, and **every copy** in the lobby uses it:
+
+| Name | What it replaces |
+| --- | --- |
+| `Pumpkin` | every plain pumpkin (patch, piles, posts, signs) |
+| `JackOLantern` | every carved, glowing pumpkin |
+| `SpookyTree` / `DeadTree` | trees with puffy leaves / bare trees with lanterns |
+| `Lamppost`, `Lantern`, `Candle` | lamps, small glass lanterns, candles |
+| `Bench`, `HayBale`, `Crate`, `Barrel` | furniture and clutter |
+| `Gravestone`, `FencePost` | tombstones, iron fence posts with a pumpkin on top |
+| `Signpost`, `Mushroom`, `Bat`, `Cobweb` | signs, glowing toadstools, bats, spider webs |
+| `ClockTower`, `Cauldron`, `KingStatue` | the big centrepieces |
+| `VendorStall`, `ReadyPadArch` | the Pumpkin Shop stall, the arch over the Ready circle |
+
+The code for all of them is in `src/server/Build/Props.luau` (and `Hub/NpcLooks.luau` for the stall).
 - Not sure of the name? Select the decoration and look at its `PropName` attribute.
 - It is scaled to the size of the decoration it replaces (add `KeepSize` = true to keep yours) and stands where it stood, turned the same way (only left/right: it is never tipped over).
 - It works in a saved or Locked lobby too: the swap happens each time the game starts.

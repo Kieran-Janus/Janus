@@ -136,7 +136,11 @@ describe("HubBuilder", function()
 		expect(#pads).toBe(1)
 		expect(pads[1]).toBeInstanceOf("BasePart")
 		expect(Lobby.InZone(pads[1].Position, "ReadyArea")).toBe(true)
-		expect(pads[1].CFrame.UpVector).toBeNear(w.Vector3.yAxis, 1e-4) -- lies flat (Y up)
+		-- Lies flat: a square pad's Y axis points up, a round pad (a Cylinder) stands on its X axis.
+		local padUp = if pads[1].Shape.Name == "Cylinder"
+			then pads[1].CFrame.RightVector
+			else pads[1].CFrame.UpVector
+		expect(math.abs(padUp.Y)).toBeNear(1, 1e-4)
 		local signs = w.tagged(Tags.ReadySign, hub)
 		expect(#signs).toBe(1)
 		expect(signs[1]:FindFirstChild("Title", true)).toBeInstanceOf("TextLabel")
