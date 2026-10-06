@@ -56,6 +56,7 @@ local function reserve(reserved: { Rect }, offset: Vector3, size: Vector3, pad: 
 end
 
 -- A plain pumpkin sitting on cf, `size` studs tall without its stem (prop "Pumpkin").
+-- Walk-through decoration: a custom one never blocks players or the King's view either.
 local function decorPumpkin(cf: CFrame, size: number, colors: any, parent: Instance)
 	Kit.prop("Pumpkin", cf, parent, size * 1.25, function()
 		local m = Kit.model("Pumpkin", parent)
@@ -73,7 +74,7 @@ local function decorPumpkin(cf: CFrame, size: number, colors: any, parent: Insta
 			Color = colors.Green,
 		}, m)
 		return m
-	end)
+	end, { Visual = true })
 end
 
 -- A lamp on a wooden post with a glowing lamp hanging from its arm (prop "Lamppost").
@@ -141,13 +142,8 @@ local function scarecrow(ctx: MapBase.Ctx, base: CFrame, parent: Instance)
 				Material = Enum.Material.Grass,
 			}, m)
 		end
-		local head = Kit.jackOLantern(base * CFrame.new(0, 7.6, 0), 2.6, colors, m)
-		for _, d in head:GetDescendants() do
-			if d:IsA("BasePart") then
-				d.CanCollide = false
-				d.CanQuery = false
-			end
-		end
+		-- (its head is only for looks: the scarecrow's post is what you bump into)
+		Kit.jackOLantern(base * CFrame.new(0, 7.6, 0), 2.6, colors, m, { Visual = true })
 		Kit.decor({
 			Name = "HatBrim",
 			Shape = Enum.PartType.Cylinder,
@@ -475,7 +471,10 @@ local function buildGraveyard(ctx: MapBase.Ctx, parent: Model)
 		Kit.light(candle, colors.Glow, 12, 1, true)
 		m.PrimaryPart = candle
 		return m
-	end, { Light = { Color = colors.Glow, Range = 12, Brightness = 1, Height = 0.9 } })
+	end, {
+		Light = { Color = colors.Glow, Range = 12, Brightness = 1, Height = 0.9 },
+		Visual = true,
+	})
 
 	local reserved: { Rect } = { { Center = Vector2.new(mx, mz), Half = Vector2.new(9, 9) } }
 	for _ = 1, cfg.Tombstones do

@@ -1309,15 +1309,17 @@ local Config = {
 		-- Lights for custom props. Your own lantern, lamppost, candle or jack-o'-lantern with
 		-- no light inside gets the game's glow light, so the lobby and the maps don't go dark.
 		--   AddLights          false = never add a light to a custom model
-		--   EveryJackOLantern  true = every custom jack-o'-lantern glows (the built ones glow
-		--                      through their carved faces; yours may not). false = only the
-		--                      ones whose built version has a light (fewer lights: faster on
-		--                      phones)
+		--   EveryJackOLantern  false = only the custom jack-o'-lanterns whose built version has
+		--                      a light get one (the lobby stays inside its phone light budget,
+		--                      Hub.Budget.MaxLights). true = every custom jack-o'-lantern glows
+		--                      (the built ones glow through their carved faces; yours may not),
+		--                      but that adds about 16 lights to the lobby and goes over the
+		--                      budget: slower on phones
 		--   JackOLanternGlow   the glow's colour, brightness and reach (studs of light per stud
 		--                      of pumpkin height) when the built one had no light to copy
 		PropLights = {
 			AddLights = true,
-			EveryJackOLantern = true,
+			EveryJackOLantern = false,
 			JackOLanternGlow = {
 				Color = Color3.fromRGB(255, 170, 70),
 				Brightness = 1.2,

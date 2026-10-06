@@ -4,7 +4,8 @@
 	(a Locked hub, a map baked into ServerStorage.Maps), where the builders don't run any more.
 	Run these in Studio's command bar (View > Command Bar) while the game is NOT running (edit
 	mode), then save the place (Ctrl+S). Ctrl+Z undoes them. In a playtest, F8 > "Apply custom
-	props" runs Swap.Props() for that playtest only.
+	props" runs Swap.Props() for that playtest only (it leaves the round map being played and
+	the hiders' pumpkins alone: the next map loads with your models by itself).
 
 	  require(game.ServerScriptService.Server.Tools.Swap).Props()
 	      Every prop (a Model with a PropName attribute: JackOLantern, Pumpkin, HayBale...) in
@@ -17,11 +18,14 @@
 	  require(game.ServerScriptService.Server.Tools.Swap).Props({ Revert = true })
 	      The same, and first puts the built look back on props whose custom model you removed
 	      from Custom.Props (only ones Swap replaced: those have a backup).
-	  require(game.ServerScriptService.Server.Tools.Swap).Replace("Pumpkin", workspace.MyPumpkin)
-	      For anything else: every Model or Part NAMED "Pumpkin" in Workspace and
-	      ServerStorage.Maps is replaced by a copy of workspace.MyPumpkin, at the same spot and
-	      facing, scaled to the old one's height. A third argument limits it to one place,
-	      e.g. Replace("Tree", workspace.MyTree, workspace.Hub). Prints how many it changed.
+	  require(game.ServerScriptService.Server.Tools.Swap).Replace("Rock", workspace.MyRock)
+	      For things that aren't props (ones you placed by hand): every Model or Part NAMED
+	      "Rock" in Workspace and ServerStorage.Maps is replaced by a copy of workspace.MyRock,
+	      at the same spot and facing, scaled to the old one's height. A third argument limits
+	      it to one place, e.g. Replace("Rock", workspace.MyRock, workspace.Hub). Prints how
+	      many it changed. Props, and the parts inside them (a jack-o'-lantern's core is
+	      called "Pumpkin", a gravestone's slab "Tombstone"), are left alone: a prop name
+	      (Pumpkin, Gravestone...) goes in Custom.Props and Swap.Props() instead.
 
 	Each one prints what it did and returns how many it changed (and that message).
 	Step by step: docs/CUSTOMIZE.md > "Swap every copy of something at once".
@@ -35,6 +39,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local Kit = require(script.Parent.Parent.Build.Kit)
+local MapService = require(script.Parent.Parent.Services.MapService)
 
 local Swap = {}
 
@@ -108,6 +113,27 @@ local function rootsOf(root: Instance?): { Instance }
 		table.insert(roots, maps)
 	end
 	return roots
+end
+
+--[[
+	During a playtest: true for things a round is using right now, which Swap.Props leaves
+	alone. That is the round map being played (its pickups, decoys and hiding spots are in
+	use; the next map loads with your models by itself) and a Hide & Seek hider's pumpkin
+	(welded to the hider: a swapped copy would stand still and couldn't be tagged).
+]]
+local function inUse(m: Model): boolean
+	if not RunService:IsRunning() then
+		return false
+	end
+	local node: Instance? = m
+	while node do
+		if node:GetAttribute("HiderUserId") ~= nil then
+			return true
+		end
+		node = node.Parent
+	end
+	local map = MapService.Current()
+	return map ~= nil and m:IsDescendantOf(map.Model)
 end
 
 local function backupFolder(): Folder
@@ -188,6 +214,7 @@ function Swap.Props(options: (PropsOptions | string)?): (number, string)
 	local swapped: { [string]: number } = {}
 	local reverted: { [string]: number } = {}
 	local stuck: { [string]: number } = {}
+	local busy = 0 -- props left alone because a round is using them (inUse)
 	local total = 0
 	undoable("Swap props", function()
 		for _, root in rootsOf(nil) do
@@ -196,6 +223,7 @@ function Swap.Props(options: (PropsOptions | string)?): (number, string)
 				local gone = Kit.findProps(root, function(m: Model): boolean
 					return m:GetAttribute("CustomProp") == true
 						and not CustomAssets.Has("Props", m:GetAttribute("PropName") :: string)
+						and not inUse(m)
 				end)
 				for _, custom in gone do
 					local name = custom:GetAttribute("PropName") :: string
@@ -210,7 +238,14 @@ function Swap.Props(options: (PropsOptions | string)?): (number, string)
 				end
 			end
 			local list = Kit.findProps(root, function(m: Model): boolean
-				return CustomAssets.Has("Props", m:GetAttribute("PropName") :: string)
+				if not CustomAssets.Has("Props", m:GetAttribute("PropName") :: string) then
+					return false
+				end
+				if inUse(m) then
+					busy += 1
+					return false
+				end
+				return true
 			end)
 			for _, old in list do
 				local name = old:GetAttribute("PropName") :: string
@@ -258,7 +293,7 @@ function Swap.Props(options: (PropsOptions | string)?): (number, string)
 				.. ". Bake the hub or map again to rebuild them."
 		)
 	end
-	if #lines == 0 then
+	if #lines == 0 and busy == 0 then
 		local custom = ReplicatedStorage:FindFirstChild("Custom")
 		local props = custom and custom:FindFirstChild("Props")
 		local mine = 0
@@ -272,6 +307,14 @@ function Swap.Props(options: (PropsOptions | string)?): (number, string)
 			if mine == 0
 				then "Nothing to swap: put a model named like a prop (its PropName, e.g. JackOLantern) in ReplicatedStorage > Custom > Props first."
 				else "Nothing to swap: no lobby or map saved in your place has those props (the lobby and maps built when the game starts use your models by themselves; Swap.Props() is for a lobby or map you baked). Check your model's name matches a PropName exactly."
+		)
+	end
+	if busy > 0 then
+		table.insert(
+			lines,
+			("Left %d alone that a round is using (the map being played, hiders' pumpkins): the next map loads with your models by itself."):format(
+				busy
+			)
 		)
 	end
 	if RunService:IsRunning() then
@@ -327,31 +370,64 @@ local function freshCopy(model: Instance, name: string): Model?
 	return m
 end
 
+-- The prop `d` is, or is a piece of (the nearest Model with a PropName attribute), or nil.
+local function propOf(d: Instance): Model?
+	local node: Instance? = d
+	while node do
+		if node:IsA("Model") and node:GetAttribute("PropName") ~= nil then
+			return node
+		end
+		node = node.Parent
+	end
+	return nil
+end
+
+-- Is `name` the PropName of a prop in Workspace / ServerStorage.Maps (or under `root`)?
+local function isPropName(name: string, root: Instance?): boolean
+	for _, where in rootsOf(root) do
+		for _, d in where:GetDescendants() do
+			if d:IsA("Model") and d:GetAttribute("PropName") == name then
+				return true
+			end
+		end
+	end
+	return false
+end
+
 --[[
 	Replaces every Model or Part named `name` (in Workspace and ServerStorage.Maps, or only
 	under `root`) with a copy of `model`: at the same spot (bottoms lined up) and facing, scaled
 	to the old one's height (unless `model` has KeepSize = true). The copy keeps the old one's
 	name, tags and attributes, and working (tagged) parts inside the old one are moved into it.
-	`model` itself and anything inside it are never replaced. Returns how many it replaced and
-	the message it printed.
+	`model` itself and anything inside it are never replaced. Props and the parts inside them
+	are left alone (a jack-o'-lantern's core part is called "Pumpkin"): when `name` is a prop
+	name it stops and says to use Custom.Props and Swap.Props() instead, which keeps what the
+	game needs (hitboxes, lights, sizes). Returns how many it replaced and the message it
+	printed.
 ]]
 function Swap.Replace(name: string, model: Instance, root: Instance?): (number, string)
 	if type(name) ~= "string" or name == "" then
 		error(
-			'Swap.Replace: give the name to look for, e.g. Swap.Replace("Pumpkin", workspace.MyPumpkin)',
+			'Swap.Replace: give the name to look for, e.g. Swap.Replace("Rock", workspace.MyRock)',
 			0
 		)
 	end
 	if typeof(model) ~= "Instance" or not (model:IsA("Model") or model:IsA("BasePart")) then
-		error(
-			"Swap.Replace: the second thing must be a Model or a Part, e.g. workspace.MyPumpkin",
-			0
+		error("Swap.Replace: the second thing must be a Model or a Part, e.g. workspace.MyRock", 0)
+	end
+	if isPropName(name, root) then
+		local message = ("%s is a prop name, so Replace leaves it alone (it would lose what the game needs, like hitboxes and lights). Instead: name your model %s, put it in ReplicatedStorage > Custom > Props and run Swap.Props(). Nothing was replaced."):format(
+			name,
+			name
 		)
+		warn("[Swap] " .. message)
+		return 0, message
 	end
 	local count, skipped = 0, 0
+	local inProps: { [string]: number } = {} -- matches that are (part of) a prop, by PropName
 	undoable("Replace " .. name, function()
 		for _, where in rootsOf(root) do
-			-- Matches, outermost only (a Model named Pumpkin may hold a part named Pumpkin).
+			-- Matches, outermost only (a Model named Rock may hold a part named Rock).
 			local matches: { PVInstance } = {}
 			local chosen: { [Instance]: boolean } = {}
 			for _, d in where:GetDescendants() do
@@ -371,10 +447,18 @@ function Swap.Replace(name: string, model: Instance, root: Instance?): (number, 
 						end
 						ancestor = ancestor.Parent
 					end
-					if not inside then
-						chosen[d] = true
-						table.insert(matches, d :: PVInstance)
+					if inside then
+						continue
 					end
+					-- A prop, or a piece of one: left alone (swap the whole prop in Custom.Props).
+					local prop = propOf(d)
+					if prop then
+						local propName = tostring(prop:GetAttribute("PropName"))
+						inProps[propName] = (inProps[propName] or 0) + 1
+						continue
+					end
+					chosen[d] = true
+					table.insert(matches, d :: PVInstance)
 				end
 			end
 			for _, old in matches do
@@ -419,9 +503,15 @@ function Swap.Replace(name: string, model: Instance, root: Instance?): (number, 
 	end)
 	local message = if count > 0
 		then ("Replaced %d %s with a copy of %s."):format(count, name, model.Name)
+		elseif skipped > 0 or next(inProps) then ("Replaced nothing named %q."):format(name)
 		else ("Found nothing named %q to replace (names must match exactly, capitals too)."):format(
 			name
 		)
+	if next(inProps) then
+		message ..= (" Left alone the ones that are props or part of one (%s): to change those, put your model in ReplicatedStorage > Custom > Props named like the prop and run Swap.Props()."):format(
+			summary(inProps)
+		)
+	end
 	if skipped > 0 then
 		message ..= (" Left %d part(s) named %s alone: they do something in the game (they have a tag). Swap their look with a prop in Custom.Props instead."):format(
 			skipped,

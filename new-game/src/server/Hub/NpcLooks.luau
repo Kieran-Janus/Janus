@@ -88,7 +88,7 @@ local function shelfItem(kind: string, cf: CFrame, parent: Instance)
 				PaletteShade = 0.3,
 			}, m)
 			return m
-		end)
+		end, { Visual = true })
 	elseif kind == "Potion" then
 		decor({
 			Name = "PotionBottle",

@@ -332,6 +332,8 @@ end
 
 local function topiary(ctx: MapBase.Ctx, cf: CFrame, kind: number, parent: Instance)
 	local colors = ctx.Def.Colors
+	-- (drawn before Kit.prop, so a custom topiary moves nothing else in the map)
+	local green = jitter(colors.HedgeTop, ctx.Rng, 0.06)
 	Kit.prop("Topiary", cf, parent, 6, function()
 		local m = Kit.model("Topiary", parent)
 		Kit.part({
@@ -342,7 +344,6 @@ local function topiary(ctx: MapBase.Ctx, cf: CFrame, kind: number, parent: Insta
 			Color = colors.Pot,
 			Material = Enum.Material.Slate,
 		}, m)
-		local green = jitter(colors.HedgeTop, ctx.Rng, 0.06)
 		if kind == 1 then
 			-- Three balls on a stick.
 			Kit.decor({
@@ -385,7 +386,7 @@ local function topiary(ctx: MapBase.Ctx, cf: CFrame, kind: number, parent: Insta
 	end)
 end
 
--- A patch of leaves with four flowers (prop "Flowers").
+-- A patch of leaves with four flowers (prop "Flowers", only for looks: walk-through).
 local function flowers(ctx: MapBase.Ctx, center: Vector3, radius: number, parent: Instance)
 	local colors = ctx.Def.Colors
 	local turn = ctx.Rng:NextNumber(0, math.pi)
@@ -416,7 +417,7 @@ local function flowers(ctx: MapBase.Ctx, center: Vector3, radius: number, parent
 			}, m)
 		end
 		return m
-	end)
+	end, { Visual = true })
 end
 
 local function buildPlaza(

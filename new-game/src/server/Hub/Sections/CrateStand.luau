@@ -95,11 +95,12 @@ local function display(
 
 	-- The crate floats a little above the plinth and bobs (client HubAmbience).
 	local stand = top.CFrame * CFrame.new(0, 0.15 + 0.25, 0)
+	-- (only for looks: the prompt is on its own part below)
 	local crateModel = Kit.prop(crate.Id, stand, m, CrateArt.Height(size), function()
 		local built = CrateArt.Build(crate, size)
 		built:PivotTo(stand)
 		return built
-	end)
+	end, { Visual = true })
 	crateModel.Name = crate.Id
 	local bob = Config.Crates.Stand.Bob
 	if bob > 0 and crateModel.PrimaryPart then

@@ -139,8 +139,9 @@ AdminService.Register("RepaintHub", "Repaint hub", function(_player, _data)
 	return HubService.Repaint()
 end)
 
--- Swaps every prop in the lobby, the current map and the baked maps for your models in
--- ReplicatedStorage.Custom.Props (src/server/Tools/Swap.luau), for this playtest.
+-- Swaps every prop in the lobby and the baked maps for your models in
+-- ReplicatedStorage.Custom.Props (src/server/Tools/Swap.luau), for this playtest. A round
+-- being played is left alone (its map and the hiders' pumpkins); the next map uses them.
 AdminService.Register("ApplyCustomProps", "Apply custom props", function(_player, _data)
 	local _, message = Swap.Props()
 	return message

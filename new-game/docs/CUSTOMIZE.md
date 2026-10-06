@@ -131,7 +131,8 @@ Want every pumpkin in the game to be **your** pumpkin? You don't have to click o
 Good to know:
 - **Size is automatic.** Each copy is scaled to the height of the thing it replaces (a small pumpkin stays small, a big one stays big), so any size of model works. To keep the size you built it at, add the attribute **KeepSize** (boolean, ticked) to your model.
 - **Facing**: the model's front is the front of its pivot (Model tab > **Pivot > Edit Pivot**, look at the arrow). Turned the wrong way? Rotate your model and try again.
-- **Lights**: a jack-o'-lantern, lantern, lamppost or candle with no light inside gets the game's glow light, so the maps don't go dark (switch: `Config.Custom.PropLights`).
+- **Lights**: a jack-o'-lantern, lantern, lamppost or candle with no light inside gets the glow light the built one had, so the maps don't go dark (switch: `Config.Custom.PropLights`). Jack-o'-lanterns that are built without a light (most of the lobby's: their faces glow by themselves) stay without one, so the lobby keeps within its phone light budget; `EveryJackOLantern = true` lights them all, but phones get slower.
+- **Decorations stay walk-through.** Store models are usually solid. Where the built thing is just decoration you walk through (the Pumpkin Patch field pumpkins, cobwebs, candles, crows, flowers, mushrooms, bats...), your model is too: nobody bumps into it, the King sees through it, and candy flies through it.
 - **Gameplay pieces keep working with any model.** For `CollectPumpkin`, `HidingPumpkin`, `ParkourPumpkin` and `Haystack` your model is only the *look*: an invisible part still does the job (the pickup you touch, the hitbox candy hits, the lid you land on, the spot that hides you from the King).
 - **Not sure what something is called?** Select it in Studio (in a playtest, or a baked lobby/map) and look at its **PropName** attribute (Properties > Attributes).
 - Take your model out of the folder and the built look comes back next time you press Play (in a lobby or map saved in your place, use Revert: see below).
@@ -194,17 +195,23 @@ When you press Play the swap happens by itself, also in a lobby you edited by ha
    Every prop in `Workspace` (the lobby too) and `ServerStorage > Maps` becomes your model. The Output window says what it swapped, e.g. `Swapped JackOLantern x29, Pumpkin x51.`
 3. Save the place (Ctrl+S). **Ctrl+Z** undoes it.
 
-- Trying it in a playtest? **F8 > Apply custom props** does the same for that playtest only.
+- Trying it in a playtest? **F8 > Apply custom props** does the same for that playtest only. A round being played is left alone (its map and the hiders' pumpkins); the next map loads with your models by itself.
 - Changed your model? Run `.Props()` again: every copy gets the new version.
 - Want the built look back? Take your model out of `Custom > Props`, then run `require(game.ServerScriptService.Server.Tools.Swap).Props({ Revert = true })`. The built ones are kept in `ServerStorage > PropBackups` for this (delete that folder once you're happy; then Revert can't bring them back, but `Bake.Hub()` / `Bake.Map(...)` can rebuild them).
 - Tags and attributes the game needs are kept (decoys stay decoys, parkour pads stay pads).
 
 ### Anything else: replace by name
-For things that aren't in the table (a part you added, a tombstone you copied around by hand), replace everything with the same **name**:
+For things that aren't in the table (say, rocks you dragged in from the Toolbox and copied around by hand), replace everything with the same **name**:
 
-`require(game.ServerScriptService.Server.Tools.Swap).Replace("Tombstone", workspace.MyTombstone)`
+`require(game.ServerScriptService.Server.Tools.Swap).Replace("Rock", workspace.MyRock)`
 
-Every Model or Part named `Tombstone` in `Workspace` and `ServerStorage > Maps` becomes a copy of `workspace.MyTombstone`: same spot, facing the same way, scaled to the old one's height. It keeps their tags and attributes and prints how many it changed. Add a third part to only change one place, e.g. `.Replace("Tombstone", workspace.MyTombstone, workspace.Hub)`. Parts that *do* something (they have a tag, like a parkour pad) are never replaced. Ctrl+Z undoes it; save the place to keep it.
+Every Model or Part named `Rock` in `Workspace` and `ServerStorage > Maps` becomes a copy of `workspace.MyRock`: same spot, facing the same way, scaled to the old one's height. It keeps their tags and attributes and prints how many it changed. Add a third part to only change one place, e.g. `.Replace("Rock", workspace.MyRock, workspace.Hub)`.
+
+What it never touches:
+- **Props, and the parts inside them.** Pumpkins, jack-o'-lanterns, gravestones... are built from parts with names like `Pumpkin` (a jack-o'-lantern's middle) or `Tombstone` (a gravestone's slab); replacing one part would leave the rest floating. Give it a prop name (`Pumpkin`, `Gravestone`...) and it stops and tells you to use the steps above instead (your model in `Custom > Props`, then `Swap.Props()`), which also keeps what the game needs, like hitboxes and lights.
+- Parts that *do* something (they have a tag, like a parkour pad).
+
+Ctrl+Z undoes it; save the place to keep it.
 
 ### Keep it in git
 Your model lives in the place file. To keep it in git too (recommended): right-click it > **Save to File...** and save it as `new-game/assets/Props/<Name>.rbxm`, e.g. `assets/Props/Pumpkin.rbxm`. Rojo syncs it into `ReplicatedStorage > Custom > Props`, so it survives even if the place file is lost. With Rojo connected, delete the Studio copy afterwards so there is only one.

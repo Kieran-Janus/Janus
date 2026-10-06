@@ -932,7 +932,7 @@ local function buildFarmhouse(
 			Enum.Material.WoodPlanks
 		)
 	end
-	-- Rocking chairs and pumpkins on the porch.
+	-- Rocking chairs (only for looks) and pumpkins on the porch.
 	for _, x in { -9, 9 } do
 		local chair = base * CFrame.new(x, floorY, deckZ + 0.5) * CFrame.Angles(0, math.pi, 0)
 		Kit.prop("RockingChair", chair, m, 4, function()
@@ -968,7 +968,7 @@ local function buildFarmhouse(
 				}, c)
 			end
 			return c
-		end)
+		end, { Visual = true })
 	end
 	table.insert(decoySpots, base * CFrame.new(-4.5, 0, front - porch - 3))
 	table.insert(decoySpots, base * CFrame.new(4.5, 0, front - porch - 3.5))
@@ -1114,7 +1114,7 @@ local function littlePumpkins(
 					Color = shades[i],
 				}, pumpkin)
 				return pumpkin
-			end)
+			end, { Visual = true })
 		end
 	end
 end

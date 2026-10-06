@@ -564,7 +564,7 @@ local function buildSign(standModel: Model, base: CFrame)
 				end
 			end
 			return corn
-		end, { Anchor = "Center" })
+		end, { Anchor = "Center", Visual = true })
 	end
 end
 

@@ -351,14 +351,14 @@ Put **one** model in `ReplicatedStorage > Custom > Props`, named exactly like th
 | Where | Prop names |
 | --- | --- |
 | Pumpkins | `Pumpkin` (plain), `JackOLantern` (carved, glowing), `CollectPumpkin` (King Hunt pickups), `HidingPumpkin` (Hide & Seek decoys and hiders), `ParkourPumpkin` (parkour jumps), `ParkourTrophy` |
-| Lights | `Lantern`, `Lamppost`, `Candle` (a custom one with no light gets the glow light) |
+| Lights | `Lantern`, `Lamppost`, `Candle` (a custom one with no light gets the built one's glow light) |
 | Trees and plants | `SpookyTree`, `DeadTree`, `AutumnTree`, `SpiderGroveTree`, `CornStalk`, `Mushroom`, `Flowers`, `HedgePost`, `Topiary` |
 | Graveyard and farm | `Gravestone`, `Coffin`, `FencePost`, `Scarecrow`, `HayBale`, `HayRoll`, `Haystack`, `Crow`, `Bat`, `Cobweb`, `Cauldron`, `Wheelbarrow`, `HarvestCart`, `Well`, `Tractor`, `RockingChair`, `Fountain` |
 | Lobby pieces | `Bench`, `Crate`, `Barrel`, `Signpost`, `ClockTower`, `KingStatue`, `VendorStall`, `ReadyPadArch`, `ParkourArch` |
 | Candy Rush, Web Scour, eggs, crates | `CandyCane`, `GiantLollipop`, `CandyBucket`, `Gumdrop`, `SignCandyCorn`, the candies `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn`, `GroveSpider`, `EggGoldenPumpkin`, `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost`, a crate's Id (e.g. `PumpkinCrate`) |
 | ScareMaze | `ScareScarecrow`, `ScareZombie`, `ScareBat`, `ScareGhost` |
 
-A Locked lobby or a baked map swaps by itself when you press Play. To keep it in the place file, run `require(game.ServerScriptService.Server.Tools.Swap).Props()` in the command bar (edit mode; Ctrl+Z undoes it), or try it with **F8 > Apply custom props**. Anything else can be replaced by name: `Swap.Replace("Tombstone", workspace.MyTombstone)`. Full guide with sizes: [`docs/CUSTOMIZE.md` > Swap every copy of something at once](CUSTOMIZE.md#swap-every-copy-of-something-at-once), or ask Claude Code: `/swap-prop Pumpkin`.
+A Locked lobby or a baked map swaps by itself when you press Play. To keep it in the place file, run `require(game.ServerScriptService.Server.Tools.Swap).Props()` in the command bar (edit mode; Ctrl+Z undoes it), or try it with **F8 > Apply custom props** (a round being played is left alone). Things that aren't props, like rocks you placed by hand, can be replaced by name: `Swap.Replace("Rock", workspace.MyRock)` (it never touches props or the parts inside them). Your model in place of a walk-through decoration (field pumpkins, cobwebs, candles...) is walk-through too. Full guide with sizes: [`docs/CUSTOMIZE.md` > Swap every copy of something at once](CUSTOMIZE.md#swap-every-copy-of-something-at-once), or ask Claude Code: `/swap-prop Pumpkin`.
 
 ### Your own characters
 Put a model in `ReplicatedStorage > Custom > Characters` named `PumpkinKing`, `SkeletonPatrol`, `Bat`, `GhostCat` or `PumpkinVendor` (the shopkeeper). Sizes are in `Config.Custom.Heights`. Keep a copy in git: right-click > **Save to File...** into `new-game/assets/Characters/`. Or ask Claude Code: `/reskin PumpkinKing a giant jack-o-lantern king with a purple cape`.

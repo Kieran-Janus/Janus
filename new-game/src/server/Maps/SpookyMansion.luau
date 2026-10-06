@@ -69,7 +69,8 @@ local function chandelier(room: Room, height: number)
 	Kit.float(m, 0.3, room.Ctx.Rng)
 end
 
--- A candle (prop "Candle") whose wax starts `foot`; `height` = wax + flame.
+-- A candle (prop "Candle") whose wax starts `foot`; `height` = wax + flame. Only for looks
+-- (a custom candle never blocks anyone either).
 local function candle(
 	room: Room,
 	foot: CFrame,
@@ -82,7 +83,10 @@ local function candle(
 		local m = Kit.model("Candle", room.Model)
 		m.PrimaryPart = build(m)
 		return m
-	end, { Light = { Color = colors.Glow, Range = light, Brightness = 0.8, Height = 0.85 } })
+	end, {
+		Light = { Color = colors.Glow, Range = light, Brightness = 0.8, Height = 0.85 },
+		Visual = true,
+	})
 end
 
 local function floatingCandle(room: Room, x: number, y: number, z: number)

@@ -404,6 +404,37 @@ local function buildClockTower(parent: Instance)
 			Up = rng:NextNumber(-3, 5),
 		}
 	end
+	-- The bats round the roof, and where each starts its bob: worked out now, before Kit.prop,
+	-- so a custom clock tower (no bats) draws the same random numbers and moves nothing else.
+	-- (The roof's frame is worked out the same way as the floors below.)
+	local roof = base * CFrame.new(0, 1.6, 0)
+	for i = 1, cfg.Floors do
+		local turn = if i % 2 == 0 then cfg.Twist else -cfg.Twist
+		roof = roof
+			* CFrame.new(0, cfg.FloorHeight, 0)
+			* CFrame.Angles(0, math.rad(turn), math.rad(cfg.Lean))
+	end
+	roof *= CFrame.new(0, 6, 0)
+	local roofWidth = if cfg.Floors >= 1
+		then cfg.Width * (1 - 0.05 * (cfg.Floors - 1))
+		else cfg.Width
+	local bats: { { CFrame: CFrame, Phase: number } } = {}
+	for _, spot in batSpots do
+		local pos = (roof * CFrame.new(
+			math.cos(spot.Angle) * (roofWidth + 3),
+			spot.Up,
+			math.sin(spot.Angle) * (roofWidth + 3)
+		)).Position
+		if not blocked(pos, 0) then
+			table.insert(bats, {
+				CFrame = CFrame.lookAt(
+					pos,
+					pos + Vector3.new(-math.sin(spot.Angle), 0, math.cos(spot.Angle))
+				),
+				Phase = rng:NextNumber(0, math.pi * 2),
+			})
+		end
+	end
 	Kit.prop("ClockTower", base, parent, height, function()
 		local tower = model("ClockTower", parent)
 		local w0 = cfg.Width
@@ -600,27 +631,9 @@ local function buildClockTower(parent: Instance)
 			Material = Enum.Material.Neon,
 		}, tower)
 		glowLight(orb, "Orange", 26, 1.6)
-		-- Bats round the roof.
-		local roof = cf * CFrame.new(0, 6, 0)
-		for _, spot in batSpots do
-			local pos = (roof * CFrame.new(
-				math.cos(spot.Angle) * (width + 3),
-				spot.Up,
-				math.sin(spot.Angle) * (width + 3)
-			)).Position
-			if blocked(pos, 0) then
-				continue
-			end
-			Props.Bat(
-				paint,
-				CFrame.lookAt(
-					pos,
-					pos + Vector3.new(-math.sin(spot.Angle), 0, math.cos(spot.Angle))
-				),
-				2.2,
-				tower,
-				rng
-			)
+		-- Bats round the roof (placed above, before Kit.prop).
+		for _, bat in bats do
+			Props.Bat(paint, bat.CFrame, 2.2, tower, bat.Phase)
 		end
 		-- Cobwebs in the bottom front corners.
 		for _, side in { -1, 1 } do

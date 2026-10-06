@@ -992,7 +992,7 @@ local function buildDecor(zone: Zone, area: Model)
 			end
 			m.PrimaryPart = body
 			return m
-		end)
+		end, { Visual = true })
 		Kit.float(bat, 1.2 + (i % 3) * 0.4, rng)
 	end
 end

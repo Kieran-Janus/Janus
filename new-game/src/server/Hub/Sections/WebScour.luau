@@ -474,7 +474,7 @@ local function buildSpider(cf: CFrame, size: number, parent: Instance): Model
 		)
 		m.PrimaryPart = abdomen
 		return m
-	end)
+	end, { Visual = true })
 end
 
 -- The start lantern ----------------------------------------------------------------------------------------
@@ -647,7 +647,7 @@ local function buildFloor(frame: Frame, zone: Zone, trees: { Tree }, rng: Random
 				Material = Enum.Material.Neon,
 			}, mushroom)
 			return mushroom
-		end)
+		end, { Visual = true })
 	end
 end
 

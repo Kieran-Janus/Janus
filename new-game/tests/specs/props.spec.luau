@@ -1,8 +1,10 @@
 -- Swapping props (ReplicatedStorage.Custom.Props): one model per name replaces every copy in
 -- the lobby and in every round map, the gameplay pieces keep working with any model (King
--- Hunt pumpkins, parkour pumpkins, Hide & Seek decoys and disguises, hiding haystacks), the
+-- Hunt pumpkins, parkour pumpkins, Hide & Seek decoys and disguises, hiding haystacks), a
+-- custom model in place of walk-through decoration is walk-through too, a custom model never
+-- moves anything else, custom jack-o'-lanterns keep the lobby inside its light budget, the
 -- docs list every name, and the Swap tool (src/server/Tools/Swap.luau) swaps, reverts and
--- replaces things in a saved hub and a baked map.
+-- replaces things in a saved hub and a baked map (never parts of props, never a round in play).
 
 local fs = require("@lune/fs")
 
@@ -65,6 +67,71 @@ local function world(): any
 	return w
 end
 
+-- Is BasePart `d` part of prop `m` itself (not of a prop inside it)?
+local function ownPart(d: any, m: any): boolean
+	local node = d.Parent
+	while node and node ~= m do
+		if node:IsA("Model") and node:GetAttribute("PropName") ~= nil then
+			return false
+		end
+		node = node.Parent
+	end
+	return true
+end
+
+-- True when prop `m` is pure decoration: it has parts and none of them collides or blocks
+-- raycasts (King sight, candy).
+local function onlyLooks(m: any): boolean
+	local any = false
+	for _, d in m:GetDescendants() do
+		if d:IsA("BasePart") and ownPart(d, m) then
+			if d.CanCollide or d.CanQuery then
+				return false
+			end
+			any = true
+		end
+	end
+	return any
+end
+
+-- Where prop `m` stands, for matching a built prop with the custom one in its place.
+local function spotKey(place: string, m: any): string
+	local p = m:GetPivot().Position
+	return ("%s|%s|%.2f,%.2f,%.2f"):format(place, m:GetAttribute("PropName"), p.X, p.Y, p.Z)
+end
+
+-- The props under `root` that aren't inside another prop, in the order they were made.
+local function outerProps(root: any): { any }
+	local list = {}
+	for _, d in root:GetDescendants() do
+		if d:IsA("Model") and d:GetAttribute("PropName") ~= nil then
+			local inside = false
+			local node = d.Parent
+			while node and node ~= root do
+				if node:IsA("Model") and node:GetAttribute("PropName") ~= nil then
+					inside = true
+					break
+				end
+				node = node.Parent
+			end
+			if not inside then
+				table.insert(list, d)
+			end
+		end
+	end
+	return list
+end
+
+local function lightCount(root: any): number
+	local n = 0
+	for _, d in root:GetDescendants() do
+		if d:IsA("Light") then
+			n += 1
+		end
+	end
+	return n
+end
+
 -- The lobby and every round map, built from code: calls visit(name, model) for each.
 local function eachPlace(w: any, visit: (string, any) -> ())
 	local hub = w.HubBuilder.Build()
@@ -104,15 +171,55 @@ end
 describe("One custom model per prop name", function()
 	local w = world()
 	local names: { [string]: number } = {}
+	local decorSpots: { [string]: boolean } = {} -- spotKey of each built walk-through prop
+	type Placed = { Name: string, Pivot: any, Size: any }
+	local builtOuter: { [string]: { Placed } } = {} -- per place, the outer props as built
+	local builtHubLights = 0
+
+	local function placed(root: any): { Placed }
+		local list = {}
+		for _, m in outerProps(root) do
+			table.insert(list, {
+				Name = m:GetAttribute("PropName"),
+				Pivot = m:GetPivot(),
+				Size = m:GetAttribute("PropSize"),
+			})
+		end
+		return list
+	end
 
 	it("finds the props the lobby and every map build, and the docs list each name", function()
-		eachPlace(w, function(_place, root)
+		local unmarked = {}
+		eachPlace(w, function(place, root)
 			for _, m in w.props(root) do
 				local name = m:GetAttribute("PropName")
 				names[name] = (names[name] or 0) + 1
 				expect(m:GetAttribute("CustomProp")).toBeNil() -- nothing custom yet
+				-- Walk-through decoration says so (Kit.prop options.Visual), so a custom model
+				-- in its place is walk-through too.
+				if onlyLooks(m) then
+					decorSpots[spotKey(place, m)] = true
+					if m:GetAttribute("PropVisual") ~= true then
+						unmarked[place .. " " .. name] = true
+					end
+				end
+			end
+			builtOuter[place] = placed(root)
+			if place == "Hub" then
+				builtHubLights = lightCount(root)
 			end
 		end)
+		local list = {}
+		for what in unmarked do
+			table.insert(list, what)
+		end
+		table.sort(list)
+		if #list > 0 then
+			error(
+				"walk-through props built without Visual = true (a custom model would be solid): "
+					.. table.concat(list, ", ")
+			)
+		end
 		-- The pumpkins, in every place they appear.
 		for _, name in { "Pumpkin", "JackOLantern", "HidingPumpkin", "ParkourPumpkin" } do
 			expect(names[name]).toBeGreaterThan(0)
@@ -184,6 +291,85 @@ describe("One custom model per prop name", function()
 		-- Every lobby area and map still builds with a custom model for everything.
 		if #w.rt.warnings > 0 then
 			error("warning while building: " .. tostring(w.rt.warnings[1]))
+		end
+	end)
+
+	it("keeps a custom model walk-through where the built one is decoration", function()
+		local checked = 0
+		eachPlace(w, function(place, root)
+			for _, m in w.props(root) do
+				if decorSpots[spotKey(place, m)] then
+					checked += 1
+					for _, d in m:GetDescendants() do
+						if d:IsA("BasePart") and (d.CanCollide or d.CanQuery or d.CanTouch) then
+							error(
+								("%s: the custom %s at %s is solid (players could hide behind it from the King)"):format(
+									place,
+									m:GetAttribute("PropName"),
+									m:GetFullName()
+								)
+							)
+						end
+					end
+				end
+			end
+		end)
+		T.note(("%d walk-through custom props"):format(checked))
+		expect(checked).toBeGreaterThan(150) -- field pumpkins, cobwebs, candles, crows...
+	end)
+
+	it("never moves anything else: every prop stands where the built one stood", function()
+		-- (a custom model skips the built one's code: random numbers drawn in there would
+		-- shift every later prop)
+		eachPlace(w, function(place, root)
+			local built = builtOuter[place]
+			local now = placed(root)
+			expect(#now).toBe(#built)
+			for i, b in built do
+				local c = now[i]
+				local moved = c.Name ~= b.Name
+					or (c.Pivot.Position - b.Pivot.Position).Magnitude > 1e-3
+					or (c.Pivot.LookVector - b.Pivot.LookVector).Magnitude > 1e-3
+					or (typeof(b.Size) == "number" and math.abs(c.Size - b.Size) > 1e-6)
+				if moved then
+					error(
+						("%s: prop #%d is a %s at %s facing %s, size %s; built it was a %s at %s facing %s, size %s"):format(
+							place,
+							i,
+							c.Name,
+							tostring(c.Pivot.Position),
+							tostring(c.Pivot.LookVector),
+							tostring(c.Size),
+							b.Name,
+							tostring(b.Pivot.Position),
+							tostring(b.Pivot.LookVector),
+							tostring(b.Size)
+						)
+					)
+				end
+			end
+		end)
+	end)
+
+	it("keeps the lobby inside its light budget with your models", function()
+		-- Your model for everything, and only a jack-o'-lantern (the lobby has the most of
+		-- those, and most are built without a light: Config.Custom.PropLights).
+		local budget = w.Config.Hub.Budget.MaxLights
+		local all = lightCount(w.HubBuilder.Build())
+		local only = world()
+		only.custom("JackOLantern")
+		local jacks = lightCount(only.HubBuilder.Build())
+		T.note(
+			("%d lights built, %d with every prop custom, %d with a custom JackOLantern (budget %d)"):format(
+				builtHubLights,
+				all,
+				jacks,
+				budget
+			)
+		)
+		for _, lights in { all, jacks } do
+			expect(lights).toBeLessThanOrEqual(builtHubLights)
+			expect(lights).toBeLessThanOrEqual(budget)
 		end
 	end)
 
@@ -376,6 +562,18 @@ describe("Hide & Seek with a custom HidingPumpkin", function()
 			hider.Character.HumanoidRootPart
 		)
 		expect(w.CollectionService:HasTag(pumpkin, "HidingDecoy")).toBe(false)
+		-- F8 > Apply custom props in the middle of the round leaves the round alone: the
+		-- hider's pumpkin stays welded on (a swapped copy would stand still, never tagged).
+		local Swap = rt:require("ServerScriptService.Server.Tools.Swap")
+		local _, message = Swap.Props()
+		expect(message).toMatch("a round is using")
+		expect(pumpkin.Parent).toBe(map.Model.HiderPumpkins)
+		expect(pumpkin.PrimaryPart:FindFirstChildOfClass("WeldConstraint").Part0).toBe(
+			hider.Character.HumanoidRootPart
+		)
+		for _, decoy in decoys do
+			expect(decoy:IsDescendantOf(map.Model)).toBe(true)
+		end
 		-- Let the seekers out, then shoot a decoy and the hider.
 		rt:advance(Config.HideSeek.HeadStart + 0.5)
 		local shoot = RS.Remotes.HideSeekShoot
@@ -560,5 +758,105 @@ describe("Swap tool (src/server/Tools/Swap.luau)", function()
 		expect(function()
 			Swap.Replace("Thing", nil :: any)
 		end).toThrow("Model or a Part")
+	end)
+
+	it("Replace leaves props and the parts inside them alone", function()
+		local w = world()
+		local rt = w.rt
+		local Bake = rt:require("ServerScriptService.Server.Tools.Bake")
+		local Swap = rt:require("ServerScriptService.Server.Tools.Swap")
+		local hub = Bake.Hub()
+		Bake.Map("PumpkinPatch")
+		Bake.Map("PumpkinFarm")
+		local function named(name: string): number
+			local n = 0
+			for _, root in { rt.workspace, w.ServerStorage.Maps } do
+				for _, d in root:GetDescendants() do
+					if d.Name == name then
+						n += 1
+					end
+				end
+			end
+			return n
+		end
+		local mine = w.model("MyRock")
+		mine.Parent = rt.workspace
+		-- A prop name: nothing changes (a jack-o'-lantern's core part and the Hide & Seek
+		-- decoys are called Pumpkin too), and it says to use Custom.Props instead.
+		local pumpkins = named("Pumpkin")
+		expect(pumpkins).toBeGreaterThan(100)
+		local count, message = Swap.Replace("Pumpkin", mine)
+		expect(count).toBe(0)
+		expect(message).toMatch("Custom > Props")
+		expect(named("Pumpkin")).toBe(pumpkins)
+		-- A part inside a prop (each gravestone's slab is called Tombstone): left alone.
+		local slabs = named("Tombstone")
+		expect(slabs).toBeGreaterThan(20)
+		count, message = Swap.Replace("Tombstone", mine)
+		expect(count).toBe(0)
+		expect(message).toMatch("Gravestone")
+		expect(named("Tombstone")).toBe(slabs)
+		-- The docs' example name: nothing the game builds is called Rock, so only your own
+		-- are replaced (two placed by hand), not one hidden inside a prop.
+		expect(named("Rock")).toBe(0)
+		for i = 1, 2 do
+			rt:create("Part", {
+				Name = "Rock",
+				Size = w.Vector3.new(3, 2, 3),
+				CFrame = w.CFrame.new(40 + i * 6, 1, 40),
+			}, hub)
+		end
+		local gravestone
+		for _, m in w.props(w.ServerStorage.Maps.PumpkinPatch) do
+			if m:GetAttribute("PropName") == "Gravestone" then
+				gravestone = m
+				break
+			end
+		end
+		local inProp = rt:create("Part", { Name = "Rock" }, gravestone)
+		count = Swap.Replace("Rock", mine)
+		expect(count).toBe(2)
+		expect(inProp.Parent).toBe(gravestone)
+		local copies = 0
+		for _, d in hub:GetChildren() do
+			if d.Name == "Rock" and d:IsA("Model") and d:FindFirstChild("Look") then
+				copies += 1
+			end
+		end
+		expect(copies).toBe(2)
+	end)
+
+	it("swaps a baked map's decoration to a walk-through custom model", function()
+		-- (a map baked before props remembered PropVisual swaps the same way)
+		local w = world()
+		local rt = w.rt
+		local Bake = rt:require("ServerScriptService.Server.Tools.Bake")
+		local Swap = rt:require("ServerScriptService.Server.Tools.Swap")
+		Bake.Map("PumpkinPatch")
+		local baked = w.ServerStorage.Maps.PumpkinPatch
+		local field = 0
+		for _, m in w.props(baked) do
+			if m:GetAttribute("PropName") == "Pumpkin" then
+				field += 1
+				if field % 2 == 0 then
+					m:SetAttribute("PropVisual", nil) -- an older bake
+				end
+			end
+		end
+		expect(field).toBeGreaterThan(20)
+		local solid = w.custom("Pumpkin")
+		solid.Look.CanCollide = true
+		solid.Look.CanQuery = true
+		Swap.Props()
+		local swapped = 0
+		for _, m in w.props(baked) do
+			if m:GetAttribute("PropName") == "Pumpkin" then
+				swapped += 1
+				expect(m:GetAttribute("CustomProp")).toBe(true)
+				expect(m.Look.CanCollide).toBe(false)
+				expect(m.Look.CanQuery).toBe(false)
+			end
+		end
+		expect(swapped).toBe(field)
 	end)
 end)

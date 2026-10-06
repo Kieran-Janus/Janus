@@ -319,7 +319,7 @@ local function make(name: string, cf: CFrame, parent: Instance): Model
 	local build = BUILDERS[name]
 	local m = Kit.prop(name, cf, parent, if typeof(size) == "number" then size else nil, function()
 		return build(cf, parent)
-	end)
+	end, { Visual = true })
 	-- A custom model is anchored by Kit.prop; make it pass through everything like ours.
 	for _, d in m:GetDescendants() do
 		if d:IsA("BasePart") then

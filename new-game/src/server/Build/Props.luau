@@ -186,7 +186,7 @@ export type PumpkinOptions = {
 
 --[[
 	A ribbed pumpkin sitting on cf; `size` is its height. Model "Pumpkin" (PrimaryPart: its
-	core, named "Pumpkin").
+	core, named "Pumpkin"). A small one is walk-through, and so is a custom model in its place.
 ]]
 function Props.Pumpkin(
 	paint: Painter,
@@ -196,10 +196,10 @@ function Props.Pumpkin(
 	options: PumpkinOptions?
 ): Model
 	local o: PumpkinOptions = options or {}
+	local solid = if o.Solid ~= nil then o.Solid else size >= 2.5
 	return Kit.prop("Pumpkin", cf, parent, size * 1.25, function()
 		local m = Kit.model("Pumpkin", parent)
 		local body = Vector3.new(size * 1.28, size, size * 1.28)
-		local solid = if o.Solid ~= nil then o.Solid else size >= 2.5
 		local core = Kit.pumpkinBody(
 			cf * CFrame.new(0, size * 0.48, 0),
 			body,
@@ -253,7 +253,7 @@ function Props.Pumpkin(
 		end
 		m.PrimaryPart = core
 		return m
-	end)
+	end, { Visual = not solid })
 end
 
 export type JackOptions = {
@@ -488,7 +488,7 @@ function Props.Lantern(
 		end
 		m.PrimaryPart = flame
 		return m
-	end, { Light = light })
+	end, { Light = light, Visual = true })
 end
 
 export type LampOptions = { Light: boolean?, Range: number? }
@@ -641,7 +641,7 @@ function Props.Candle(
 		end
 		m.PrimaryPart = wax
 		return m
-	end, { Light = light })
+	end, { Light = light, Visual = true })
 end
 
 -- Furniture and clutter ---------------------------------------------------------------------------
@@ -1077,8 +1077,15 @@ end
 
 -- Little critters and glow ---------------------------------------------------------------------
 
--- A little bat centred on cf (wings out to the sides), facing cf.LookVector. It bobs.
-function Props.Bat(paint: Painter, cf: CFrame, size: number, parent: Instance, rng: Random): Model
+-- A little bat centred on cf (wings out to the sides), facing cf.LookVector. It bobs: `phase`
+-- is where in its bob it starts, or a Random to pick one (Kit.float).
+function Props.Bat(
+	paint: Painter,
+	cf: CFrame,
+	size: number,
+	parent: Instance,
+	phase: Random | number
+): Model
 	local m = Kit.prop("Bat", cf, parent, size, function()
 		local bat = Kit.model("Bat", parent)
 		local body = paint.decor({
@@ -1112,8 +1119,8 @@ function Props.Bat(paint: Painter, cf: CFrame, size: number, parent: Instance, r
 		end
 		bat.PrimaryPart = body
 		return bat
-	end, { Anchor = "Center" })
-	Kit.float(m, size * 0.5, rng)
+	end, { Anchor = "Center", Visual = true })
+	Kit.float(m, size * 0.5, phase)
 	return m
 end
 
@@ -1159,7 +1166,7 @@ function Props.Mushrooms(
 		end
 		m.PrimaryPart = first
 		return m
-	end)
+	end, { Visual = true })
 end
 
 -- Spider webs and bunting -------------------------------------------------------------------------
@@ -1193,7 +1200,7 @@ function Props.Cobweb(paint: Painter, cf: CFrame, size: number, parent: Instance
 		holder:SetAttribute("PaletteRole", nil)
 		m.PrimaryPart = holder
 		return m
-	end, { Anchor = "Center" })
+	end, { Anchor = "Center", Visual = true })
 end
 
 export type BuntingOptions = {

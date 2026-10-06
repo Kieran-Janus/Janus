@@ -243,7 +243,9 @@ export type PropOptions = {
 	Anchor: string?, -- "Feet" (default: stands on cframe) or "Center" (middle at cframe)
 	Light: PropLight?, -- the light the built one has: a custom model with no light gets it
 	Visual: boolean?, -- a custom model is only for looks: it never collides, blocks raycasts
-	-- (King sight, candy, pumpkin spawns) or fires Touched
+	-- (King sight, candy, pumpkin spawns) or fires Touched. Pass it for pure decoration (the
+	-- built one is all Kit.decor parts: walk-through, never in the way), so a custom model
+	-- (Creator Store models are usually solid) doesn't become something to hide behind
 	Hitbox: Vector3?, -- a custom model gets an invisible solid part this big, standing on
 	-- cframe (named "Hitbox", its PrimaryPart), that collides and gets hit instead of it
 }
@@ -254,6 +256,7 @@ local PROP_ATTRIBUTES = {
 	PropSize = true,
 	PropAnchor = true,
 	PropHitbox = true,
+	PropVisual = true,
 	PropLook = true,
 	CustomProp = true,
 }
@@ -411,9 +414,11 @@ end
 	Studio you can see what to call your own version, and its pivot is `cframe`.
 	options.Anchor = "Center" instead puts the model's middle at cframe with cframe's full
 	turn (flat things hung on walls, like cobwebs). options.Light / Visual / Hitbox: see
-	PropOptions above.
-	Built props remember their size, anchor and hitbox (attributes PropSize, PropAnchor,
-	PropHitbox) so Kit.swapProp can swap them later, e.g. in a hub saved in the place file.
+	PropOptions above (pure decoration passes Visual = true; tests/specs/props.spec.luau
+	checks it).
+	Built props remember their size, anchor, hitbox and Visual (attributes PropSize,
+	PropAnchor, PropHitbox, PropVisual) so Kit.swapProp can swap them later, e.g. in a hub
+	saved in the place file.
 ]]
 function Kit.prop(
 	name: string,
@@ -434,6 +439,7 @@ function Kit.prop(
 	m:SetAttribute("PropSize", size)
 	m:SetAttribute("PropAnchor", anchor)
 	m:SetAttribute("PropHitbox", o.Hitbox)
+	m:SetAttribute("PropVisual", if o.Visual == true then true else nil)
 	-- Built or custom, the pivot is the spot it was placed on (other code relies on this, e.g.
 	-- the shopkeeper stands relative to the stall's pivot).
 	setPivot(m, cframe)
@@ -539,6 +545,22 @@ local function lightOf(old: Model, name: string, size: number?): PropLight?
 	return nil
 end
 
+-- True when built prop `old` is pure decoration: it has parts of its own and none of them
+-- collides or blocks raycasts (working parts don't count: they keep working either way).
+-- For props saved before the PropVisual attribute existed.
+local function onlyLooks(old: Model): boolean
+	local any = false
+	for _, d in old:GetDescendants() do
+		if d:IsA("BasePart") and ownedBy(d, old) and not Kit.isWorking(d) then
+			if d.CanCollide or d.CanQuery then
+				return false
+			end
+			any = true
+		end
+	end
+	return any
+end
+
 -- The hitbox a gameplay prop saved before hitboxes existed gets: its visible size, when the
 -- model itself is a working piece (e.g. a Hide & Seek decoy, tag HidingDecoy).
 local function fallbackHitbox(old: Model): Vector3?
@@ -568,11 +590,16 @@ function Kit.swapProp(old: Model): Model?
 	local size: number? = if typeof(rawSize) == "number" then rawSize else nil
 	local rawHitbox = old:GetAttribute("PropHitbox")
 	local look = old:GetAttribute("PropLook") == true
+	-- Only for looks: a Kit.look, a prop built with Visual, or (saved before PropVisual
+	-- existed) a built prop nothing can bump into.
+	local visual = look
+		or old:GetAttribute("PropVisual") == true
+		or (old:GetAttribute("CustomProp") ~= true and onlyLooks(old))
 	local custom = Kit.prop(name, old:GetPivot(), parent, size, function()
 		return old
 	end, {
 		Anchor = if old:GetAttribute("PropAnchor") == "Center" then "Center" else nil,
-		Visual = look,
+		Visual = visual,
 		Hitbox = if typeof(rawHitbox) == "Vector3" then rawHitbox else fallbackHitbox(old),
 		Light = lightOf(old, name, size),
 	})
@@ -742,9 +769,14 @@ function Kit.particles(parent: BasePart, props: { [string]: any }): ParticleEmit
 	return e
 end
 
-function Kit.float(m: Model, bob: number, rng: Random)
+-- Makes model `m` bob up and down `bob` studs (client HubAmbience). `phase` is where in its
+-- bob it starts (radians), or a Random to pick one.
+function Kit.float(m: Model, bob: number, phase: Random | number)
 	m:SetAttribute("BobHeight", bob)
-	m:SetAttribute("Phase", rng:NextNumber(0, math.pi * 2))
+	m:SetAttribute(
+		"Phase",
+		if typeof(phase) == "number" then phase else phase:NextNumber(0, math.pi * 2)
+	)
 	CollectionService:AddTag(m, "HubFloat")
 end
 
@@ -943,6 +975,7 @@ export type LanternOptions = {
 	Light: boolean?, -- a flickering PointLight inside (default true; the neon face glows anyway)
 	Ribs: number?, -- 3 (6 bulges, default) or 4 (8 bulges)
 	Detail: string?, -- "Full" face (default) or "Simple"
+	Visual: boolean?, -- only for looks: never collides or blocks raycasts (built or custom)
 }
 
 -- The built jack-o'-lantern (see Kit.jackOLantern).
@@ -979,6 +1012,14 @@ local function buildJackOLantern(
 	if not (options and options.Light == false) then
 		Kit.light(core, colors.Glow, size * 4, 1.2, true):SetAttribute("PaletteRole", "Glow")
 	end
+	if options and options.Visual then
+		for _, d in m:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.CanCollide = false
+				d.CanQuery = false
+			end
+		end
+	end
 	m.PrimaryPart = core
 	return m
 end
@@ -986,8 +1027,9 @@ end
 --[[
 	A carved, glowing, ribbed pumpkin sitting on `cf` (front = cf.LookVector); `size` is its
 	height without the stem. Prop "JackOLantern" (one custom model swaps every jack-o'-lantern
-	in the lobby and the maps; it gets the glow light, Config.Custom.PropLights). Built: the
-	core ("Pumpkin", collides, the PrimaryPart), ribs, a curly stem and the face.
+	in the lobby and the maps; it gets the built one's glow light, and unlit ones get one too
+	only when Config.Custom.PropLights.EveryJackOLantern is on). Built: the core ("Pumpkin",
+	collides, the PrimaryPart), ribs, a curly stem and the face.
 ]]
 function Kit.jackOLantern(
 	cf: CFrame,
@@ -1003,7 +1045,7 @@ function Kit.jackOLantern(
 	end
 	return Kit.prop("JackOLantern", cf, parent, size * 1.2, function()
 		return buildJackOLantern(cf, size, colors, parent, options)
-	end, { Light = glow })
+	end, { Light = glow, Visual = options ~= nil and options.Visual == true })
 end
 
 -- A flat spider web centred on `cf`, facing cf.LookVector (prop "Cobweb").
@@ -1038,7 +1080,7 @@ function Kit.cobweb(cf: CFrame, size: number, color: Color3, parent: Instance): 
 			end
 		end
 		return m
-	end, { Anchor = "Center" })
+	end, { Anchor = "Center", Visual = true })
 end
 
 -- A bare spooky tree standing on `base` (prop "DeadTree"). `rng` shapes its branches (drawn

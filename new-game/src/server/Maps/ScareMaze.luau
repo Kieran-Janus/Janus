@@ -530,7 +530,7 @@ local function buildWalls(b: Builder, parent: Instance)
 end
 
 -- A small pumpkin (an oval, Roblox Ball parts are always round), lit ones have a carved face.
--- Props "Pumpkin" and "JackOLantern".
+-- Props "Pumpkin" and "JackOLantern", only for looks (a custom one never gets in the way).
 local function pumpkin(b: Builder, cf: CFrame, size: number, lit: boolean, parent: Instance)
 	local colors = b.Colors
 	local orange = jitter(b, colors.Orange, 0.1) -- (drawn either way: the map stays the same)
@@ -579,7 +579,7 @@ local function pumpkin(b: Builder, cf: CFrame, size: number, lit: boolean, paren
 		end
 		m.PrimaryPart = body
 		return m
-	end, { Light = light })
+	end, { Light = light, Visual = true })
 end
 
 -- A lantern hanging on the corn wall on side `side` of `cell`: an iron bracket (always) and
@@ -623,7 +623,10 @@ local function wallLantern(b: Builder, cell: Cell, side: string, parent: Instanc
 		Kit.light(lamp, colors.Glow, 22, 1.5, true)
 		lantern.PrimaryPart = lamp
 		return lantern
-	end, { Light = { Color = colors.Glow, Range = 22, Brightness = 1.5, Height = 0.5 } })
+	end, {
+		Light = { Color = colors.Glow, Range = 22, Brightness = 1.5, Height = 0.5 },
+		Visual = true,
+	})
 	return m
 end
 
@@ -657,7 +660,7 @@ local function postLantern(b: Builder, pos: Vector3, parent: Instance)
 	end, { Light = { Color = colors.Glow, Range = 26, Brightness = 1.6, Height = 0.9 } })
 end
 
--- A crow perched on cf (prop "Crow").
+-- A crow perched on cf (prop "Crow", only for looks).
 local function crow(b: Builder, cf: CFrame, parent: Instance)
 	local colors = b.Colors
 	Kit.prop("Crow", cf, parent, 1.35, function()
@@ -692,7 +695,7 @@ local function crow(b: Builder, cf: CFrame, parent: Instance)
 		}, m)
 		m.PrimaryPart = body
 		return m
-	end)
+	end, { Visual = true })
 end
 
 -- A rectangular hay bale standing on cf (prop "HayBale").
