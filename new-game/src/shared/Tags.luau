@@ -12,6 +12,7 @@
 	  CandyRushPad       Lane (number)
 	  EasterEgg          EggId (string, matches Config.EasterEggs.List) and Coins (number)
 	  ScareTrigger       Kind (string: which scare plays)
+	  CrateDisplay       CrateId (string, a crate Id from Config.Crates.List)
 	Colours: any part can have the attribute PaletteRole (an attribute, not a tag) to take its
 	colour from Config.Hub.Palette (and PaletteShade: 0.3 = 30% darker, -0.2 = 20% lighter).
 
@@ -25,6 +26,8 @@ local Tags = {
 	HubSpawn = "HubSpawn", -- where players appear in the lobby
 	ShopKeeper = "ShopKeeper", -- the Pumpkin Shop keeper and its prompt (a tagged part with no
 	-- prompt gets one, so tagging any part ShopKeeper makes it open the shop)
+	CrateDisplay = "CrateDisplay", -- a crate on the crate stand: its prompt opens that crate's
+	-- panel (attribute CrateId). A tagged part or model with no prompt gets one.
 	-- Parkour
 	ParkourStart = "ParkourStart",
 	ParkourCheckpoint = "ParkourCheckpoint", -- attribute Index
