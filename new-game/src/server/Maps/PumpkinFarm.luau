@@ -12,7 +12,11 @@
 	  edge        a rail fence and autumn trees (an invisible wall keeps everyone in)
 	Decoy pumpkins (src/server/Build/HidingPumpkin.luau, tag HidingDecoy) fill the fields and
 	sit round the yard; hiders start on the parts tagged HiderSpawn (folder Spawns).
-	Everything is placed with ctx.Rng, so the farm is the same every time.
+	Everything is placed with ctx.Rng, so the farm is the same every time (random numbers are
+	drawn before Kit.prop, so a custom model never moves the rest of the farm).
+	Repeated decorations are props (one model in ReplicatedStorage.Custom.Props swaps every
+	copy): HidingPumpkin, Pumpkin (the little ones in the carts), CornStalk, HayBale, HayRoll,
+	Lamppost, AutumnTree, Scarecrow, Wheelbarrow, HarvestCart, Well, Tractor, RockingChair.
 ]]
 
 local Kit = require(script.Parent.Parent.Build.Kit)
@@ -257,33 +261,44 @@ local function buildCorn(ctx: MapBase.Ctx, parent: Instance, reserved: { Rect })
 					ctx.Rng:NextNumber(-0.05, 0.05)
 				)
 				local foot = CFrame.new(MapBase.at(ctx, x, zz, 0)) * lean
-				-- A tall corn stalk (solid: it blocks the view and candy), a leaf, a tassel.
-				oval({
-					Name = "Corn",
-					Size = Vector3.new(1.9, height, 1.9),
-					CFrame = foot * CFrame.new(0, height / 2 - 0.3, 0),
-					Color = jitter(colors.Corn, ctx.Rng, 0.12),
-					Material = Enum.Material.LeafyGrass,
-				}, folder, true)
+				local cornColor = jitter(colors.Corn, ctx.Rng, 0.12)
+				local leafSide, leafHeight, leafColor = 0, 0, colors.Corn
 				if n % 2 == 1 then
-					local side = if ctx.Rng:NextNumber() < 0.5 then -1 else 1
-					oval({
-						Name = "Leaf",
-						Size = Vector3.new(0.25, 3.2, 1.1),
-						CFrame = foot
-							* CFrame.new(0, height * ctx.Rng:NextNumber(0.35, 0.6), side * 1.2)
-							* CFrame.Angles(side * math.rad(40), 0, 0),
-						Color = jitter(colors.Corn, ctx.Rng, 0.15),
-						Material = Enum.Material.LeafyGrass,
-					}, folder)
+					leafSide = if ctx.Rng:NextNumber() < 0.5 then -1 else 1
+					leafHeight = height * ctx.Rng:NextNumber(0.35, 0.6)
+					leafColor = jitter(colors.Corn, ctx.Rng, 0.15)
 				end
-				oval({
-					Name = "Tassel",
-					Size = Vector3.new(0.7, 1.5, 0.7),
-					CFrame = foot * CFrame.new(0, height + 0.3, 0),
-					Color = jitter(colors.CornTop, ctx.Rng, 0.08),
-					Material = Enum.Material.Fabric,
-				}, folder)
+				local tasselColor = jitter(colors.CornTop, ctx.Rng, 0.08)
+				-- A tall corn stalk (solid: it blocks the view and candy), a leaf, a tassel.
+				Kit.prop("CornStalk", foot, folder, height + 1.05, function()
+					local m = Kit.model("CornStalk", folder)
+					m.PrimaryPart = oval({
+						Name = "Corn",
+						Size = Vector3.new(1.9, height, 1.9),
+						CFrame = foot * CFrame.new(0, height / 2 - 0.3, 0),
+						Color = cornColor,
+						Material = Enum.Material.LeafyGrass,
+					}, m, true)
+					if leafSide ~= 0 then
+						oval({
+							Name = "Leaf",
+							Size = Vector3.new(0.25, 3.2, 1.1),
+							CFrame = foot
+								* CFrame.new(0, leafHeight, leafSide * 1.2)
+								* CFrame.Angles(leafSide * math.rad(40), 0, 0),
+							Color = leafColor,
+							Material = Enum.Material.LeafyGrass,
+						}, m)
+					end
+					oval({
+						Name = "Tassel",
+						Size = Vector3.new(0.7, 1.5, 0.7),
+						CFrame = foot * CFrame.new(0, height + 0.3, 0),
+						Color = tasselColor,
+						Material = Enum.Material.Fabric,
+					}, m)
+					return m
+				end)
 			end
 		end
 	end
@@ -1074,8 +1089,43 @@ local function scarecrow(ctx: MapBase.Ctx, cf: CFrame, parent: Instance)
 	end)
 end
 
+-- Little pumpkins (prop "Pumpkin") sitting on a heap of hay in a cart: `spots` are their
+-- middles (relative to `cf`), `size` their width and height. Their colours are drawn now.
+local function littlePumpkins(
+	ctx: MapBase.Ctx,
+	cf: CFrame,
+	spots: { Vector3 },
+	size: Vector2
+): (Model) -> ()
+	local colors = ctx.Def.Colors
+	local shades = {}
+	for i in spots do
+		shades[i] = jitter(colors.Orange, ctx.Rng, 0.08)
+	end
+	return function(m: Model)
+		for i, p in spots do
+			local foot = cf * CFrame.new(p.X, p.Y - size.Y / 2, p.Z) * CFrame.Angles(0, i, 0)
+			Kit.prop("Pumpkin", foot, m, size.Y, function()
+				local pumpkin = Kit.model("Pumpkin", m)
+				pumpkin.PrimaryPart = oval({
+					Name = "LittlePumpkin",
+					Size = Vector3.new(size.X, size.Y, size.X),
+					CFrame = foot * CFrame.new(0, size.Y / 2, 0),
+					Color = shades[i],
+				}, pumpkin)
+				return pumpkin
+			end)
+		end
+	end
+end
+
 local function wheelbarrow(ctx: MapBase.Ctx, cf: CFrame, parent: Instance)
 	local colors = ctx.Def.Colors
+	local pumpkins = littlePumpkins(ctx, cf, {
+		Vector3.new(-0.6, 3.1, -0.8),
+		Vector3.new(0.6, 3.1, 0.6),
+		Vector3.new(-0.3, 3.2, 1.2),
+	}, Vector2.new(1.4, 1.1))
 	Kit.prop("Wheelbarrow", cf, parent, 3, function()
 		local m = Kit.model("Wheelbarrow", parent)
 		Kit.part({
@@ -1123,20 +1173,7 @@ local function wheelbarrow(ctx: MapBase.Ctx, cf: CFrame, parent: Instance)
 			Color = colors.Hay,
 			Material = Enum.Material.Fabric,
 		}, m)
-		for i, p in
-			{
-				Vector3.new(-0.6, 3.1, -0.8),
-				Vector3.new(0.6, 3.1, 0.6),
-				Vector3.new(-0.3, 3.2, 1.2),
-			}
-		do
-			oval({
-				Name = "LittlePumpkin",
-				Size = Vector3.new(1.4, 1.1, 1.4),
-				CFrame = cf * CFrame.new(p) * CFrame.Angles(0, i, 0),
-				Color = jitter(colors.Orange, ctx.Rng, 0.08),
-			}, m)
-		end
+		pumpkins(m)
 		return m
 	end)
 end
@@ -1348,6 +1385,11 @@ end
 -- A wooden harvest cart (decoy pumpkins sit round it).
 local function buildCart(ctx: MapBase.Ctx, cf: CFrame, parent: Instance)
 	local colors = ctx.Def.Colors
+	local pumpkins = littlePumpkins(ctx, cf, {
+		Vector3.new(-0.9, 3.5, -1.8),
+		Vector3.new(0.8, 3.5, 0.2),
+		Vector3.new(-0.5, 3.5, 2),
+	}, Vector2.new(1.7, 1.3))
 	Kit.prop("HarvestCart", cf, parent, 4, function()
 		local m = Kit.model("HarvestCart", parent)
 		Kit.part({
@@ -1402,16 +1444,7 @@ local function buildCart(ctx: MapBase.Ctx, cf: CFrame, parent: Instance)
 			Color = colors.Hay,
 			Material = Enum.Material.Fabric,
 		}, m)
-		for i, p in
-			{ Vector3.new(-0.9, 3.5, -1.8), Vector3.new(0.8, 3.5, 0.2), Vector3.new(-0.5, 3.5, 2) }
-		do
-			oval({
-				Name = "LittlePumpkin",
-				Size = Vector3.new(1.7, 1.3, 1.7),
-				CFrame = cf * CFrame.new(p) * CFrame.Angles(0, i, 0),
-				Color = jitter(colors.Orange, ctx.Rng, 0.08),
-			}, m)
-		end
+		pumpkins(m)
 		return m
 	end)
 end

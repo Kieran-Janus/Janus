@@ -8,7 +8,8 @@
 	(it swings open when the seekers are let out) with parts tagged SeekerSpawn inside.
 
 	Every function takes `cf` = where the prop stands (the middle of its bottom, facing
-	cf.LookVector) and a colour table with the keys it needs.
+	cf.LookVector) and a colour table with the keys it needs. Random numbers are drawn before
+	Kit.prop, so a custom model never changes where the rest of the map goes.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -33,11 +34,11 @@ function HideSeekProps.jitter(color: Color3, rng: Random, amount: number): Color
 	return Kit.shade(color, rng:NextNumber(-amount, amount))
 end
 
--- A lamp post with a warm glowing lantern hanging from its arm.
+-- A lamp post with a warm glowing lantern hanging from its arm (prop "Lamppost").
 function HideSeekProps.lantern(cf: CFrame, colors: any, parent: Instance): Model
-	return Kit.prop("Lantern", cf, parent, 9, function()
-		local m = Kit.model("Lantern", parent)
-		Kit.part({
+	return Kit.prop("Lamppost", cf, parent, 9, function()
+		local m = Kit.model("Lamppost", parent)
+		m.PrimaryPart = Kit.part({
 			Name = "Post",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(8.4, 0.5, 0.5),
@@ -76,19 +77,20 @@ function HideSeekProps.lantern(cf: CFrame, colors: any, parent: Instance): Model
 		}, m)
 		Kit.light(glass, colors.Glow, 22, 1.3, true)
 		return m
-	end)
+	end, { Light = { Color = colors.Glow, Range = 22, Brightness = 1.3, Height = 0.8 } })
 end
 
 -- A rectangular hay bale with two dark twine bands.
 function HideSeekProps.hayBale(cf: CFrame, colors: any, rng: Random, parent: Instance): Model
+	local hay = HideSeekProps.jitter(colors.Hay, rng, 0.06)
 	return Kit.prop("HayBale", cf, parent, 2.4, function()
 		local m = Kit.model("HayBale", parent)
 		local size = Vector3.new(4.4, 2.4, 2.6)
-		Kit.part({
+		m.PrimaryPart = Kit.part({
 			Name = "Hay",
 			Size = size,
 			CFrame = cf * CFrame.new(0, size.Y / 2, 0),
-			Color = HideSeekProps.jitter(colors.Hay, rng, 0.06),
+			Color = hay,
 			Material = Enum.Material.Fabric,
 		}, m)
 		for _, x in { -1.1, 1.1 } do
@@ -105,14 +107,15 @@ end
 
 -- A round hay roll lying on its side.
 function HideSeekProps.hayRoll(cf: CFrame, colors: any, rng: Random, parent: Instance): Model
+	local hay = HideSeekProps.jitter(colors.Hay, rng, 0.06)
 	return Kit.prop("HayRoll", cf, parent, 4.6, function()
 		local m = Kit.model("HayRoll", parent)
-		Kit.part({
+		m.PrimaryPart = Kit.part({
 			Name = "Hay",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(4, 4.6, 4.6),
 			CFrame = cf * CFrame.new(0, 2.3, 0),
-			Color = HideSeekProps.jitter(colors.Hay, rng, 0.06),
+			Color = hay,
 			Material = Enum.Material.Fabric,
 		}, m)
 		Kit.decor({
@@ -127,7 +130,7 @@ function HideSeekProps.hayRoll(cf: CFrame, colors: any, rng: Random, parent: Ins
 	end)
 end
 
--- A tree in autumn colours: a leaning trunk and a few round leaf clumps.
+-- A tree in autumn colours: a leaning trunk and a few round leaf clumps (prop "AutumnTree").
 function HideSeekProps.autumnTree(
 	cf: CFrame,
 	height: number,
@@ -136,11 +139,24 @@ function HideSeekProps.autumnTree(
 	rng: Random,
 	parent: Instance
 ): Model
+	-- Every random number first (in the order the tree always drew them).
+	local lean = CFrame.Angles(rng:NextNumber(-0.06, 0.06), 0, rng:NextNumber(-0.06, 0.06))
+	local width = height * 0.62
+	local clumps = {}
+	for i = 1, 4 do
+		local angle = (i / 4) * math.pi * 2 + rng:NextNumber(-0.4, 0.4)
+		local w = width * rng:NextNumber(0.6, 0.8)
+		local rise = rng:NextNumber(-0.6, 1.2)
+		local color = HideSeekProps.jitter(leafColors[rng:NextInteger(1, #leafColors)], rng, 0.08)
+		clumps[i] = { Angle = angle, Width = w, Rise = rise, Color = color }
+	end
+	local pileX = rng:NextNumber(-1, 1)
+	local pileZ = rng:NextNumber(-1, 1)
+	local pileColor = HideSeekProps.jitter(leafColors[1], rng, 0.1)
 	return Kit.prop("AutumnTree", cf, parent, height, function()
 		local m = Kit.model("AutumnTree", parent)
-		local lean = CFrame.Angles(rng:NextNumber(-0.06, 0.06), 0, rng:NextNumber(-0.06, 0.06))
 		local trunkHeight = height * 0.55
-		Kit.part({
+		m.PrimaryPart = Kit.part({
 			Name = "Trunk",
 			Shape = Enum.PartType.Cylinder,
 			Size = Vector3.new(trunkHeight + 1, 1.8, 1.8),
@@ -149,27 +165,18 @@ function HideSeekProps.autumnTree(
 			Material = Enum.Material.Wood,
 		}, m)
 		local top = cf * lean * CFrame.new(0, trunkHeight, 0)
-		local width = height * 0.62
-		local clumps = 4
-		for i = 1, clumps do
-			local angle = (i / clumps) * math.pi * 2 + rng:NextNumber(-0.4, 0.4)
+		for i, clump in clumps do
 			local r = if i == 1 then 0 else width * 0.22
-			local w = width * rng:NextNumber(0.6, 0.8)
+			local w = clump.Width
 			HideSeekProps.oval({
 				Name = "Leaves",
 				Size = Vector3.new(w, w * 0.8, w),
 				CFrame = top * CFrame.new(
-					math.cos(angle) * r,
-					height * 0.18
-						+ rng:NextNumber(-0.6, 1.2)
-						+ (if i == 1 then height * 0.08 else 0),
-					math.sin(angle) * r
+					math.cos(clump.Angle) * r,
+					height * 0.18 + clump.Rise + (if i == 1 then height * 0.08 else 0),
+					math.sin(clump.Angle) * r
 				),
-				Color = HideSeekProps.jitter(
-					leafColors[rng:NextInteger(1, #leafColors)],
-					rng,
-					0.08
-				),
+				Color = clump.Color,
 				Material = Enum.Material.LeafyGrass,
 			}, m)
 		end
@@ -177,8 +184,8 @@ function HideSeekProps.autumnTree(
 		HideSeekProps.oval({
 			Name = "LeafPile",
 			Size = Vector3.new(width * 0.7, 0.4, width * 0.6),
-			CFrame = cf * CFrame.new(rng:NextNumber(-1, 1), 0.1, rng:NextNumber(-1, 1)),
-			Color = HideSeekProps.jitter(leafColors[1], rng, 0.1),
+			CFrame = cf * CFrame.new(pileX, 0.1, pileZ),
+			Color = pileColor,
 			Material = Enum.Material.LeafyGrass,
 		}, m)
 		return m

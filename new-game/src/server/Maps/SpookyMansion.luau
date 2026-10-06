@@ -15,6 +15,8 @@
 	  Conservatory  dead plants and tall hedges (hiding spots)
 	  Ballroom      big open checkered floor and chandelier (hotspot, risky)
 	  Crypt         coffins, pillars and a stone tomb (hiding spot)
+	Repeated decorations are props (Kit.prop), so one model in ReplicatedStorage.Custom.Props
+	swaps every copy: JackOLantern, Candle, Cobweb, Cauldron, Coffin.
 ]]
 
 local Kit = require(script.Parent.Parent.Build.Kit)
@@ -67,26 +69,43 @@ local function chandelier(room: Room, height: number)
 	Kit.float(m, 0.3, room.Ctx.Rng)
 end
 
+-- A candle (prop "Candle") whose wax starts `foot`; `height` = wax + flame.
+local function candle(
+	room: Room,
+	foot: CFrame,
+	height: number,
+	light: number,
+	build: (m: Model) -> BasePart
+): Model
+	local colors = room.Ctx.Def.Colors
+	return Kit.prop("Candle", foot, room.Model, height, function()
+		local m = Kit.model("Candle", room.Model)
+		m.PrimaryPart = build(m)
+		return m
+	end, { Light = { Color = colors.Glow, Range = light, Brightness = 0.8, Height = 0.85 } })
+end
+
 local function floatingCandle(room: Room, x: number, y: number, z: number)
 	local colors = room.Ctx.Def.Colors
-	local m = Kit.model("Candle", room.Model)
-	local wax = Kit.decor({
-		Name = "Wax",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1.6, 0.6, 0.6),
-		CFrame = Kit.upright(c(room, x, y, z)),
-		Color = colors.Bone,
-	}, m)
-	local flame = Kit.decor({
-		Name = "Flame",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(0.35, 0.6, 0.35),
-		CFrame = c(room, x, y + 1.1, z),
-		Color = colors.Glow,
-		Material = Enum.Material.Neon,
-	}, m)
-	Kit.light(flame, colors.Glow, 10, 0.8, true)
-	m.PrimaryPart = wax
+	local m = candle(room, c(room, x, y - 0.8, z), 2.2, 10, function(holder: Model): BasePart
+		local wax = Kit.decor({
+			Name = "Wax",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.6, 0.6, 0.6),
+			CFrame = Kit.upright(c(room, x, y, z)),
+			Color = colors.Bone,
+		}, holder)
+		local flame = Kit.decor({
+			Name = "Flame",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.35, 0.6, 0.35),
+			CFrame = c(room, x, y + 1.1, z),
+			Color = colors.Glow,
+			Material = Enum.Material.Neon,
+		}, holder)
+		Kit.light(flame, colors.Glow, 10, 0.8, true)
+		return wax
+	end)
 	Kit.float(m, 0.8, room.Ctx.Rng)
 end
 
@@ -284,22 +303,25 @@ function Rooms.Dining(room: Room)
 		end
 	end
 	for _, x in { -10, 0, 10 } do
-		local flame = Kit.decor({
-			Name = "Candelabra",
-			Size = Vector3.new(0.6, 2, 0.6),
-			CFrame = c(room, x, 4.6, 0),
-			Color = colors.Gold,
-			Material = Enum.Material.Metal,
-		}, room.Model)
-		Kit.decor({
-			Name = "Flame",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(0.5, 0.8, 0.5),
-			CFrame = c(room, x, 6, 0),
-			Color = colors.Glow,
-			Material = Enum.Material.Neon,
-		}, room.Model)
-		Kit.light(flame, colors.Glow, 18, 1.2, true)
+		candle(room, c(room, x, 3.6, 0), 2.8, 18, function(m: Model): BasePart
+			local stick = Kit.decor({
+				Name = "Candelabra",
+				Size = Vector3.new(0.6, 2, 0.6),
+				CFrame = c(room, x, 4.6, 0),
+				Color = colors.Gold,
+				Material = Enum.Material.Metal,
+			}, m)
+			local flame = Kit.decor({
+				Name = "Flame",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(0.5, 0.8, 0.5),
+				CFrame = c(room, x, 6, 0),
+				Color = colors.Glow,
+				Material = Enum.Material.Neon,
+			}, m)
+			Kit.light(flame, colors.Glow, 18, 1.2, true)
+			return stick
+		end)
 	end
 	-- A row of jack-o'-lanterns as the feast.
 	for _, x in { -5, 5 } do
@@ -351,33 +373,39 @@ function Rooms.Kitchen(room: Room)
 			Material = Enum.Material.Marble,
 		}, room.Model)
 	end
-	local pot = Kit.part({
-		Name = "Cauldron",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(4, 7, 7),
-		CFrame = Kit.upright(c(room, 0, 2, -4)),
-		Color = Color3.fromRGB(30, 28, 34),
-		Material = Enum.Material.Metal,
-	}, room.Model)
-	local brew = Kit.decor({
-		Name = "Brew",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.3, 6, 6),
-		CFrame = Kit.upright(c(room, 0, 4, -4)),
-		Color = colors.Slime,
-		Material = Enum.Material.Neon,
-	}, room.Model)
-	Kit.particles(brew, {
-		Rate = 6,
-		Color = ColorSequence.new(colors.Slime),
-		LightEmission = 0.8,
-		Size = NumberSequence.new(0.6),
-		Lifetime = NumberRange.new(1, 2),
-		Speed = NumberRange.new(1, 3),
-		SpreadAngle = Vector2.new(20, 20),
-		EmissionDirection = Enum.NormalId.Top,
-	})
-	Kit.light(pot, colors.Slime, 20, 1.2, true)
+	-- A bubbling cauldron (prop "Cauldron", like the lobby's big one).
+	Kit.prop("Cauldron", c(room, 0, 0, -4), room.Model, 4.2, function()
+		local m = Kit.model("Cauldron", room.Model)
+		local pot = Kit.part({
+			Name = "Cauldron",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(4, 7, 7),
+			CFrame = Kit.upright(c(room, 0, 2, -4)),
+			Color = Color3.fromRGB(30, 28, 34),
+			Material = Enum.Material.Metal,
+		}, m)
+		local brew = Kit.decor({
+			Name = "Brew",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.3, 6, 6),
+			CFrame = Kit.upright(c(room, 0, 4, -4)),
+			Color = colors.Slime,
+			Material = Enum.Material.Neon,
+		}, m)
+		Kit.particles(brew, {
+			Rate = 6,
+			Color = ColorSequence.new(colors.Slime),
+			LightEmission = 0.8,
+			Size = NumberSequence.new(0.6),
+			Lifetime = NumberRange.new(1, 2),
+			Speed = NumberRange.new(1, 3),
+			SpreadAngle = Vector2.new(20, 20),
+			EmissionDirection = Enum.NormalId.Top,
+		})
+		Kit.light(pot, colors.Slime, 20, 1.2, true)
+		m.PrimaryPart = pot
+		return m
+	end, { Light = { Color = colors.Slime, Range = 20, Brightness = 1.2, Height = 0.8 } })
 	Kit.hidingSpot({
 		Name = "Pantry",
 		Size = Vector3.new(7, 9, 5),
@@ -477,13 +505,18 @@ function Rooms.Crypt(room: Room)
 		)
 	end
 	for _, p in { { -6, -16 }, { 6, -16 }, { -18, 0 }, { 18, 0 }, { -6, 16 }, { 6, 16 } } do
-		Kit.part({
-			Name = "Coffin",
-			Size = Vector3.new(3, 2, 7),
-			CFrame = c(room, p[1], 1, p[2]) * CFrame.Angles(0, rng:NextNumber(-0.3, 0.3), 0),
-			Color = colors.DarkWood,
-			Material = Enum.Material.Wood,
-		}, room.Model)
+		local foot = c(room, p[1], 0, p[2]) * CFrame.Angles(0, rng:NextNumber(-0.3, 0.3), 0)
+		Kit.prop("Coffin", foot, room.Model, 2, function()
+			local m = Kit.model("Coffin", room.Model)
+			m.PrimaryPart = Kit.part({
+				Name = "Coffin",
+				Size = Vector3.new(3, 2, 7),
+				CFrame = foot * CFrame.new(0, 1, 0),
+				Color = colors.DarkWood,
+				Material = Enum.Material.Wood,
+			}, m)
+			return m
+		end)
 	end
 	Kit.hidingSpot({
 		Name = "Tomb",
@@ -495,14 +528,18 @@ function Rooms.Crypt(room: Room)
 	}, room.Model)
 	for i = 1, 6 do
 		local a = i / 6 * math.pi * 2
-		local flame = Kit.decor({
-			Name = "Candle",
-			Size = Vector3.new(0.5, 1, 0.5),
-			CFrame = c(room, math.cos(a) * 8, 0.5, math.sin(a) * 8),
-			Color = colors.Glow,
-			Material = Enum.Material.Neon,
-		}, room.Model)
-		Kit.light(flame, colors.Glow, 10, 0.8, true)
+		local x, z = math.cos(a) * 8, math.sin(a) * 8
+		candle(room, c(room, x, 0, z), 1, 10, function(m: Model): BasePart
+			local flame = Kit.decor({
+				Name = "Candle",
+				Size = Vector3.new(0.5, 1, 0.5),
+				CFrame = c(room, x, 0.5, z),
+				Color = colors.Glow,
+				Material = Enum.Material.Neon,
+			}, m)
+			Kit.light(flame, colors.Glow, 10, 0.8, true)
+			return flame
+		end)
 	end
 end
 

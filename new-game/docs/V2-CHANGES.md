@@ -187,7 +187,7 @@ Do these once, in this order.
 3. Restart Claude Code (Ctrl+C twice, then `claude`), so it sees the new slash commands like `/verify-v2`.
 
 ### 3. The lobby rebuilds itself once
-Every lobby the game builds carries a version number: the attribute **BuildVersion** on `Workspace.Hub`. The code's number is `Config.Hub.BuildVersion` (now 4). When the lobby saved in your place has a lower number (or none, like your old one), the game builds the new lobby automatically when you press Play.
+Every lobby the game builds carries a version number: the attribute **BuildVersion** on `Workspace.Hub`. The code's number is `Config.Hub.BuildVersion` (now 5). When the lobby saved in your place has a lower number (or none, like your old one), the game builds the new lobby automatically when you press Play.
 
 What that means for you:
 - **If you never changed the old lobby by hand:** nothing to do. You get the new lobby.
@@ -345,20 +345,20 @@ More recipes: [`docs/CUSTOMIZE.md`](CUSTOMIZE.md). Or ask Claude Code: `/tweak m
 
 Full step-by-step guide: [`docs/CUSTOMIZE.md` > Editing the lobby and maps by hand](CUSTOMIZE.md#editing-the-lobby-and-maps-by-hand). The short version:
 
-### Swap a decoration everywhere (props)
-Put a model in `ReplicatedStorage > Custom > Props`, named exactly like the decoration. **Every copy** in the lobby and maps uses your model. It is scaled to the same size and turned the same way. Not sure of a name? Select the decoration in Studio and read its `PropName` attribute.
+### Swap every copy of something at once (props)
+Put **one** model in `ReplicatedStorage > Custom > Props`, named exactly like the thing, and **every copy** uses it: in the lobby, in all five round maps, and the pumpkins players pick up or hide in. It is scaled to each copy's size and turned the same way. Not sure of a name? Select the thing in Studio and read its `PropName` attribute.
 
 | Where | Prop names |
 | --- | --- |
-| Lobby decorations | `Pumpkin`, `JackOLantern`, `SpookyTree`, `DeadTree`, `Lamppost`, `Lantern`, `Candle`, `Bench`, `HayBale`, `Crate`, `Barrel`, `Gravestone`, `FencePost`, `Signpost`, `Mushroom`, `Bat`, `Cobweb` |
-| Lobby centrepieces | `ClockTower`, `Cauldron`, `KingStatue`, `VendorStall`, `ReadyPadArch` |
-| Parkour | `ParkourArch`, `ParkourTrophy`, `ParkourBat` |
-| Candy Rush | `CandyCane`, `GiantLollipop`, `CandyBucket`, `Gumdrop`, `SignCandyCorn`, and the candies `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn` |
-| Web Scour | `GroveSpider` |
-| Secret pumpkins | `EggGoldenPumpkin`, `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost` |
-| Crates | a model named after the crate's Id, e.g. `PumpkinCrate` |
-| Hide & Seek maps | `HidingPumpkin` (hiders and decoys), `Scarecrow`, `Wheelbarrow`, `Well`, `Tractor`, `HarvestCart`, `RockingChair`, `AutumnTree`, `HayRoll`, `Fountain`, `Topiary` |
+| Pumpkins | `Pumpkin` (plain), `JackOLantern` (carved, glowing), `CollectPumpkin` (King Hunt pickups), `HidingPumpkin` (Hide & Seek decoys and hiders), `ParkourPumpkin` (parkour jumps), `ParkourTrophy` |
+| Lights | `Lantern`, `Lamppost`, `Candle` (a custom one with no light gets the glow light) |
+| Trees and plants | `SpookyTree`, `DeadTree`, `AutumnTree`, `SpiderGroveTree`, `CornStalk`, `Mushroom`, `Flowers`, `HedgePost`, `Topiary` |
+| Graveyard and farm | `Gravestone`, `Coffin`, `FencePost`, `Scarecrow`, `HayBale`, `HayRoll`, `Haystack`, `Crow`, `Bat`, `Cobweb`, `Cauldron`, `Wheelbarrow`, `HarvestCart`, `Well`, `Tractor`, `RockingChair`, `Fountain` |
+| Lobby pieces | `Bench`, `Crate`, `Barrel`, `Signpost`, `ClockTower`, `KingStatue`, `VendorStall`, `ReadyPadArch`, `ParkourArch` |
+| Candy Rush, Web Scour, eggs, crates | `CandyCane`, `GiantLollipop`, `CandyBucket`, `Gumdrop`, `SignCandyCorn`, the candies `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn`, `GroveSpider`, `EggGoldenPumpkin`, `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost`, a crate's Id (e.g. `PumpkinCrate`) |
 | ScareMaze | `ScareScarecrow`, `ScareZombie`, `ScareBat`, `ScareGhost` |
+
+A Locked lobby or a baked map swaps by itself when you press Play. To keep it in the place file, run `require(game.ServerScriptService.Server.Tools.Swap).Props()` in the command bar (edit mode; Ctrl+Z undoes it), or try it with **F8 > Apply custom props**. Anything else can be replaced by name: `Swap.Replace("Tombstone", workspace.MyTombstone)`. Full guide with sizes: [`docs/CUSTOMIZE.md` > Swap every copy of something at once](CUSTOMIZE.md#swap-every-copy-of-something-at-once), or ask Claude Code: `/swap-prop Pumpkin`.
 
 ### Your own characters
 Put a model in `ReplicatedStorage > Custom > Characters` named `PumpkinKing`, `SkeletonPatrol`, `Bat`, `GhostCat` or `PumpkinVendor` (the shopkeeper). Sizes are in `Config.Custom.Heights`. Keep a copy in git: right-click > **Save to File...** into `new-game/assets/Characters/`. Or ask Claude Code: `/reskin PumpkinKing a giant jack-o-lantern king with a purple cape`.
@@ -451,7 +451,7 @@ In Claude Code (with Studio open, Rojo connected and the Studio MCP on), type:
 It walks through every v2 feature in order: solo Play first, then a 2-player test for Hide & Seek, ScareMaze, Candy Rush races and spectating, then phone screens with **Test > Device**. It reads the Output window, fixes what's broken, runs the offline tests (`lune run tests/run`), commits and pushes. Some 2-player steps need you to click **Test > Clients and Servers > 2 players > Start**; it will tell you when.
 
 Shortcuts for testing by hand: press **F8** in a playtest (or the Admin button on a phone) for the owner panel:
-- **+ Coins**, **Unlock all items**, **Reset daily reward**, **Rebuild hub**, **Repaint hub**, **Reset my save**
+- **+ Coins**, **Unlock all items**, **Reset daily reward**, **Rebuild hub**, **Repaint hub**, **Apply custom props** (swaps your `Custom > Props` models into the lobby and maps), **Reset my save**
 - **Start round now**, **Force mode**, and one "force next round" button per mode (Studio only)
 - **Parkour: teleport to start**, **Parkour: reset my best/cooldown**
 - **Candy Rush: start solo test**, **Web Scour: start**, **Easter eggs: reset mine**

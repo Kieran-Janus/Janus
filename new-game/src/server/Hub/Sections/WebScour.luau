@@ -628,21 +628,26 @@ local function buildFloor(frame: Frame, zone: Zone, trees: { Tree }, rng: Random
 		placed += 1
 		local height = rng:NextNumber(0.7, 1.4)
 		local capColor = grove.Colors.MushroomCaps[(placed - 1) % #grove.Colors.MushroomCaps + 1]
-		decor({
-			Name = "MushroomStem",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(height, 0.4, 0.4),
-			CFrame = Kit.upright(CFrame.new(position + Vector3.new(0, height / 2, 0))),
-			PaletteRole = "Bone",
-		}, m)
-		oval({
-			Name = "MushroomCap",
-			Size = Vector3.new(1.3, 0.7, 1.3) * (height / 1.1),
-			CFrame = CFrame.new(position + Vector3.new(0, height, 0))
-				* CFrame.Angles(rng:NextNumber(-0.2, 0.2), 0, rng:NextNumber(-0.2, 0.2)),
-			Color = capColor,
-			Material = Enum.Material.Neon,
-		}, m)
+		local tilt = CFrame.Angles(rng:NextNumber(-0.2, 0.2), 0, rng:NextNumber(-0.2, 0.2))
+		-- A glowing toadstool (prop "Mushroom", like the lobby's mushroom clusters).
+		Kit.prop("Mushroom", CFrame.new(position), m, height * 1.32, function()
+			local mushroom = Kit.model("Mushroom", m)
+			mushroom.PrimaryPart = decor({
+				Name = "MushroomStem",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(height, 0.4, 0.4),
+				CFrame = Kit.upright(CFrame.new(position + Vector3.new(0, height / 2, 0))),
+				PaletteRole = "Bone",
+			}, mushroom)
+			oval({
+				Name = "MushroomCap",
+				Size = Vector3.new(1.3, 0.7, 1.3) * (height / 1.1),
+				CFrame = CFrame.new(position + Vector3.new(0, height, 0)) * tilt,
+				Color = capColor,
+				Material = Enum.Material.Neon,
+			}, mushroom)
+			return mushroom
+		end)
 	end
 end
 

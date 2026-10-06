@@ -45,9 +45,7 @@ local decor = paint.decor
 local color = paint.color
 
 local function jackOLantern(cf: CFrame, size: number, parent: Instance): Model
-	return Kit.prop("JackOLantern", cf, parent, size * 1.2, function()
-		return Kit.jackOLantern(cf, size, Config.Hub.Palette :: any, parent)
-	end)
+	return Kit.jackOLantern(cf, size, Config.Hub.Palette :: any, parent)
 end
 
 -- One crate on its plinth, with the prompt that opens it.

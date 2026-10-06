@@ -86,9 +86,14 @@ function HubAmbience.Mount()
 		nextFlicker = t + 1 / perf.FlickerHz
 		for l, f in flickers do
 			local holder = l.Parent
+			-- (in a part, or in an Attachment: the light a custom prop gets, Kit.prop)
+			local at: Vector3? = if holder and holder:IsA("BasePart")
+				then holder.Position
+				elseif holder and holder:IsA("Attachment") then holder.WorldPosition
+				else nil
 			if not holder then
 				flickers[l] = nil
-			elseif holder:IsA("BasePart") and (holder.Position - eye).Magnitude <= maxDistance then
+			elseif at and (at - eye).Magnitude <= maxDistance then
 				l.Brightness = f.Brightness * (0.8 + 0.25 * math.noise(t * 3, f.Seed))
 			end
 		end

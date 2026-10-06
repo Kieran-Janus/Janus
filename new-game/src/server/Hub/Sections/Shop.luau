@@ -99,7 +99,7 @@ function Shop.Build(hub: Model, zone: Zone): Model
 	Props.Crate(paint, left * CFrame.new(0.2, 2.2, 0.1) * CFrame.Angles(0, 0.6, 0), 1.6, dressing)
 	local right = base * CFrame.new(edge, 0.18, 3.4)
 	Props.Barrel(paint, right, 2.8, dressing)
-	Props.HayBale(
+	Props.HayRoll(
 		paint,
 		base * CFrame.new(edge - 0.4, 0.18, 0.4) * CFrame.Angles(0, math.rad(90), 0),
 		2,

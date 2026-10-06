@@ -4,7 +4,7 @@ description: Restyle a character, NPC, monster or lobby decoration. Usage: /resk
 
 Restyle: $ARGUMENTS
 
-1. Read `CLAUDE.md`, `docs/CUSTOMIZE.md` ("Builder mode" and "Swap a decoration everywhere: props") and `src/shared/CustomAssets.luau`.
+1. Read `CLAUDE.md`, `docs/CUSTOMIZE.md` ("Builder mode" and "Swap every copy of something at once") and `src/shared/CustomAssets.luau`. To swap a decoration or pumpkin everywhere, `/swap-prop` is the full walk-through.
 2. Work out what it is and where its model goes:
    - A character: `PumpkinKing`, `SkeletonPatrol`, `Bat`, `GhostCat` or `PumpkinVendor` (the Pumpkin Shop keeper, the only shopkeeper since v2) -> `ReplicatedStorage.Custom.Characters`.
    - A cosmetic: its item Id from `Config.Shop.Items` or `src/shared/Config/Skins/` -> `ReplicatedStorage.Custom.Cosmetics`.

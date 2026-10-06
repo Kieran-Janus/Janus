@@ -1066,7 +1066,7 @@ local function buildClutter(parent: Instance)
 	for _, offset in cfg.HayBales do
 		local cf = place(offset, 2)
 		if cf then
-			Props.HayBale(paint, cf, 2.6, folder)
+			Props.HayRoll(paint, cf, 2.6, folder)
 		end
 	end
 	for _, offset in cfg.Crates do

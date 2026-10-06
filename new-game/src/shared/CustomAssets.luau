@@ -10,11 +10,13 @@
 	              Shop keeper)
 	  Cosmetics   the shop item Id (Config.Shop.Items),       Cosmetics (hats, pets, skin
 	              e.g. WitchHat, MiniPumpkin, Skeleton        head pieces) and shop previews
-	  Props       a lobby decoration: JackOLantern,           Kit.prop (HubBuilder, HubExtras,
-	              Lamppost, DeadTree, Gravestone, Candle,     Hub/Npcs, Hub/Sections): every
-	              Cobweb, KingStatue, ClockTower, Cauldron,   copy in the lobby swaps at once
-	              VendorStall, ReadyPadArch                   (the built ones have the
-	                                                          attribute PropName)
+	  Props       a decoration or pumpkin: Pumpkin,           Kit.prop / Kit.look (the hub, the
+	              JackOLantern, CollectPumpkin,               round maps, King Hunt pickups):
+	              HidingPumpkin, ParkourPumpkin, Lamppost,    every copy in the lobby AND the
+	              Lantern, HayBale, Gravestone, DeadTree...   maps swaps at once (the built
+	              (the full list: docs/CUSTOMIZE.md, "Swap    ones have the attribute PropName;
+	              every copy of something at once")          src/server/Tools/Swap.luau swaps
+	                                                          a saved hub or baked map in Studio)
 
 	Two ways to add one (docs/CUSTOMIZE.md has screenshots-free step by step):
 	  1. In Studio: put the Model in ReplicatedStorage > Custom > Characters (etc.) and save.

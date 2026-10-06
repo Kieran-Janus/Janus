@@ -3,7 +3,7 @@
 	Owner-only test panel (client: src/client/AdminUI.luau, key Config.Admin.OpenKey).
 	Made for trying out customisations fast: give yourself coins, unlock every cosmetic,
 	reset your save, rebuild the hub after changing Config.Hub or custom NPC models, repaint
-	the hub from Config.Hub.Palette.
+	the hub from Config.Hub.Palette, swap in your custom props (Apply custom props).
 
 	Who is an admin:
 	  - anyone in a Studio playtest (only you and your Team Create collaborators can be there)
@@ -36,6 +36,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local HubService = require(script.Parent.HubService)
 local DataService = require(script.Parent.DataService)
 local ShopService = require(script.Parent.ShopService)
+local Swap = require(script.Parent.Parent.Tools.Swap)
 
 local AdminService = {}
 
@@ -136,6 +137,13 @@ end)
 
 AdminService.Register("RepaintHub", "Repaint hub", function(_player, _data)
 	return HubService.Repaint()
+end)
+
+-- Swaps every prop in the lobby, the current map and the baked maps for your models in
+-- ReplicatedStorage.Custom.Props (src/server/Tools/Swap.luau), for this playtest.
+AdminService.Register("ApplyCustomProps", "Apply custom props", function(_player, _data)
+	local _, message = Swap.Props()
+	return message
 end)
 
 AdminService.Register("ResetSave", "Reset my save", function(player, data)

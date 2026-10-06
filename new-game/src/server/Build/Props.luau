@@ -5,7 +5,8 @@
 
 	Every builder takes a painter (Kit.painter(palette)), so colours come from that palette by
 	role (PaletteRole attributes: "Repaint hub" recolours them), and goes through Kit.prop, so a
-	model with the same name in ReplicatedStorage.Custom.Props replaces every copy at once:
+	model with the same name in ReplicatedStorage.Custom.Props replaces every copy at once (in
+	the lobby AND the round maps, which use the same names for the same kind of thing):
 
 	  Prop name       Built by                 What
 	  Pumpkin         Props.Pumpkin            ribbed pumpkin with a curly stem and a leaf
@@ -15,7 +16,7 @@
 	  Lamppost        Props.Lamppost           iron lamppost with a glass lantern
 	  Bench           Props.Bench              wooden bench with iron sides
 	  Gravestone      Props.Gravestone         rounded, cross or pointed tombstone
-	  HayBale         Props.HayBale            rolled bale of hay
+	  HayRoll         Props.HayRoll            round roll of hay lying on its side
 	  Candle          Props.Candle             wax candle with drips and a flame
 	  Cobweb          Props.Cobweb             spider web (thin Beams: costs a single part)
 	  Crate           Props.Crate              wooden crate
@@ -26,6 +27,7 @@
 	  Bat             Props.Bat                little flying bat (bobs: tag HubFloat)
 	  Mushroom        Props.Mushrooms          a cluster of glowing toadstools
 	Not swappable (they connect two points): Props.Bunting (flags on a rope), Props.FenceSpan.
+	Lit props pass their light to Kit.prop, so a custom one with no light still glows.
 
 	Facing: a prop's front is cf.LookVector (-Z); it stands on cf (unless it says "centre").
 ]]
@@ -269,14 +271,12 @@ function Props.JackOLantern(
 	options: JackOptions?
 ): Model
 	local o: JackOptions = options or {}
-	return Kit.prop("JackOLantern", cf, parent, size * 1.2, function()
-		local palette = paint.palette
-		return Kit.jackOLantern(cf, size, {
-			Orange = palette.Orange,
-			Green = palette.Green,
-			Glow = palette.Glow,
-		}, parent, { Light = o.Light == true, Detail = o.Detail, Ribs = o.Ribs })
-	end)
+	local palette = paint.palette
+	return Kit.jackOLantern(cf, size, {
+		Orange = palette.Orange,
+		Green = palette.Green,
+		Glow = palette.Glow,
+	}, parent, { Light = o.Light == true, Detail = o.Detail, Ribs = o.Ribs })
 end
 
 -- Trees -----------------------------------------------------------------------------------------
@@ -442,6 +442,9 @@ function Props.Lantern(
 	options: LanternOptions?
 ): Model
 	local o: LanternOptions = options or {}
+	local light: Kit.PropLight? = if o.Light
+		then { Color = paint.color("Glow"), Range = o.Range or 14, Brightness = 1.4, Height = 0.45 }
+		else nil
 	return Kit.prop("Lantern", cf, parent, size, function()
 		local m = Kit.model("Lantern", parent)
 		local k = size / 1.3
@@ -485,7 +488,7 @@ function Props.Lantern(
 		end
 		m.PrimaryPart = flame
 		return m
-	end)
+	end, { Light = light })
 end
 
 export type LampOptions = { Light: boolean?, Range: number? }
@@ -499,6 +502,9 @@ function Props.Lamppost(
 	options: LampOptions?
 ): Model
 	local o: LampOptions = options or {}
+	local light: Kit.PropLight? = if o.Light ~= false
+		then { Color = paint.color("Glow"), Range = o.Range or 22, Brightness = 1.6, Height = 0.85 }
+		else nil
 	return Kit.prop("Lamppost", cf, parent, height, function()
 		local m = Kit.model("Lamppost", parent)
 		local iron: Props = { PaletteRole = "Iron", Material = Enum.Material.Metal }
@@ -574,7 +580,7 @@ function Props.Lamppost(
 		m.PrimaryPart = pole
 		local _ = base
 		return m
-	end)
+	end, { Light = light })
 end
 
 export type CandleOptions = { Light: boolean?, Drips: number? }
@@ -588,6 +594,9 @@ function Props.Candle(
 	options: CandleOptions?
 ): Model
 	local o: CandleOptions = options or {}
+	local light: Kit.PropLight? = if o.Light
+		then { Color = paint.color("Glow"), Range = 9, Brightness = 0.9, Height = 0.95 }
+		else nil
 	return Kit.prop("Candle", cf, parent, height + 0.7, function()
 		local m = Kit.model("Candle", parent)
 		local d = 0.55 + height * 0.08
@@ -632,7 +641,7 @@ function Props.Candle(
 		end
 		m.PrimaryPart = wax
 		return m
-	end)
+	end, { Light = light })
 end
 
 -- Furniture and clutter ---------------------------------------------------------------------------
@@ -686,10 +695,10 @@ function Props.Bench(paint: Painter, cf: CFrame, parent: Instance): Model
 	end)
 end
 
--- A rolled hay bale lying on cf (its length runs left to right).
-function Props.HayBale(paint: Painter, cf: CFrame, size: number, parent: Instance): Model
-	return Kit.prop("HayBale", cf, parent, size, function()
-		local m = Kit.model("HayBale", parent)
+-- A round roll of hay lying on cf (its length runs left to right), `size` studs tall.
+function Props.HayRoll(paint: Painter, cf: CFrame, size: number, parent: Instance): Model
+	return Kit.prop("HayRoll", cf, parent, size, function()
+		local m = Kit.model("HayRoll", parent)
 		local length = size * 1.15
 		local roll = paint.part({
 			Name = "Hay",

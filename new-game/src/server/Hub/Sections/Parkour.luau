@@ -16,7 +16,8 @@
 	  Decor                bats and lanterns, only for looks
 	ParkourService finds the working parts by tag, so pieces can be moved, resized, copied or
 	replaced in Studio. Props you can swap for your own model (ReplicatedStorage.Custom.Props):
-	ParkourArch, ParkourTrophy, ParkourBat, JackOLantern.
+	ParkourPumpkin (the pumpkins you jump on: only their look, the Top lid you stand on stays),
+	ParkourArch, ParkourTrophy, Bat, JackOLantern.
 
 	Parkour.Build(hub, zone) -> Model    the whole course (an empty model when the feature is off)
 	Parkour.Repair(hub, zone) -> Model   builds what is missing in a saved hub: the whole course
@@ -183,9 +184,7 @@ local function carveFace(center: CFrame, a: number, b: number, c: number, parent
 end
 
 local function jackOLantern(cf: CFrame, size: number, parent: Instance): Model
-	return Kit.prop("JackOLantern", cf, parent, size * 1.2, function()
-		return Kit.jackOLantern(cf, size, Config.Hub.Palette :: any, parent) -- the lobby's own colours
-	end)
+	return Kit.jackOLantern(cf, size, Config.Hub.Palette :: any, parent) -- the lobby's own colours
 end
 
 -- Where things are -----------------------------------------------------------------------------
@@ -207,6 +206,10 @@ type Builder = (top: CFrame, size: Vector3, step: Step, m: Model, index: number)
 
 local builders: { [string]: Builder } = {}
 
+-- A pumpkin to jump on. You stand on "Top", a flat lid that always does the work; the round
+-- body is its look, prop "ParkourPumpkin" (Kit.look): with your own model in
+-- ReplicatedStorage.Custom.Props, Top turns invisible and your pumpkin stands under it, its top
+-- where you stand, `size.Y` studs tall.
 builders.Pumpkin = function(top, size, _step, m, index)
 	local width = math.min(size.X, size.Z)
 	local lid = disc(
@@ -218,33 +221,48 @@ builders.Pumpkin = function(top, size, _step, m, index)
 		m,
 		true
 	)
-	-- The round body is lobes around the middle (ribs), a little above the lid's edge.
-	local center = top * CFrame.new(0, -size.Y / 2 + 0.25, 0)
-	oval("Body", center, Vector3.new(size.X * 0.92, size.Y, size.Z * 0.92), colors.Pumpkin, m)
-	for i = 0, 3 do
-		oval(
-			"Rib",
-			center * CFrame.Angles(0, math.rad(i * 45), 0),
-			Vector3.new(size.X, size.Y * 0.97, size.Z * 0.55),
-			colors.Pumpkin:Lerp(Color3.new(0, 0, 0), if i % 2 == 0 then 0.12 else 0.04),
-			m
+	local lit = index % 2 == 0 -- every other pumpkin is a glowing jack-o-lantern
+	local light: Kit.PropLight? = if lit and look.Lights
+		then { Color = colors.Face, Range = 12, Brightness = 1.2, Flicker = false, Height = 0.5 }
+		else nil
+	Kit.look("ParkourPumpkin", lid, top * CFrame.new(0, -size.Y, 0), size.Y, function()
+		local body = Kit.model("ParkourPumpkin", lid)
+		-- The round body is lobes around the middle (ribs), a little above the lid's edge.
+		local center = top * CFrame.new(0, -size.Y / 2 + 0.25, 0)
+		local core = oval(
+			"Body",
+			center,
+			Vector3.new(size.X * 0.92, size.Y, size.Z * 0.92),
+			colors.Pumpkin,
+			body
 		)
-	end
-	-- A curly stem at the back edge of the lid (no collision: you can stand through it).
-	decor({
-		Name = "Stem",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1.4, 0.7, 0.7),
-		CFrame = Kit.upright(top * CFrame.new(0, 0.5, -width * look.PumpkinTop / 2 + 0.6))
-			* CFrame.Angles(0, 0, math.rad(-20)),
-		Color = colors.PumpkinStem,
-	}, m)
-	-- Every other pumpkin is a glowing jack-o-lantern facing the plaza.
-	if index % 2 == 0 then
-		carveFace(center, size.X / 2 * 0.98, size.Y / 2, size.Z / 2 * 0.98, m)
-		local inside = Kit.holder("Glow", center, Vector3.one, m)
-		glow(inside, colors.Face, 12, 1.2)
-	end
+		for i = 0, 3 do
+			oval(
+				"Rib",
+				center * CFrame.Angles(0, math.rad(i * 45), 0),
+				Vector3.new(size.X, size.Y * 0.97, size.Z * 0.55),
+				colors.Pumpkin:Lerp(Color3.new(0, 0, 0), if i % 2 == 0 then 0.12 else 0.04),
+				body
+			)
+		end
+		-- A curly stem at the back edge of the lid (no collision: you can stand through it).
+		decor({
+			Name = "Stem",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.4, 0.7, 0.7),
+			CFrame = Kit.upright(top * CFrame.new(0, 0.5, -width * look.PumpkinTop / 2 + 0.6))
+				* CFrame.Angles(0, 0, math.rad(-20)),
+			Color = colors.PumpkinStem,
+		}, body)
+		-- A jack-o-lantern faces the plaza.
+		if lit then
+			carveFace(center, size.X / 2 * 0.98, size.Y / 2, size.Z / 2 * 0.98, body)
+			local inside = Kit.holder("Glow", center, Vector3.one, body)
+			glow(inside, colors.Face, 12, 1.2)
+		end
+		body.PrimaryPart = core
+		return body
+	end, { Light = light })
 	return lid
 end
 
@@ -948,8 +966,8 @@ local function buildDecor(zone: Zone, area: Model)
 		local cf = frame
 			* CFrame.new(spot.X, spot.Y, -spot.Z)
 			* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
-		local bat = Kit.prop("ParkourBat", cf, folder, 2, function()
-			local m = Kit.model("ParkourBat", folder)
+		local bat = Kit.prop("Bat", cf, folder, 2, function()
+			local m = Kit.model("Bat", folder)
 			local body =
 				oval("Body", cf * CFrame.new(0, 0.8, 0), Vector3.new(0.9, 1.2, 0.8), colors.Bat, m)
 			for _, side in { -1, 1 } do

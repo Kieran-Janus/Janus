@@ -8,6 +8,9 @@
 	there as <Id>.rbxm is in git too.
 	The loaded model is Workspace.Map with attribute MapId; the client uses it to switch to
 	the map's lighting and ambient sound (src/client/ZoneLighting.luau).
+	A hand-made (baked) map gets your custom props when it loads: every prop in it (a Model
+	with a PropName attribute) is swapped for the model of that name in
+	ReplicatedStorage.Custom.Props (Kit.applyCustomProps), like a map built from code.
 
 	A map must have a part named "Floor" and a folder named after its SpawnFolder with spawn
 	parts in it. If a map is broken (missing those, or its builder errors), the Output window
@@ -21,6 +24,7 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 local Tags = require(game:GetService("ReplicatedStorage").Shared.Tags)
+local Kit = require(script.Parent.Parent.Build.Kit)
 local Builders = script.Parent.Parent.Maps
 
 export type LoadedMap = {
@@ -76,6 +80,11 @@ local function make(def: any, useHandMade: boolean): LoadedMap
 	if source then
 		model = source:Clone()
 		model:PivotTo(CFrame.new(Config.Maps.Origin))
+		-- Your custom props (a map baked before you added them still gets them).
+		local ok, err = pcall(Kit.applyCustomProps, model)
+		if not ok then
+			warn(("[MapService] Couldn't swap custom props into %s: %s"):format(id, tostring(err)))
+		end
 	else
 		local builder = Builders:FindFirstChild(tostring(def.Builder or ""))
 		if not (builder and builder:IsA("ModuleScript")) then

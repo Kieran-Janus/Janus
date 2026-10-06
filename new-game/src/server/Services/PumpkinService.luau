@@ -6,12 +6,19 @@
 	is the "Pumpkins" attribute on the Player, which the HUD reads.
 	A share of pumpkins (Config.Pumpkins.HotspotChance) spawn in the map's risky Hotspots.
 	The Ghost Cat (MinionService) can Steal pumpkins; Drop puts them back on the map later.
+
+	Your own look: a model named "CollectPumpkin" in ReplicatedStorage.Custom.Props. Each
+	pumpkin is still the glowing ball Part that is touched and collected (attribute Collected,
+	its PointLight); the ball turns invisible and your model sits on it, only for looks
+	(Kit.look), scaled to Config.Pumpkins.Size. So any model works, even one without parts
+	that can be touched.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Kit = require(script.Parent.Parent.Build.Kit)
 local MapService = require(script.Parent.MapService)
 local NoiseService = require(script.Parent.NoiseService)
 
@@ -104,6 +111,16 @@ local function spawnOne(map: MapService.LoadedMap)
 	pumpkin.Touched:Connect(function(hit)
 		collect(pumpkin, hit)
 	end)
+	-- Its look: the ball itself, or your "CollectPumpkin" model (turned a different way at
+	-- each spot, without using up random numbers).
+	Kit.look(
+		"CollectPumpkin",
+		pumpkin,
+		CFrame.new(spot) * CFrame.Angles(0, (spot.X * 1.7 + spot.Z * 2.3) % (math.pi * 2), 0),
+		cfg.Size,
+		nil,
+		{ Anchor = "Center" }
+	)
 	pumpkin.Parent = folder
 	active += 1
 end

@@ -13,6 +13,9 @@
 
 	HedgeMaze.Plan(def) -> Plan   the maze and the chosen cells, without building anything
 	                              (tests use it to check every spawn can reach the hut)
+	Repeated decorations are props (one model in ReplicatedStorage.Custom.Props swaps every
+	copy): HidingPumpkin, HedgePost (the round posts where hedges meet; the long hedges can't
+	be swapped, they come in every length), Flowers, Lamppost, Bench, Topiary, Fountain.
 ]]
 
 local Kit = require(script.Parent.Parent.Build.Kit)
@@ -159,26 +162,33 @@ local function hedge(ctx: MapBase.Ctx, a: Vector2, b: Vector2, parent: Instance)
 	}, parent)
 end
 
--- A round post where hedges meet, a little taller, with a leafy ball on top.
+-- A round post where hedges meet, a little taller, with a leafy ball on top (prop "HedgePost").
 local function post(ctx: MapBase.Ctx, p: Vector2, parent: Instance)
 	local layout = ctx.Def.Layout
 	local colors = ctx.Def.Colors
 	local h, t = layout.HedgeHeight, layout.HedgeThickness
-	Kit.part({
-		Name = "HedgePost",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(h, t + 0.8, t + 0.8),
-		CFrame = Kit.upright(CFrame.new(MapBase.at(ctx, p.X, p.Y, h / 2))),
-		Color = jitter(colors.Hedge, ctx.Rng, 0.06),
-		Material = Enum.Material.LeafyGrass,
-	}, parent)
-	oval({
-		Name = "PostTop",
-		Size = Vector3.new(t + 1.4, t + 1, t + 1.4),
-		CFrame = CFrame.new(MapBase.at(ctx, p.X, p.Y, h + 0.6)),
-		Color = jitter(colors.HedgeTop, ctx.Rng, 0.06),
-		Material = Enum.Material.LeafyGrass,
-	}, parent)
+	local postColor = jitter(colors.Hedge, ctx.Rng, 0.06)
+	local topColor = jitter(colors.HedgeTop, ctx.Rng, 0.06)
+	local foot = CFrame.new(MapBase.at(ctx, p.X, p.Y, 0))
+	Kit.prop("HedgePost", foot, parent, h + 1.1 + t / 2, function()
+		local m = Kit.model("HedgePost", parent)
+		m.PrimaryPart = Kit.part({
+			Name = "HedgePost",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(h, t + 0.8, t + 0.8),
+			CFrame = Kit.upright(foot * CFrame.new(0, h / 2, 0)),
+			Color = postColor,
+			Material = Enum.Material.LeafyGrass,
+		}, m)
+		oval({
+			Name = "PostTop",
+			Size = Vector3.new(t + 1.4, t + 1, t + 1.4),
+			CFrame = foot * CFrame.new(0, h + 0.6, 0),
+			Color = topColor,
+			Material = Enum.Material.LeafyGrass,
+		}, m)
+		return m
+	end)
 end
 
 -- Little roses dotted along both sides of a hedge.
@@ -375,29 +385,38 @@ local function topiary(ctx: MapBase.Ctx, cf: CFrame, kind: number, parent: Insta
 	end)
 end
 
+-- A patch of leaves with four flowers (prop "Flowers").
 local function flowers(ctx: MapBase.Ctx, center: Vector3, radius: number, parent: Instance)
 	local colors = ctx.Def.Colors
-	local m = Kit.model("Flowers", parent)
-	oval({
-		Name = "Leaves",
-		Size = Vector3.new(radius * 2, 0.9, radius * 1.6),
-		CFrame = CFrame.new(center + Vector3.new(0, 0.3, 0))
-			* CFrame.Angles(0, ctx.Rng:NextNumber(0, math.pi), 0),
-		Color = jitter(colors.Hedge, ctx.Rng, 0.1),
-		Material = Enum.Material.LeafyGrass,
-	}, m)
+	local turn = ctx.Rng:NextNumber(0, math.pi)
+	local leafColor = jitter(colors.Hedge, ctx.Rng, 0.1)
 	local color = colors.Flowers[ctx.Rng:NextInteger(1, #colors.Flowers)]
-	for _ = 1, 4 do
+	local spots = {}
+	for i = 1, 4 do
 		local a = ctx.Rng:NextNumber(0, math.pi * 2)
 		local r = ctx.Rng:NextNumber(0, radius * 0.7)
-		Kit.decor({
-			Name = "Flower",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(0.6, 0.6, 0.6),
-			CFrame = CFrame.new(center + Vector3.new(math.cos(a) * r, 0.85, math.sin(a) * r * 0.8)),
-			Color = color,
-		}, m)
+		spots[i] = Vector3.new(math.cos(a) * r, 0.85, math.sin(a) * r * 0.8)
 	end
+	Kit.prop("Flowers", CFrame.new(center), parent, 1.15, function()
+		local m = Kit.model("Flowers", parent)
+		m.PrimaryPart = oval({
+			Name = "Leaves",
+			Size = Vector3.new(radius * 2, 0.9, radius * 1.6),
+			CFrame = CFrame.new(center + Vector3.new(0, 0.3, 0)) * CFrame.Angles(0, turn, 0),
+			Color = leafColor,
+			Material = Enum.Material.LeafyGrass,
+		}, m)
+		for _, spot in spots do
+			Kit.decor({
+				Name = "Flower",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(0.6, 0.6, 0.6),
+				CFrame = CFrame.new(center + spot),
+				Color = color,
+			}, m)
+		end
+		return m
+	end)
 end
 
 local function buildPlaza(

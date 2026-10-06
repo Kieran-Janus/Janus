@@ -15,6 +15,9 @@
 	a long box: its scarecrow walks from one end to the other.
 	The way from the entrance to the exit always exists (MazeGen.Solve); most traps and the
 	lanterns are along it.
+	Repeated decorations are props (Kit.prop), so one model in ReplicatedStorage.Custom.Props
+	swaps every copy: Pumpkin, JackOLantern, Lantern (on the corn walls; the bracket stays),
+	Lamppost, HayBale, Crow, DeadTree.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -527,50 +530,60 @@ local function buildWalls(b: Builder, parent: Instance)
 end
 
 -- A small pumpkin (an oval, Roblox Ball parts are always round), lit ones have a carved face.
+-- Props "Pumpkin" and "JackOLantern".
 local function pumpkin(b: Builder, cf: CFrame, size: number, lit: boolean, parent: Instance)
 	local colors = b.Colors
-	local m = Kit.model(if lit then "JackOLantern" else "Pumpkin", parent)
-	local body = Kit.decor({
-		Name = "Pumpkin",
-		Size = Vector3.new(size * 1.25, size, size * 1.15),
-		CFrame = cf * CFrame.new(0, size / 2, 0),
-		Color = jitter(b, colors.Orange, 0.1),
-	}, m)
-	local mesh = Instance.new("SpecialMesh")
-	mesh.MeshType = Enum.MeshType.Sphere
-	mesh.Parent = body
-	Kit.decor({
-		Name = "Stem",
-		Size = Vector3.new(size * 0.15, size * 0.3, size * 0.15),
-		CFrame = cf * CFrame.new(0, size * 1.08, 0) * CFrame.Angles(0, 0, math.rad(10)),
-		Color = colors.Green,
-	}, m)
-	if lit then
-		local front = size * 1.15 / 2
-		for _, side in { -1, 1 } do
+	local orange = jitter(b, colors.Orange, 0.1) -- (drawn either way: the map stays the same)
+	local name = if lit then "JackOLantern" else "Pumpkin"
+	local light: Kit.PropLight? = if lit
+		then { Color = colors.Glow, Range = size * 5, Brightness = 1.3, Height = 0.45 }
+		else nil
+	return Kit.prop(name, cf, parent, size * (if lit then 1.2 else 1.25), function()
+		local m = Kit.model(name, parent)
+		local body = Kit.decor({
+			Name = "Pumpkin",
+			Size = Vector3.new(size * 1.25, size, size * 1.15),
+			CFrame = cf * CFrame.new(0, size / 2, 0),
+			Color = orange,
+		}, m)
+		local mesh = Instance.new("SpecialMesh")
+		mesh.MeshType = Enum.MeshType.Sphere
+		mesh.Parent = body
+		Kit.decor({
+			Name = "Stem",
+			Size = Vector3.new(size * 0.15, size * 0.3, size * 0.15),
+			CFrame = cf * CFrame.new(0, size * 1.08, 0) * CFrame.Angles(0, 0, math.rad(10)),
+			Color = colors.Green,
+		}, m)
+		if lit then
+			local front = size * 1.15 / 2
+			for _, side in { -1, 1 } do
+				Kit.decor({
+					Name = "Eye",
+					Size = Vector3.new(size * 0.18, size * 0.18, 0.15),
+					CFrame = cf
+						* CFrame.new(side * size * 0.22, size * 0.62, -front * 0.92)
+						* CFrame.Angles(0, 0, math.rad(45)),
+					Color = colors.Glow,
+					Material = Enum.Material.Neon,
+				}, m)
+			end
 			Kit.decor({
-				Name = "Eye",
-				Size = Vector3.new(size * 0.18, size * 0.18, 0.15),
-				CFrame = cf
-					* CFrame.new(side * size * 0.22, size * 0.62, -front * 0.92)
-					* CFrame.Angles(0, 0, math.rad(45)),
+				Name = "Mouth",
+				Size = Vector3.new(size * 0.5, size * 0.1, 0.15),
+				CFrame = cf * CFrame.new(0, size * 0.32, -front * 0.9),
 				Color = colors.Glow,
 				Material = Enum.Material.Neon,
 			}, m)
+			Kit.light(body, colors.Glow, size * 5, 1.3, true)
 		end
-		Kit.decor({
-			Name = "Mouth",
-			Size = Vector3.new(size * 0.5, size * 0.1, 0.15),
-			CFrame = cf * CFrame.new(0, size * 0.32, -front * 0.9),
-			Color = colors.Glow,
-			Material = Enum.Material.Neon,
-		}, m)
-		Kit.light(body, colors.Glow, size * 5, 1.3, true)
-	end
-	return m
+		m.PrimaryPart = body
+		return m
+	end, { Light = light })
 end
 
--- A lantern hanging on the corn wall on side `side` of `cell`.
+-- A lantern hanging on the corn wall on side `side` of `cell`: an iron bracket (always) and
+-- the lantern itself, prop "Lantern" (the same name as the lobby's little lanterns).
 local function wallLantern(b: Builder, cell: Cell, side: string, parent: Instance)
 	local colors = b.Colors
 	local plan = b.Plan
@@ -578,113 +591,134 @@ local function wallLantern(b: Builder, cell: Cell, side: string, parent: Instanc
 	local inner = (plan.CellSize - plan.Thickness) / 2
 	local base = cellPoint(b, cell, 0) + dir * (inner - 0.9)
 	local cf = CFrame.lookAt(base, base + dir) -- facing the wall
-	local m = Kit.model("Lantern", parent)
+	local m = Kit.model("WallLantern", parent)
 	Kit.decor({
 		Name = "Bracket",
 		Size = Vector3.new(0.3, 0.3, 1.6),
 		CFrame = cf * CFrame.new(0, 8.9, -0.4),
 		Color = colors.Iron,
 	}, m)
-	Kit.decor({
-		Name = "Cap",
-		Size = Vector3.new(1.1, 0.3, 1.1),
-		CFrame = cf * CFrame.new(0, 8.5, 0),
-		Color = colors.Iron,
-	}, m)
-	local lamp = Kit.decor({
-		Name = "Lamp",
-		Size = Vector3.new(0.75, 1.1, 0.75),
-		CFrame = cf * CFrame.new(0, 7.75, 0),
-		Color = colors.Glow,
-		Material = Enum.Material.Neon,
-	}, m)
-	Kit.decor({
-		Name = "Base",
-		Size = Vector3.new(1, 0.25, 1),
-		CFrame = cf * CFrame.new(0, 7.1, 0),
-		Color = colors.Iron,
-	}, m)
-	Kit.light(lamp, colors.Glow, 22, 1.5, true)
+	local foot = cf * CFrame.new(0, 6.975, 0)
+	Kit.prop("Lantern", foot, m, 1.675, function()
+		local lantern = Kit.model("Lantern", m)
+		Kit.decor({
+			Name = "Cap",
+			Size = Vector3.new(1.1, 0.3, 1.1),
+			CFrame = cf * CFrame.new(0, 8.5, 0),
+			Color = colors.Iron,
+		}, lantern)
+		local lamp = Kit.decor({
+			Name = "Lamp",
+			Size = Vector3.new(0.75, 1.1, 0.75),
+			CFrame = cf * CFrame.new(0, 7.75, 0),
+			Color = colors.Glow,
+			Material = Enum.Material.Neon,
+		}, lantern)
+		Kit.decor({
+			Name = "Base",
+			Size = Vector3.new(1, 0.25, 1),
+			CFrame = cf * CFrame.new(0, 7.1, 0),
+			Color = colors.Iron,
+		}, lantern)
+		Kit.light(lamp, colors.Glow, 22, 1.5, true)
+		lantern.PrimaryPart = lamp
+		return lantern
+	end, { Light = { Color = colors.Glow, Range = 22, Brightness = 1.5, Height = 0.5 } })
 	return m
 end
 
--- A lantern on a post (the field and the yard).
+-- A lantern on a post (the field and the yard): prop "Lamppost".
 local function postLantern(b: Builder, pos: Vector3, parent: Instance)
 	local colors = b.Colors
-	local m = Kit.model("Lantern", parent)
-	Kit.part({
-		Name = "Post",
-		Size = Vector3.new(0.7, 8, 0.7),
-		CFrame = CFrame.new(pos + Vector3.new(0, 4, 0)),
-		Color = colors.Wood,
-		Material = Enum.Material.Wood,
-	}, m)
-	local lamp = Kit.decor({
-		Name = "Lamp",
-		Size = Vector3.new(1, 1.3, 1),
-		CFrame = CFrame.new(pos + Vector3.new(0, 8.7, 0)),
-		Color = colors.Glow,
-		Material = Enum.Material.Neon,
-	}, m)
-	Kit.decor({
-		Name = "Cap",
-		Size = Vector3.new(1.4, 0.35, 1.4),
-		CFrame = CFrame.new(pos + Vector3.new(0, 9.5, 0)),
-		Color = colors.Iron,
-	}, m)
-	Kit.light(lamp, colors.Glow, 26, 1.6, true)
+	Kit.prop("Lamppost", CFrame.new(pos), parent, 9.7, function()
+		local m = Kit.model("Lamppost", parent)
+		m.PrimaryPart = Kit.part({
+			Name = "Post",
+			Size = Vector3.new(0.7, 8, 0.7),
+			CFrame = CFrame.new(pos + Vector3.new(0, 4, 0)),
+			Color = colors.Wood,
+			Material = Enum.Material.Wood,
+		}, m)
+		local lamp = Kit.decor({
+			Name = "Lamp",
+			Size = Vector3.new(1, 1.3, 1),
+			CFrame = CFrame.new(pos + Vector3.new(0, 8.7, 0)),
+			Color = colors.Glow,
+			Material = Enum.Material.Neon,
+		}, m)
+		Kit.decor({
+			Name = "Cap",
+			Size = Vector3.new(1.4, 0.35, 1.4),
+			CFrame = CFrame.new(pos + Vector3.new(0, 9.5, 0)),
+			Color = colors.Iron,
+		}, m)
+		Kit.light(lamp, colors.Glow, 26, 1.6, true)
+		return m
+	end, { Light = { Color = colors.Glow, Range = 26, Brightness = 1.6, Height = 0.9 } })
 end
 
+-- A crow perched on cf (prop "Crow").
 local function crow(b: Builder, cf: CFrame, parent: Instance)
 	local colors = b.Colors
-	local m = Kit.model("Crow", parent)
-	local body = Kit.decor({
-		Name = "Body",
-		Size = Vector3.new(0.8, 0.8, 1.4),
-		CFrame = cf * CFrame.new(0, 0.5, 0) * CFrame.Angles(math.rad(-15), 0, 0),
-		Color = colors.Crow,
-	}, m)
-	local mesh = Instance.new("SpecialMesh")
-	mesh.MeshType = Enum.MeshType.Sphere
-	mesh.Parent = body
-	Kit.decor({
-		Name = "Head",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.one * 0.6,
-		CFrame = cf * CFrame.new(0, 1.05, -0.6),
-		Color = colors.Crow,
-	}, m)
-	Kit.decor({
-		Name = "Beak",
-		Size = Vector3.new(0.18, 0.15, 0.45),
-		CFrame = cf * CFrame.new(0, 1, -1.05),
-		Color = colors.Beak,
-	}, m)
-	Kit.decor({
-		Name = "Tail",
-		Size = Vector3.new(0.5, 0.12, 0.7),
-		CFrame = cf * CFrame.new(0, 0.45, 0.85) * CFrame.Angles(math.rad(20), 0, 0),
-		Color = colors.Crow,
-	}, m)
+	Kit.prop("Crow", cf, parent, 1.35, function()
+		local m = Kit.model("Crow", parent)
+		local body = Kit.decor({
+			Name = "Body",
+			Size = Vector3.new(0.8, 0.8, 1.4),
+			CFrame = cf * CFrame.new(0, 0.5, 0) * CFrame.Angles(math.rad(-15), 0, 0),
+			Color = colors.Crow,
+		}, m)
+		local mesh = Instance.new("SpecialMesh")
+		mesh.MeshType = Enum.MeshType.Sphere
+		mesh.Parent = body
+		Kit.decor({
+			Name = "Head",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 0.6,
+			CFrame = cf * CFrame.new(0, 1.05, -0.6),
+			Color = colors.Crow,
+		}, m)
+		Kit.decor({
+			Name = "Beak",
+			Size = Vector3.new(0.18, 0.15, 0.45),
+			CFrame = cf * CFrame.new(0, 1, -1.05),
+			Color = colors.Beak,
+		}, m)
+		Kit.decor({
+			Name = "Tail",
+			Size = Vector3.new(0.5, 0.12, 0.7),
+			CFrame = cf * CFrame.new(0, 0.45, 0.85) * CFrame.Angles(math.rad(20), 0, 0),
+			Color = colors.Crow,
+		}, m)
+		m.PrimaryPart = body
+		return m
+	end)
 end
 
+-- A rectangular hay bale standing on cf (prop "HayBale").
 local function hayBale(b: Builder, cf: CFrame, parent: Instance)
 	local colors = b.Colors
-	local bale = Kit.part({
-		Name = "HayBale",
-		Size = Vector3.new(4, 2.4, 2.6),
-		CFrame = cf * CFrame.new(0, 1.2, 0),
-		Color = jitter(b, colors.Hay, 0.08),
-		Material = Enum.Material.Grass,
-	}, parent)
-	for _, x in { -1, 1 } do
-		Kit.decor({
-			Name = "Twine",
-			Size = Vector3.new(0.15, 2.45, 2.65),
-			CFrame = bale.CFrame * CFrame.new(x * 1.1, 0, 0),
-			Color = colors.Wood,
-		}, parent)
-	end
+	local hay = jitter(b, colors.Hay, 0.08) -- (drawn either way: the map stays the same)
+	Kit.prop("HayBale", cf, parent, 2.4, function()
+		local m = Kit.model("HayBale", parent)
+		local bale = Kit.part({
+			Name = "HayBale",
+			Size = Vector3.new(4, 2.4, 2.6),
+			CFrame = cf * CFrame.new(0, 1.2, 0),
+			Color = hay,
+			Material = Enum.Material.Grass,
+		}, m)
+		for _, x in { -1, 1 } do
+			Kit.decor({
+				Name = "Twine",
+				Size = Vector3.new(0.15, 2.45, 2.65),
+				CFrame = bale.CFrame * CFrame.new(x * 1.1, 0, 0),
+				Color = colors.Wood,
+			}, m)
+		end
+		m.PrimaryPart = bale
+		return m
+	end)
 end
 
 -- A sign board with spooky lettering on its south (+Z) side.

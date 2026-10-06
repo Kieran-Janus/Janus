@@ -55,101 +55,178 @@ local function reserve(reserved: { Rect }, offset: Vector3, size: Vector3, pad: 
 	})
 end
 
+-- A plain pumpkin sitting on cf, `size` studs tall without its stem (prop "Pumpkin").
 local function decorPumpkin(cf: CFrame, size: number, colors: any, parent: Instance)
-	Kit.decor({
-		Name = "Pumpkin",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(size * 1.2, size, size * 1.2),
-		CFrame = cf * CFrame.new(0, size / 2, 0),
-		Color = colors.Orange,
-	}, parent)
-	Kit.decor({
-		Name = "Stem",
-		Size = Vector3.new(size * 0.15, size * 0.3, size * 0.15),
-		CFrame = cf * CFrame.new(0, size + size * 0.1, 0),
-		Color = colors.Green,
-	}, parent)
+	Kit.prop("Pumpkin", cf, parent, size * 1.25, function()
+		local m = Kit.model("Pumpkin", parent)
+		m.PrimaryPart = Kit.decor({
+			Name = "Pumpkin",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(size * 1.2, size, size * 1.2),
+			CFrame = cf * CFrame.new(0, size / 2, 0),
+			Color = colors.Orange,
+		}, m)
+		Kit.decor({
+			Name = "Stem",
+			Size = Vector3.new(size * 0.15, size * 0.3, size * 0.15),
+			CFrame = cf * CFrame.new(0, size + size * 0.1, 0),
+			Color = colors.Green,
+		}, m)
+		return m
+	end)
 end
 
+-- A lamp on a wooden post with a glowing lamp hanging from its arm (prop "Lamppost").
 local function lantern(ctx: MapBase.Ctx, pos: Vector3, parent: Instance)
 	local colors = ctx.Def.Colors
-	local m = Kit.model("Lantern", parent)
-	Kit.part({
-		Name = "Post",
-		Size = Vector3.new(0.6, 9, 0.6),
-		CFrame = CFrame.new(pos + Vector3.new(0, 4.5, 0)),
-		Color = colors.Wood,
-		Material = Enum.Material.Wood,
-	}, m)
-	Kit.decor({
-		Name = "Arm",
-		Size = Vector3.new(2.4, 0.3, 0.3),
-		CFrame = CFrame.new(pos + Vector3.new(1, 8.7, 0)),
-		Color = colors.Iron,
-	}, m)
-	local glass = Kit.decor({
-		Name = "Lamp",
-		Size = Vector3.new(1.1, 1.4, 1.1),
-		CFrame = CFrame.new(pos + Vector3.new(2, 7.7, 0)),
-		Color = colors.Glow,
-		Material = Enum.Material.Neon,
-	}, m)
-	Kit.light(glass, colors.Glow, 22, 1.4, true)
+	Kit.prop("Lamppost", CFrame.new(pos), parent, 9, function()
+		local m = Kit.model("Lamppost", parent)
+		m.PrimaryPart = Kit.part({
+			Name = "Post",
+			Size = Vector3.new(0.6, 9, 0.6),
+			CFrame = CFrame.new(pos + Vector3.new(0, 4.5, 0)),
+			Color = colors.Wood,
+			Material = Enum.Material.Wood,
+		}, m)
+		Kit.decor({
+			Name = "Arm",
+			Size = Vector3.new(2.4, 0.3, 0.3),
+			CFrame = CFrame.new(pos + Vector3.new(1, 8.7, 0)),
+			Color = colors.Iron,
+		}, m)
+		local glass = Kit.decor({
+			Name = "Lamp",
+			Size = Vector3.new(1.1, 1.4, 1.1),
+			CFrame = CFrame.new(pos + Vector3.new(2, 7.7, 0)),
+			Color = colors.Glow,
+			Material = Enum.Material.Neon,
+		}, m)
+		Kit.light(glass, colors.Glow, 22, 1.4, true)
+		return m
+	end, { Light = { Color = colors.Glow, Range = 22, Brightness = 1.4, Height = 0.85 } })
 end
 
+-- A scarecrow with a jack-o'-lantern head standing on `base` (prop "Scarecrow").
 local function scarecrow(ctx: MapBase.Ctx, base: CFrame, parent: Instance)
 	local colors = ctx.Def.Colors
-	local m = Kit.model("Scarecrow", parent)
-	Kit.part({
-		Name = "Pole",
-		Size = Vector3.new(0.8, 9, 0.8),
-		CFrame = base * CFrame.new(0, 4.5, 0),
-		Color = colors.Wood,
-		Material = Enum.Material.Wood,
-	}, m)
-	Kit.decor({
-		Name = "Arms",
-		Size = Vector3.new(7, 0.6, 0.6),
-		CFrame = base * CFrame.new(0, 6.5, 0),
-		Color = colors.Wood,
-		Material = Enum.Material.Wood,
-	}, m)
-	Kit.decor({
-		Name = "Shirt",
-		Size = Vector3.new(3, 3, 1.4),
-		CFrame = base * CFrame.new(0, 6, 0),
-		Color = colors.Barn:Lerp(colors.Hay, 0.4),
-		Material = Enum.Material.Fabric,
-	}, m)
-	for _, side in { -1, 1 } do
+	Kit.prop("Scarecrow", base, parent, 12.6, function()
+		local m = Kit.model("Scarecrow", parent)
+		m.PrimaryPart = Kit.part({
+			Name = "Pole",
+			Size = Vector3.new(0.8, 9, 0.8),
+			CFrame = base * CFrame.new(0, 4.5, 0),
+			Color = colors.Wood,
+			Material = Enum.Material.Wood,
+		}, m)
 		Kit.decor({
-			Name = "Straw",
-			Size = Vector3.new(0.8, 0.8, 0.8),
-			CFrame = base * CFrame.new(side * 3.7, 6.5, 0) * CFrame.Angles(0, 0, math.rad(45)),
+			Name = "Arms",
+			Size = Vector3.new(7, 0.6, 0.6),
+			CFrame = base * CFrame.new(0, 6.5, 0),
+			Color = colors.Wood,
+			Material = Enum.Material.Wood,
+		}, m)
+		Kit.decor({
+			Name = "Shirt",
+			Size = Vector3.new(3, 3, 1.4),
+			CFrame = base * CFrame.new(0, 6, 0),
+			Color = colors.Barn:Lerp(colors.Hay, 0.4),
+			Material = Enum.Material.Fabric,
+		}, m)
+		for _, side in { -1, 1 } do
+			Kit.decor({
+				Name = "Straw",
+				Size = Vector3.new(0.8, 0.8, 0.8),
+				CFrame = base * CFrame.new(side * 3.7, 6.5, 0) * CFrame.Angles(0, 0, math.rad(45)),
+				Color = colors.Hay,
+				Material = Enum.Material.Grass,
+			}, m)
+		end
+		local head = Kit.jackOLantern(base * CFrame.new(0, 7.6, 0), 2.6, colors, m)
+		for _, d in head:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.CanCollide = false
+				d.CanQuery = false
+			end
+		end
+		Kit.decor({
+			Name = "HatBrim",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.2, 4, 4),
+			CFrame = Kit.upright(base * CFrame.new(0, 10.4, 0)),
+			Color = colors.Iron,
+		}, m)
+		Kit.decor({
+			Name = "Hat",
+			Size = Vector3.new(1.6, 2.2, 1.6),
+			CFrame = base * CFrame.new(0, 11.5, 0) * CFrame.Angles(0, 0, math.rad(8)),
+			Color = colors.Iron,
+		}, m)
+		return m
+	end)
+end
+
+-- A rectangular hay bale standing on cf (prop "HayBale", like the Hide & Seek maps').
+local function hayBale(ctx: MapBase.Ctx, cf: CFrame, parent: Instance)
+	local colors = ctx.Def.Colors
+	Kit.prop("HayBale", cf, parent, 2.6, function()
+		local m = Kit.model("HayBale", parent)
+		m.PrimaryPart = Kit.part({
+			Name = "HayBale",
+			Size = Vector3.new(4, 2.6, 2.6),
+			CFrame = cf * CFrame.new(0, 1.3, 0),
 			Color = colors.Hay,
 			Material = Enum.Material.Grass,
 		}, m)
-	end
-	local head = Kit.jackOLantern(base * CFrame.new(0, 7.6, 0), 2.6, colors, m)
-	for _, d in head:GetDescendants() do
-		if d:IsA("BasePart") then
-			d.CanCollide = false
-			d.CanQuery = false
-		end
-	end
-	Kit.decor({
-		Name = "HatBrim",
+		return m
+	end)
+end
+
+--[[
+	A walk-in haystack standing on `foot`: the hiding spot (tag HidingSpot: it hides you from
+	the King) is a see-through cylinder (`size` = height, width, width); `top` adds a round
+	top. Its look is prop "Haystack" (Kit.look): your own model replaces the look, and the
+	spot (now invisible) keeps hiding you.
+]]
+local function haystack(
+	ctx: MapBase.Ctx,
+	name: string,
+	foot: Vector3,
+	size: Vector3,
+	top: boolean,
+	parent: Instance
+)
+	local colors = ctx.Def.Colors
+	local spot = Kit.hidingSpot({
+		Name = name,
 		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.2, 4, 4),
-		CFrame = Kit.upright(base * CFrame.new(0, 10.4, 0)),
-		Color = colors.Iron,
-	}, m)
-	Kit.decor({
-		Name = "Hat",
-		Size = Vector3.new(1.6, 2.2, 1.6),
-		CFrame = base * CFrame.new(0, 11.5, 0) * CFrame.Angles(0, 0, math.rad(8)),
-		Color = colors.Iron,
-	}, m)
+		Size = size,
+		CFrame = Kit.upright(CFrame.new(foot + Vector3.new(0, size.X / 2, 0))),
+		Color = colors.Hay,
+		Material = Enum.Material.Grass,
+		Transparency = 0.2,
+	}, parent)
+	local height = if top then size.X + 3 else size.X -- (the round top pokes 3 studs out)
+	Kit.look(
+		"Haystack",
+		spot,
+		CFrame.new(foot),
+		height,
+		if top
+			then function(): Model
+				local m = Kit.model("Haystack", spot)
+				m.PrimaryPart = Kit.decor({
+					Name = name .. "Top",
+					Shape = Enum.PartType.Ball,
+					Size = Vector3.new(7, 7, 7),
+					CFrame = CFrame.new(foot + Vector3.new(0, height - 3.5, 0)),
+					Color = colors.Hay,
+					Material = Enum.Material.Grass,
+					Transparency = 0.2,
+				}, m)
+				return m
+			end
+			else nil
+	)
 end
 
 local function buildCornMaze(ctx: MapBase.Ctx, parent: Model)
@@ -291,25 +368,22 @@ local function buildBarn(ctx: MapBase.Ctx, parent: Model)
 		local x = ctx.Rng:NextNumber(-s.X / 2 + 3, s.X / 2 - 3)
 		local z = ctx.Rng:NextNumber(-s.Z / 2 + 6, s.Z / 2 - 6)
 		if math.abs(x) > 4 then -- keep the aisle between the doors clear
-			Kit.part({
-				Name = "HayBale",
-				Size = Vector3.new(4, 2.6, 2.6),
-				CFrame = CFrame.new(MapBase.at(ctx, o.X + x, o.Z + z, 1.3))
+			hayBale(
+				ctx,
+				CFrame.new(MapBase.at(ctx, o.X + x, o.Z + z, 0))
 					* CFrame.Angles(0, ctx.Rng:NextNumber(0, math.pi), 0),
-				Color = colors.Hay,
-				Material = Enum.Material.Grass,
-			}, folder)
+				folder
+			)
 		end
 	end
-	Kit.hidingSpot({
-		Name = "HayPile",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(7, 9, 9),
-		CFrame = Kit.upright(CFrame.new(MapBase.at(ctx, o.X - s.X / 2 + 5.5, o.Z, 3.5))),
-		Color = colors.Hay,
-		Material = Enum.Material.Grass,
-		Transparency = 0.2,
-	}, folder)
+	haystack(
+		ctx,
+		"HayPile",
+		MapBase.at(ctx, o.X - s.X / 2 + 5.5, o.Z, 0),
+		Vector3.new(7, 9, 9),
+		false,
+		folder
+	)
 	local lamp = Kit.decor({
 		Name = "Lamp",
 		Size = Vector3.new(1, 1.4, 1),
@@ -388,14 +462,20 @@ local function buildGraveyard(ctx: MapBase.Ctx, parent: Model)
 		Material = Enum.Material.Slate,
 	}, folder)
 	cap.CanQuery = false
-	local candle = Kit.decor({
-		Name = "Candle",
-		Size = Vector3.new(0.5, 0.8, 0.5),
-		CFrame = CFrame.new(MapBase.at(ctx, mx, mz + 3, 1)),
-		Color = colors.Glow,
-		Material = Enum.Material.Neon,
-	}, folder)
-	Kit.light(candle, colors.Glow, 12, 1, true)
+	local candleFoot = CFrame.new(MapBase.at(ctx, mx, mz + 3, 0.6))
+	Kit.prop("Candle", candleFoot, folder, 0.8, function()
+		local m = Kit.model("Candle", folder)
+		local candle = Kit.decor({
+			Name = "Candle",
+			Size = Vector3.new(0.5, 0.8, 0.5),
+			CFrame = candleFoot * CFrame.new(0, 0.4, 0),
+			Color = colors.Glow,
+			Material = Enum.Material.Neon,
+		}, m)
+		Kit.light(candle, colors.Glow, 12, 1, true)
+		m.PrimaryPart = candle
+		return m
+	end, { Light = { Color = colors.Glow, Range = 12, Brightness = 1, Height = 0.9 } })
 
 	local reserved: { Rect } = { { Center = Vector2.new(mx, mz), Half = Vector2.new(9, 9) } }
 	for _ = 1, cfg.Tombstones do
@@ -422,29 +502,33 @@ local function buildGraveyard(ctx: MapBase.Ctx, parent: Model)
 			local cf = CFrame.new(MapBase.at(ctx, spot.X, spot.Y, 0))
 				* CFrame.Angles(0, math.rad(ctx.Rng:NextNumber(-15, 15)), 0)
 				* CFrame.Angles(math.rad(ctx.Rng:NextNumber(-6, 6)), 0, 0)
-			Kit.part({
-				Name = "Tombstone",
-				Size = Vector3.new(3, 3.4, 0.8),
-				CFrame = cf * CFrame.new(0, 1.7, 0),
-				Color = colors.Stone,
-				Material = Enum.Material.Slate,
-			}, folder)
-			Kit.decor({
-				Name = "Top",
-				Shape = Enum.PartType.Cylinder,
-				Size = Vector3.new(0.8, 3, 3),
-				CFrame = cf * CFrame.new(0, 3.4, 0) * CFrame.Angles(0, math.rad(90), 0),
-				Color = colors.Stone,
-				Material = Enum.Material.Slate,
-			}, folder)
-			Kit.decor({
-				Name = "Mound",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.new(2.6, 0.7, 4),
-				CFrame = cf * CFrame.new(0, 0, -2.6),
-				Color = colors.Dirt,
-				Material = Enum.Material.Ground,
-			}, folder)
+			Kit.prop("Gravestone", cf, folder, 4.9, function()
+				local m = Kit.model("Gravestone", folder)
+				m.PrimaryPart = Kit.part({
+					Name = "Tombstone",
+					Size = Vector3.new(3, 3.4, 0.8),
+					CFrame = cf * CFrame.new(0, 1.7, 0),
+					Color = colors.Stone,
+					Material = Enum.Material.Slate,
+				}, m)
+				Kit.decor({
+					Name = "Top",
+					Shape = Enum.PartType.Cylinder,
+					Size = Vector3.new(0.8, 3, 3),
+					CFrame = cf * CFrame.new(0, 3.4, 0) * CFrame.Angles(0, math.rad(90), 0),
+					Color = colors.Stone,
+					Material = Enum.Material.Slate,
+				}, m)
+				Kit.decor({
+					Name = "Mound",
+					Shape = Enum.PartType.Ball,
+					Size = Vector3.new(2.6, 0.7, 4),
+					CFrame = cf * CFrame.new(0, 0, -2.6),
+					Color = colors.Dirt,
+					Material = Enum.Material.Ground,
+				}, m)
+				return m
+			end)
 		end
 	end
 	-- Iron fence posts along the two inner edges, with gaps to walk through.
@@ -466,12 +550,17 @@ local function buildGraveyard(ctx: MapBase.Ctx, parent: Model)
 			-- Leave an opening every few posts.
 			if p % 6 ~= 3 and p % 6 ~= 4 then
 				local pos = a:Lerp(b, p / posts)
-				Kit.part({
-					Name = "FencePost",
-					Size = Vector3.new(0.4, 4.5, 0.4),
-					CFrame = CFrame.new(MapBase.at(ctx, pos.X, pos.Y, 2.25)),
-					Color = colors.Iron,
-				}, folder)
+				local foot = CFrame.new(MapBase.at(ctx, pos.X, pos.Y, 0))
+				Kit.prop("FencePost", foot, folder, 4.5, function()
+					local m = Kit.model("FencePost", folder)
+					m.PrimaryPart = Kit.part({
+						Name = "FencePost",
+						Size = Vector3.new(0.4, 4.5, 0.4),
+						CFrame = foot * CFrame.new(0, 2.25, 0),
+						Color = colors.Iron,
+					}, m)
+					return m
+				end)
 			end
 		end
 	end
@@ -509,24 +598,14 @@ function PumpkinPatch.Build(def: any): Model
 	for _ = 1, layout.Haystacks do
 		local p = freeSpot(ctx, reserved, 5, clearing)
 		if p then
-			Kit.hidingSpot({
-				Name = "Haystack",
-				Shape = Enum.PartType.Cylinder,
-				Size = Vector3.new(7.5, 9, 9),
-				CFrame = Kit.upright(CFrame.new(MapBase.at(ctx, p.X, p.Y, 3.75))),
-				Color = colors.Hay,
-				Material = Enum.Material.Grass,
-				Transparency = 0.2,
-			}, scatter)
-			Kit.decor({
-				Name = "HaystackTop",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.new(7, 7, 7),
-				CFrame = CFrame.new(MapBase.at(ctx, p.X, p.Y, 7)),
-				Color = colors.Hay,
-				Material = Enum.Material.Grass,
-				Transparency = 0.2,
-			}, scatter)
+			haystack(
+				ctx,
+				"Haystack",
+				MapBase.at(ctx, p.X, p.Y, 0),
+				Vector3.new(7.5, 9, 9),
+				true,
+				scatter
+			)
 		end
 	end
 
@@ -558,14 +637,12 @@ function PumpkinPatch.Build(def: any): Model
 	for _ = 1, layout.HayBales do
 		local p = freeSpot(ctx, reserved, 3, clearing)
 		if p then
-			Kit.part({
-				Name = "HayBale",
-				Size = Vector3.new(4, 2.6, 2.6),
-				CFrame = CFrame.new(MapBase.at(ctx, p.X, p.Y, 1.3))
+			hayBale(
+				ctx,
+				CFrame.new(MapBase.at(ctx, p.X, p.Y, 0))
 					* CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
-				Color = colors.Hay,
-				Material = Enum.Material.Grass,
-			}, scatter)
+				scatter
+			)
 		end
 	end
 
@@ -581,7 +658,9 @@ function PumpkinPatch.Build(def: any): Model
 				rng,
 				scatter
 			)
-			Kit.cobweb(base * CFrame.new(0, 8, -1.15), 3.5, colors.Bone, tree)
+			if tree:GetAttribute("CustomProp") ~= true then -- (on the built trunk)
+				Kit.cobweb(base * CFrame.new(0, 8, -1.15), 3.5, colors.Bone, tree)
+			end
 		end
 	end
 

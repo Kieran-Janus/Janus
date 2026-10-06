@@ -6,9 +6,12 @@
 
 	Want your own pumpkin model? Put a Model named "HidingPumpkin" in
 	ReplicatedStorage.Custom.Props (assets/Props/HidingPumpkin): every decoy AND every hider
-	uses it (scaled to Config.HideSeek.Pumpkin.Height). Hiders wear a copy of one of the map's
-	decoys (src/server/Modes/HideSeek.luau), so on a map baked into ServerStorage.Maps they
-	always match its decoys; bake it again to give those decoys a new look.
+	uses it (scaled to each pumpkin's height). Your model is only for looks: an invisible part
+	called "Hitbox" (the pumpkin's size, its PrimaryPart) does the colliding and is what candy
+	hits, so any model works. Hiders wear a copy of one of the map's decoys
+	(src/server/Modes/HideSeek.luau), so they always match them; a map baked into
+	ServerStorage.Maps gets your model when it loads (Kit.applyCustomProps), or for good with
+	require(game.ServerScriptService.Server.Tools.Swap).Props() in the command bar.
 
 	HidingPumpkin.Build(cframe, rng, parent) -> Model
 	    A pumpkin standing on `cframe` (the middle of its bottom). Anchored; the big parts
@@ -37,11 +40,36 @@ function HidingPumpkin.Size(rng: Random): (number, number)
 	return cfg.Width * scale, cfg.Height * scale * squash
 end
 
-local function pickColor(rng: Random): Color3
+-- Everything random about one pumpkin, drawn before it is built (in the same order every
+-- time), so a custom model never changes the rest of the map.
+type Look = {
+	Width: number,
+	Height: number,
+	Color: Color3,
+	Twist: number,
+	Tilt: CFrame,
+	Leaf: number?, -- the leaf's turn, or nil for no leaf
+}
+
+local function pickLook(rng: Random): Look
 	local cfg = Config.HideSeek.Pumpkin
+	local width, height = HidingPumpkin.Size(rng)
 	local base = cfg.Colors[rng:NextInteger(1, #cfg.Colors)]
-	local nudge = rng:NextNumber(-cfg.ColorVariation, cfg.ColorVariation)
-	return Kit.shade(base, nudge)
+	local color = Kit.shade(base, rng:NextNumber(-cfg.ColorVariation, cfg.ColorVariation))
+	local twist = rng:NextNumber(0, math.pi / 3)
+	local tilt = CFrame.Angles(rng:NextNumber(-0.25, 0.25), 0, rng:NextNumber(-0.25, 0.25))
+	local leaf: number? = nil
+	if rng:NextNumber() < cfg.LeafChance then
+		leaf = rng:NextNumber(0, math.pi * 2)
+	end
+	return {
+		Width = width,
+		Height = height,
+		Color = color,
+		Twist = twist,
+		Tilt = tilt,
+		Leaf = leaf,
+	}
 end
 
 -- An oval: a block part with a sphere mesh fills its whole size (a Ball part can't be oval).
@@ -59,11 +87,11 @@ local function oval(name: string, size: Vector3, cf: CFrame, color: Color3, pare
 	return p
 end
 
-local function build(cframe: CFrame, rng: Random, width: number, height: number): Model
+local function build(cframe: CFrame, look: Look): Model
 	local cfg = Config.HideSeek.Pumpkin
+	local width, height, color = look.Width, look.Height, look.Color
 	local m = Instance.new("Model")
 	m.Name = "Pumpkin"
-	local color = pickColor(rng)
 	local center = cframe * CFrame.new(0, height / 2, 0)
 	-- The core shows in the grooves between the ribs, so it is a bit darker.
 	local body = oval(
@@ -74,35 +102,33 @@ local function build(cframe: CFrame, rng: Random, width: number, height: number)
 		m
 	)
 	-- Three long ovals crossing at 60 degrees make six rounded ribs.
-	local twist = rng:NextNumber(0, math.pi / 3)
 	for i = 0, 2 do
 		oval(
 			"Rib",
 			Vector3.new(width, height, width * 0.5),
-			center * CFrame.Angles(0, twist + i * math.pi / 3, 0),
+			center * CFrame.Angles(0, look.Twist + i * math.pi / 3, 0),
 			color,
 			m
 		)
 	end
 	local stemHeight = height * 0.3
-	local tilt = CFrame.Angles(rng:NextNumber(-0.25, 0.25), 0, rng:NextNumber(-0.25, 0.25))
 	local stem = Kit.part({
 		Name = "Stem",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(stemHeight, width * 0.12, width * 0.12),
-		CFrame = Kit.upright(cframe * CFrame.new(0, height * 0.92 + stemHeight / 2, 0) * tilt),
+		CFrame = Kit.upright(cframe * CFrame.new(0, height * 0.92 + stemHeight / 2, 0) * look.Tilt),
 		Color = cfg.StemColor,
 		Material = Enum.Material.Wood,
 		CanCollide = false,
 	}, m)
 	stem.CanQuery = false
-	if rng:NextNumber() < cfg.LeafChance then
+	if look.Leaf then
 		local leaf = oval(
 			"Leaf",
 			Vector3.new(width * 0.34, 0.14, width * 0.2),
 			cframe
 				* CFrame.new(0, height * 0.97, 0)
-				* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+				* CFrame.Angles(0, look.Leaf, 0)
 				* CFrame.new(width * 0.16, 0, 0)
 				* CFrame.Angles(0, 0, math.rad(-12)),
 			cfg.LeafColor,
@@ -116,12 +142,16 @@ local function build(cframe: CFrame, rng: Random, width: number, height: number)
 end
 
 function HidingPumpkin.Build(cframe: CFrame, rng: Random, parent: Instance): Model
-	local width, height = HidingPumpkin.Size(rng)
+	local look = pickLook(rng)
+	local width, height = look.Width, look.Height
 	local model = Kit.prop(PROP_NAME, cframe, parent, height, function()
-		local built = build(cframe, rng, width, height)
+		local built = build(cframe, look)
 		built.Parent = parent
 		return built
-	end)
+	end, {
+		-- A custom model is only for looks: this invisible box collides and gets hit by candy.
+		Hitbox = Vector3.new(width * 0.85, height, width * 0.85),
+	})
 	model.Name = "Pumpkin"
 	model:SetAttribute("PumpkinWidth", width)
 	model:SetAttribute("PumpkinHeight", height)

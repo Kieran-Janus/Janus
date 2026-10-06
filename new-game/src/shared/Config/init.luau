@@ -570,9 +570,9 @@ local Config = {
 	]]
 	Hub = {
 		Name = "Spooky Town Square",
-		-- Bump this number (4 -> 5) whenever the hub code or these settings change in a way the
+		-- Bump this number (5 -> 6) whenever the hub code or these settings change in a way the
 		-- saved hub should pick up: a saved hub with a lower number is rebuilt on the next start.
-		BuildVersion = 4,
+		BuildVersion = 5,
 		Center = Vector3.new(0, 0, 0), -- top of the baseplate
 		Seed = 31, -- random variation in decorations (change it for a different scatter)
 		Radius = 105, -- cobblestone plaza (room for 32 players)
@@ -1301,10 +1301,29 @@ local Config = {
 
 	-- Custom art: drop your own models into ReplicatedStorage.Custom (docs/CUSTOMIZE.md,
 	-- src/shared/CustomAssets.luau). They're scaled to these sizes unless they have the
-	-- attribute KeepSize = true. Lobby props (Custom > Props: Pumpkin, JackOLantern, Lamppost,
-	-- SpookyTree, DeadTree, Bench, Gravestone... the full list is at the top of
-	-- src/server/Build/Props.luau) are scaled to the size of the decoration they replace.
+	-- attribute KeepSize = true. Props (Custom > Props: Pumpkin, JackOLantern, Lamppost,
+	-- HayBale, Gravestone... the full list is in docs/CUSTOMIZE.md, "Swap every copy of
+	-- something at once") replace every copy in the lobby AND the round maps, scaled to the
+	-- size of the thing they replace.
 	Custom = {
+		-- Lights for custom props. Your own lantern, lamppost, candle or jack-o'-lantern with
+		-- no light inside gets the game's glow light, so the lobby and the maps don't go dark.
+		--   AddLights          false = never add a light to a custom model
+		--   EveryJackOLantern  true = every custom jack-o'-lantern glows (the built ones glow
+		--                      through their carved faces; yours may not). false = only the
+		--                      ones whose built version has a light (fewer lights: faster on
+		--                      phones)
+		--   JackOLanternGlow   the glow's colour, brightness and reach (studs of light per stud
+		--                      of pumpkin height) when the built one had no light to copy
+		PropLights = {
+			AddLights = true,
+			EveryJackOLantern = true,
+			JackOLanternGlow = {
+				Color = Color3.fromRGB(255, 170, 70),
+				Brightness = 1.2,
+				RangePerStud = 3.3,
+			},
+		},
 		StripScripts = true, -- remove scripts from custom models (free models can hide bad ones)
 		Heights = { -- studs, feet to top
 			PumpkinKing = 10,

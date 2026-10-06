@@ -70,20 +70,25 @@ local SHELF_ITEMS = { "Pumpkin", "Potion", "WhitePumpkin", "Hat" }
 
 local function shelfItem(kind: string, cf: CFrame, parent: Instance)
 	if kind == "Pumpkin" or kind == "WhitePumpkin" then
-		decor({
-			Name = "ShelfPumpkin",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(1.3, 1, 1.3),
-			CFrame = cf * CFrame.new(0, 0.5, 0),
-			PaletteRole = if kind == "Pumpkin" then "Orange" else "Bone",
-		}, parent)
-		decor({
-			Name = "ShelfPumpkinStem",
-			Size = Vector3.new(0.18, 0.35, 0.18),
-			CFrame = cf * CFrame.new(0, 1.1, 0) * CFrame.Angles(0, 0, math.rad(12)),
-			PaletteRole = "Green",
-			PaletteShade = 0.3,
-		}, parent)
+		-- A little pumpkin for sale (prop "Pumpkin": your own pumpkin model replaces it too).
+		Kit.prop("Pumpkin", cf, parent, 1.3, function()
+			local m = model("Pumpkin", parent)
+			m.PrimaryPart = decor({
+				Name = "ShelfPumpkin",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(1.3, 1, 1.3),
+				CFrame = cf * CFrame.new(0, 0.5, 0),
+				PaletteRole = if kind == "Pumpkin" then "Orange" else "Bone",
+			}, m)
+			decor({
+				Name = "ShelfPumpkinStem",
+				Size = Vector3.new(0.18, 0.35, 0.18),
+				CFrame = cf * CFrame.new(0, 1.1, 0) * CFrame.Angles(0, 0, math.rad(12)),
+				PaletteRole = "Green",
+				PaletteShade = 0.3,
+			}, m)
+			return m
+		end)
 	elseif kind == "Potion" then
 		decor({
 			Name = "PotionBottle",
@@ -594,7 +599,7 @@ function NpcLooks.PhotoSpot(cf: CFrame, m: Model): BasePart
 		local base = cf
 			* CFrame.new(side * 7.6, 0, 4.2)
 			* CFrame.Angles(0, math.rad(90 + side * 20), 0)
-		Props.HayBale(paint, base, 2.6, m)
+		Props.HayRoll(paint, base, 2.6, m)
 		Props.JackOLantern(
 			paint,
 			base * CFrame.new(0, 2.5, 0) * CFrame.Angles(0, math.rad(-90 - side * 20), 0),

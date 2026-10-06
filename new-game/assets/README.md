@@ -7,10 +7,12 @@ instead of the Part-built placeholders. Name each file after what it replaces, e
 
 - `Characters/`: the King, minions and the Pumpkin Shop keeper (`PumpkinVendor`).
 - `Cosmetics/`: hats, pets and skin head pieces, named after the shop item Id.
-- `Props/`: lobby decorations. One model reskins every copy in the lobby at once:
-  `JackOLantern`, `Lamppost`, `DeadTree`, `Gravestone`, `Candle`, `Cobweb`, `KingStatue`,
-  `ClockTower`, `Cauldron`, `VendorStall`, `ReadyPadArch`. (In Studio, a built decoration
-  shows its name in the attribute `PropName`.)
+- `Props/`: pumpkins and decorations. One model reskins every copy in the lobby AND every
+  round map at once: `Pumpkin`, `JackOLantern`, `CollectPumpkin` (King Hunt pickups),
+  `HidingPumpkin` (Hide & Seek), `ParkourPumpkin`, `Lantern`, `Lamppost`, `HayBale`,
+  `Gravestone`, `DeadTree`... The full table (what each is, where it appears, its size) is in
+  `docs/CUSTOMIZE.md` > "Swap every copy of something at once". (In Studio, a built one shows
+  its name in the attribute `PropName`.)
 
 Hand-edited round maps don't go here: they live in `ServerStorage > Maps`, saved in the
 `maps/` folder next to this one.

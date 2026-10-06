@@ -9,8 +9,15 @@
 	re-applied later from the palette (src/server/Hub/HubPalette.luau). Kit.painter(palette)
 	gives part/decor/wedge helpers that also fill in Color from the role.
 
-	Props: Kit.prop(name, cframe, parent, size?, build) swaps a decoration for a model in
-	ReplicatedStorage.Custom.Props with the same name (every copy at once), else builds it.
+	Props: Kit.prop(name, cframe, parent, size?, build, options?) swaps a decoration for a model
+	in ReplicatedStorage.Custom.Props with the same name (every copy at once), else builds it.
+	Kit.look(name, part, cframe, size?, build?, options?) does the same for the look of a part
+	that DOES something (a King Hunt pumpkin, a parkour step, a hiding haystack): a custom
+	model is only for looks and the working part goes invisible but keeps working.
+	Kit.swapProp / Kit.applyCustomProps swap props that were already built (a saved hub, a
+	baked map); src/server/Tools/Swap.luau does it in Studio. Every repeated decoration MUST be
+	built through Kit.prop (or Kit.look), with one name per kind of thing (docs/CUSTOMIZE.md >
+	"Swap every copy of something at once" lists them).
 
 	Shapes: Roblox always draws a Ball part as a perfect sphere (its smallest side wins), so
 	Kit.part turns a Ball with unequal sides into a Block with a SpecialMesh "Oval" (MeshType
@@ -28,7 +35,9 @@
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
+local Tags = require(ReplicatedStorage.Shared.Tags)
 
 local Kit = {}
 
@@ -221,9 +230,69 @@ function Kit.painter(palette: ColorPalette): Painter
 	}
 end
 
+-- A light a custom prop gets when it has none of its own (Config.Custom.PropLights).
+export type PropLight = {
+	Color: Color3,
+	Range: number,
+	Brightness: number,
+	Flicker: boolean?, -- flickers like a candle (tag HubFlicker, client HubAmbience); default true
+	Height: number?, -- where it sits, as a share of the model's height (default 0.6)
+}
+
 export type PropOptions = {
 	Anchor: string?, -- "Feet" (default: stands on cframe) or "Center" (middle at cframe)
+	Light: PropLight?, -- the light the built one has: a custom model with no light gets it
+	Visual: boolean?, -- a custom model is only for looks: it never collides, blocks raycasts
+	-- (King sight, candy, pumpkin spawns) or fires Touched
+	Hitbox: Vector3?, -- a custom model gets an invisible solid part this big, standing on
+	-- cframe (named "Hitbox", its PrimaryPart), that collides and gets hit instead of it
 }
+
+-- Attributes Kit itself puts on props (not copied from an old prop to its replacement).
+local PROP_ATTRIBUTES = {
+	PropName = true,
+	PropSize = true,
+	PropAnchor = true,
+	PropHitbox = true,
+	PropLook = true,
+	CustomProp = true,
+}
+
+-- Tags that only change how something looks (everything else in Tags does something).
+local LOOK_TAGS = { [Tags.HubFloat] = true, [Tags.HubFlicker] = true, [Tags.SkinFx] = true }
+
+-- True for a part or model that DOES something: it has a tag from Tags.luau that isn't only
+-- for looks. Swapping a prop never throws these away.
+function Kit.isWorking(instance: Instance): boolean
+	for _, tag in CollectionService:GetTags(instance) do
+		if not LOOK_TAGS[tag] then
+			return true
+		end
+	end
+	return false
+end
+
+-- The working parts inside `root` (outermost ones: their insides go with them).
+function Kit.workingParts(root: Instance): { BasePart }
+	local list: { BasePart } = {}
+	for _, d in root:GetDescendants() do
+		if d:IsA("BasePart") and Kit.isWorking(d) then
+			local inner = false
+			local node = d.Parent
+			while node and node ~= root do
+				if Kit.isWorking(node) then
+					inner = true
+					break
+				end
+				node = node.Parent
+			end
+			if not inner then
+				table.insert(list, d)
+			end
+		end
+	end
+	return list
+end
 
 -- Moves a model's pivot (what Studio's move/rotate tools hold) to `cframe` without moving it.
 local function setPivot(m: Model, cframe: CFrame)
@@ -235,6 +304,104 @@ local function setPivot(m: Model, cframe: CFrame)
 	end
 end
 
+local function hasLight(root: Instance): boolean
+	for _, d in root:GetDescendants() do
+		if d:IsA("Light") then
+			return true
+		end
+	end
+	return false
+end
+
+-- Gives custom prop `m` the light `light` (in an Attachment, so it costs no part), unless
+-- it has a light of its own or Config.Custom.PropLights.AddLights is off.
+local function addPropLight(m: Model, light: PropLight)
+	if not Config.Custom.PropLights.AddLights or hasLight(m) then
+		return
+	end
+	local holder = m.PrimaryPart or CustomAssets.BiggestPart(m)
+	local low, high, found = CustomAssets.VisibleBox(m)
+	if not holder or not found then
+		return
+	end
+	local share = math.clamp(light.Height or 0.6, 0, 1)
+	local spot =
+		Vector3.new((low.X + high.X) / 2, low.Y + (high.Y - low.Y) * share, (low.Z + high.Z) / 2)
+	local attachment = Instance.new("Attachment")
+	attachment.Name = "PropLight"
+	attachment.CFrame = holder.CFrame:ToObjectSpace(CFrame.new(spot))
+	attachment.Parent = holder
+	local l =
+		Kit.light(attachment, light.Color, light.Range, light.Brightness, light.Flicker ~= false)
+	l.Name = "PropLight"
+end
+
+-- The glow a custom jack-o'-lantern `height` studs tall gets when the built one had no light
+-- to copy (nil when Config.Custom.PropLights.EveryJackOLantern is off).
+function Kit.jackOLanternGlow(height: number, color: Color3?): PropLight?
+	local cfg = Config.Custom.PropLights
+	if not cfg.EveryJackOLantern then
+		return nil
+	end
+	return {
+		Color = color or cfg.JackOLanternGlow.Color,
+		Range = math.max(height * cfg.JackOLanternGlow.RangePerStud, 4),
+		Brightness = cfg.JackOLanternGlow.Brightness,
+		Height = 0.45,
+	}
+end
+
+-- Makes a fresh copy of a custom prop ready: sized, scripts out, anchored, placed, and (as
+-- `options` say) only for looks, with a hitbox and a light.
+local function dressCustom(
+	custom: Model,
+	name: string,
+	cframe: CFrame,
+	size: number?,
+	options: PropOptions,
+	center: boolean
+)
+	CustomAssets.Fit(custom, size)
+	local visual = options.Visual == true or options.Hitbox ~= nil
+	for _, d in custom:GetDescendants() do
+		if d:IsA("LuaSourceContainer") then
+			d:Destroy()
+		elseif d:IsA("BasePart") then
+			d.Anchored = true
+			if visual then
+				d.CanCollide = false
+				d.CanQuery = false
+				d.CanTouch = false
+			end
+		end
+	end
+	if center then
+		CustomAssets.PlaceCenter(custom, cframe)
+	else
+		CustomAssets.PlaceFeet(custom, cframe)
+	end
+	custom.Name = name
+	custom:SetAttribute("CustomProp", true)
+	local hitbox = options.Hitbox
+	if hitbox then
+		local box = Instance.new("Part")
+		box.Name = "Hitbox"
+		box.Size = hitbox
+		box.CFrame = if center then cframe else cframe * CFrame.new(0, hitbox.Y / 2, 0)
+		box.Transparency = 1
+		box.Anchored = true
+		box.CanCollide = true
+		box.CanQuery = true
+		box.CanTouch = false
+		box.CastShadow = false
+		box.Parent = custom
+		custom.PrimaryPart = box
+	end
+	if options.Light then
+		addPropLight(custom, options.Light)
+	end
+end
+
 --[[
 	A decoration that can be swapped for your own model. If ReplicatedStorage.Custom.Props has
 	a model called `name`, a copy of it is used: scaled to `size` studs tall (if given, and the
@@ -243,9 +410,10 @@ end
 	put its model at `cframe`). Either way the model gets the attribute PropName = name, so in
 	Studio you can see what to call your own version, and its pivot is `cframe`.
 	options.Anchor = "Center" instead puts the model's middle at cframe with cframe's full
-	turn (flat things hung on walls, like cobwebs).
-	Built props remember their size and anchor (attributes PropSize, PropAnchor) so
-	Kit.applyCustomProps can swap them later, e.g. in a hub saved in the place file.
+	turn (flat things hung on walls, like cobwebs). options.Light / Visual / Hitbox: see
+	PropOptions above.
+	Built props remember their size, anchor and hitbox (attributes PropSize, PropAnchor,
+	PropHitbox) so Kit.swapProp can swap them later, e.g. in a hub saved in the place file.
 ]]
 function Kit.prop(
 	name: string,
@@ -255,29 +423,17 @@ function Kit.prop(
 	build: () -> Model,
 	options: PropOptions?
 ): Model
-	local anchor = if options and options.Anchor == "Center" then "Center" else nil
+	local o: PropOptions = options or {}
+	local anchor = if o.Anchor == "Center" then "Center" else nil
 	local custom = CustomAssets.Clone("Props", name)
 	if custom then
-		CustomAssets.Fit(custom, size)
-		for _, d in custom:GetDescendants() do
-			if d:IsA("LuaSourceContainer") then
-				d:Destroy()
-			elseif d:IsA("BasePart") then
-				d.Anchored = true
-			end
-		end
-		if anchor == "Center" then
-			CustomAssets.PlaceCenter(custom, cframe)
-		else
-			CustomAssets.PlaceFeet(custom, cframe)
-		end
-		custom.Name = name
-		custom:SetAttribute("CustomProp", true)
+		dressCustom(custom, name, cframe, size, o, anchor == "Center")
 	end
 	local m = custom or build()
 	m:SetAttribute("PropName", name)
 	m:SetAttribute("PropSize", size)
 	m:SetAttribute("PropAnchor", anchor)
+	m:SetAttribute("PropHitbox", o.Hitbox)
 	-- Built or custom, the pivot is the spot it was placed on (other code relies on this, e.g.
 	-- the shopkeeper stands relative to the stall's pivot).
 	setPivot(m, cframe)
@@ -287,28 +443,179 @@ function Kit.prop(
 	return m
 end
 
+-- Hides a working part whose look is a custom model (it keeps working); remembers how it was.
+function Kit.hideWorkingPart(part: BasePart)
+	if part:GetAttribute("LookTransparency") == nil then
+		part:SetAttribute("LookTransparency", part.Transparency)
+	end
+	part.Transparency = 1
+end
+
+-- Shows a working part again (its look is the built one again).
+function Kit.showWorkingPart(part: BasePart)
+	local was = part:GetAttribute("LookTransparency")
+	if typeof(was) == "number" then
+		part.Transparency = was
+	end
+	part:SetAttribute("LookTransparency", nil)
+end
+
 --[[
-	Swaps every built prop under `root` (a Model with a PropName attribute) for the custom
-	model of that name in ReplicatedStorage.Custom.Props, when there is one. It goes where the
-	built one's pivot is now, so props moved by hand in Studio keep their new spot. Tags and
-	the bobbing attributes are carried over. Returns how many were swapped.
+	The look of a part that DOES something (a King Hunt pumpkin, a parkour step, a hiding
+	haystack): a prop called `name` that lives inside `part` (attribute PropLook). With a
+	custom model of that name, the look is a copy of it that is only for looks (it never
+	collides, blocks raycasts or fires Touched) and `part` turns invisible: its tags,
+	attributes, Touched and collision keep working, so ANY model works. Otherwise build()
+	makes the built look; with no build, `part` is its own look and the look is an empty
+	Model (so a custom model can still be swapped in later).
 ]]
-function Kit.applyCustomProps(root: Instance): number
-	-- Built props that have a custom version, outermost first: a prop inside one that is
-	-- swapped (a lantern on a custom stall) goes with it.
-	local wanted: { [Instance]: boolean } = {}
-	local list: { Model } = {}
-	for _, d in root:GetDescendants() do
-		if d:IsA("Model") and d:GetAttribute("CustomProp") ~= true then
-			local name = d:GetAttribute("PropName")
-			if typeof(name) == "string" and CustomAssets.Has("Props", name) then
-				wanted[d] = true
-				table.insert(list, d)
+function Kit.look(
+	name: string,
+	part: BasePart,
+	cframe: CFrame,
+	size: number?,
+	build: (() -> Model)?,
+	options: PropOptions?
+): Model
+	local o: PropOptions = if options then table.clone(options) else {}
+	o.Visual = true
+	local m = Kit.prop(name, cframe, part, size, function(): Model
+		if build then
+			return build()
+		end
+		local empty = Instance.new("Model")
+		empty.Name = name
+		return empty
+	end, o)
+	if m.Parent ~= part then
+		m.Parent = part
+	end
+	m:SetAttribute("PropLook", true)
+	if m:GetAttribute("CustomProp") == true then
+		Kit.hideWorkingPart(part)
+	end
+	return m
+end
+
+-- Is `d` (inside prop `root`) part of `root` itself, not of a prop nested inside it?
+local function ownedBy(d: Instance, root: Instance): boolean
+	local node = d.Parent
+	while node and node ~= root do
+		if node:IsA("Model") and node:GetAttribute("PropName") ~= nil then
+			return false
+		end
+		node = node.Parent
+	end
+	return node == root
+end
+
+-- The light prop `old` has (to give its custom replacement), or nil.
+local function lightOf(old: Model, name: string, size: number?): PropLight?
+	local low, high, found = CustomAssets.VisibleBox(old)
+	for _, d in old:GetDescendants() do
+		if d:IsA("PointLight") and ownedBy(d, old) then
+			local holder = d.Parent
+			local at: Vector3? = if holder and holder:IsA("BasePart")
+				then holder.Position
+				elseif holder and holder:IsA("Attachment") then holder.WorldPosition
+				else nil
+			local share: number? = nil
+			if found and at and high.Y - low.Y > 0.01 then
+				share = math.clamp((at.Y - low.Y) / (high.Y - low.Y), 0, 1)
 			end
+			return {
+				Color = d.Color,
+				Range = d.Range,
+				Brightness = d.Brightness,
+				Flicker = CollectionService:HasTag(d, Tags.HubFlicker),
+				Height = share,
+			}
 		end
 	end
-	local swapped = 0
-	for _, d in list do
+	if name == "JackOLantern" then
+		local height = if size then size elseif found then high.Y - low.Y else 2
+		return Kit.jackOLanternGlow(height)
+	end
+	return nil
+end
+
+-- The hitbox a gameplay prop saved before hitboxes existed gets: its visible size, when the
+-- model itself is a working piece (e.g. a Hide & Seek decoy, tag HidingDecoy).
+local function fallbackHitbox(old: Model): Vector3?
+	if not Kit.isWorking(old) then
+		return nil
+	end
+	local low, high, found = CustomAssets.VisibleBox(old, old:GetPivot())
+	return if found then high - low else nil
+end
+
+--[[
+	Replaces prop `old` (a Model with a PropName attribute) with a fresh copy of the custom
+	model of that name in ReplicatedStorage.Custom.Props: at old's pivot (so props moved by
+	hand keep their new spot), with its size, anchor, hitbox and light. The tags and
+	attributes of `old` are copied over, and working (tagged) parts inside it are moved into
+	the new model, so nothing the game needs is lost. A look (Kit.look) hides its working part.
+	Returns the new model, or nil when there is no custom model of that name. `old` is NOT
+	destroyed: the caller destroys it, or keeps it as a backup (src/server/Tools/Swap.luau).
+]]
+function Kit.swapProp(old: Model): Model?
+	local name = old:GetAttribute("PropName")
+	local parent = old.Parent
+	if typeof(name) ~= "string" or not parent or not CustomAssets.Has("Props", name) then
+		return nil
+	end
+	local rawSize = old:GetAttribute("PropSize")
+	local size: number? = if typeof(rawSize) == "number" then rawSize else nil
+	local rawHitbox = old:GetAttribute("PropHitbox")
+	local look = old:GetAttribute("PropLook") == true
+	local custom = Kit.prop(name, old:GetPivot(), parent, size, function()
+		return old
+	end, {
+		Anchor = if old:GetAttribute("PropAnchor") == "Center" then "Center" else nil,
+		Visual = look,
+		Hitbox = if typeof(rawHitbox) == "Vector3" then rawHitbox else fallbackHitbox(old),
+		Light = lightOf(old, name, size),
+	})
+	if custom == old then
+		return nil
+	end
+	custom.Name = old.Name
+	if look then
+		custom:SetAttribute("PropLook", true)
+	end
+	for _, tag in CollectionService:GetTags(old) do
+		CollectionService:AddTag(custom, tag)
+	end
+	for key, value in old:GetAttributes() do
+		if not PROP_ATTRIBUTES[key] and custom:GetAttribute(key) == nil then
+			custom:SetAttribute(key, value)
+		end
+	end
+	for _, part in Kit.workingParts(old) do
+		part.Parent = custom
+	end
+	if look and parent:IsA("BasePart") then
+		Kit.hideWorkingPart(parent)
+	end
+	return custom
+end
+
+--[[
+	Every prop under `root` (a Model with a PropName attribute) for which keep(model) is true,
+	outermost first: a prop inside another one on the list (a lantern on a custom stall) is
+	left out, because it goes with it.
+]]
+function Kit.findProps(root: Instance, keep: (Model) -> boolean): { Model }
+	local wanted: { [Instance]: boolean } = {}
+	local found: { Model } = {}
+	for _, d in root:GetDescendants() do
+		if d:IsA("Model") and typeof(d:GetAttribute("PropName")) == "string" and keep(d) then
+			wanted[d] = true
+			table.insert(found, d)
+		end
+	end
+	local list: { Model } = {}
+	for _, d in found do
 		local ancestor = d.Parent
 		local inside = false
 		while ancestor and ancestor ~= root do
@@ -318,33 +625,30 @@ function Kit.applyCustomProps(root: Instance): number
 			end
 			ancestor = ancestor.Parent
 		end
-		local parent = d.Parent
-		if inside or not parent then
-			continue
+		if not inside then
+			table.insert(list, d)
 		end
-		local name = d:GetAttribute("PropName") :: string
-		local size = d:GetAttribute("PropSize")
-		local custom = Kit.prop(
-			name,
-			d:GetPivot(),
-			parent,
-			if typeof(size) == "number" then size else nil,
-			function()
-				return d
-			end,
-			{ Anchor = if d:GetAttribute("PropAnchor") == "Center" then "Center" else nil }
-		)
-		if custom == d then
-			continue
+	end
+	return list
+end
+
+--[[
+	Swaps every built prop under `root` for the custom model of that name in
+	ReplicatedStorage.Custom.Props, when there is one (Kit.swapProp). Used when the game
+	starts on a hub saved in the place and when a baked map loads. Props that already are a
+	custom model are left alone. Returns how many were swapped.
+]]
+function Kit.applyCustomProps(root: Instance): number
+	local list = Kit.findProps(root, function(m: Model): boolean
+		return m:GetAttribute("CustomProp") ~= true
+			and CustomAssets.Has("Props", m:GetAttribute("PropName") :: string)
+	end)
+	local swapped = 0
+	for _, d in list do
+		if Kit.swapProp(d) then
+			d:Destroy()
+			swapped += 1
 		end
-		for _, tag in CollectionService:GetTags(d) do
-			CollectionService:AddTag(custom, tag)
-		end
-		for _, key in { "BobHeight", "Phase" } do
-			custom:SetAttribute(key, d:GetAttribute(key))
-		end
-		d:Destroy()
-		swapped += 1
 	end
 	return swapped
 end
@@ -410,7 +714,7 @@ function Kit.holder(name: string, cf: CFrame, size: Vector3, parent: Instance): 
 end
 
 function Kit.light(
-	parent: BasePart,
+	parent: Instance, -- a part, or an Attachment in one
 	color: Color3,
 	range: number,
 	brightness: number,
@@ -641,12 +945,8 @@ export type LanternOptions = {
 	Detail: string?, -- "Full" face (default) or "Simple"
 }
 
---[[
-	A carved, glowing, ribbed pumpkin sitting on `cf` (front = cf.LookVector); `size` is its
-	height. Model "JackOLantern": the core ("Pumpkin", collides, the PrimaryPart), ribs, a
-	curly stem and the face.
-]]
-function Kit.jackOLantern(
+-- The built jack-o'-lantern (see Kit.jackOLantern).
+local function buildJackOLantern(
 	cf: CFrame,
 	size: number,
 	colors: Palette,
@@ -683,40 +983,66 @@ function Kit.jackOLantern(
 	return m
 end
 
--- A flat spider web facing cf.LookVector.
-function Kit.cobweb(cf: CFrame, size: number, color: Color3, parent: Instance): Model
-	local m = Kit.model("Cobweb", parent)
-	local spokes = 6
-	local points: { { Vector3 } } = {}
-	for i = 1, spokes do
-		local a = (i / spokes) * math.pi * 2
-		local dir = (cf.RightVector * math.cos(a) + cf.UpVector * math.sin(a))
-		Kit.decor({
-			Name = "Strand",
-			Size = Vector3.new(0.06, 0.06, size),
-			CFrame = CFrame.lookAt(cf.Position + dir * size / 2, cf.Position + dir * size),
-			Color = color,
-			Transparency = 0.35,
-		}, m)
-		points[i] = { cf.Position + dir * size * 0.45, cf.Position + dir * size * 0.85 }
+--[[
+	A carved, glowing, ribbed pumpkin sitting on `cf` (front = cf.LookVector); `size` is its
+	height without the stem. Prop "JackOLantern" (one custom model swaps every jack-o'-lantern
+	in the lobby and the maps; it gets the glow light, Config.Custom.PropLights). Built: the
+	core ("Pumpkin", collides, the PrimaryPart), ribs, a curly stem and the face.
+]]
+function Kit.jackOLantern(
+	cf: CFrame,
+	size: number,
+	colors: Palette,
+	parent: Instance,
+	options: LanternOptions?
+): Model
+	local lit = not (options and options.Light == false)
+	local glow: PropLight? = nil
+	if lit or Config.Custom.PropLights.EveryJackOLantern then
+		glow = { Color = colors.Glow, Range = size * 4, Brightness = 1.2, Height = 0.45 }
 	end
-	for ring = 1, 2 do
+	return Kit.prop("JackOLantern", cf, parent, size * 1.2, function()
+		return buildJackOLantern(cf, size, colors, parent, options)
+	end, { Light = glow })
+end
+
+-- A flat spider web centred on `cf`, facing cf.LookVector (prop "Cobweb").
+function Kit.cobweb(cf: CFrame, size: number, color: Color3, parent: Instance): Model
+	return Kit.prop("Cobweb", cf, parent, size, function()
+		local m = Kit.model("Cobweb", parent)
+		local spokes = 6
+		local points: { { Vector3 } } = {}
 		for i = 1, spokes do
-			local a = points[i][ring]
-			local b = points[i % spokes + 1][ring]
+			local a = (i / spokes) * math.pi * 2
+			local dir = (cf.RightVector * math.cos(a) + cf.UpVector * math.sin(a))
 			Kit.decor({
 				Name = "Strand",
-				Size = Vector3.new(0.05, 0.05, (b - a).Magnitude),
-				CFrame = CFrame.lookAt((a + b) / 2, b),
+				Size = Vector3.new(0.06, 0.06, size),
+				CFrame = CFrame.lookAt(cf.Position + dir * size / 2, cf.Position + dir * size),
 				Color = color,
 				Transparency = 0.35,
 			}, m)
+			points[i] = { cf.Position + dir * size * 0.45, cf.Position + dir * size * 0.85 }
 		end
-	end
-	return m
+		for ring = 1, 2 do
+			for i = 1, spokes do
+				local a = points[i][ring]
+				local b = points[i % spokes + 1][ring]
+				Kit.decor({
+					Name = "Strand",
+					Size = Vector3.new(0.05, 0.05, (b - a).Magnitude),
+					CFrame = CFrame.lookAt((a + b) / 2, b),
+					Color = color,
+					Transparency = 0.35,
+				}, m)
+			end
+		end
+		return m
+	end, { Anchor = "Center" })
 end
 
--- A bare spooky tree standing on `base`.
+-- A bare spooky tree standing on `base` (prop "DeadTree"). `rng` shapes its branches (drawn
+-- the same either way, so a custom tree never moves the rest of a map).
 function Kit.deadTree(
 	base: CFrame,
 	height: number,
@@ -724,32 +1050,41 @@ function Kit.deadTree(
 	rng: Random,
 	parent: Instance
 ): Model
-	local m = Kit.model("DeadTree", parent)
-	Kit.part({
-		Name = "Trunk",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(height, 2.2, 2.2),
-		CFrame = Kit.upright(base * CFrame.new(0, height / 2, 0)),
-		Color = color,
-		Material = Enum.Material.Wood,
-	}, m)
+	local branches = {}
 	for b = 1, 5 do
-		local y = height * rng:NextNumber(0.45, 0.95)
-		local yaw = (b / 5) * math.pi * 2 + rng:NextNumber(-0.4, 0.4)
-		local length = rng:NextNumber(4, 8)
-		Kit.decor({
-			Name = "Branch",
-			Size = Vector3.new(0.6, 0.6, length),
-			CFrame = base * CFrame.new(0, y, 0) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(
-				math.rad(rng:NextNumber(30, 55)),
-				0,
-				0
-			) * CFrame.new(0, 0, -length / 2),
+		branches[b] = {
+			Y = height * rng:NextNumber(0.45, 0.95),
+			Yaw = (b / 5) * math.pi * 2 + rng:NextNumber(-0.4, 0.4),
+			Length = rng:NextNumber(4, 8),
+			Tilt = math.rad(rng:NextNumber(30, 55)),
+		}
+	end
+	return Kit.prop("DeadTree", base, parent, height, function()
+		local m = Kit.model("DeadTree", parent)
+		local trunk = Kit.part({
+			Name = "Trunk",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(height, 2.2, 2.2),
+			CFrame = Kit.upright(base * CFrame.new(0, height / 2, 0)),
 			Color = color,
 			Material = Enum.Material.Wood,
 		}, m)
-	end
-	return m
+		for _, branch in branches do
+			Kit.decor({
+				Name = "Branch",
+				Size = Vector3.new(0.6, 0.6, branch.Length),
+				CFrame = base
+					* CFrame.new(0, branch.Y, 0)
+					* CFrame.Angles(0, branch.Yaw, 0)
+					* CFrame.Angles(branch.Tilt, 0, 0)
+					* CFrame.new(0, 0, -branch.Length / 2),
+				Color = color,
+				Material = Enum.Material.Wood,
+			}, m)
+		end
+		m.PrimaryPart = trunk
+		return m
+	end)
 end
 
 --[[

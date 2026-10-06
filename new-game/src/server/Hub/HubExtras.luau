@@ -314,70 +314,81 @@ local function buildStatue(parent: Instance)
 	end)
 end
 
+-- A scarecrow with a jack-o'-lantern head, standing on cf (prop "Scarecrow").
 local function buildScarecrow(cf: CFrame, parent: Instance)
-	local m = Kit.model("Scarecrow", parent)
-	part({
-		Name = "Pole",
-		Size = Vector3.new(0.5, 8, 0.5),
-		CFrame = cf * CFrame.new(0, 4, 0.2),
-		PaletteRole = "Wood",
-		PaletteShade = 0.2,
-		Material = Enum.Material.Wood,
-	}, m)
-	decor({
-		Name = "Crossbar",
-		Size = Vector3.new(6.5, 0.45, 0.45),
-		CFrame = cf * CFrame.new(0, 6, 0.2),
-		PaletteRole = "Wood",
-		PaletteShade = 0.2,
-		Material = Enum.Material.Wood,
-	}, m)
-	decor({
-		Name = "Shirt",
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(2.6, 3.4, 1.6),
-		CFrame = cf * CFrame.new(0, 5.2, 0),
-		PaletteRole = "Cloth",
-		PaletteShade = 0.1,
-		Material = Enum.Material.Fabric,
-	}, m)
-	for _, side in { -1, 1 } do
-		decor({
-			Name = "Sleeve",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(2.6, 0.9, 0.9),
-			CFrame = cf * CFrame.new(side * 2, 6, 0.1),
-			PaletteRole = "Orange",
-			PaletteShade = 0.3,
-			Material = Enum.Material.Fabric,
+	Kit.prop("Scarecrow", cf, parent, 10.7, function()
+		local m = Kit.model("Scarecrow", parent)
+		local pole = part({
+			Name = "Pole",
+			Size = Vector3.new(0.5, 8, 0.5),
+			CFrame = cf * CFrame.new(0, 4, 0.2),
+			PaletteRole = "Wood",
+			PaletteShade = 0.2,
+			Material = Enum.Material.Wood,
 		}, m)
 		decor({
-			Name = "Straw",
+			Name = "Crossbar",
+			Size = Vector3.new(6.5, 0.45, 0.45),
+			CFrame = cf * CFrame.new(0, 6, 0.2),
+			PaletteRole = "Wood",
+			PaletteShade = 0.2,
+			Material = Enum.Material.Wood,
+		}, m)
+		decor({
+			Name = "Shirt",
 			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(0.9, 0.6, 0.6),
-			CFrame = cf * CFrame.new(side * 3.4, 6, 0.1),
+			Size = Vector3.new(2.6, 3.4, 1.6),
+			CFrame = cf * CFrame.new(0, 5.2, 0),
+			PaletteRole = "Cloth",
+			PaletteShade = 0.1,
+			Material = Enum.Material.Fabric,
+		}, m)
+		for _, side in { -1, 1 } do
+			decor({
+				Name = "Sleeve",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(2.6, 0.9, 0.9),
+				CFrame = cf * CFrame.new(side * 2, 6, 0.1),
+				PaletteRole = "Orange",
+				PaletteShade = 0.3,
+				Material = Enum.Material.Fabric,
+			}, m)
+			decor({
+				Name = "Straw",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(0.9, 0.6, 0.6),
+				CFrame = cf * CFrame.new(side * 3.4, 6, 0.1),
+				PaletteRole = "Straw",
+				Material = Enum.Material.Fabric,
+			}, m)
+		end
+		Props.JackOLantern(
+			paint,
+			cf * CFrame.new(0, 6.9, 0),
+			2.4,
+			m,
+			{ Detail = "Full", Light = true }
+		)
+		decor({
+			Name = "HatBrim",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.2, 3.8, 3.8),
+			CFrame = Kit.upright(cf * CFrame.new(0, 9.4, 0) * CFrame.Angles(0, 0, math.rad(-8))),
 			PaletteRole = "Straw",
+			PaletteShade = 0.2,
 			Material = Enum.Material.Fabric,
 		}, m)
-	end
-	Props.JackOLantern(paint, cf * CFrame.new(0, 6.9, 0), 2.4, m, { Detail = "Full", Light = true })
-	decor({
-		Name = "HatBrim",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.2, 3.8, 3.8),
-		CFrame = Kit.upright(cf * CFrame.new(0, 9.4, 0) * CFrame.Angles(0, 0, math.rad(-8))),
-		PaletteRole = "Straw",
-		PaletteShade = 0.2,
-		Material = Enum.Material.Fabric,
-	}, m)
-	paint.roundedDecor({
-		Name = "HatTop",
-		Size = Vector3.new(2, 1.3, 2),
-		CFrame = cf * CFrame.new(0, 10, 0) * CFrame.Angles(0, 0, math.rad(-8)),
-		PaletteRole = "Straw",
-		PaletteShade = 0.2,
-		Material = Enum.Material.Fabric,
-	}, m)
+		paint.roundedDecor({
+			Name = "HatTop",
+			Size = Vector3.new(2, 1.3, 2),
+			CFrame = cf * CFrame.new(0, 10, 0) * CFrame.Angles(0, 0, math.rad(-8)),
+			PaletteRole = "Straw",
+			PaletteShade = 0.2,
+			Material = Enum.Material.Fabric,
+		}, m)
+		m.PrimaryPart = pole
+		return m
+	end)
 end
 
 local function buildPumpkinPatch(parent: Instance, rng: Random)

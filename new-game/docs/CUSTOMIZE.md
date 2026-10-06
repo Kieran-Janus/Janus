@@ -5,16 +5,18 @@ The game is built so you can change almost anything without touching code. There
 | Layer | What it controls | Where | How hard |
 | --- | --- | --- | --- |
 | **1. Config** | Every number, name, price, colour, dialogue line, code, reward | `src/shared/Config/` (`init.luau` plus one file per v2 feature) | Edit text, save. Rojo syncs it live. |
-| **2. Custom models** | How every character, NPC, hat, pet and skin *looks* | Studio: `ReplicatedStorage > Custom` | Build or import a model, give it the right name. |
+| **2. Custom models** | How every character, NPC, hat, pet, skin and decoration *looks* (one model swaps every copy) | Studio: `ReplicatedStorage > Custom` | Build or import a model, give it the right name. |
 | **3. Code** | New behaviour (a new monster, mode, item type) | `src/` | Ask Claude Code with a slash command (bottom of this page). |
 
-Test anything fast in a Studio playtest with **F8** (admin panel; phones get an Admin button at the top right): + Coins, Unlock all items, Reset daily reward, **Rebuild hub**, **Repaint hub**, Reset my save, Start round now, Force mode, plus buttons the v2 features add (parkour, Candy Rush, Web Scour, Easter eggs, crates). It only works in Studio unless you turn it on for live servers (`Config.Admin`).
+Test anything fast in a Studio playtest with **F8** (admin panel; phones get an Admin button at the top right): + Coins, Unlock all items, Reset daily reward, **Rebuild hub**, **Repaint hub**, **Apply custom props**, Reset my save, Start round now, Force mode, plus buttons the v2 features add (parkour, Candy Rush, Web Scour, Easter eggs, crates). It only works in Studio unless you turn it on for live servers (`Config.Admin`).
 
 Every v2 feature has an on/off switch in `src/shared/Config/Features.luau`. New to v2? Start with [`docs/V2-CHANGES.md`](V2-CHANGES.md).
 
+Want every pumpkin (or lantern, tree, gravestone...) to be **your** model, everywhere at once? See [Swap every copy of something at once](#swap-every-copy-of-something-at-once).
+
 Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See [Editing the lobby and maps by hand](#editing-the-lobby-and-maps-by-hand).
 
-Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Props](#swap-a-decoration-everywhere-props) · [Tags](#parts-that-do-something-tags)
+Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Tags](#parts-that-do-something-tags)
 
 ---
 
@@ -66,7 +68,7 @@ Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Mod
 | Top-left Menu: its button, tile order, words, icons, colours | `Config.Menu` (`src/shared/Config/Menu.luau`) |
 | Character/NPC/hat/pet/skin looks | A model in `ReplicatedStorage > Custom` (below) |
 | A whole map | A model in `ServerStorage > Maps` (below) |
-| One decoration everywhere (every jack-o-lantern, lamp, tree...) | A model in `ReplicatedStorage > Custom > Props` (below) |
+| Every copy of a pumpkin, lantern, tree, gravestone... at once (lobby AND maps) | A model in `ReplicatedStorage > Custom > Props`: [Swap every copy of something at once](#swap-every-copy-of-something-at-once) |
 
 Colours in Config are `Color3.fromRGB(red, green, blue)`, each 0-255. Pick them in any colour picker.
 Sounds are `"rbxassetid://NUMBER"` from the Creator Store (Toolbox > Audio). Empty `""` means no sound.
@@ -108,6 +110,106 @@ Notes:
 - Board, gravestone and photo spot NPCs keep their built look, because the game draws text on them.
 - **Put characters in `Custom > Characters`, not by hand into Workspace > Hub.** The game places them for you, also in a hand-edited lobby.
 - **Move an NPC**: change its `Offset` in `Config.Npcs.List` (the shop follows `Config.Lobby.Zones.Shop`), then F8 > Rebuild hub. In a hand-edited (Locked) lobby, just drag the NPC's model in Studio: the shopkeeper moves with its stall.
+
+---
+
+## Swap every copy of something at once
+
+Want every pumpkin in the game to be **your** pumpkin? You don't have to click on each one. Make **one** model, give it the right name, drop it in one folder, and every copy changes: in the lobby, in all five round maps, and the pumpkins players pick up or hide in.
+
+### Step by step
+1. **Get a model.** Any of these:
+   - **Creator Store**: View > **Toolbox** > Creator Store, search e.g. "pumpkin", click one to insert it. (Scripts inside are removed automatically, so free models are safe.)
+   - **Studio's AI**: open the **Assistant** and ask it to generate a 3D model, e.g. "a cute carved pumpkin with a glowing face". Insert the one you like.
+   - **Blender** (or any 3D app): export a `.fbx` or `.obj`, then in Studio **File > Import 3D**.
+   - **Build it** from Parts (Model tab > Part), colour and resize them.
+2. **Make it one Model.** Select everything that belongs to it in the Explorer and press **Ctrl+G** (a single MeshPart: also Ctrl+G). It must be a **Model**.
+3. **Name it exactly** like one of the names in the table below, e.g. `Pumpkin` or `JackOLantern` (capitals matter, no spaces).
+4. **Move it** into **ReplicatedStorage > Custom > Props** in the Explorer (drag and drop).
+5. **Press Play.** Every copy uses your model. Save the place (Ctrl+S).
+
+Good to know:
+- **Size is automatic.** Each copy is scaled to the height of the thing it replaces (a small pumpkin stays small, a big one stays big), so any size of model works. To keep the size you built it at, add the attribute **KeepSize** (boolean, ticked) to your model.
+- **Facing**: the model's front is the front of its pivot (Model tab > **Pivot > Edit Pivot**, look at the arrow). Turned the wrong way? Rotate your model and try again.
+- **Lights**: a jack-o'-lantern, lantern, lamppost or candle with no light inside gets the game's glow light, so the maps don't go dark (switch: `Config.Custom.PropLights`).
+- **Gameplay pieces keep working with any model.** For `CollectPumpkin`, `HidingPumpkin`, `ParkourPumpkin` and `Haystack` your model is only the *look*: an invisible part still does the job (the pickup you touch, the hitbox candy hits, the lid you land on, the spot that hides you from the King).
+- **Not sure what something is called?** Select it in Studio (in a playtest, or a baked lobby/map) and look at its **PropName** attribute (Properties > Attributes).
+- Take your model out of the folder and the built look comes back next time you press Play (in a lobby or map saved in your place, use Revert: see below).
+
+### Every name you can use
+Sizes are studs tall (each copy is scaled to its own size, so this is just a guide).
+
+| Name | What it is | Where it appears | Size |
+| --- | --- | --- | --- |
+| `Pumpkin` | a plain pumpkin (decoration) | lobby (pumpkin patch, piles, shop shelf, signposts, the Ready arch), Pumpkin Patch field, ScareMaze dead ends, Pumpkin Farm carts | 1-4 |
+| `JackOLantern` | a carved, glowing pumpkin | lobby (ring round the plaza, arches, stalls, scarecrow head, parkour, crate stand), Pumpkin Patch, Spooky Mansion, ScareMaze | 1.6-4.3 |
+| `CollectPumpkin` | the pumpkins you pick up in King Hunt (look only: the glowing pickup still works) | every King Hunt round | 2.5 (`Config.Pumpkins.Size`) |
+| `HidingPumpkin` | Hide & Seek decoys **and** the pumpkins hiders turn into, so they always match (look only: a hidden hitbox is what candy hits) | Pumpkin Farm, Hedge Maze | 2.7-3.9 |
+| `ParkourPumpkin` | the pumpkins you jump on (look only: the flat lid you land on stays, invisible) | lobby parkour | 4.5-5.5 |
+| `ParkourTrophy` | the golden trophy pumpkin at the top | lobby parkour | 12 |
+| `EggGoldenPumpkin`, `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost` | the secret pumpkins (Easter eggs) | lobby | 1.6 (`Config.EasterEggs.Size`) |
+| `Lantern` | a small glass lantern | lobby (clock tower, shop, dead trees), ScareMaze corn walls (the bracket stays) | 1.3-1.7 |
+| `Lamppost` | a lamp on a post | lobby and every map | 9-14 |
+| `Candle` | a candle | lobby (floating candles, Ready arch), Spooky Mansion, Pumpkin Patch mausoleum | 0.8-2.8 |
+| `SpookyTree` | a tree with puffy dark leaves | lobby | 17-28 |
+| `DeadTree` | a bare, twisted tree | lobby, Pumpkin Patch, ScareMaze | 13-28 |
+| `AutumnTree` | an orange autumn tree | Pumpkin Farm | 11-18 |
+| `SpiderGroveTree` | the Spider Grove's crooked trees | lobby (Web Scour) | 15-22 |
+| `CornStalk` | one corn plant | Pumpkin Farm corn patch | 8-10.5 |
+| `Mushroom` | glowing toadstools | lobby | 1-2.2 |
+| `Flowers` | a patch of flowers | Hedge Maze | 1.1 |
+| `HedgePost` | the round leafy post where hedges meet | Hedge Maze | 12.6 |
+| `Topiary` | a clipped bush shape | Hedge Maze | 6 |
+| `Gravestone` | a tombstone | lobby graveyard, Pumpkin Patch graveyard | 3-5 |
+| `Coffin` | a coffin | Spooky Mansion crypt | 2 |
+| `FencePost` | a fence post | lobby fence, Pumpkin Patch graveyard | 4.5-5.4 |
+| `Scarecrow` | a scarecrow | lobby pumpkin patch, Pumpkin Patch, Pumpkin Farm | 10-12.6 |
+| `HayBale` | a rectangular hay bale | Pumpkin Patch, Pumpkin Farm, ScareMaze | 2.4-2.6 |
+| `HayRoll` | a round roll of hay | lobby, Pumpkin Farm | 2-4.6 |
+| `Haystack` | a walk-in haystack that hides you from the King (look only: the hiding spot stays) | Pumpkin Patch | 7-10.5 |
+| `Crow` | a crow on the corn | ScareMaze | 1.4 |
+| `Bat` | a little bat | lobby (round the moon, over the parkour) | 1-2.2 |
+| `Cobweb` | a spider web (size = across) | lobby, Pumpkin Patch, Spooky Mansion | 2.8-5 |
+| `Cauldron` | a bubbling cauldron | lobby centre, Spooky Mansion kitchen | 4-12 |
+| `Bench` | a bench | lobby, Hedge Maze | 3.2-3.6 |
+| `Crate`, `Barrel` | a wooden crate, a barrel | lobby | 1.6-3 |
+| `Signpost` | a signpost (yours has no arrow words) | lobby | 7-13.5 |
+| `Wheelbarrow`, `HarvestCart`, `Well`, `Tractor`, `RockingChair` | farm things | Pumpkin Farm | 3-9 |
+| `Fountain` | the fountain | Hedge Maze | 9 |
+| `ClockTower`, `KingStatue` | the big lobby centrepieces | lobby | 64.5, 18 |
+| `VendorStall` | the Pumpkin Shop stall (the shopkeeper is `PumpkinVendor` in `Custom > Characters`) | lobby | 21 |
+| `ReadyPadArch`, `ParkourArch` | the arch over the Ready circle, the parkour start arch | lobby | 15.4, 13 |
+| `CandyCane`, `GiantLollipop`, `CandyBucket`, `Gumdrop`, `SignCandyCorn` | the Candy Rush stand's decorations | lobby | 1.2-24 |
+| `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn` | the candies you click in Candy Rush | lobby, during a race | 2.4 (`Config.CandyRush`) |
+| `GroveSpider` | the friendly spider in the Spider Grove | lobby | 8 |
+| a crate's Id, e.g. `PumpkinCrate` | that crate on the crate stand | lobby | 3-3.6 |
+| `ScareScarecrow`, `ScareZombie`, `ScareBat`, `ScareGhost` | the ScareMaze scares | ScareMaze | 9, 6, 1.4, 6 |
+
+Can't be swapped this way: things that come in every length (the long hedge and corn walls, fence rails, bunting, paths), and anything with words drawn on it by the game (the boards). Characters (the King, minions, the shopkeeper) go in `Custom > Characters` and hats, pets and skins in `Custom > Cosmetics` ([Builder mode](#builder-mode-give-a-character-your-own-look)).
+
+### A saved (Locked) lobby or a baked map
+When you press Play the swap happens by itself, also in a lobby you edited by hand (Locked) and in maps baked into `ServerStorage > Maps`. To see your models in **edit mode** and keep them in the place file:
+1. Stop the game. Open **View > Command Bar**.
+2. Paste this and press Enter: `require(game.ServerScriptService.Server.Tools.Swap).Props()`
+   Every prop in `Workspace` (the lobby too) and `ServerStorage > Maps` becomes your model. The Output window says what it swapped, e.g. `Swapped JackOLantern x29, Pumpkin x51.`
+3. Save the place (Ctrl+S). **Ctrl+Z** undoes it.
+
+- Trying it in a playtest? **F8 > Apply custom props** does the same for that playtest only.
+- Changed your model? Run `.Props()` again: every copy gets the new version.
+- Want the built look back? Take your model out of `Custom > Props`, then run `require(game.ServerScriptService.Server.Tools.Swap).Props({ Revert = true })`. The built ones are kept in `ServerStorage > PropBackups` for this (delete that folder once you're happy; then Revert can't bring them back, but `Bake.Hub()` / `Bake.Map(...)` can rebuild them).
+- Tags and attributes the game needs are kept (decoys stay decoys, parkour pads stay pads).
+
+### Anything else: replace by name
+For things that aren't in the table (a part you added, a tombstone you copied around by hand), replace everything with the same **name**:
+
+`require(game.ServerScriptService.Server.Tools.Swap).Replace("Tombstone", workspace.MyTombstone)`
+
+Every Model or Part named `Tombstone` in `Workspace` and `ServerStorage > Maps` becomes a copy of `workspace.MyTombstone`: same spot, facing the same way, scaled to the old one's height. It keeps their tags and attributes and prints how many it changed. Add a third part to only change one place, e.g. `.Replace("Tombstone", workspace.MyTombstone, workspace.Hub)`. Parts that *do* something (they have a tag, like a parkour pad) are never replaced. Ctrl+Z undoes it; save the place to keep it.
+
+### Keep it in git
+Your model lives in the place file. To keep it in git too (recommended): right-click it > **Save to File...** and save it as `new-game/assets/Props/<Name>.rbxm`, e.g. `assets/Props/Pumpkin.rbxm`. Rojo syncs it into `ReplicatedStorage > Custom > Props`, so it survives even if the place file is lost. With Rojo connected, delete the Studio copy afterwards so there is only one.
+
+Or ask Claude Code: `/swap-prop Pumpkin` (it walks through all of this in Studio for you).
 
 ---
 
@@ -420,35 +522,7 @@ The lobby's colours are in `Config.Hub.Palette` (the `hubPalette` list at the to
 - To paint one of your own parts from the palette, give it a `PaletteRole` attribute (a string, e.g. `Wood`).
 
 ### Swap a decoration everywhere: props
-Put a model in `ReplicatedStorage > Custom > Props` named exactly after the decoration, and **every copy** in the lobby uses it:
-
-| Name | What it replaces |
-| --- | --- |
-| `Pumpkin` | every plain pumpkin (patch, piles, posts, signs) |
-| `JackOLantern` | every carved, glowing pumpkin |
-| `SpookyTree` / `DeadTree` | trees with puffy leaves / bare trees with lanterns |
-| `Lamppost`, `Lantern`, `Candle` | lamps, small glass lanterns, candles |
-| `Bench`, `HayBale`, `Crate`, `Barrel` | furniture and clutter |
-| `Gravestone`, `FencePost` | tombstones, iron fence posts with a pumpkin on top |
-| `Signpost`, `Mushroom`, `Bat`, `Cobweb` | signs, glowing toadstools, bats, spider webs |
-| `ClockTower`, `Cauldron`, `KingStatue` | the big centrepieces |
-| `VendorStall`, `ReadyPadArch` | the Pumpkin Shop stall, the arch over the Ready circle |
-| `ParkourArch`, `ParkourTrophy`, `ParkourBat` | the parkour start arch, the trophy pumpkin, the bat-wing jumps |
-| `CandyCane`, `GiantLollipop`, `CandyBucket`, `Gumdrop`, `SignCandyCorn` | the Candy Rush stand's decorations |
-| `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn` | the candies you click in Candy Rush |
-| `GroveSpider` | the friendly spider in the Spider Grove |
-| `EggGoldenPumpkin`, `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost` | the secret pumpkins (Easter eggs) |
-| a crate's Id, e.g. `PumpkinCrate` | that crate on the stand and in the crate panel |
-| `HidingPumpkin` | Hide & Seek pumpkins (when a map has no decoys of its own) |
-| `Scarecrow`, `Wheelbarrow`, `Well`, `Tractor`, `HarvestCart`, `RockingChair`, `AutumnTree`, `HayRoll`, `Fountain`, `Topiary` | Pumpkin Farm and Hedge Maze decorations |
-| `ScareScarecrow`, `ScareZombie`, `ScareBat`, `ScareGhost` | the ScareMaze scare characters |
-
-The code for all of them is in `src/server/Build/Props.luau` (and `Hub/NpcLooks.luau` for the stall).
-- Not sure of the name? Select the decoration and look at its `PropName` attribute.
-- It is scaled to the size of the decoration it replaces (add `KeepSize` = true to keep yours) and stands where it stood, turned the same way (only left/right: it is never tipped over).
-- It works in a saved or Locked lobby too: the swap happens each time the game starts.
-- Scripts inside are removed. Keep it in git: **Save to File...** as `assets/Props/JackOLantern.rbxm`.
-- Removed your custom prop? Lobbies built while it existed still contain copies of it: run `Bake.Hub()` again (or F8 > Rebuild hub) to get the built ones back.
+Moved to its own section: [Swap every copy of something at once](#swap-every-copy-of-something-at-once). It works in a hand-edited (Locked) lobby and in baked maps too.
 
 ### Lobby areas (zones)
 `Config.Lobby.Zones` (`src/shared/Config/Lobby.luau`) keeps one area of the lobby free for each thing. Decorations are never placed inside a zone.
@@ -495,6 +569,7 @@ The code for all of them is in `src/server/Build/Props.luau` (and `Hub/NpcLooks.
 | `/new-playlist` | New mode + map pair in the vote |
 | `/add-cosmetic` | New hat, pet, trail or skin. Describe it and it builds the look too |
 | `/reskin` | Restyle a character or NPC (Part-built or from a model you name) |
+| `/swap-prop` | Swap every copy of a prop (every pumpkin, lantern, tree...) for your model, also in a saved lobby and baked maps |
 | `/add-npc` | New lobby NPC with dialogue and a prompt |
 | `/add-monster` | New King Hunt minion type with behaviour and config |
 | `/add-map` | New round map, built from code, in the existing style |
