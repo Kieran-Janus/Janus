@@ -58,6 +58,7 @@ local MAX_LANES = 12
 local GO_SECONDS = 1 -- "GO!" stays on the board this long
 local CANDY_GAP = 0.75 -- studs between the board's face and a candy's middle
 local SCREEN_GAP = 0.12 -- studs between the board's face and the LaneScreen
+local RESCAN_SECONDS = 1 -- how often the stands, boards and pads are looked up again
 
 export type Phase = "Waiting" | "Countdown" | "Live" | "Results"
 
@@ -166,6 +167,7 @@ type Station = {
 	Screen: Screen?,
 	Signature: string,
 	Warned: boolean,
+	PartsAt: number, -- os.clock() when the board and pads were last looked up
 }
 
 local stateRemote: RemoteEvent? = nil
@@ -996,6 +998,7 @@ local function newStation(model: Instance): Station
 		Screen = nil,
 		Signature = "",
 		Warned = false,
+		PartsAt = -math.huge,
 	}
 end
 
@@ -1021,8 +1024,25 @@ local function removeStation(station: Station)
 	station.Watchers = {}
 end
 
--- Every stand in Workspace, oldest first (new ones are set up, removed ones stopped).
-local function currentStations(): { Station }
+local stationList: { Station } = {}
+local stationsAt = -math.huge
+
+-- Every stand in Workspace (new ones are set up, removed ones stopped). Looked up again
+-- every RESCAN_SECONDS, or straight away with `now = true`.
+local function currentStations(now: boolean?): { Station }
+	if not now and os.clock() - stationsAt < RESCAN_SECONDS then
+		local alive = true
+		for _, station in stationList do
+			if not station.Model:IsDescendantOf(workspace) then
+				alive = false
+				break
+			end
+		end
+		if alive then
+			return stationList
+		end
+	end
+	stationsAt = os.clock()
 	local seen: { [Instance]: boolean } = {}
 	local list: { Station } = {}
 	for _, model in CollectionService:GetTagged(Tags.CandyRushStation) do
@@ -1044,6 +1064,7 @@ local function currentStations(): { Station }
 	table.sort(list, function(a, b)
 		return a.Model:GetFullName() < b.Model:GetFullName()
 	end)
+	stationList = list
 	return list
 end
 
@@ -1056,7 +1077,10 @@ local function step(
 	lobby: { LobbyPlayer },
 	claimed: { [Player]: Station }
 )
-	refreshParts(station)
+	if now - station.PartsAt >= RESCAN_SECONDS then
+		station.PartsAt = now
+		refreshParts(station)
+	end
 	local race = station.Race
 	local racingLanes: { [number]: boolean } = {}
 	if race and station.Phase == "Live" then
@@ -1245,7 +1269,7 @@ function CandyRushService.StartSolo(player: Player): (boolean, string)
 	if not lobbyRoot(player) or not character then
 		return false, "You need a character in the lobby."
 	end
-	local list = currentStations()
+	local list = currentStations(true)
 	if #list == 0 then
 		return false, "There is no Candy Rush stand (tag CandyRushStation) in Workspace."
 	end
