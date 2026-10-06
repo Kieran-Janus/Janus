@@ -375,13 +375,14 @@ function NpcLooks.Board(cf: CFrame, m: Model, text: string): (BasePart, BasePart
 			{ Ribs = 3, Leaf = false, Solid = false }
 		)
 	end
-	part({
+	local backing = part({
 		Name = "Backing",
 		Size = Vector3.new(12.2, 8.6, 0.6),
 		CFrame = cf * CFrame.new(0, 7, 0),
 		PaletteRole = "Wood",
 		Material = Enum.Material.WoodPlanks,
 	}, m)
+	sign(backing, text, color("Orange"), Enum.NormalId.Back) -- readable from behind too
 	-- The Screen's front face carries the live vote SurfaceGui (rendered by each client).
 	local screen = part({
 		Name = "Screen",
@@ -556,11 +557,21 @@ function NpcLooks.PhotoSpot(cf: CFrame, m: Model): BasePart
 	decor({
 		Name = "MoonHalo",
 		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.3, 13.6, 13.6),
+		Size = Vector3.new(0.3, 13.5, 13.5),
 		CFrame = moonCf * CFrame.new(0, 0, 0.3) * CFrame.Angles(0, math.rad(90), 0),
 		PaletteRole = "Glow",
 		Material = Enum.Material.Neon,
-		Transparency = 0.35,
+		Transparency = 0.3,
+	}, m)
+	-- A wooden back, so from behind it looks like a painted cut-out.
+	decor({
+		Name = "MoonBack",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.3, 13.8, 13.8),
+		CFrame = moonCf * CFrame.new(0, 0, 0.6) * CFrame.Angles(0, math.rad(90), 0),
+		PaletteRole = "Wood",
+		PaletteShade = 0.3,
+		Material = Enum.Material.WoodPlanks,
 	}, m)
 	for i, spot in
 		{ Vector3.new(-2.6, 2.4, 0), Vector3.new(2.8, 0.8, 0), Vector3.new(0.4, -2.2, 0) }

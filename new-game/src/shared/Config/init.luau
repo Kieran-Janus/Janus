@@ -586,7 +586,8 @@ local Config = {
 			Lighting. Dusk: a purple sky with an orange glow, warm lamps.
 			For soft shadows from the lamps, set Lighting > Technology to "Future" once in
 			Studio (Properties window): scripts are not allowed to change it.
-			Sky: StarCount, CelestialBodiesShown (sun + moon), MoonAngularSize (a big moon).
+			Sky: StarCount, CelestialBodiesShown (sun + moon), MoonAngularSize (a big moon). Put your
+			own Sky in Lighting (a skybox from the Toolbox) and it is used instead.
 			Clouds: drifting clouds (Cover 0-1 = how much of the sky, Density 0-1 = how thick).
 			DepthOfField: far things get a little soft (Enabled = false to turn it off).
 		]]
@@ -707,7 +708,7 @@ local Config = {
 				{ Zone = "CandyRush", Text = "Candy Rush", Feature = "CandyRush" },
 				{ Zone = "WebScour", Text = "Web Scour", Feature = "WebScour" },
 			} :: { { Zone: string, Text: string, Feature: string } },
-			Spawn = Vector3.new(11, 0, 66), -- the big signpost next to the spawn
+			Spawn = Vector3.new(13, 0, 74), -- the big signpost next to the spawn
 			Centre = Vector3.new(-10, 0, -15), -- the one by the cauldron (pointing everywhere)
 		},
 
@@ -791,7 +792,6 @@ local Config = {
 				Vector3.new(-70, 0, 60),
 				Vector3.new(92, 0, -4),
 			},
-			Puddles = true,
 		},
 		-- Extra dressing around the plaza (src/server/Hub/HubExtras.luau).
 		Polish = {
@@ -897,7 +897,7 @@ local Config = {
 				Kind = "Board",
 				DisplayName = "Voting Board",
 				Offset = Vector3.new(-24, 0, 56), -- by the Ready circle...
-				LookAt = Vector3.new(0, 0, 44), -- ...facing it, so ready players can read it
+				LookAt = Vector3.new(0, 0, 60), -- ...turned so players on the pad and at the spawn can read it
 				Prompt = { ActionText = "Vote", ObjectText = "Voting Board" },
 				Lines = {
 					"Voting opens between rounds. Pick a map and Easy or Hard on the board or the vote panel.",

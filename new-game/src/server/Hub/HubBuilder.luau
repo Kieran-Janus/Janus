@@ -1295,7 +1295,8 @@ end
 --[[
 	Lighting from Config.Hub.Lighting: the main settings plus HubAtmosphere,
 	HubColorCorrection, HubBloom (src/client/ZoneLighting.luau fades these between the hub and
-	the round map), HubSky, HubDepthOfField and HubClouds (on Workspace.Terrain).
+	the round map), HubSky (skipped when you put your own Sky in Lighting), HubDepthOfField
+	and HubClouds (on Workspace.Terrain).
 	Lighting.Technology can't be set from a script: set it to Future once in Studio.
 ]]
 function HubBuilder.ApplyLighting()
@@ -1329,15 +1330,26 @@ function HubBuilder.ApplyLighting()
 	set(atmosphere, cfg.Atmosphere)
 	set(ensure(Lighting, "ColorCorrectionEffect", "HubColorCorrection"), cfg.ColorCorrection)
 	set(ensure(Lighting, "BloomEffect", "HubBloom"), cfg.Bloom)
-	-- Only one Atmosphere (and one Sky) is used by the engine; drop any other one.
-	local sky = ensure(Lighting, "Sky", "HubSky") :: Sky
-	set(sky, cfg.Sky)
+	-- Only one Atmosphere is used by the engine; drop any other one.
 	for _, child in Lighting:GetChildren() do
-		if
-			(child:IsA("Atmosphere") and child ~= atmosphere) or (child:IsA("Sky") and child ~= sky)
-		then
+		if child:IsA("Atmosphere") and child ~= atmosphere then
 			child:Destroy()
 		end
+	end
+	-- The sky (stars and a big moon), unless you put your own Sky in Lighting: yours wins.
+	local ownSky = false
+	for _, child in Lighting:GetChildren() do
+		if child:IsA("Sky") and child.Name ~= "HubSky" then
+			ownSky = true
+		end
+	end
+	if ownSky then
+		local old = Lighting:FindFirstChild("HubSky")
+		if old then
+			old:Destroy()
+		end
+	else
+		set(ensure(Lighting, "Sky", "HubSky"), cfg.Sky)
 	end
 	local dof = ensure(Lighting, "DepthOfFieldEffect", "HubDepthOfField") :: DepthOfFieldEffect
 	set(dof, cfg.DepthOfField)
