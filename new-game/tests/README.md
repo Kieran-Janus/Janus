@@ -16,8 +16,8 @@ lune run tests/run -- --quiet       # hide the game's warnings too
 ```
 
 On Windows, run the same commands in PowerShell or cmd from `new-game\`. `rokit install`
-puts `lune` on your PATH (it is pinned in `rokit.toml`; the harness was written against
-Lune 0.8.9). Rojo is **not** needed: the harness reads `default.project.json` and the files
+puts `lune` on your PATH (pinned to 0.10.2 in `rokit.toml`: Lune 0.8.9 sometimes froze
+forever while reading files when the computer was busy). Rojo is **not** needed: the harness reads `default.project.json` and the files
 itself.
 
 The runner prints one line per test, a summary, and exits with code 1 if anything failed. A
