@@ -775,9 +775,11 @@ function WebScourUI.Mount(gui: ScreenGui)
 	-- The remotes (the server makes them even while Web Scour is off, so this never waits forever
 	-- in a real game).
 	task.spawn(function()
-		local Remotes = require(ReplicatedStorage.Shared.Remotes) :: any
-		action = Remotes.Event("WebScourAction")
-		local run: RemoteEvent = Remotes.Event("WebScourRun")
+		-- (What Remotes.Event does on a client, without requiring Remotes here: requiring it
+		-- waits for the Remotes folder, and this module must load without waiting.)
+		local remotes = ReplicatedStorage:WaitForChild("Remotes")
+		action = remotes:WaitForChild("WebScourAction") :: RemoteEvent
+		local run = remotes:WaitForChild("WebScourRun") :: RemoteEvent
 		run.OnClientEvent:Connect(function(message: unknown)
 			if type(message) ~= "table" then
 				return
