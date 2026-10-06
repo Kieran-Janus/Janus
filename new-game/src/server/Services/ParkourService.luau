@@ -12,6 +12,9 @@
 	  - reaching a part tagged ParkourFinish after every checkpoint, and no faster than
 	    MinSeconds, finishes: best time and finishes are saved (data.Parkour) and
 	    Reward.Coins are given once every Reward.CooldownHours
+	  - moving sideways or upwards faster than anyone can run, jump or climb stops the run
+	    ("TooFast": a teleport or fly cheat; limits SpeedTolerance, MaxRiseSpeed... in Config,
+	    the maths in src/shared/SpeedCheck.luau)
 	Players in a round (attribute InRound) are left alone; a run stops when you respawn,
 	leave the course, join a round or leave the game. Parts are found by tag only, so pieces
 	can be moved, resized or copied in Studio. A saved hub with no course gets one built.
@@ -42,6 +45,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local ParkourLogic = require(ReplicatedStorage.Shared.ParkourLogic)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local SpeedCheck = require(ReplicatedStorage.Shared.SpeedCheck)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local AdminService = require(script.Parent.AdminService)
 local DataService = require(script.Parent.DataService)
@@ -55,6 +59,19 @@ local ParkourService = {}
 
 local cfg = Config.Parkour
 local text = cfg.Text
+
+-- How fast a climber can really move (read every check, so tests and tweaks apply at once).
+local function speedLimits(): SpeedCheck.Limits
+	return {
+		MaxSpeed = Config.Player.SprintSpeed
+			* Config.Monetization.VipSpeedMultiplier
+			* cfg.SpeedTolerance,
+		Slack = cfg.SpeedSlack,
+		MaxRiseSpeed = cfg.MaxRiseSpeed,
+		RiseSlack = cfg.RiseSlack,
+		WindowSeconds = cfg.SpeedWindowSeconds,
+	}
+end
 
 export type Pad = {
 	Instance: Instance,
@@ -78,8 +95,7 @@ export type Run = {
 	Started: number, -- workspace:GetServerTimeNow() when the clock started
 	Reached: number, -- checkpoints reached, in order
 	Character: Model,
-	LastPosition: Vector3?,
-	LastCheck: number, -- os.clock() of the last check
+	Speed: SpeedCheck.Check, -- anti-teleport: where they were at the last checks (os.clock())
 	GraceUntil: number, -- os.clock(): ignore falls and slime until then (just sent back)
 	Hinted: number?, -- the skipped checkpoint we last told them about
 	FinishHinted: boolean,
@@ -362,8 +378,7 @@ local function arm(player: Player, character: Model)
 		Started = 0,
 		Reached = 0,
 		Character = character,
-		LastPosition = nil,
-		LastCheck = os.clock(),
+		Speed = SpeedCheck.new(),
 		GraceUntil = 0,
 		Hinted = nil,
 		FinishHinted = false,
@@ -394,7 +409,7 @@ local function sendBack(player: Player, run: Run, body: Body, course: CoursePart
 	end
 	teleport(body, target)
 	run.GraceUntil = os.clock() + cfg.TeleportGraceSeconds
-	run.LastPosition = nil
+	SpeedCheck.Reset(run.Speed, nil, os.clock()) -- the server moved them: not a teleport
 	run.FinishHinted = false
 	if run.Reached == 0 then
 		run.State = "Ready" -- back on the start pad: the clock starts again when they leave it
@@ -485,24 +500,15 @@ local function checkPlayer(player: Player, course: CourseParts)
 	local clock = os.clock()
 	if clock < run.GraceUntil then
 		-- Just sent back: the player's computer may report the old spot for a moment.
-		run.LastPosition = nil
+		SpeedCheck.Reset(run.Speed, nil, clock)
 		return
 	end
 
-	-- Teleport check: nobody walks or jumps this fast.
-	local last = run.LastPosition
-	if last then
-		local moved = Vector3.new(position.X - last.X, 0, position.Z - last.Z).Magnitude
-		local maxSpeed = Config.Player.SprintSpeed
-			* Config.Monetization.VipSpeedMultiplier
-			* cfg.SpeedTolerance
-		if moved > maxSpeed * (clock - run.LastCheck) + cfg.SpeedSlack then
-			stop(player, "TooFast")
-			return
-		end
+	-- Teleport check: nobody walks, jumps or climbs this fast (src/shared/SpeedCheck.luau).
+	if SpeedCheck.Step(run.Speed, position, clock, speedLimits()) then
+		stop(player, "TooFast")
+		return
 	end
-	run.LastPosition = position
-	run.LastCheck = clock
 
 	if run.State == "Ready" then
 		if onStart then

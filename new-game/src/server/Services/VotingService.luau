@@ -3,8 +3,8 @@
 	The vote before each round: players pick a playlist (a game mode on a map,
 	Config.Modes.Playlists) and, when an offered mode uses it, the difficulty.
 	Offered: up to Config.Modes.VoteChoices random playlists whose mode is switched on in
-	Config.Features and whose MinPlayers fits the number of ready players; never none (it falls
-	back to Config.Modes.FallbackMode, King Hunt).
+	Config.Features and whose MinPlayers fits the number of ready players (when every mode is
+	off: Config.Modes.FallbackMode, King Hunt; when none fits: no vote, back to waiting).
 	With Config.Lobby.Ready.VoteOnlyReady, only players on the Ready pad can vote (and only
 	their votes count); everyone else sees the vote greyed out.
 
@@ -174,6 +174,9 @@ function VotingService.Run(options: RunOptions): (string?, string?)
 	local offered: { Playlists.Playlist } = if options.Forced
 		then { options.Forced }
 		else Playlists.Offer(ReadyService.Count(), Config.Modes.VoteChoices)
+	if #offered == 0 then
+		return nil, nil -- too few ready players for every switched-on mode: no vote
+	end
 	mapOptions = {}
 	local usesDifficulty = false
 	for _, playlist in offered do

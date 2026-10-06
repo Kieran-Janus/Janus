@@ -38,10 +38,15 @@ return {
 	StartGraceSeconds = 2, -- safe time when the run starts
 	ScareGraceSeconds = 2, -- safe time after a jumpscare or a BOO has slowed you down
 	CountdownAfter = 0.6, -- the red 3-2-1 shows after standing still this long
-	-- Anti-cheat: a Survivor who moved faster than this (studs per second, plus SlackStuds for
-	-- lag) can't escape for EscapeLockSeconds.
-	MaxMoveSpeed = 40,
-	SlackStuds = 14,
+	-- Anti-cheat (src/shared/SpeedCheck.luau): a Survivor who moves faster than anyone can run
+	-- (a teleport or fly cheat) is put back where they were and can't escape for
+	-- EscapeLockSeconds. This is checked from where they stood at the start, so moving during
+	-- "Get ready" doesn't work either.
+	MaxMoveSpeed = 40, -- studs per second sideways...
+	SlackStuds = 14, -- ...plus this many for lag (counted once per SpeedWindowSeconds)
+	MaxRiseSpeed = 14, -- studs per second upwards (jumping is fine, flying over walls isn't)...
+	RiseSlack = 10, -- ...plus this many (one jump)
+	SpeedWindowSeconds = 1,
 	EscapeLockSeconds = 3,
 
 	-- Haunters: BOO! -------------------------------------------------------------------------------

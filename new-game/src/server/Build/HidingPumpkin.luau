@@ -6,7 +6,9 @@
 
 	Want your own pumpkin model? Put a Model named "HidingPumpkin" in
 	ReplicatedStorage.Custom.Props (assets/Props/HidingPumpkin): every decoy AND every hider
-	uses it (scaled to Config.HideSeek.Pumpkin.Height).
+	uses it (scaled to Config.HideSeek.Pumpkin.Height). Hiders wear a copy of one of the map's
+	decoys (src/server/Modes/HideSeek.luau), so on a map baked into ServerStorage.Maps they
+	always match its decoys; bake it again to give those decoys a new look.
 
 	HidingPumpkin.Build(cframe, rng, parent) -> Model
 	    A pumpkin standing on `cframe` (the middle of its bottom). Anchored; the big parts

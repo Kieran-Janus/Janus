@@ -10,10 +10,14 @@
 	Playlists.IsEnabled(playlist) -> boolean      its mode exists and is switched on, its map exists
 	Playlists.Available(readyCount) -> { Playlist }   enabled ones that fit this many players
 	Playlists.Enabled() -> { Playlist }           every enabled one, whatever the player count
+	Playlists.FewestPlayers() -> number           ready players the smallest enabled playlist needs
+	                                              (1 when every mode is off)
 	Playlists.Offer(readyCount, count, rng?) -> { Playlist }
-	                                              `count` random picks for the vote; never empty
-	                                              (falls back to Config.Modes.FallbackMode)
-	Playlists.Fallback() -> Playlist              the playlist used when nothing else fits
+	                                              `count` random picks for the vote. Empty when
+	                                              too few players are ready for every switched-on
+	                                              mode (a mode that is off is never offered);
+	                                              Config.Modes.FallbackMode when every mode is off
+	Playlists.Fallback() -> Playlist              the playlist used when every mode is off
 	Playlists.ForMap(mapId, modeId?) -> Playlist  a playlist on this map (made up if none is listed)
 	Playlists.ModeName(modeId) -> string          what players see for a mode id
 ]]
@@ -117,6 +121,16 @@ function Playlists.Available(readyCount: number): { Playlist }
 	return list
 end
 
+-- The fewest ready players any switched-on playlist needs (a round can't start with fewer).
+-- 1 when every mode is off: then the fallback mode plays with anyone.
+function Playlists.FewestPlayers(): number
+	local fewest = math.huge
+	for _, playlist in Playlists.Enabled() do
+		fewest = math.min(fewest, Playlists.MinPlayers(playlist))
+	end
+	return if fewest == math.huge then 1 else fewest
+end
+
 -- A listed playlist on `mapId` (for `modeId` if given), or a made-up one so that mode can
 -- always be played there (modeId defaults to Config.Modes.FallbackMode).
 function Playlists.ForMap(mapId: string, modeId: string?): Playlist
@@ -157,11 +171,16 @@ end
 
 --[[
 	The vote's choices: up to `count` different playlists picked at random from the ones that
-	fit `readyCount` players, in Config.Modes.Order. Never empty. `rng` is optional (a Random).
+	fit `readyCount` players, in Config.Modes.Order. `rng` is optional (a Random).
+	Empty when some mode is switched on but none fits this many players (the round waits for
+	more: Playlists.FewestPlayers); the fallback playlist only when every mode is off.
 ]]
 function Playlists.Offer(readyCount: number, count: number, rng: Random?): { Playlist }
 	local pool = Playlists.Available(readyCount)
 	if #pool == 0 then
+		if #Playlists.Enabled() > 0 then
+			return {}
+		end
 		return { Playlists.Fallback() }
 	end
 	local picked = {}

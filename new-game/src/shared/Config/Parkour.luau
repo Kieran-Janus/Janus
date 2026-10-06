@@ -99,8 +99,12 @@ return {
 	HazardHeight = 3.5, -- studs above slime that still count as touching it
 	TeleportGraceSeconds = 0.6, -- after being sent back, don't check that climber for this long
 	LeaveDistance = 90, -- a climber further than this from every course pad has left: run stops
-	SpeedTolerance = 1.5, -- moving faster than sprint speed x this between checks = cheating
-	SpeedSlack = 8, -- extra studs allowed per check (bumps, lag)
+	-- Anti-teleport (src/shared/SpeedCheck.luau): a climber who moves faster than this stops.
+	SpeedTolerance = 1.5, -- moving sideways faster than sprint speed x this = cheating
+	SpeedSlack = 8, -- extra sideways studs allowed (bumps, lag), once per SpeedWindowSeconds
+	MaxRiseSpeed = 14, -- studs per second a climber can go UP (jumping from piece to piece)...
+	RiseSlack = 8, -- ...plus this many studs (one jump), so flying straight up is caught
+	SpeedWindowSeconds = 1, -- the slack only counts once in this many seconds, not every check
 	RequestCooldown = 2, -- seconds between "Go to start" / "Stop" requests from one player
 	HintSeconds = 10, -- "Start on the START pad" shows at most this often (climbing without starting)
 	LobbyRadius = 450, -- "Go to start" only works within this many studs of the hub centre

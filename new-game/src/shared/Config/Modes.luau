@@ -26,8 +26,9 @@ return {
 	-- Modes, in the order the vote shows them.
 	Order = { "KingHunt", "HideSeek", "ScareMaze" },
 	VoteChoices = 3, -- how many playlists the vote offers (picked at random from the ones that fit)
-	-- Used when no playlist fits (too few players, or every mode switched off), so a round
-	-- can always start.
+	-- Played when every mode is switched off in Config.Features (or a map is broken), so a
+	-- round can still start. A mode that is switched off is never offered otherwise: with too
+	-- few ready players for the modes that are on, the game waits for more.
 	FallbackMode = "KingHunt",
 	-- The owner's "Force mode" button (F8 panel) only exists in Studio playtests unless this
 	-- is true. It picks the next round's playlist without a vote, to test modes alone.

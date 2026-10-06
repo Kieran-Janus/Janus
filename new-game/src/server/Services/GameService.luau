@@ -2,7 +2,8 @@
 --[[
 	The round loop, the same for every game mode:
 	  Waiting for players -> Voting -> Intermission -> the mode plays -> Results -> again
-	- Waiting: until Config.Lobby.Ready.MinReady players stand on the Ready pad (ReadyService).
+	- Waiting: until Config.Lobby.Ready.MinReady players stand on the Ready pad (ReadyService;
+	  at least as many as the smallest switched-on mode needs).
 	- Voting: VotingService offers playlists (a mode on a map, Config.Modes.Playlists).
 	- Intermission: the map loads. The vote and intermission stop if too few stay ready.
 	- The mode plays: src/server/Modes/<Mode>.luau, Run(ctx) (see Modes/Types.luau). Only the
@@ -268,6 +269,12 @@ local function playOneRound(): boolean
 
 	local forced = forcedPlaylist
 	forcedPlaylist = nil
+	local offer = forced
+	if not offer and #Playlists.Available(ReadyService.Count()) == 0 then
+		-- Only "Start round now" gets here (otherwise canStart waits for enough ready players):
+		-- play a switched-on playlist anyway.
+		offer = Playlists.Offer(math.huge, 1)[1]
+	end
 	local playlistId, difficultyId = VotingService.Run({
 		SetState = setState,
 		AbortIf = function()
@@ -276,7 +283,7 @@ local function playOneRound(): boolean
 		EndIf = function()
 			return startNow
 		end,
-		Forced = forced,
+		Forced = offer,
 	})
 	if not playlistId or not difficultyId then
 		forcedPlaylist = forcedPlaylist or forced -- keep the owner's pick for the next try
@@ -390,8 +397,9 @@ end
 -- Owner buttons in the F8 admin panel (AdminService).
 local function registerAdminCommands()
 	AdminService.Register("StartRoundNow", "Start round now", function(_player, _data)
-		local state = ReplicatedStorage:GetAttribute("State")
-		if state == "Playing" then
+		-- (activeMode is set while a mode runs, including its own phases like Hide & Seek's
+		-- "Hiding" or ScareMaze's "Get ready", not only "Playing".)
+		if activeMode ~= nil then
 			return "A round is already being played."
 		end
 		startNow = true

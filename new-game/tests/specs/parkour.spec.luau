@@ -126,6 +126,53 @@ describe("Config.Parkour.Course", function()
 	end)
 end)
 
+describe("SpeedCheck (the anti-teleport maths for parkour and ScareMaze)", function()
+	local rt = shared
+	local V = rt.env.Vector3
+	local SpeedCheck = rt:require("ReplicatedStorage.Shared.SpeedCheck")
+	local limits =
+		{ MaxSpeed = 40, Slack = 10, MaxRiseSpeed = 14, RiseSlack = 8, WindowSeconds = 1 }
+
+	it("lets running, jumping and falling through, but not teleports or flying up", function()
+		local check = SpeedCheck.new()
+		expect(SpeedCheck.Step(check, V.new(0, 0, 0), 0, limits)).toBe(false) -- first look
+		-- Running at 30 studs a second for 2 seconds, with a jump.
+		local t = 0
+		for i = 1, 20 do
+			t = i * 0.1
+			local y = if i == 5 then 6 else 0
+			expect(SpeedCheck.Step(check, V.new(i * 3, y, 0), t, limits)).toBe(false)
+		end
+		-- Falling 50 studs at once is fine.
+		expect(SpeedCheck.Step(check, V.new(60, -50, 0), t + 0.1, limits)).toBe(false)
+		-- A teleport 100 studs sideways is too fast, and isn't remembered.
+		local last = check.Last
+		expect(SpeedCheck.Step(check, V.new(160, -50, 0), t + 0.2, limits)).toBe(true)
+		expect(check.Last).toBe(last)
+		-- 20 studs straight up in a tenth of a second: too fast.
+		expect(SpeedCheck.Step(check, V.new(60, -30, 0), t + 0.2, limits)).toBe(true)
+		-- After a Reset (the server moved them) it measures from the new spot.
+		SpeedCheck.Reset(check, V.new(500, 0, 0), t + 0.3)
+		expect(SpeedCheck.Step(check, V.new(503, 0, 0), t + 0.4, limits)).toBe(false)
+	end)
+
+	it("counts the slack once per window, not on every check", function()
+		local check = SpeedCheck.new()
+		SpeedCheck.Reset(check, V.new(0, 0, 0), 0)
+		-- 13 studs every 0.1 s: each hop alone fits MaxSpeed x 0.1 + Slack = 14...
+		expect(SpeedCheck.TooFast(V.new(0, 0, 0), V.new(13, 0, 0), 0.1, limits)).toBe(false)
+		local caught = nil
+		for i = 1, 10 do
+			if SpeedCheck.Step(check, V.new(i * 13, 0, 0), i * 0.1, limits) then
+				caught = i
+				break
+			end
+		end
+		-- ...but 130 studs a second is caught straight away.
+		expect(caught).toBe(2)
+	end)
+end)
+
 describe("ParkourLogic", function()
 	local rt = shared
 	local Logic = rt:require("ReplicatedStorage.Shared.ParkourLogic")
@@ -489,6 +536,33 @@ describe("ParkourService", function()
 		local cancels = events("Cancel")
 		expect(cancels[#cancels].Reason).toBe("TooFast")
 		expect(player:GetAttribute("ParkourRun")).toBe("")
+	end)
+
+	it("stops a run that flies straight up, or hops a little too far on every check", function()
+		local step02 = rt.workspace.Hub.Parkour.Course.Step02_Pumpkin.PrimaryPart
+		travel(spotOn(first(Tags.ParkourStart)))
+		travel(spotOn(step02))
+		expect(player:GetAttribute("ParkourRun")).toBe("Running")
+		player.Character:PivotTo(root().CFrame + Vector3.new(0, 15, 0))
+		rt:advance(0.2)
+		local cancels = events("Cancel")
+		expect(cancels[#cancels].Reason).toBe("TooFast")
+		expect(player:GetAttribute("ParkourRun")).toBe("")
+		-- 11 studs per check fits one check's SpeedSlack, but not a second's worth of them.
+		travel(spotOn(first(Tags.ParkourStart)))
+		travel(spotOn(step02))
+		expect(player:GetAttribute("ParkourRun")).toBe("Running")
+		local before = #events("Cancel")
+		for _ = 1, 8 do
+			player.Character:PivotTo(root().CFrame + Vector3.new(11, 0, 0))
+			rt:advance(cfg.CheckSeconds)
+			if player:GetAttribute("ParkourRun") == "" then
+				break
+			end
+		end
+		cancels = events("Cancel")
+		expect(#cancels).toBe(before + 1)
+		expect(cancels[#cancels].Reason).toBe("TooFast")
 	end)
 
 	it("stops on respawn and ignores players in a round", function()

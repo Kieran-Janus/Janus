@@ -36,6 +36,19 @@ return {
 	TrailMinSpeed = 3, -- a hider moving faster than this (studs a second) leaves a faint leaf trail
 	GlowLastSeconds = 30, -- hiders glow softly for the last this-many seconds of the round
 
+	-- Fair play ------------------------------------------------------------------------------------
+	-- A hider who resets (or dies) once the seekers are out leaves their pumpkin where it was
+	-- (it can still be found) and comes back to it, so resetting is no way to escape.
+	FallMargin = 20, -- ...unless the pumpkin fell this many studs below the map's floor
+	-- Lobby spectators and ghosts only watch seekers: watching a hider shows where they hide
+	-- (and someone could tell the seekers). true = hiders can be watched too.
+	SpectateHiders = false,
+	HideChatBubbles = true, -- no chat bubbles during a round: they'd float over the hidden pumpkins
+	-- More seekers than seeker pads (the hut has 4)? The extra ones line up in rows in front of
+	-- the pads, this many studs apart, at most SpawnRows rows deep.
+	SpawnRowSpacing = 3.5,
+	SpawnRows = 3,
+
 	-- Coins at the end of the round (the friend bonus is added on top) ---------------------------
 	Rewards = {
 		PerTag = 10, -- for every pumpkin you tag
