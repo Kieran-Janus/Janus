@@ -38,6 +38,7 @@ Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See 
 | NPC names, positions, dialogue | `Config.Npcs.List` |
 | Shop items and prices (hats, trails, pets, skins) | `Config.Shop.Items` |
 | VIP perks, Robux products | `Config.Monetization` (IDs from Creator Hub) |
+| Crates: prices, odds, Robux products, the crate stand, words | `Config.Crates` (`src/shared/Config/Crates.luau`, see "Crates" below) |
 | Codes for YouTubers | `Config.Codes.List` |
 | Daily streak rewards | `Config.Daily.Rewards` |
 | First-round tutorial tips and timings | `Config.Tutorial` |
@@ -137,6 +138,41 @@ Skins are removed cleanly when unequipped: the player's own avatar comes back.
 
 ### Trails
 A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
+
+---
+
+## Crates
+Mystery crates give a random skin. Everything about them is in `src/shared/Config/Crates.luau`
+(switch them off with `Config.Features.Crates = false`, or only the Robux ones with
+`Config.Features.RobuxCrates = false`).
+- **Odds**: `Odds = { Common = 70, Uncommon = 24.9, Rare = 5, Crazy = 0.1 }` is the chance (in
+  percent) of each rarity. The skins of one rarity share it equally, so in the Pumpkin Crate each
+  of the 12 Commons has 5.833% and its one CRAZY skin 0.100%. Keep the total at 100. One crate can
+  have its own `Odds`.
+- **Prices**: each crate's `Price` (coins). A Robux price is set in Creator Hub: make a Developer
+  Product (Monetization > Developer Products) and paste its id into that crate's
+  `Robux.ProductId`. Until then the button says "Coming soon".
+- **Which skins are inside**: a skin is in a crate when its `Crate` is that crate's Id (the theme
+  files in `Config/Skins/` do this for you). The rarity crates (Common, Uncommon, Rare, CRAZY Crate)
+  hold every crate skin of their rarity.
+- **New crate**: copy a line in `List`, give it a new Id and Name, then set `Crate = "<new Id>"` on
+  the skins it should give. It appears in Menu > Crates and on the crate stand automatically.
+- **Duplicates**: a skin you already own pays back `DuplicateRefund` coins (`Config/Rarity.luau`).
+- **The crate stand** next to the Pumpkin Shop (`src/server/Hub/Sections/CrateStand.luau`, in
+  `Config.Lobby.Zones.Crates`): every crate on a plinth with an "Open" prompt. Each prompt sits on
+  an invisible part tagged `CrateDisplay` with the attribute `CrateId`: move or copy them in
+  Studio, or tag any part of your own. Your own crate look: a model named after the crate's Id
+  (e.g. `PumpkinCrate`) in `ReplicatedStorage > Custom > Props`.
+- **Test it**: F8 > "Crates: open free Pumpkin Crate" and "Crates: +100k coins".
+
+**Roblox's rule for paid random items (please keep it):** players must see every item and its
+exact chance *before* they pay (the crate panel always shows them), and players whose region
+doesn't allow paid random items (Roblox tells the game through `PolicyService`) can't open any
+crate, not even with coins (coins can be bought with Robux). They see "Crates aren't available in
+your region; you can still buy any skin directly in the Shop", and every crate skin stays for
+sale in the Shop at its rarity price. If Roblox can't answer, crates stay closed for that player
+(in Studio they stay open so you can test; set `Policy.TestAsRestricted = true` to see what those
+players see). If such a player still buys a Robux crate somehow, they get its coin price instead.
 
 ---
 

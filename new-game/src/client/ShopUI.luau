@@ -5,6 +5,9 @@
 	Pumpkin Shop stall (Config.Npcs OpensShop -> ShopUI.Open(tab), the Skins tab). Every action
 	goes through the server (ShopService); this only shows the state it sends back.
 
+	The Skins tab has a Crates button (while Config.Features.Crates is on) that opens the
+	crate panel (src/client/CrateUI.luau) on the crate of the theme you're looking at.
+
 	Item tabs show one page of cards at a time (Config.Skins.Shop.PageSize) with filters: All /
 	Owned, a rarity, and (Skins tab) a theme. Each card has a border and tag in its rarity's
 	colour (Config.Rarity); CRAZY cards shimmer. A card's 3D preview is only built while its
@@ -26,6 +29,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local CrateUI = require(script.Parent.CrateUI)
 local Layout = require(script.Parent.Layout)
 local SkinFx = require(script.Parent.SkinFx)
 local Sounds = require(script.Parent.Sounds)
@@ -522,6 +526,22 @@ function ShopUI.Mount(gui: ScreenGui)
 		themeNames[theme.Id] = theme.Name
 	end
 	local themeChip = chip("Theme", "", 130, 20)
+	-- Crates (Skins tab): opens the crate panel on the shown theme's crate.
+	local cratesChip = chip("Crates", Config.Crates.Text.ShopChip, 100, 30)
+	cratesChip.BackgroundColor3 = Color3.fromRGB(170, 60, 120)
+	cratesChip.Activated:Connect(function()
+		local crateId: string? = nil
+		for _, theme in Config.Skins.Themes do
+			if theme.Id == filters.Theme then
+				crateId = theme.Crate
+			end
+		end
+		panel.Visible = false
+		CrateUI.Open(crateId)
+	end)
+	CrateUI.SetShopOpener(function(wanted: CrateUI.ShopFilters)
+		ShopUI.Open("Skin", { Theme = wanted.Theme, Rarity = wanted.Rarity })
+	end)
 	themeChip.Activated:Connect(function()
 		local index = table.find(themeIds, filters.Theme) or 1
 		filters.Theme = themeIds[index % #themeIds + 1]
@@ -539,6 +559,7 @@ function ShopUI.Mount(gui: ScreenGui)
 			b.TextColor3 = if selected or id == ANY then Theme.Text else colour
 		end
 		themeChip.Visible = tab == "Skin"
+		cratesChip.Visible = tab == "Skin" and Config.Features.Crates
 		themeChip.Text = (themeNames[filters.Theme] or filters.Theme) .. "  >"
 		local themeColour: Color3? = nil
 		for _, theme in Config.Skins.Themes do

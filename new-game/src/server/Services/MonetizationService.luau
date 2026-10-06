@@ -9,6 +9,13 @@
 	Coin packs    - Developer Products granted in ProcessReceipt. Each receipt id is stored in
 	                the player's save and the save must succeed before Roblox is told it was
 	                granted, so a purchase is never lost or granted twice.
+	Crates        - a Developer Product that is a crate's Robux.ProductId (Config.Crates) opens
+	                that crate the same way: the receipt is checked first, then CrateService
+	                rolls and gives the skin, and everything is undone if the save fails (Roblox
+	                retries later with a new roll). The player's screen then plays the opening
+	                (CrateResult). If crates aren't allowed for the player (their region, or
+	                Config.Features.Crates / RobuxCrates switched off) they get the crate's coin
+	                Price instead of a random skin.
 	King tracker  - TrackKing() -> (direction, distance) of the nearest King, VIP only, for a
 	                living player in the round, with a cooldown (attribute TrackerReadyAt).
 	IDs of 0 mean "not created yet": nothing is checked or granted for them.
@@ -19,7 +26,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local CrateOdds = require(ReplicatedStorage.Shared.CrateOdds)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local CrateService = require(script.Parent.CrateService)
 local DataService = require(script.Parent.DataService)
 local KingService = require(script.Parent.KingService)
 local ShopService = require(script.Parent.ShopService)
@@ -64,7 +73,83 @@ local function productById(id: number): any
 	return nil
 end
 
+local function rememberReceipt(data: { [string]: any }, receiptId: string)
+	table.insert(data.Receipts, receiptId)
+	while #data.Receipts > Config.Monetization.ReceiptHistory do
+		table.remove(data.Receipts, 1)
+	end
+end
+
+local function forgetReceipt(data: { [string]: any }, receiptId: string)
+	local index = table.find(data.Receipts, receiptId)
+	if index then
+		table.remove(data.Receipts, index)
+	end
+end
+
+-- A crate bought with Robux (Config.Crates, Robux.ProductId).
+local function processCrateReceipt(
+	receipt: any,
+	crate: CrateOdds.Crate
+): Enum.ProductPurchaseDecision
+	local player = Players:GetPlayerByUserId(receipt.PlayerId)
+	local data = player and DataService.Get(player)
+	if not player or not data or not DataService.IsLoaded(player) then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	local receiptId = tostring(receipt.PurchaseId)
+	if table.find(data.Receipts, receiptId) then
+		return Enum.ProductPurchaseDecision.PurchaseGranted -- already granted earlier
+	end
+	-- May wait a little for the region check that starts when the player joins.
+	local allowed = CrateService.CanOpenWithRobux(player, Config.Crates.Policy.WaitSeconds)
+	data = DataService.Get(player)
+	if player.Parent ~= Players or not data then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	if table.find(data.Receipts, receiptId) then
+		return Enum.ProductPurchaseDecision.PurchaseGranted -- granted while we were waiting
+	end
+
+	local result: CrateService.Result? = nil
+	local undo: () -> () = function() end
+	if allowed then
+		result, undo = CrateService.Grant(player, crate, "Robux")
+	end
+	local coins = 0
+	if not result then
+		-- No random skin for this player: the crate's coin price instead.
+		coins = CrateOdds.CoinPrice(crate) or 0
+		DataService.Add(player, "Coins", coins)
+		result = {
+			Ok = false,
+			Message = Config.Crates.Text.RobuxInstead:format(coins, Config.Economy.CurrencyName),
+			CrateId = crate.Id,
+			Paid = "Robux",
+		}
+	end
+	rememberReceipt(data, receiptId)
+	if not DataService.Save(player) then
+		-- Undo, so the retry Roblox will make doesn't double up.
+		undo()
+		if coins > 0 then
+			DataService.Add(player, "Coins", -coins)
+		end
+		forgetReceipt(data, receiptId)
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	ShopService.Push(player)
+	if result then
+		CrateService.SendResult(player, result)
+	end
+	return Enum.ProductPurchaseDecision.PurchaseGranted
+end
+
 local function processReceipt(receipt: any): Enum.ProductPurchaseDecision
+	local crate = CrateOdds.ByProductId(receipt.ProductId)
+	if crate then
+		return processCrateReceipt(receipt, crate)
+	end
 	local product = productById(receipt.ProductId)
 	local player = Players:GetPlayerByUserId(receipt.PlayerId)
 	if not product or not player then
