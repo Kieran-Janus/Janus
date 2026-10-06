@@ -101,6 +101,7 @@ return {
 	SpeedTolerance = 1.5, -- moving faster than sprint speed x this between checks = cheating
 	SpeedSlack = 8, -- extra studs allowed per check (bumps, lag)
 	RequestCooldown = 2, -- seconds between "Go to start" / "Stop" requests from one player
+	HintSeconds = 10, -- "Start on the START pad" shows at most this often (climbing without starting)
 	LobbyRadius = 450, -- "Go to start" only works within this many studs of the hub centre
 	BoardRows = 5, -- times listed on the board at the start
 
@@ -132,6 +133,7 @@ return {
 		SlimedStart = "Slimed! Back to the start",
 		Missed = "You missed checkpoint %d!",
 		NeedCheckpoints = "Touch every checkpoint first!",
+		NeedStart = "Start on the START pad to win coins!",
 		Finished = "You reached the top!",
 		FinishTime = "Time: %s",
 		NewBest = "New best!",

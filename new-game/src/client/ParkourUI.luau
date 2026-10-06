@@ -451,6 +451,8 @@ function ParkourUI.Mount(gui: ScreenGui)
 				pop(text.Missed:format(number(data.Next)), colors.Back)
 			elseif kind == "NeedCheckpoints" then
 				pop(text.NeedCheckpoints, colors.Back)
+			elseif kind == "NeedStart" then
+				pop(text.NeedStart, colors.Timer)
 			elseif kind == "Finish" then
 				showFinish(data)
 				play(cfg.Sounds.Finish)

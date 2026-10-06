@@ -345,6 +345,18 @@ describe("ParkourService", function()
 		expect(ReplicatedStorage:GetAttribute("ParkourCheckpoints")).toBe(3)
 	end)
 
+	it("tells you to use the start pad when you climb on without it", function()
+		player.Character:PivotTo(CFrame.new(spotOn(checkpoint(1))))
+		rt:advance(0.3)
+		expect(#events("NeedStart")).toBe(1)
+		expect(player:GetAttribute("ParkourRun")).toBe("")
+		expect(Parkour.Run(player)).toBeNil()
+		rt:advance(1)
+		expect(#events("NeedStart")).toBe(1) -- not again straight away
+		rt:advance(cfg.HintSeconds)
+		expect(#events("NeedStart")).toBe(2)
+	end)
+
 	it("gets ready on the start pad and starts the clock when you leave it", function()
 		player.Character:PivotTo(CFrame.new(spotOn(first(Tags.ParkourStart))))
 		rt:advance(0.3)

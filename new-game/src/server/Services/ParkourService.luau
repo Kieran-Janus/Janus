@@ -19,7 +19,8 @@
 	Remotes (made in Start even when the feature is off):
 	  ParkourEvent    server -> client (kind, info): Start, Checkpoint {Index, Count},
 	                  Back {Reason = "Fall" | "Hazard", Checkpoint}, Missed {Next},
-	                  NeedCheckpoints, Finish {Time, Best, NewBest, Coins, Wait},
+	                  NeedCheckpoints, NeedStart (on a checkpoint without a run),
+	                  Finish {Time, Best, NewBest, Coins, Wait},
 	                  Cancel {Reason = "Stopped" | "TooFast" | "Left" | "TimeUp" | "Cheat"}
 	  ParkourRequest  client -> server ("GoToStart" | "Stop") -> (ok, message)
 	Player attributes: ParkourRun ("" | "Ready" | "Running"), ParkourStarted (server time),
@@ -86,6 +87,7 @@ export type Run = {
 
 local runs: { [Player]: Run } = {}
 local lastRequest: { [Player]: number } = {}
+local lastHint: { [Player]: number } = {} -- os.clock() of the last "start on the START pad" hint
 local playerConnections: { [Player]: { RBXScriptConnection } } = {}
 local hazardConnections: { [Instance]: RBXScriptConnection } = {}
 local event: RemoteEvent? = nil
@@ -192,6 +194,16 @@ end
 
 local function inside(position: Vector3, pad: Pad, margin: number, height: number): boolean
 	return ReadyService.Inside(position, pad.CFrame, pad.Size, pad.Shape, margin, height)
+end
+
+-- Standing on any of `pads`.
+local function onAny(position: Vector3, pads: { Pad }): boolean
+	for _, pad in pads do
+		if inside(position, pad, cfg.TouchMargin, cfg.TouchHeight) then
+			return true
+		end
+	end
+	return false
 end
 
 -- On (or jumping on) any start pad.
@@ -458,6 +470,14 @@ local function checkPlayer(player: Player, course: CourseParts)
 	if not run then
 		if onStart and player:GetAttribute("DataReady") == true and #course.Finishes > 0 then
 			arm(player, body.Character)
+		elseif onAny(position, course.Checkpoints) then
+			-- Climbed on without starting: tell them where the clock starts (now and then).
+			-- (Not on the finish: that is where everyone stands just after finishing.)
+			local now = os.clock()
+			if now - (lastHint[player] or -math.huge) >= cfg.HintSeconds then
+				lastHint[player] = now
+				fire(player, "NeedStart")
+			end
 		end
 		return
 	end
@@ -657,6 +677,7 @@ local function onPlayer(player: Player)
 	if playerConnections[player] then
 		return
 	end
+	setRunAttributes(player, nil)
 	local list: { RBXScriptConnection } = {}
 	table.insert(
 		list,
@@ -681,6 +702,7 @@ end
 local function onLeave(player: Player)
 	runs[player] = nil
 	lastRequest[player] = nil
+	lastHint[player] = nil
 	local list = playerConnections[player]
 	playerConnections[player] = nil
 	if list then
