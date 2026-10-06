@@ -468,6 +468,9 @@ local Config = {
 		ReferenceHeight = 760, -- usable screen height the UI is drawn for; taller screens scale up...
 		MaxScale = 1.35, -- ...to at most this (never down: phones keep full-size, readable text)
 		PhoneMaxHeight = 500, -- a touch screen this short (usable points) gets the phone layout
+		-- At start-up the screen size isn't known for a moment; the screens wait for it (at most
+		-- this many seconds) so they pick the phone or PC layout from the real size.
+		ScreenWaitSeconds = 5,
 		EdgeMargin = 12, -- gap between panels and the screen edge
 		-- The old column of Shop / Codes / Invite / Settings buttons, only used when the Menu is
 		-- switched off (Features.Menu = false; the Menu's own sizes are in Config/Menu.luau).
@@ -476,6 +479,9 @@ local Config = {
 		-- and panels along the bottom keep this clear of the thumbstick and jump button.
 		PhoneSideTop = 8,
 		TouchBottomSideClear = 130,
+		-- The vote panel also keeps this much clear on the right: the jump button plus the round
+		-- action buttons Roblox puts around it (HEY!, Run).
+		TouchActionsClear = 205,
 		MinTextSize = 14, -- shrinking text never goes below this
 		-- Banners and big messages placed part-way down the screen (round, minigame and easter
 		-- egg pop-ups) move down on short phone screens so they never cover the bar at the top

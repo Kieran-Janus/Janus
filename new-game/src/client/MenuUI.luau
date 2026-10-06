@@ -153,7 +153,7 @@ local function refresh()
 		end
 	end
 	local grid = MenuLogic.Grid(Layout.Screen(), count)
-	current.Grid.CellSize = UDim2.fromOffset(grid.Cell, Config.Menu.Panel.TileHeight)
+	current.Grid.CellSize = UDim2.fromOffset(grid.Cell, grid.TileHeight)
 	current.Panel.Size = UDim2.fromOffset(grid.Width, grid.Height)
 end
 

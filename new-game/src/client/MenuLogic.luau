@@ -32,7 +32,13 @@ export type Resolved = {
 	Hidden: boolean,
 }
 
-export type Grid = { Columns: number, Cell: number, Width: number, Height: number }
+export type Grid = {
+	Columns: number,
+	Cell: number,
+	TileHeight: number,
+	Width: number,
+	Height: number,
+}
 
 export type Place = { Mode: string, X: number, Y: number, Width: number, Height: number }
 
@@ -78,20 +84,49 @@ end
 function MenuLogic.Grid(screen: Vector2, tileCount: number): Grid
 	local p = Config.Menu.Panel
 	local margin = Config.UI.EdgeMargin
-	local widest = math.min(screen.X - 2 * margin, p.MaxWidth)
 	local inset = MenuLogic.TileInset
-	local inner = widest - 2 * p.Padding - p.ScrollBar - 2 * inset
-	local columns = math.floor((inner + p.TileGap) / (p.TileMinWidth + p.TileGap))
-	columns = math.clamp(columns, 1, p.MaxColumns)
-	local cell = math.floor((inner - p.TileGap * (columns - 1)) / columns)
-	cell = math.clamp(cell, 1, p.TileMaxWidth)
-	local width = columns * cell + (columns - 1) * p.TileGap + 2 * (p.Padding + inset) + p.ScrollBar
-	local rows = math.max(1, math.ceil(tileCount / columns))
-	local tilesHeight = rows * p.TileHeight + (rows - 1) * p.TileGap + 2 * inset
-	-- Taller than the screen allows: the tiles scroll.
-	local height =
-		math.min(p.HeaderHeight + tilesHeight + p.FooterHeight, p.MaxHeight, screen.Y - 2 * margin)
-	return { Columns = columns, Cell = cell, Width = width, Height = math.max(height, 1) }
+	local function layout(maxWidth: number, maxColumns: number): (number, number, number, number)
+		local widest = math.min(screen.X - 2 * margin, maxWidth)
+		local inner = widest - 2 * p.Padding - p.ScrollBar - 2 * inset
+		local columns = math.floor((inner + p.TileGap) / (p.TileMinWidth + p.TileGap))
+		columns = math.clamp(columns, 1, maxColumns)
+		local cell = math.floor((inner - p.TileGap * (columns - 1)) / columns)
+		cell = math.clamp(cell, 1, p.TileMaxWidth)
+		local width = columns * cell
+			+ (columns - 1) * p.TileGap
+			+ 2 * (p.Padding + inset)
+			+ p.ScrollBar
+		return columns, cell, width, math.max(1, math.ceil(tileCount / columns))
+	end
+	local function rowsHeight(rows: number, tileHeight: number): number
+		return rows * tileHeight + (rows - 1) * p.TileGap
+	end
+	local tallest = math.min(p.MaxHeight, screen.Y - 2 * margin)
+	local room = tallest - p.HeaderHeight - p.FooterHeight - 2 * inset -- for the rows of tiles
+	local columns, cell, width, rows = layout(p.MaxWidth, p.MaxColumns)
+	-- A short screen: more tiles per row (the whole screen width) if that saves a row...
+	if rowsHeight(rows, p.TileHeight) > room then
+		local wideColumns, wideCell, wideWidth, wideRows =
+			layout(math.huge, p.ShortScreenMaxColumns)
+		if wideRows < rows then
+			columns, cell, width, rows = wideColumns, wideCell, wideWidth, wideRows
+		end
+	end
+	-- ...then shorter tiles. Still too many: the tiles scroll.
+	local tileHeight = p.TileHeight
+	if rowsHeight(rows, tileHeight) > room then
+		local fit = math.floor((room - (rows - 1) * p.TileGap) / rows)
+		tileHeight = math.clamp(fit, p.TileMinHeight, p.TileHeight)
+	end
+	local tilesHeight = rowsHeight(rows, tileHeight) + 2 * inset
+	local height = math.min(p.HeaderHeight + tilesHeight + p.FooterHeight, tallest)
+	return {
+		Columns = columns,
+		Cell = cell,
+		TileHeight = tileHeight,
+		Width = width,
+		Height = math.max(height, 1),
+	}
 end
 
 function MenuLogic.ButtonPlace(hudLeft: number?, hudBottom: number?): Place

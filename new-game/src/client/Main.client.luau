@@ -9,6 +9,9 @@
 	shows nothing.
 ]]
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local Layout = require(script.Parent.Layout)
 local PanelManager = require(script.Parent.PanelManager)
@@ -60,6 +63,18 @@ gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 Layout.Mount(gui) -- first: the screen scale and the Menu tiles the others use
 PanelManager.Mount(gui) -- one centred panel at a time (Menu, Shop, Settings, Codes...)
 Sounds.Mount() -- early, so every button made below gets click/hover sounds
+
+-- The first moments of a game report a stand-in screen size (the camera says 1x1, the gui a
+-- PC-sized box), and screens choose their phone or PC layout when they mount: wait for the
+-- real size first (Config.UI.ScreenWaitSeconds at most).
+local camera = workspace.CurrentCamera
+if camera and camera.ViewportSize.X <= 1 then
+	local waited = 0
+	while camera.ViewportSize.X <= 1 and waited < Config.UI.ScreenWaitSeconds do
+		waited += task.wait()
+	end
+	task.wait() -- one more frame, so the gui has taken the new size too
+end
 
 local function report(name: string, err: unknown)
 	warn(

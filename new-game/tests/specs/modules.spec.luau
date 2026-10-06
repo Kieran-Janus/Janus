@@ -132,6 +132,24 @@ describe("client modules", function()
 		T.note("PlayerGui: " .. table.concat(names, ", "))
 	end)
 
+	it("waits for the real screen size before mounting the screens", function()
+		local late = Runtime.new({ client = true })
+		late:replicateFrom(server)
+		local camera = late.game:GetService("Workspace").CurrentCamera
+		camera.ViewportSize = late.env.Vector2.new(1, 1) -- the stand-in size of a game's first moments
+		local ok, err = late:runScript("StarterPlayer.StarterPlayerScripts.Client.Main")
+		if not ok then
+			error(err, 0)
+		end
+		late:advance(0.5)
+		local gameUi = late.game:GetService("Players").LocalPlayer.PlayerGui.GameUI
+		expect(gameUi:FindFirstChild("Menu")).toBe(nil) -- still waiting
+		camera.ViewportSize = late.env.Vector2.new(749, 367)
+		late:advance(1)
+		expect(gameUi:FindFirstChild("Menu")).toBeInstanceOf("Frame")
+		noMainFailures(late)
+	end)
+
 	it("puts every panel's button into the Menu as a tile", function()
 		local gui = client.game:GetService("Players").LocalPlayer.PlayerGui.GameUI
 		local ids = {}

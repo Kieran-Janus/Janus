@@ -88,8 +88,6 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	tip.Visible = false
 	tip.ZIndex = 12
 	Layout.Fit(tip)
-	-- On short phone screens the banner and tip move down together, clear of the top bar.
-	Layout.KeepBelowHud({ banner, tip })
 
 	local bannerToken = 0
 	local foundAt = -math.huge
@@ -134,6 +132,9 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	status.Size = UDim2.fromOffset(440, 34)
 	status.Visible = false
 	Layout.Fit(status)
+	-- On short phone screens the banner and tip move down together, clear of the top bar and
+	-- this status bar.
+	Layout.KeepBelowHud({ banner, tip }, status)
 	local statusText = Theme.label("", 17, status)
 	statusText.Size = UDim2.new(1, -16, 1, 0)
 	statusText.Position = UDim2.fromOffset(8, 0)
@@ -185,8 +186,10 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	local counting = Theme.label("", 72, blind)
 	counting.Name = "Counting"
 	counting.Font = Enum.Font.GothamBlack
-	counting.AnchorPoint = Vector2.new(0.5, 0.5)
-	counting.Position = UDim2.fromScale(0.5, 0.45)
+	-- At the bottom of the screen, "No peeking!" under it: the status bar, the role banner and
+	-- its tip fill the top (on a phone on its side they reach past the middle).
+	counting.AnchorPoint = Vector2.new(0.5, 1)
+	counting.Position = UDim2.new(0.5, 0, 1, -48)
 	counting.Size = UDim2.fromScale(0.9, 0.16)
 	counting.TextScaled = true
 	counting.TextColor3 = cfg.Colors.Seeker
@@ -198,8 +201,8 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	countingScale.Parent = counting
 	local peek = Theme.label(text.CountingTip, 22, blind)
 	peek.Name = "Tip"
-	peek.AnchorPoint = Vector2.new(0.5, 0)
-	peek.Position = UDim2.fromScale(0.5, 0.56)
+	peek.AnchorPoint = Vector2.new(0.5, 1)
+	peek.Position = UDim2.new(0.5, 0, 1, -14)
 	peek.Size = UDim2.new(0.9, 0, 0, 30)
 	peek.TextScaled = true
 	peek.TextColor3 = Theme.Muted

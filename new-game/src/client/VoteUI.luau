@@ -102,17 +102,22 @@ function VoteUI.Mount(gui: ScreenGui)
 	local mapHeading, mapRow = section("Vote for the next game", 1)
 	local difficultyHeading, difficultyRow = section("Vote for the difficulty", 3)
 
-	-- As wide as the screen allows (on touch screens: between the thumbstick and the jump
-	-- button), up to WIDTH.
-	local function panelWidth(): number
+	-- As wide as the screen allows, up to WIDTH. On touch screens it sits between the
+	-- thumbstick and the jump button's group of round buttons (HEY!, Run), which reach further
+	-- in, so it moves left of the middle.
+	local function placePanel(): number
 		local screen = Layout.Screen()
 		if screen.X <= 0 then
 			return WIDTH -- (not laid out yet)
 		end
-		local clear = if Layout.IsTouch()
-			then Config.UI.TouchBottomSideClear
-			else Config.UI.EdgeMargin
-		return math.clamp(screen.X - 2 * clear, MIN_WIDTH, WIDTH)
+		if not Layout.IsTouch() then
+			panel.Position = UDim2.new(0.5, 0, 1, -24)
+			return math.clamp(screen.X - 2 * Config.UI.EdgeMargin, MIN_WIDTH, WIDTH)
+		end
+		local left = Config.UI.TouchBottomSideClear
+		local width = math.clamp(screen.X - left - Config.UI.TouchActionsClear, MIN_WIDTH, WIDTH)
+		panel.Position = UDim2.new(0, left + width / 2, 1, -24)
+		return width
 	end
 
 	-- Only Ready players can vote (when the server says so).
@@ -180,7 +185,7 @@ function VoteUI.Mount(gui: ScreenGui)
 		-- Phones: someone who can't vote yet only sees the hint.
 		local hintOnly = not enabled and Layout.IsPhone()
 		local hasDifficulty = #state.Difficulties > 0 and not hintOnly
-		local width = panelWidth()
+		local width = placePanel()
 		local mapHeight = if width < NARROW then TALL_ROW_HEIGHT else ROW_HEIGHT
 		hint.Visible = not enabled
 		mapHeading.Visible = not hintOnly

@@ -242,8 +242,10 @@ describe("Panels at full size on a short phone screen", function()
 		local panel = p.gui.Vote
 		local ui = p.Config.UI
 		expect(panel.Hint.Visible).toBe(false)
-		-- As wide as the gap allows, so Layout.Fit has nothing to shrink...
-		expect(panel.Size.X.Offset).toBe(p.width - 2 * ui.TouchBottomSideClear)
+		-- As wide as the gap allows (never under 340), so Layout.Fit has nothing to shrink...
+		local gap = p.width - ui.TouchBottomSideClear - ui.TouchActionsClear
+		expect(panel.Size.X.Offset).toBe(math.max(gap, 340))
+		expect(panel.Position.X.Offset - panel.Size.X.Offset / 2).toBe(ui.TouchBottomSideClear)
 		-- ...and below the Hud (it sits 24 above the bottom edge).
 		expect(p.height - 24 - panel.Size.Y.Offset).toBeGreaterThanOrEqual(p.hudBottom)
 		local buttons = 0
@@ -256,6 +258,15 @@ describe("Panels at full size on a short phone screen", function()
 			end
 		end
 		expect(buttons).toBe(5)
+		-- An iPhone 14 on its side: the panel ends before the round buttons by the jump button
+		-- (HEY!, Run), so a tap on "Hard" never lands on them.
+		local phone = screen(749, 309, true)
+		phone.rt:require(phone.Client.VoteUI).Mount(phone.gui)
+		phone.player:SetAttribute("Ready", true)
+		phone.rt:fire(phone.remotes.VoteUpdate, "OnClientEvent", voteState())
+		local vote = phone.gui.Vote
+		local right = vote.Position.X.Offset + vote.Size.X.Offset / 2
+		expect(right <= phone.width - ui.TouchActionsClear).toBe(true)
 		-- PC and tablets keep the wide panel.
 		local pc = screen(1280, 760, false)
 		pc.rt:require(pc.Client.VoteUI).Mount(pc.gui)

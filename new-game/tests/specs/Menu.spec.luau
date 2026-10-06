@@ -169,8 +169,16 @@ describe("MenuLogic", function()
 				check(grid.Width <= screen.X - 2 * margin, "too wide")
 				check(grid.Height <= screen.Y - 2 * margin, "too tall")
 				check(grid.Height <= p.MaxHeight, "taller than MaxHeight")
-				check(grid.Columns >= 1 and grid.Columns <= p.MaxColumns, "bad column count")
+				check(
+					grid.Columns >= 1
+						and grid.Columns <= math.max(p.MaxColumns, p.ShortScreenMaxColumns),
+					"bad column count"
+				)
 				check(grid.Cell <= p.TileMaxWidth, "tiles too wide")
+				check(
+					grid.TileHeight >= p.TileMinHeight and grid.TileHeight <= p.TileHeight,
+					"bad tile height"
+				)
 				if grid.Columns > 1 then
 					check(grid.Cell >= p.TileMinWidth, "tiles too narrow")
 				end
@@ -178,6 +186,16 @@ describe("MenuLogic", function()
 		end
 		-- An upright 360-wide phone still gets 3 tiles per row.
 		expect(MenuLogic.Grid(Vector2.new(360, 640), 11).Columns).toBeGreaterThanOrEqual(3)
+		-- Phones on their side (iPhone 14 in Studio: 749x309 below the top bar): all 11 tiles
+		-- show without scrolling.
+		for _, phone in { Vector2.new(749, 309), Vector2.new(667, 317) } do
+			local grid = MenuLogic.Grid(phone, 11)
+			local rows = math.ceil(11 / grid.Columns)
+			local tiles = rows * grid.TileHeight + (rows - 1) * p.TileGap + 2 * MenuLogic.TileInset
+			expect(p.HeaderHeight + tiles + p.FooterHeight <= grid.Height).toBe(true)
+		end
+		-- A big screen keeps the normal tiles.
+		expect(MenuLogic.Grid(Vector2.new(1920, 1017), 11).TileHeight).toBe(p.TileHeight)
 	end)
 
 	it("never puts the Menu button over the Hud", function()

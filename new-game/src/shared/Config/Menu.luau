@@ -65,6 +65,11 @@ return {
 		TileMaxWidth = 130, -- ...and at most this wide
 		TileGap = 10,
 		MaxColumns = 4, -- most tiles in one row
+		-- Short screens (phones on their side): when the rows don't fit, a row may hold up to
+		-- this many tiles (using the whole screen width), and then tiles get shorter, down to
+		-- TileMinHeight, so every tile shows without scrolling.
+		ShortScreenMaxColumns = 6,
+		TileMinHeight = 64,
 		TileTextSize = 15,
 		IconSize = 32,
 	},

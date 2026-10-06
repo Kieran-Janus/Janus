@@ -17,6 +17,7 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
@@ -70,6 +71,7 @@ local NOTES: { [string]: string } = {
 }
 
 local GOLD = Color3.fromRGB(255, 210, 60)
+local GRAB_REACH = 400 -- studs a click's ray looks for your candy (the server checks the distance)
 
 -- A sound from Config.Minigames.CandyRush.Sounds (their tables differ a little, hence any).
 local function play(spec: any)
@@ -141,6 +143,22 @@ local function watchCandies(me: Player)
 		watchStation(station)
 	end
 	CollectionService:GetInstanceAddedSignal(Tags.CandyRushStation):Connect(watchStation)
+end
+
+-- Your own candies on every stand (usually one at a time).
+local function myCandies(me: Player): { Instance }
+	local list = {}
+	for _, station in CollectionService:GetTagged(Tags.CandyRushStation) do
+		local folder = station:FindFirstChild("Candies")
+		if folder then
+			for _, candy in folder:GetChildren() do
+				if candy:IsA("Model") and candy:GetAttribute("OwnerUserId") == me.UserId then
+					table.insert(list, candy)
+				end
+			end
+		end
+	end
+	return list
 end
 
 -- Turns whatever arrived over the network into a State (or nil to hide everything).
@@ -548,6 +566,44 @@ function CandyRushUI.Mount(gui: ScreenGui)
 		-- should wait for it.
 		local Remotes = require(ReplicatedStorage.Shared.Remotes)
 		Remotes.Event("CandyRushState").OnClientEvent:Connect(onState)
+		local grab = Remotes.Event("CandyRushGrab")
+
+		-- Clicks and taps: a ray that only sees your own candy, so your character (or a big
+		-- hat) between the camera and your lane can't block it. The candies' click detectors
+		-- still work too; the server counts whichever arrives first, once.
+		local function tryGrab(point: Vector2)
+			local state = current
+			if not (state and state.InRace and state.Phase == "Live" and not state.Out) then
+				return
+			end
+			local yours = myCandies(me)
+			local camera = workspace.CurrentCamera
+			if #yours == 0 or not camera then
+				return
+			end
+			local ray = camera:ViewportPointToRay(point.X, point.Y)
+			local params = RaycastParams.new()
+			params.FilterType = Enum.RaycastFilterType.Include
+			params.FilterDescendantsInstances = yours
+			local hit = workspace:Raycast(ray.Origin, ray.Direction * GRAB_REACH, params)
+			local node: Instance? = hit and hit.Instance
+			while node and not table.find(yours, node) do
+				node = node.Parent
+			end
+			if node then
+				grab:FireServer(node)
+			end
+		end
+		UserInputService.InputBegan:Connect(function(input, processed)
+			if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 then
+				tryGrab(UserInputService:GetMouseLocation())
+			end
+		end)
+		UserInputService.TouchTapInWorld:Connect(function(position, processedByUI)
+			if not processedByUI then
+				tryGrab(position)
+			end
+		end)
 	end)
 end
 

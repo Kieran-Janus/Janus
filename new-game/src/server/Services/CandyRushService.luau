@@ -1327,12 +1327,30 @@ local function ensureStand()
 	end
 end
 
+-- A click or tap the player's screen spotted itself (CandyRushUI aims only at your own candy,
+-- so your own character can't block it). The same checks as the click detectors.
+local function onGrab(player: Player, candy: unknown)
+	if typeof(candy) ~= "Instance" or not candy:IsA("Model") then
+		return
+	end
+	for _, station in stations do
+		local race = station.Race
+		local runner = race and race.Runners[player]
+		if race and runner and runner.Candy == candy then
+			onClick(station, race, runner, candy, player)
+			return
+		end
+	end
+end
+
 function CandyRushService.Start()
-	-- Created even when Candy Rush is off, so a client never waits for it.
+	-- Created even when Candy Rush is off, so a client never waits for them.
 	stateRemote = Remotes.Event("CandyRushState")
+	local grabRemote = Remotes.Event("CandyRushGrab")
 	if not Config.Features.CandyRush then
 		return -- (HubService takes the stand out of the running game)
 	end
+	grabRemote.OnServerEvent:Connect(onGrab)
 	local ok, err = pcall(ensureStand :: any)
 	if not ok then
 		warn("[CandyRushService] Couldn't build the Candy Rush stand: " .. tostring(err))

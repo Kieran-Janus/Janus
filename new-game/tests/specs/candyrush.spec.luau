@@ -424,6 +424,20 @@ describe("Candy Rush races", function()
 		expect(fromPad).toBeLessThan(cfg.ClickDistance)
 	end)
 
+	it("takes grabs the screen spotted (CandyRushGrab) with the same checks", function()
+		local grab = rt:find("ReplicatedStorage.Remotes.CandyRushGrab")
+		expect(grab).toBeInstanceOf("RemoteEvent")
+		rt:advance(0.3)
+		local amys = w.candyOf(a)
+		local bens = w.candyOf(b)
+		rt:fireServer(grab, b, amys) -- someone else's candy: nothing
+		expect(amys.Parent).never.toBeNil()
+		rt:fireServer(grab, b, "not a candy") -- junk: nothing
+		rt:fireServer(grab, b, bens) -- your own: popped
+		expect(bens.Parent).toBeNil()
+		rt:fireServer(grab, b, bens) -- the same candy again: nothing more
+	end)
+
 	it("pays the first to grab them all and counts the win", function()
 		local coinsA = DataService.Get(a).Coins
 		local coinsB = DataService.Get(b).Coins
