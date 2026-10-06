@@ -12,7 +12,7 @@ return {
 	LobbySpectate = true, -- players in the lobby can watch the round (Menu > Spectate)
 	Menu = true, -- the top-left Menu button with tiles for every panel
 	KingHunt = true, -- the classic mode: grab pumpkins and hide from the Pumpkin King
-	HideSeek = false, -- Pumpkin Hide & Seek: seekers with candy guns vs pumpkin hiders
+	HideSeek = true, -- Pumpkin Hide & Seek: seekers with candy guns vs pumpkin hiders
 	ScareMaze = false, -- ScareMaze: Survivors run the maze, Haunters scare them
 	Parkour = true, -- the parkour course in the lobby
 	CandyRush = true, -- lobby minigame: click your candies, first to clear them all wins
