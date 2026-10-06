@@ -1040,6 +1040,7 @@ local function addGlowAndAura(ctx: Dress, root: BasePart, style: any)
 		emitter.Rotation = NumberRange.new(0, 360)
 		emitter.RotSpeed = NumberRange.new(-look.Spin, look.Spin)
 		emitter.LightEmission = look.Glow
+		emitter.LightInfluence = 1 - math.clamp(look.Glow, 0, 1) -- glowing bits shine at night
 		emitter.SpreadAngle = Vector2.new(look.Spread, look.Spread)
 		emitter.Color = if ctx.Rainbow then rainbowSequence() else ColorSequence.new(c1, c2)
 		emitter.Parent = holder
@@ -1511,6 +1512,17 @@ local function wearSkin(character: Model, item: any, head: BasePart, root: BaseP
 		for _, child in character:GetChildren() do
 			if child:IsA("Clothing") or child:IsA("ShirtGraphic") then
 				(child :: Instance).Parent = stashIn(character)
+			elseif child:IsA("Accessory") then
+				-- 3D (layered) clothes: jackets, shirts and shoes that wrap the body
+				local handle = child:FindFirstChild("Handle")
+				if
+					handle
+					and handle:IsA("BasePart")
+					and handle:FindFirstChildOfClass("WrapLayer")
+				then
+					remember(handle, "Transparency", handle.Transparency)
+					handle.Transparency = 1
+				end
 			end
 		end
 	end

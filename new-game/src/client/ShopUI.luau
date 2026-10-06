@@ -473,6 +473,7 @@ function ShopUI.Mount(gui: ScreenGui)
 			)
 			none.TextColor3 = Theme.Muted
 			grid.CellSize = UDim2.new(1, -10, 0, 40)
+			updateButtons() -- (the coins label)
 			return
 		end
 		for i = (page - 1) * pageSize + 1, math.min(#items, page * pageSize) do

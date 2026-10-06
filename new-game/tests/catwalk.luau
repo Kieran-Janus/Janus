@@ -176,7 +176,11 @@ local function r15(name: string, x: number, z: number): any
 	rigPart(m, "LowerTorso", Vector3.new(2, 0.4, 1), at(0, 2.8), PANTS)
 	rigPart(m, "UpperTorso", Vector3.new(2, 1.6, 1), at(0, 3.8), SHIRT)
 	local head = rigPart(m, "Head", Vector3.new(1.2, 1.2, 1.2), at(0, 5.2), SKIN)
-	rt:create("SpecialMesh", { MeshType = Enum.MeshType.Head, Scale = Vector3.new(1.25, 1.25, 1.25) }, head)
+	rt:create(
+		"SpecialMesh",
+		{ MeshType = Enum.MeshType.Head, Scale = Vector3.new(1.25, 1.25, 1.25) },
+		head
+	)
 	rt:create("Decal", { Name = "face" }, head)
 	for _, side in { -1, 1 } do
 		local prefix = if side < 0 then "Left" else "Right"
@@ -185,7 +189,13 @@ local function r15(name: string, x: number, z: number): any
 		rigPart(m, prefix .. "Hand", Vector3.new(1, 0.3, 1), at(side * 1.5, 2.35), SKIN)
 		rigPart(m, prefix .. "UpperLeg", Vector3.new(1, 1.2, 1), at(side * 0.5, 2.0), PANTS)
 		rigPart(m, prefix .. "LowerLeg", Vector3.new(1, 1.1, 1), at(side * 0.5, 0.85), PANTS)
-		rigPart(m, prefix .. "Foot", Vector3.new(1, 0.3, 1), at(side * 0.5, 0.15), Color3.fromRGB(40, 35, 45))
+		rigPart(
+			m,
+			prefix .. "Foot",
+			Vector3.new(1, 0.3, 1),
+			at(side * 0.5, 0.15),
+			Color3.fromRGB(40, 35, 45)
+		)
 	end
 	rt:create("Humanoid", {}, m)
 	rt:create("Shirt", {}, m)
@@ -204,7 +214,11 @@ local function r6(name: string, x: number, z: number): any
 	root.Transparency = 1
 	rigPart(m, "Torso", Vector3.new(2, 2, 1), at(0, 3), SHIRT)
 	local head = rigPart(m, "Head", Vector3.new(2, 1, 1), at(0, 4.5), SKIN)
-	rt:create("SpecialMesh", { MeshType = Enum.MeshType.Head, Scale = Vector3.new(1.25, 1.25, 1.25) }, head)
+	rt:create(
+		"SpecialMesh",
+		{ MeshType = Enum.MeshType.Head, Scale = Vector3.new(1.25, 1.25, 1.25) },
+		head
+	)
 	for _, side in { -1, 1 } do
 		local prefix = if side < 0 then "Left" else "Right"
 		rigPart(m, prefix .. " Arm", Vector3.new(1, 2, 1), at(side * 1.5, 3), SKIN)
@@ -255,11 +269,13 @@ for r, row in rows do
 				for k = 1, count do
 					local a = math.pi * 0.8 + (k - 1) / count * math.pi * 2
 					local piece = HeadPieces.Orbit(crazy.Orbit, nil, settings.OrbitScale)
-					piece:PivotTo(CFrame.new(
-						x + math.cos(a) * settings.OrbitRadius,
-						3.4 + settings.OrbitHeight + math.sin(k * 2) * settings.OrbitBob,
-						z + math.sin(a) * settings.OrbitRadius
-					) * CFrame.Angles(0, -a, 0))
+					piece:PivotTo(
+						CFrame.new(
+							x + math.cos(a) * settings.OrbitRadius,
+							3.4 + settings.OrbitHeight + math.sin(k * 2) * settings.OrbitBob,
+							z + math.sin(a) * settings.OrbitRadius
+						) * CFrame.Angles(0, -a, 0)
+					)
 					piece.Parent = scene
 				end
 			end
@@ -273,7 +289,11 @@ for r, row in rows do
 			Anchored = true,
 		}, scene)
 		local gui = rt:create("SurfaceGui", { Face = Enum.NormalId.Top }, sign)
-		rt:create("TextLabel", { Text = item.Name .. " (" .. Items.RarityInfo(item).Name .. ")" }, gui)
+		rt:create(
+			"TextLabel",
+			{ Text = item.Name .. " (" .. Items.RarityInfo(item).Name .. ")" },
+			gui
+		)
 		count += 1
 	end
 end
@@ -287,7 +307,15 @@ local stats = Export.write(output, { scene }, {
 	lighting = Config.Hub.Lighting,
 	meta = { source = "new-game/tests/catwalk.luau", kind = "catwalk", name = mode },
 })
-print(("wrote %s: %d skins, %d parts, %d lights, %d effects"):format(output, count, stats.parts, stats.lights, stats.effects))
+print(
+	("wrote %s: %d skins, %d parts, %d lights, %d effects"):format(
+		output,
+		count,
+		stats.parts,
+		stats.lights,
+		stats.effects
+	)
+)
 local renderer = exporterPath:gsub("export%.luau$", "render.mjs")
 local cameras = {}
 for r, row in rows do
