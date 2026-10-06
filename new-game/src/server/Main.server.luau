@@ -11,6 +11,7 @@ local Services = script.Parent:WaitForChild("Services")
 -- Start order matters: earlier services are ready before later ones start.
 local ORDER = {
 	"SfxService", -- first: creates the sound groups the hub music uses
+	"AnnounceService", -- server-wide banners (the Announce remote), used by later services
 	"HubService", -- early, so the hub spawn exists before characters load
 	"DataService",
 	"ShopService",
@@ -33,6 +34,7 @@ local ORDER = {
 	"VotingService",
 	"AIService",
 	"ParkourService", -- lobby extras: they work between and during rounds
+	"TowerService", -- the Tormented Tower (after ParkourService: they share the course runner)
 	"CandyRushService",
 	"WebScourService",
 	"EasterEggService",

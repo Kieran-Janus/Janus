@@ -20,7 +20,7 @@ return {
 		WebScour = { Offset = Vector3.new(-38, 0, -32), Size = Vector3.new(32, 0, 26) },
 		-- (the course spirals up to about 90 studs; deeper at the back, so its front still clears
 		-- the clock tower)
-		Parkour = { Offset = Vector3.new(0, 0, -82), Size = Vector3.new(76, 0, 48), Height = 120 },
+		Parkour = { Offset = Vector3.new(0, 0, -86), Size = Vector3.new(76, 0, 48), Height = 120 },
 		Crates = { Offset = Vector3.new(46, 0, 6), Size = Vector3.new(20, 0, 12) }, -- crate stand by the shop
 	} :: { [string]: { Offset: Vector3, Size: Vector3, Height: number? } },
 
@@ -110,8 +110,17 @@ return {
 				Text = "PARKOUR",
 				Color = Color3.fromRGB(255, 220, 60),
 				Feature = "Parkour",
-				Offset = Vector3.new(-23, 0, -55),
-				LookAt = Vector3.new(-23, 0, -80),
+				Offset = Vector3.new(-26, 0, -58),
+				LookAt = Vector3.new(-26, 0, -84),
+			},
+			{
+				Zone = "TowerParkour", -- the Tormented Tower's doorway (Config.TowerParkour)
+				Text = "TORMENTED TOWER - only the bravest",
+				Color = Color3.fromRGB(255, 60, 70),
+				Feature = "TowerParkour",
+				Offset = Vector3.new(0, 0, -29), -- in front of the clock tower's door
+				LookAt = Vector3.new(0, 0, -47),
+				Width = 16,
 			},
 		} :: {
 			{

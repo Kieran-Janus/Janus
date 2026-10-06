@@ -2,6 +2,8 @@
 --[[
 	Parkour screen bits ("Spooky Sky Climb", settings in Config.Parkour; on/off:
 	Config.Features.Parkour, off = Mount does nothing and nothing shows).
+	ParkourUI.MountCourse(gui, spec) shows the same bits for another course (the Tormented
+	Tower, client TowerUI), with its own attributes, remotes and words.
 
 	  ParkourTimer   a small timer just below the bar at the top while you climb, with the
 	                 checkpoints you have and a Stop button
@@ -29,10 +31,24 @@ local Theme = require(script.Parent.Theme)
 
 local ParkourUI = {}
 
-local cfg = Config.Parkour
-local text = cfg.Text
+local cfg = Config.Parkour -- the look, sounds and timings (shared by every course)
 local screen = cfg.Screen
 local colors = screen.Colors
+
+-- One course's screen: its switch, player attributes (<Prefix>Run...), remotes and words.
+export type CourseSpec = {
+	Feature: string, -- its Config.Features switch
+	Prefix: string, -- player attributes and UI names: <Prefix>Run, <Prefix>Timer...
+	CountAttribute: string, -- ReplicatedStorage attribute: how many checkpoints
+	Event: string, -- remote names
+	Request: string,
+	Text: { [string]: string },
+	TileId: string, -- its Menu tile
+	TileOrder: number,
+	Watch: { string }, -- player attributes that change the panel
+	FinishLine: (info: { [string]: any }) -> (string, Color3), -- under the finish time
+	RewardLine: () -> (string, Color3), -- the prize line in the panel
+}
 
 -- A Config.Parkour.Sounds entry ({ SoundId, Volume?, PitchMin?, PitchMax? }).
 local function play(spec: any)
@@ -52,10 +68,10 @@ local function textSize(label: TextLabel, max: number)
 end
 
 -- Asks the server; returns its answer (never errors, never waits forever on a missing remote).
-local function request(action: string): (boolean, string)
-	-- (The remote is made by src/server/Services/ParkourService.luau, see shared/Remotes.luau.)
+local function request(name: string, action: string): (boolean, string)
+	-- (The remote is made by the course's service on the server, see shared/Remotes.luau.)
 	local folder = ReplicatedStorage:FindFirstChild("Remotes")
-	local remote = folder and folder:FindFirstChild("ParkourRequest")
+	local remote = folder and folder:FindFirstChild(name)
 	if not (remote and remote:IsA("RemoteFunction")) then
 		return false, ""
 	end
@@ -68,19 +84,25 @@ local function request(action: string): (boolean, string)
 	return done == true, if type(message) == "string" then message else ""
 end
 
-function ParkourUI.Mount(gui: ScreenGui)
-	if not Config.Features.Parkour then
+function ParkourUI.MountCourse(gui: ScreenGui, spec: CourseSpec)
+	local features = Config.Features :: any
+	if not features[spec.Feature] then
 		return
 	end
 	local player = Players.LocalPlayer
+	local text = spec.Text
+	local prefix = spec.Prefix
+	local function attr(name: string): any
+		return player:GetAttribute(prefix .. name)
+	end
 
 	local function checkpointCount(): number
-		return number(ReplicatedStorage:GetAttribute("ParkourCheckpoints"))
+		return number(ReplicatedStorage:GetAttribute(spec.CountAttribute))
 	end
 
 	-- Timer ------------------------------------------------------------------------------------
 	local timer = Theme.panel(gui)
-	timer.Name = "ParkourTimer"
+	timer.Name = prefix .. "Timer"
 	timer.AnchorPoint = Vector2.new(0.5, 0)
 	timer.Position = UDim2.new(0.5, 0, 0, 80)
 	timer.Size = UDim2.fromOffset(230, 54)
@@ -106,7 +128,7 @@ function ParkourUI.Mount(gui: ScreenGui)
 	stopButton.Position = UDim2.new(1, -8, 0.5, 0)
 	stopButton.Size = UDim2.fromOffset(62, 36)
 	stopButton.Activated:Connect(function()
-		task.spawn(request, "Stop")
+		task.spawn(request, spec.Request, "Stop")
 	end)
 
 	-- Keep the timer just below the bar at the top (the Hud), wherever that is.
@@ -142,27 +164,26 @@ function ParkourUI.Mount(gui: ScreenGui)
 	place()
 
 	local function refreshTimer()
-		local state = player:GetAttribute("ParkourRun")
+		local state = attr("Run")
 		local running = state == "Running"
 		timer.Visible = state == "Ready" or running
 		if not timer.Visible then
 			return
 		end
 		local count = checkpointCount()
-		local reached = number(player:GetAttribute("ParkourReached"))
+		local reached = number(attr("Reached"))
 		if running then
-			local elapsed = workspace:GetServerTimeNow()
-				- number(player:GetAttribute("ParkourStarted"))
+			local elapsed = workspace:GetServerTimeNow() - number(attr("Started"))
 			time.Text = text.Timer:format(ParkourLogic.FormatTime(elapsed))
 		else
 			time.Text = text.Ready
 		end
 		detail.Text = if count > 0 then text.CheckpointCount:format(reached, count) else ""
 	end
-	player:GetAttributeChangedSignal("ParkourRun"):Connect(refreshTimer)
-	player:GetAttributeChangedSignal("ParkourReached"):Connect(refreshTimer)
+	player:GetAttributeChangedSignal(prefix .. "Run"):Connect(refreshTimer)
+	player:GetAttributeChangedSignal(prefix .. "Reached"):Connect(refreshTimer)
 	RunService.Heartbeat:Connect(function()
-		if timer.Visible and player:GetAttribute("ParkourRun") == "Running" then
+		if timer.Visible and attr("Run") == "Running" then
 			refreshTimer()
 		end
 	end)
@@ -170,7 +191,7 @@ function ParkourUI.Mount(gui: ScreenGui)
 
 	-- Short messages ---------------------------------------------------------------------------
 	local popLabel = Theme.label("", 34, gui)
-	popLabel.Name = "ParkourPop"
+	popLabel.Name = prefix .. "Pop"
 	popLabel.Font = Enum.Font.GothamBlack
 	popLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 	popLabel.Position = UDim2.fromScale(0.5, 0.34)
@@ -214,7 +235,7 @@ function ParkourUI.Mount(gui: ScreenGui)
 
 	-- Finish banner ----------------------------------------------------------------------------
 	local banner = Theme.panel(gui)
-	banner.Name = "ParkourFinish"
+	banner.Name = prefix .. "Finish"
 	banner.AnchorPoint = Vector2.new(0.5, 0.5)
 	banner.Position = UDim2.fromScale(0.5, 0.42)
 	banner.Size = UDim2.fromOffset(380, 176)
@@ -254,7 +275,6 @@ function ParkourUI.Mount(gui: ScreenGui)
 	local function showFinish(info: { [string]: any })
 		local finishTime = number(info.Time)
 		local best = number(info.Best)
-		local coins = number(info.Coins)
 		bannerTitle.Text = text.Finished
 		bannerTime.Text = text.FinishTime:format(ParkourLogic.FormatTime(finishTime))
 		if info.NewBest == true then
@@ -264,13 +284,9 @@ function ParkourUI.Mount(gui: ScreenGui)
 			bannerBest.Text = text.Best:format(ParkourLogic.FormatTime(best))
 			bannerBest.TextColor3 = Theme.Muted
 		end
-		if coins > 0 then
-			bannerCoins.Text = text.Coins:format(coins, Config.Economy.CurrencyName)
-			bannerCoins.TextColor3 = colors.Finish
-		else
-			bannerCoins.Text = text.CoinsLater:format(ParkourLogic.FormatWait(number(info.Wait)))
-			bannerCoins.TextColor3 = Theme.Muted
-		end
+		local line, lineColor = spec.FinishLine(info)
+		bannerCoins.Text = line
+		bannerCoins.TextColor3 = lineColor
 		bannerId += 1
 		local id = bannerId
 		banner.Visible = true
@@ -283,7 +299,7 @@ function ParkourUI.Mount(gui: ScreenGui)
 
 	-- Panel (Menu > Parkour) -------------------------------------------------------------------
 	local panel = Theme.panel(gui)
-	panel.Name = "ParkourPanel"
+	panel.Name = prefix .. "Panel"
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
 	panel.Size = UDim2.fromOffset(360, 280)
@@ -339,21 +355,16 @@ function ParkourUI.Mount(gui: ScreenGui)
 	end)
 
 	local function refreshPanel()
-		local best = number(player:GetAttribute("ParkourBest"))
+		local best = number(attr("Best"))
 		bestLine.Text = if best > 0
 			then text.Best:format(ParkourLogic.FormatTime(best))
 			else text.NoBest
-		runsLine.Text = text.Runs:format(number(player:GetAttribute("ParkourRuns")))
-		local wait = number(player:GetAttribute("ParkourRewardAt")) - workspace:GetServerTimeNow()
-		if wait > 0 then
-			rewardLine.Text = text.RewardWait:format(ParkourLogic.FormatWait(wait))
-			rewardLine.TextColor3 = Theme.Muted
-		else
-			rewardLine.Text = text.RewardReady:format(cfg.Reward.Coins, Config.Economy.CurrencyName)
-			rewardLine.TextColor3 = colors.Finish
-		end
+		runsLine.Text = text.Runs:format(number(attr("Runs")))
+		local line, lineColor = spec.RewardLine()
+		rewardLine.Text = line
+		rewardLine.TextColor3 = lineColor
 	end
-	for _, name in { "ParkourBest", "ParkourRuns", "ParkourRewardAt" } do
+	for _, name in spec.Watch do
 		player:GetAttributeChangedSignal(name):Connect(function()
 			if panel.Visible then
 				refreshPanel()
@@ -367,7 +378,7 @@ function ParkourUI.Mount(gui: ScreenGui)
 		end
 		busy = true
 		task.spawn(function()
-			local done, message = request("GoToStart")
+			local done, message = request(spec.Request, "GoToStart")
 			busy = false
 			if done then
 				panel.Visible = false
@@ -400,21 +411,21 @@ function ParkourUI.Mount(gui: ScreenGui)
 
 	if Config.Features.Menu then
 		MenuUI.AddTile({
-			Id = "Parkour",
+			Id = spec.TileId,
 			Label = text.Tile,
-			Order = 10,
+			Order = spec.TileOrder,
 			Visible = function()
-				return Config.Features.Parkour
+				return features[spec.Feature] == true
 			end,
 			Status = function(): string?
-				local best = number(player:GetAttribute("ParkourBest"))
+				local best = number(attr("Best"))
 				return if best > 0 then ParkourLogic.FormatTime(best) else nil
 			end,
 			OnClick = openPanel,
 		})
 	else
-		local button = Layout.SideButton(text.Tile, 5)
-		button.Name = "ParkourButton"
+		local button = Layout.SideButton(text.Tile, spec.TileOrder)
+		button.Name = prefix .. "Button"
 		button.Activated:Connect(function()
 			if panel.Visible then
 				panel.Visible = false
@@ -428,7 +439,7 @@ function ParkourUI.Mount(gui: ScreenGui)
 	task.spawn(function()
 		-- Required here, not at the top: it waits for the server's Remotes folder.
 		local Remotes = require(ReplicatedStorage.Shared.Remotes)
-		local event = Remotes.Event("ParkourEvent")
+		local event = Remotes.Event(spec.Event)
 		event.OnClientEvent:Connect(function(kind: unknown, info: unknown)
 			if type(kind) ~= "string" then
 				return
@@ -483,6 +494,39 @@ function ParkourUI.Mount(gui: ScreenGui)
 			end
 		end)
 	end)
+end
+
+-- The lobby parkour ("Spooky Sky Climb"): coins once every Reward.CooldownHours.
+function ParkourUI.Mount(gui: ScreenGui)
+	local player = Players.LocalPlayer
+	local text = cfg.Text
+	ParkourUI.MountCourse(gui, {
+		Feature = "Parkour",
+		Prefix = "Parkour",
+		CountAttribute = "ParkourCheckpoints",
+		Event = "ParkourEvent",
+		Request = "ParkourRequest",
+		Text = text,
+		TileId = "Parkour",
+		TileOrder = 10,
+		Watch = { "ParkourBest", "ParkourRuns", "ParkourRewardAt" },
+		FinishLine = function(info: { [string]: any }): (string, Color3)
+			local coins = number(info.Coins)
+			if coins > 0 then
+				return text.Coins:format(coins, Config.Economy.CurrencyName), colors.Finish
+			end
+			return text.CoinsLater:format(ParkourLogic.FormatWait(number(info.Wait))), Theme.Muted
+		end,
+		RewardLine = function(): (string, Color3)
+			local wait = number(player:GetAttribute("ParkourRewardAt"))
+				- workspace:GetServerTimeNow()
+			if wait > 0 then
+				return text.RewardWait:format(ParkourLogic.FormatWait(wait)), Theme.Muted
+			end
+			return text.RewardReady:format(cfg.Reward.Coins, Config.Economy.CurrencyName),
+				colors.Finish
+		end,
+	})
 end
 
 return ParkourUI

@@ -278,6 +278,10 @@ function ShopUI.Mount(gui: ScreenGui)
 			if item.Slot ~= tab then
 				continue
 			end
+			-- Won some other way (the Tormented Tower's skin): only shown once you own it.
+			if item.Exclusive and not owns(item.Id) then
+				continue
+			end
 			if filters.Owned and not usable(item) then
 				continue
 			end

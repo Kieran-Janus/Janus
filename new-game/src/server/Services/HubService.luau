@@ -45,6 +45,7 @@ local Hub = script.Parent.Parent.Hub
 local HubBuilder = require(Hub.HubBuilder)
 local HubPalette = require(Hub.HubPalette)
 local HubSolid = require(Hub.HubSolid)
+local TowerSection = require(Hub.Sections.TowerParkour)
 local Npcs = require(Hub.Npcs)
 
 local HubService = {}
@@ -357,6 +358,10 @@ local function prepare(hub: Model)
 		function()
 			-- After the custom props, so your own models are made solid too.
 			HubSolid.Apply(hub)
+		end,
+		function()
+			-- After HubSolid: the clock tower's hollow middle stays walk-through (Tormented Tower).
+			TowerSection.Fit(hub)
 		end,
 		function()
 			HubBuilder.ApplyCustomNpcs(hub)

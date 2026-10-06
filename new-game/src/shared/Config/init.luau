@@ -75,6 +75,8 @@ local Config = {
 	Skins = require(script.Skins.Settings),
 	Menu = require(script.Menu),
 	Dances = require(script.Dances),
+	TowerParkour = require(script.TowerParkour),
+	Announce = require(script.Announce),
 
 	Game = {
 		Name = "Pumpkin Panic", -- working title, see docs/DESIGN.md
@@ -577,9 +579,9 @@ local Config = {
 	]]
 	Hub = {
 		Name = "Spooky Town Square",
-		-- Bump this number (6 -> 7) whenever the hub code or these settings change in a way the
+		-- Bump this number (7 -> 8) whenever the hub code or these settings change in a way the
 		-- saved hub should pick up: a saved hub with a lower number is rebuilt on the next start.
-		BuildVersion = 6,
+		BuildVersion = 7,
 		Center = Vector3.new(0, 0, 0), -- top of the baseplate
 		Seed = 31, -- random variation in decorations (change it for a different scatter)
 		Radius = 105, -- cobblestone plaza (room for 32 players)
@@ -596,10 +598,11 @@ local Config = {
 		NameTagDistance = 120, -- NPC name tags hide further away than this (studs)
 		-- Phones: the whole lobby (with the minigames and parkour) should stay under these.
 		-- tests/specs/HubLook.spec.luau checks them. With every lobby feature switched on the
-		-- lobby is about 3,900 parts and 83 lights (decorations about 1,900; parkour, Candy Rush,
-		-- Web Scour, the crate stand and the eggs about 1,300). Most parts are anchored and cast no
-		-- shadow, which phones handle well; lights cost more, so keep MaxLights where it is.
-		Budget = { MaxParts = 4200, MaxLights = 90 },
+		-- lobby is about 4,230 parts and 88 lights (decorations about 1,900; the 60-jump parkour,
+		-- the Tormented Tower, Candy Rush, Web Scour, the crate stand and the eggs about 1,600).
+		-- Most parts are anchored and cast no shadow, which phones handle well; lights cost more,
+		-- so keep MaxLights where it is.
+		Budget = { MaxParts = 4300, MaxLights = 90 },
 
 		--[[
 			Lighting. Dusk: a purple sky with an orange glow, warm lamps.
@@ -733,9 +736,9 @@ local Config = {
 
 		ClockTower = {
 			Offset = Vector3.new(0, 0, -47),
-			Floors = 5,
+			Floors = 7, -- the Tormented Tower climbs inside (Config.TowerParkour)
 			FloorHeight = 8.5,
-			Width = 15,
+			Width = 22, -- room for the Tormented Tower inside
 			Lean = 2.2, -- degrees each floor tilts, for the crooked look
 			Twist = 4, -- degrees each floor turns
 			ClockTime = { Hour = 11, Minute = 55 }, -- the hands are frozen just before midnight
@@ -1416,6 +1419,7 @@ local Config = {
 			-- v2
 			EasterEggs = {} :: { [string]: boolean }, -- [eggId] = true once found
 			Parkour = { Best = 0, LastReward = 0, Runs = 0 }, -- best time (s), os.time() of the last reward, finishes
+			TowerParkour = { Best = 0, Runs = 0, Conquered = false }, -- Tormented Tower: best time (s), finishes, beaten once (skin given)
 			-- Lobby minigames: Candy Rush wins, best solo time (s) and its coin limits (the UTC day
 			-- number, coins earned that day, os.time() of the last reward and of the last solo
 			-- race), the best Web Scour time (s) and the os.time() of its last coins (for its
@@ -1465,6 +1469,19 @@ local Config = {
 -- saves all find them in Config.Shop.Items.
 for _, item in require(script.Skins) do
 	table.insert(Config.Shop.Items, item)
+end
+
+-- The Tormented Tower's own skin (Config.TowerParkour.Skin): only won by beating the tower.
+-- Exclusive = never sold in the shop and in no crate (Items.Price is nil for it).
+do
+	local skin = table.clone(Config.TowerParkour.Skin) :: any
+	skin.Slot = "Skin"
+	skin.Exclusive = "TowerParkour"
+	skin.Theme = "Tower"
+	skin.Style = table.clone(skin.Style)
+	skin.Style.Kind = "Skin"
+	skin.Style.HideClothes = true
+	table.insert(Config.Shop.Items, skin)
 end
 
 return Config

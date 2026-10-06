@@ -16,7 +16,10 @@
 	  ParkourLogic.SizeOf(step) -> Vector3             its Size, or the Kind's default size
 	  ParkourLogic.Footprint(step) -> Footprint        the part of its top you can stand on
 	  ParkourLogic.Jump(a, cfA, b, cfB) -> (gap, rise) edge-to-edge gap and height change
-	  ParkourLogic.Reach(rise) -> number               longest gap a character can jump
+	  ParkourLogic.Reach(rise, speed?, height?) -> number   longest gap a character can jump
+	                                                   (speed: walking by default; height: how
+	                                                   high the jump goes, lower under a ceiling)
+	  ParkourLogic.Headroom(course, jumps, cframes, rules) -> { string }   pieces hanging over jumps
 	  ParkourLogic.Check(course, zoneSize?) -> { string }   problems (empty list = all fine)
 	Parts:
 	  ParkourLogic.TopY(cframe, size) -> number        height of a part's top face
@@ -205,14 +208,75 @@ end
 	The longest flat gap a normal character can jump when the landing is `rise` studs higher
 	(Config.Parkour.Jumps.Character: walking speed, jump height, gravity). 0 = too high.
 ]]
-function ParkourLogic.Reach(rise: number): number
+function ParkourLogic.Reach(rise: number, speed: number?, jumpHeight: number?): number
 	local c = Config.Parkour.Jumps.Character
-	if rise >= c.JumpHeight then
+	local height = jumpHeight or c.JumpHeight
+	if rise >= height then
 		return 0
 	end
-	local up = math.sqrt(2 * c.JumpHeight / c.Gravity)
-	local down = math.sqrt(2 * (c.JumpHeight - rise) / c.Gravity)
-	return c.WalkSpeed * (up + down) + c.Body
+	local up = math.sqrt(2 * height / c.Gravity)
+	local down = math.sqrt(2 * (height - rise) / c.Gravity)
+	return (speed or c.WalkSpeed) * (up + down) + c.Body
+end
+
+--[[
+	Head room: nothing may hang over a jump (or over where you stand before and after it)
+	lower than rules.Headroom studs above it, or players bump their heads mid-jump and fall.
+	A piece hangs SizeOf(piece).Y studs below its top (a gravestone is tall). `jumps` = the
+	indexes of `course` you jump on, in order; `cframes[i]` = the top middle of course[i].
+	Returns readable problems (empty = fine).
+]]
+function ParkourLogic.Headroom(
+	course: { Step },
+	jumps: { number },
+	cframes: { [number]: CFrame },
+	rules: { Headroom: number, HeadroomMargin: number }
+): { string }
+	local problems: { string } = {}
+	local function flat(v: Vector3): Vector3
+		return Vector3.new(v.X, 0, v.Z)
+	end
+	local function radius(step: Step): number
+		local size = ParkourLogic.SizeOf(step)
+		return math.max(size.X, size.Z) / 2
+	end
+	local function toSegment(p: Vector3, a: Vector3, b: Vector3): number
+		local ab = b - a
+		local t = if ab.Magnitude > 1e-6 then math.clamp((p - a):Dot(ab) / ab:Dot(ab), 0, 1) else 0
+		return (p - (a + ab * t)).Magnitude
+	end
+	for k = 2, #jumps do
+		local ia, ib = jumps[k - 1], jumps[k]
+		local pa, pb = cframes[ia].Position, cframes[ib].Position
+		local floor = math.max(pa.Y, pb.Y)
+		for _, ic in jumps do
+			if ic == ia or ic == ib then
+				continue
+			end
+			local c = course[ic]
+			local pc = cframes[ic].Position
+			if pc.Y <= floor then
+				continue -- below the jump: nothing to bump into
+			end
+			local rc = radius(c)
+			local over = toSegment(flat(pc), flat(pa), flat(pb)) < rc + rules.HeadroomMargin
+				or (flat(pc) - flat(pa)).Magnitude < rc + radius(course[ia])
+				or (flat(pc) - flat(pb)).Magnitude < rc + radius(course[ib])
+			local bottom = pc.Y - ParkourLogic.SizeOf(c).Y
+			if over and bottom - floor < rules.Headroom - 1e-6 then
+				table.insert(
+					problems,
+					("%s hangs too low over the jump from %s to %s (keep %.1f studs of head room)."):format(
+						ParkourLogic.StepName(course, ic),
+						ParkourLogic.StepName(course, ia),
+						ParkourLogic.StepName(course, ib),
+						rules.Headroom
+					)
+				)
+			end
+		end
+	end
+	return problems
 end
 
 local function stepName(course: { Step }, i: number): string
@@ -345,50 +409,9 @@ function ParkourLogic.Check(course: { Step }, zoneSize: Vector3?): { string }
 		end
 	end
 
-	-- Head room: nothing may hang over a jump (or over where you stand before and after it)
-	-- lower than Headroom studs above it, or players bump their heads mid-jump and fall. A
-	-- piece hangs SizeOf(piece).Y studs below its top (a gravestone is tall).
-	local function flat(v: Vector3): Vector3
-		return Vector3.new(v.X, 0, v.Z)
-	end
-	local function radius(step: Step): number
-		local size = ParkourLogic.SizeOf(step)
-		return math.max(size.X, size.Z) / 2
-	end
-	local function toSegment(p: Vector3, a: Vector3, b: Vector3): number
-		local ab = b - a
-		local t = if ab.Magnitude > 1e-6 then math.clamp((p - a):Dot(ab) / ab:Dot(ab), 0, 1) else 0
-		return (p - (a + ab * t)).Magnitude
-	end
-	for k = 2, #jumps do
-		local ia, ib = jumps[k - 1], jumps[k]
-		local pa, pb = cframes[ia].Position, cframes[ib].Position
-		local floor = math.max(pa.Y, pb.Y)
-		for _, ic in jumps do
-			if ic == ia or ic == ib then
-				continue
-			end
-			local c = course[ic]
-			local pc = cframes[ic].Position
-			if pc.Y <= floor then
-				continue -- below the jump: nothing to bump into
-			end
-			local rc = radius(c)
-			local over = toSegment(flat(pc), flat(pa), flat(pb)) < rc + rules.HeadroomMargin
-				or (flat(pc) - flat(pa)).Magnitude < rc + radius(course[ia])
-				or (flat(pc) - flat(pb)).Magnitude < rc + radius(course[ib])
-			local bottom = pc.Y - ParkourLogic.SizeOf(c).Y
-			if over and bottom - floor < rules.Headroom - 1e-6 then
-				add(
-					("%s hangs too low over the jump from %s to %s (keep %.1f studs of head room)."):format(
-						stepName(course, ic),
-						stepName(course, ia),
-						stepName(course, ib),
-						rules.Headroom
-					)
-				)
-			end
-		end
+	-- Head room: nothing may hang over a jump (players would bump their heads mid-jump).
+	for _, problem in ParkourLogic.Headroom(course, jumps, cframes, rules) do
+		add(problem)
 	end
 
 	-- Inside the parkour zone.

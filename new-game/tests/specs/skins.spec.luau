@@ -53,15 +53,23 @@ local STYLE_KEYS = {
 local function crateSkins(): { any }
 	local list = {}
 	for _, item in Config.Shop.Items do
-		if item.Slot == "Skin" and item.Theme ~= nil then
+		if item.Slot == "Skin" and item.Theme ~= nil and not item.Exclusive then
 			table.insert(list, item)
 		end
 	end
 	return list
 end
 
+-- Every skin sold or in a crate (an Exclusive one, like the Tormented Tower's, is checked in
+-- towerrun.spec).
 local function skins(): { any }
-	return Items.ForSlot("Skin")
+	local list = {}
+	for _, item in Items.ForSlot("Skin") do
+		if not item.Exclusive then
+			table.insert(list, item)
+		end
+	end
+	return list
 end
 
 -- Fails if game code warned while running fn.

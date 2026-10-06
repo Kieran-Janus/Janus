@@ -39,6 +39,7 @@ local ORDER = {
 	"Spectate",
 	"CrateUI",
 	"ParkourUI",
+	"TowerUI", -- the Tormented Tower (the parkour screen with its own words)
 	"CandyRushUI",
 	"WebScourUI",
 	"EasterEggUI",
@@ -51,6 +52,7 @@ local ORDER = {
 	"ReadySign", -- the "READY x / y" sign over the Ready pad
 	"VoteBoardUI",
 	"ZoneLighting",
+	"AnnounceUI", -- server-wide banners ("X conquered the Tormented Tower!")
 }
 
 local gui = Instance.new("ScreenGui")

@@ -135,7 +135,7 @@ function HubPaths.Network(): { Path }
 						from,
 						towerCentre - dir * (towerHalf + 2) + offset,
 						towerCentre + offset,
-						to + offset * 0.6,
+						to + offset, -- (straight on past the tower's back steps)
 					},
 					Width = width,
 					Zone = entry.Zone,

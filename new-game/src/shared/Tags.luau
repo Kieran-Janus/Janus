@@ -30,6 +30,14 @@ local Tags = {
 	CrateDisplay = "CrateDisplay", -- a crate on the crate stand: its prompt opens that crate's
 	-- panel (attribute CrateId). A tagged part or model with no prompt gets one.
 	PhotoSpot = "PhotoSpot", -- the Photo Spot's prompt part: dances only start near it
+	-- Tormented Tower (Config.TowerParkour): like the parkour tags, plus its moving pieces
+	TowerStart = "TowerStart",
+	TowerCheckpoint = "TowerCheckpoint", -- attribute Index
+	TowerFinish = "TowerFinish",
+	TowerHazard = "TowerHazard", -- slime: back to your last checkpoint
+	TowerVanish = "TowerVanish", -- a platform that disappears now and then (attribute Phase)
+	TowerSpinner = "TowerSpinner", -- a spinning bar that knocks you off
+	TowerGear = "TowerGear", -- a turning cog you ride
 	FloorSign = "FloorSign", -- a glowing sign lying on the ground in front of a lobby area
 	-- (attribute Zone). Move, turn or resize it in Studio; its words and colour are in Config.
 	-- Parkour

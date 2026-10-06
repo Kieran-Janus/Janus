@@ -436,6 +436,77 @@ local function buildClockTower(parent: Instance)
 			})
 		end
 	end
+	-- Hollow when the Tormented Tower is on: the climb goes up inside (Config.TowerParkour).
+	local hollow = Config.Features.TowerParkour == true
+	local walls = Config.TowerParkour.Walls
+	-- One floor's four walls. hole = (width, height, bottom) of a gap in the front wall (the
+	-- side facing the plaza), bottom measured from the floor's middle.
+	local function towerWalls(
+		tower: Instance,
+		floorCf: CFrame,
+		width: number,
+		i: number,
+		hole: Vector3?
+	)
+		local t = walls.Thickness
+		local h = cfg.FloorHeight
+		local shade = if i % 2 == 0 then 0.04 else 0.1
+		local function wall(name: string, size: Vector3, cframe: CFrame)
+			if size.X <= 0.05 or size.Y <= 0.05 or size.Z <= 0.05 then
+				return
+			end
+			part({
+				Name = name,
+				Size = size,
+				CFrame = cframe,
+				PaletteRole = "Stone",
+				PaletteShade = shade,
+				Material = Enum.Material.Brick,
+			}, tower)
+		end
+		local prefix = "TowerFloor" .. i
+		-- Back and sides.
+		wall(
+			prefix .. "Back",
+			Vector3.new(width, h, t),
+			floorCf * CFrame.new(0, 0, width / 2 - t / 2)
+		)
+		for _, side in { -1, 1 } do
+			wall(
+				prefix .. "Side",
+				Vector3.new(t, h, width - 2 * t),
+				floorCf * CFrame.new(side * (width / 2 - t / 2), 0, 0)
+			)
+		end
+		-- Front, round the hole.
+		local front = floorCf * CFrame.new(0, 0, -(width / 2 - t / 2))
+		if not hole then
+			wall(prefix .. "Front", Vector3.new(width, h, t), front)
+			return
+		end
+		local hw, hh, bottom = hole.X, hole.Y, hole.Z
+		local top = bottom + hh
+		local sideW = (width - hw) / 2
+		for _, side in { -1, 1 } do
+			wall(
+				prefix .. "Front",
+				Vector3.new(sideW, h, t),
+				front * CFrame.new(side * (hw / 2 + sideW / 2), 0, 0)
+			)
+		end
+		local aboveH = h / 2 - top
+		wall(
+			prefix .. "Front",
+			Vector3.new(hw, aboveH, t),
+			front * CFrame.new(0, top + aboveH / 2, 0)
+		)
+		local belowH = bottom + h / 2
+		wall(
+			prefix .. "Front",
+			Vector3.new(hw, belowH, t),
+			front * CFrame.new(0, -h / 2 + belowH / 2, 0)
+		)
+	end
 	Kit.prop("ClockTower", base, parent, height, function()
 		local tower = model("ClockTower", parent)
 		local w0 = cfg.Width
@@ -455,24 +526,30 @@ local function buildClockTower(parent: Instance)
 			PaletteShade = 0.18,
 			Material = Enum.Material.Slate,
 		}, tower)
-		-- An arched door with two lanterns.
-		decor({
-			Name = "Door",
-			Size = Vector3.new(4, 5.5, 0.3),
-			CFrame = base * CFrame.new(0, 4.35, -w0 / 2 - 0.1),
-			PaletteRole = "Wood",
-			PaletteShade = 0.3,
-			Material = Enum.Material.WoodPlanks,
-		}, tower)
-		decor({
-			Name = "DoorArch",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.3, 4, 4),
-			CFrame = base * CFrame.new(0, 7.1, -w0 / 2 - 0.1) * CFrame.Angles(0, math.rad(90), 0),
-			PaletteRole = "Wood",
-			PaletteShade = 0.3,
-			Material = Enum.Material.WoodPlanks,
-		}, tower)
+		-- An arched door with two lanterns (open, with no door, when the tower is hollow).
+		if not hollow then
+			decor({
+				Name = "Door",
+				Size = Vector3.new(4, 5.5, 0.3),
+				CFrame = base * CFrame.new(0, 4.35, -w0 / 2 - 0.1),
+				PaletteRole = "Wood",
+				PaletteShade = 0.3,
+				Material = Enum.Material.WoodPlanks,
+			}, tower)
+		end
+		if not hollow then
+			decor({
+				Name = "DoorArch",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.3, 4, 4),
+				CFrame = base
+					* CFrame.new(0, 7.1, -w0 / 2 - 0.1)
+					* CFrame.Angles(0, math.rad(90), 0),
+				PaletteRole = "Wood",
+				PaletteShade = 0.3,
+				Material = Enum.Material.WoodPlanks,
+			}, tower)
+		end
 		for _, side in { -1, 1 } do
 			Props.Lantern(
 				paint,
@@ -489,37 +566,68 @@ local function buildClockTower(parent: Instance)
 		for i = 1, cfg.Floors do
 			width = w0 * (1 - 0.05 * (i - 1))
 			local floorCf = cf * CFrame.new(0, cfg.FloorHeight / 2, 0)
-			part({
-				Name = "TowerFloor" .. i,
-				Size = Vector3.new(width, cfg.FloorHeight, width),
-				CFrame = floorCf,
-				PaletteRole = "Stone",
-				PaletteShade = if i % 2 == 0 then 0.04 else 0.1,
-				Material = Enum.Material.Brick,
-			}, tower)
+			if hollow then
+				-- The Tormented Tower climbs inside: four walls, a doorway on the ground floor
+				-- and a window behind the clock face (Config.TowerParkour.Walls).
+				local hole: Vector3? = nil
+				if i == 1 then
+					hole = Vector3.new(walls.DoorWidth, walls.DoorHeight, -cfg.FloorHeight / 2)
+				elseif i == clockFloor and walls.ClockWindow > 0 then
+					hole = Vector3.new(walls.ClockWindow, walls.ClockWindow, -walls.ClockWindow / 2)
+				end
+				towerWalls(tower, floorCf, width, i, hole)
+			else
+				part({
+					Name = "TowerFloor" .. i,
+					Size = Vector3.new(width, cfg.FloorHeight, width),
+					CFrame = floorCf,
+					PaletteRole = "Stone",
+					PaletteShade = if i % 2 == 0 then 0.04 else 0.1,
+					Material = Enum.Material.Brick,
+				}, tower)
+			end
 			-- Corner stones and a jutting ledge at the top: a layered, crooked silhouette.
+			-- (Hollow: the stones stand just outside the corners, clear of the climb inside.)
+			local stone = width * 0.14
+			local stoneAt = if hollow
+				then width / 2 - walls.Thickness + stone / 2
+				else width / 2 - width * 0.05
 			for _, corner in { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } } do
 				decor({
 					Name = "CornerStone",
-					Size = Vector3.new(width * 0.14, cfg.FloorHeight - 0.4, width * 0.14),
-					CFrame = floorCf * CFrame.new(
-						corner[1] * (width / 2 - width * 0.05),
-						0,
-						corner[2] * (width / 2 - width * 0.05)
-					),
+					Size = Vector3.new(stone, cfg.FloorHeight - 0.4, stone),
+					CFrame = floorCf * CFrame.new(corner[1] * stoneAt, 0, corner[2] * stoneAt),
 					PaletteRole = "Stone",
 					PaletteShade = -0.08,
 					Material = Enum.Material.Slate,
 				}, tower)
 			end
-			decor({
-				Name = "Ledge",
-				Size = Vector3.new(width + 1.3, 0.7, width + 1.3),
-				CFrame = floorCf * CFrame.new(0, cfg.FloorHeight / 2 - 0.2, 0),
-				PaletteRole = "Purple",
-				PaletteShade = 0.45,
-				Material = Enum.Material.Slate,
-			}, tower)
+			local ledgeCf = floorCf * CFrame.new(0, cfg.FloorHeight / 2 - 0.2, 0)
+			if hollow then
+				-- A ring round the outside only, so the inside stays open from top to bottom.
+				local rim = walls.Thickness + 0.65
+				for side = 0, 3 do
+					decor({
+						Name = "Ledge",
+						Size = Vector3.new(width + 1.3, 0.7, rim),
+						CFrame = ledgeCf
+							* CFrame.Angles(0, side * math.pi / 2, 0)
+							* CFrame.new(0, 0, (width + 1.3) / 2 - rim / 2),
+						PaletteRole = "Purple",
+						PaletteShade = 0.45,
+						Material = Enum.Material.Slate,
+					}, tower)
+				end
+			else
+				decor({
+					Name = "Ledge",
+					Size = Vector3.new(width + 1.3, 0.7, width + 1.3),
+					CFrame = ledgeCf,
+					PaletteRole = "Purple",
+					PaletteShade = 0.45,
+					Material = Enum.Material.Slate,
+				}, tower)
+			end
 			if i ~= clockFloor and i > 1 then
 				-- An arched, glowing window on each side.
 				for side = 0, 3 do
@@ -1526,6 +1634,19 @@ local SWITCHED_AREAS: { { Feature: string, Section: string, Tags: { string } } }
 		Tags = { Tags.CandyRushStation, Tags.CandyRushPad, Tags.CandyRushBoard },
 	},
 	{ Feature = "Crates", Section = "CrateStand", Tags = { Tags.CrateDisplay } },
+	{
+		Feature = "TowerParkour",
+		Section = "TowerParkour",
+		Tags = {
+			Tags.TowerStart,
+			Tags.TowerCheckpoint,
+			Tags.TowerFinish,
+			Tags.TowerHazard,
+			Tags.TowerVanish,
+			Tags.TowerSpinner,
+			Tags.TowerGear,
+		},
+	},
 }
 
 -- NPCs (and the shopkeeper) standing inside an area that is emptied are kept.

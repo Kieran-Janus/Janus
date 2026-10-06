@@ -16,7 +16,7 @@ Want every pumpkin (or lantern, tree, gravestone...) to be **your** model, every
 
 Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See [Editing the lobby and maps by hand](#editing-the-lobby-and-maps-by-hand).
 
-Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Tags](#parts-that-do-something-tags)
+Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Tags](#parts-that-do-something-tags)
 
 ---
 
@@ -60,6 +60,8 @@ Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Mod
 | Parkour course, coins, times | `Config.Parkour` (`src/shared/Config/Parkour.luau`) |
 | Candy Rush | `src/shared/Config/CandyRush.luau` |
 | Web Scour | `src/shared/Config/WebScour.luau` |
+| Tormented Tower (the hard climb inside the clock tower) | `Config.TowerParkour` (`src/shared/Config/TowerParkour.luau`) |
+| Server-wide announcement banners | `Config.Announce` (`src/shared/Config/Announce.luau`) |
 | Photo Spot dances | `Config.Dances` (`src/shared/Config/Dances.luau`, see "Photo Spot dances" below) |
 | Glowing floor signs in front of each lobby area | `Config.Lobby.FloorSigns` (`src/shared/Config/Lobby.luau`) |
 | What in the lobby is solid | `Config.Lobby.Solid` (`src/shared/Config/Lobby.luau`, see "A solid lobby" below) |
@@ -180,7 +182,7 @@ Sizes are studs tall (each copy is scaled to its own size, so this is just a gui
 | `Signpost` | a signpost (yours has no arrow words) | lobby | 7-13.5 |
 | `Wheelbarrow`, `HarvestCart`, `Well`, `Tractor`, `RockingChair` | farm things | Pumpkin Farm | 3-9 |
 | `Fountain` | the fountain | Hedge Maze | 9 |
-| `ClockTower`, `KingStatue` | the big lobby centrepieces | lobby | 64.5, 18 |
+| `ClockTower`, `KingStatue` | the big lobby centrepieces (the clock tower is hollow: the Tormented Tower climbs inside, see below) | lobby | 81.5, 18 |
 | `VendorStall` | the Pumpkin Shop stall (the shopkeeper is `PumpkinVendor` in `Custom > Characters`) | lobby | 21 |
 | `ReadyPadArch`, `ParkourArch` | the arch over the Ready circle, the parkour start arch | lobby | 15.4, 13 |
 | `CandyCane`, `GiantLollipop`, `CandyBucket`, `Gumdrop`, `SignCandyCorn` | the Candy Rush stand's decorations | lobby | 1.2-24 |
@@ -386,6 +388,19 @@ The "Spooky Sky Climb" behind the clock tower. Settings: `src/shared/Config/Park
 
 ---
 
+## Tormented Tower
+A REALLY hard climb inside the crooked clock tower, for the bravest players. Settings: `src/shared/Config/TowerParkour.luau` (on/off: `Config.Features.TowerParkour`).
+- **The climb:** walk in through the doorway (the glowing "TORMENTED TOWER - only the bravest" sign is in front of it), stand on START and climb about 24 hard jumps to the clock face: tiny posts, narrow beams, trusses to climb, platforms that vanish (they flicker red first), spinning bars that knock you off, turning cogs you ride, slime that sends you back, and two long jumps you can only make sprinting (hold Shift, or the sprint button on phones). Only 3 checkpoints. Falling sends you back to your last checkpoint (or the start).
+- **The prize:** the first time you beat it you win the **Tormented Soul** skin (CRAZY, with its own animated effect: swirling ghostly chains and red lightning). It is never sold in the shop and is in no crate. Every finish tells the whole server "<name> conquered the Tormented Tower!". Your best time is saved. A Roblox badge: put its id in `Reward.BadgeId` (Creator Hub > your game > Badges; `0` = no badge).
+- **Change the course:** the `Course` list at the top. Same idea as the lobby parkour: one line per piece, `Kind` (`Start`, `Ledge`, `Tiny`, `Beam`, `Truss`, `Vanish`, `Spinner`, `Gear`, `Checkpoint`, `Finish`, `Hazard`), `Offset = Vector3.new(right, up, back)` inside the tower (it follows each floor's lean and twist), `Sprint = true` for a jump that needs sprinting. The game checks every jump with the parkour jump maths, including how a piece hanging low over a jump cuts it short; the Output window warns about a problem, and `lune run tests/run -- tower` checks it too.
+- **Tweak:** sizes (`Sizes`), how hard jumps may be (`Jumps`), vanishing timings (`Vanish`), spinner and cog speeds (`Spinner`, `Gear`), the minimum time (`MinSeconds`), colours (`Look.Colors`), walls, doorway, lanterns and the window behind the clock face (`Walls`), the skin's look (`Skin`), all the words (`Text`). The skin's effect numbers are in `Config.Skins.Effects.Special.Torment`.
+- **The tower itself** is `Config.Hub.ClockTower` (now 7 floors and 22 studs wide, so the climb fits inside). It is hollow while the Tormented Tower is on. Move or resize it there and the course follows (raise `Config.Hub.BuildVersion`).
+- **Your own ClockTower model** (`ReplicatedStorage.Custom.Props.ClockTower`) works too: any part of it inside the tower's hollow middle or its doorway stops being solid when the game starts, and plain inner walls are built so the inside still looks like a tower. Leave a doorway gap at the front (the side facing the middle of the lobby), or players walk through your wall there.
+- **In Studio:** the pieces are in `Workspace.Hub.TowerParkour.Course`, found by tag: `TowerStart`, `TowerCheckpoint` (attribute `Index` = 1, 2, 3), `TowerFinish`, `TowerHazard`, `TowerVanish` (attribute `Phase`), `TowerSpinner`, `TowerGear`. Spinning bars and cogs turn on a motor (`HingeConstraint`).
+- **Test (F8):** "Tower: teleport to start", "Tower: teleport to checkpoint 1/2/3" (with the clock running), "Tower: reset my progress" (best time, finishes and the skin, so you can win it again). Menu > Tormented Tower shows your best time and a "Go to the tower" button.
+
+---
+
 ## Candy Rush
 The candy stand on the west side of the lobby. Settings: `src/shared/Config/CandyRush.luau`.
 - **The race:** `Candies` (10 to win), `MinPlayers` (2), `CountdownSeconds`, `MaxRaceSeconds` (60).
@@ -544,6 +559,10 @@ The v2 features add their own tags:
 | `WebScourSpot` | A place a spider can hide (keep it on a web strand) | |
 | `FloorSign` | A glowing sign on the ground in front of a lobby area (walk-through) | attribute `Zone` |
 | `PhotoSpot` | The Photo Spot: dances only start near it | |
+| `TowerStart`, `TowerFinish` | Tormented Tower start pad, finish | |
+| `TowerCheckpoint` | A Tormented Tower checkpoint | attribute `Index` (1, 2, 3) |
+| `TowerHazard` | Tower slime: back to your checkpoint | |
+| `TowerVanish`, `TowerSpinner`, `TowerGear` | The tower's vanishing platforms, spinning bars, turning cogs | `TowerVanish`: attribute `Phase` (seconds its timer is shifted) |
 | `EasterEgg` | A secret pumpkin | attributes `EggId`, `Coins` |
 | `SeekerSpawn`, `HiderSpawn` | Hide & Seek start spots (maps) | |
 | `HidingDecoy` | A decoy pumpkin; hiders copy its look | |
@@ -574,7 +593,7 @@ Moved to its own section: [Swap every copy of something at once](#swap-every-cop
 | `Crates` | The Mystery Crates stand, next to the shop | (46, 6): east |
 | `CandyRush` | The Candy Rush stand | (-60, 0): west |
 | `WebScour` | The Spider Grove | (-38, -32): north-west |
-| `Parkour` | The Spooky Sky Climb (76 wide, 120 tall) | (0, -82): north, behind the clock tower |
+| `Parkour` | The Spooky Sky Climb (76 wide, 120 tall) | (0, -86): north, behind the clock tower |
 
 - `Offset = Vector3.new(x, 0, z)`: x = east (+) / west (-), z = south (+) / north (-). `Size` = width and depth.
 - Each zone faces the middle of the lobby, so its front points at the plaza.

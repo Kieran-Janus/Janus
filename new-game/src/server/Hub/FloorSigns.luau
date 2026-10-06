@@ -138,7 +138,11 @@ function FloorSigns.Build(parent: Instance): Model
 		return model
 	end
 	for _, entry in cfg.Signs do
-		if HubPaths.Enabled(entry) then
+		-- A lobby area that is switched on, or a spot of its own (Offset: the Tormented Tower's
+		-- door is not a lobby area).
+		local features = Config.Features :: any
+		local on = entry.Feature == "" or features[entry.Feature] == true
+		if on and (HubPaths.Enabled(entry) or entry.Offset ~= nil) then
 			buildSign(entry, model)
 		end
 	end

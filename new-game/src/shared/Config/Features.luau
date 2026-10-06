@@ -19,6 +19,7 @@ return {
 	Parkour = true, -- the parkour course in the lobby
 	CandyRush = true, -- lobby minigame: click your candies, first to clear them all wins
 	WebScour = true, -- lobby minigame: a quick scavenger hunt in the spider webs
+	TowerParkour = true, -- the Tormented Tower: a really hard climb inside the clock tower
 	Dances = true, -- spooky code-made dances at the lobby Photo Spot (off = the bar shows nothing)
 	EasterEggs = true, -- hidden pumpkins around the lobby that give coins once each
 	Crates = true, -- crates bought with coins that give a random skin

@@ -104,6 +104,7 @@ return {
 		{ Id = "Settings", Text = "Settings", Icon = "⚙️" },
 		{ Id = "Vip", Text = "VIP & Packs", Icon = "⭐", Color = Color3.fromRGB(150, 115, 30) },
 		{ Id = "Parkour", Text = "Parkour", Icon = "🏃", Feature = "Parkour" },
+		{ Id = "TowerParkour", Text = "Tormented Tower", Icon = "🗼", Feature = "TowerParkour" },
 		{ Id = "EasterEggs", Text = "Secret Pumpkins", Icon = "🎃", Feature = "EasterEggs" },
 	} :: { TileEntry },
 }

@@ -184,6 +184,20 @@ return {
 		OrbitScale = 1.5, -- size of the orbiting pieces (1 = as built, 2 = twice as big)
 		TintTransparency = 0.72, -- the rainbow tint over the body (1 = no tint)
 		OutlineTransparency = 0.35, -- the rainbow outline (1 = no outline)
+		-- Special effects a skin can name with Crazy = { Effect = "..." } (src/client/SkinEffects.luau).
+		Special = {
+			-- The Tormented Tower's skin: ghostly chains swirling round you and red lightning.
+			Torment = {
+				Links = 9, -- links in each of the two chains
+				Radius = 2.4, -- studs from your middle
+				Height = 5.5, -- how tall the swirl is
+				Seconds = 2.4, -- one turn of the swirl
+				ChainColor = Color3.fromRGB(70, 40, 90),
+				BoltColor = Color3.fromRGB(255, 40, 60),
+				BoltEvery = 0.8, -- seconds between lightning flashes
+				BoltSeconds = 0.15, -- how long a flash lasts
+			},
+		},
 	},
 
 	-- The Skins tab of the shop.

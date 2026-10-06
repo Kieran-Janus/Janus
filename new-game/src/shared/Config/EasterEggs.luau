@@ -176,8 +176,8 @@ return {
 			Coins = 35,
 			Look = "Skull",
 			Anchor = "ClockTower",
-			Offset = Vector3.new(5, 0, 10),
-			Hint = "Tick tock... walk round the back of the crooked clock.",
+			Offset = Vector3.new(15.5, 0, 4),
+			Hint = "Tick tock... walk round the side of the crooked clock.",
 		},
 		{
 			Id = "GroveCandy",

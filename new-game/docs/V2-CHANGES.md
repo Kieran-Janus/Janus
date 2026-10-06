@@ -108,6 +108,13 @@ More views: [from the top](screenshots/lobby-top.png).
 - Reach the golden trophy pumpkin at the top: **300 coins**, at most once every 20 hours. Your best time is saved and shown on a board.
 - **Menu > Parkour** shows your best time, when coins can be won again, and a "Go to start" button.
 
+### Tormented Tower
+- The crooked clock tower is now hollow, with a REALLY hard climb inside for the bravest players. Walk in through the doorway (a glowing "TORMENTED TOWER - only the bravest" sign lies in front of it).
+- About 24 jumps up to the clock face: tiny posts, narrow beams, trusses to climb, platforms that vanish, spinning bars that knock you off, turning cogs, slime, and long jumps that need sprinting. Only 3 checkpoints.
+- Checked by the server like the lobby parkour: checkpoints in order, falls send you back, no teleporting, and a too-fast finish doesn't count. Your best time is saved.
+- Beat it once to win the **Tormented Soul** skin (CRAZY, with its own swirl of ghostly chains and red lightning). It's never sold and in no crate. Every finish tells the whole server "<name> conquered the Tormented Tower!".
+- **Menu > Tormented Tower** shows your best time and takes you to the tower.
+
 ### Candy Rush
 ![The Candy Rush stand](screenshots/lobby-candyrush.png)
 
@@ -238,12 +245,13 @@ Something broken, or you just don't want it? Open `src/shared/Config/Features.lu
 | Parkour course | line 19: `Parkour = true,` |
 | Candy Rush | line 20: `CandyRush = true,` |
 | Web Scour | line 21: `WebScour = true,` |
-| Photo Spot dances | line 22: `Dances = true,` |
-| Secret pumpkins (Easter eggs) | line 23: `EasterEggs = true,` |
-| Crates (all of them) | line 24: `Crates = true,` |
-| Robux crates only (coin crates stay) | line 25: `RobuxCrates = true,` |
-| CRAZY skins' animations (rainbow, orbiting pieces, pulsing glow) | line 26: `SkinEffects = true,` |
-| The old first-round tutorial (already off) | line 27: `Tutorial = false,` |
+| Tormented Tower | line 22: `TowerParkour = true,` |
+| Photo Spot dances | line 23: `Dances = true,` |
+| Secret pumpkins (Easter eggs) | line 24: `EasterEggs = true,` |
+| Crates (all of them) | line 25: `Crates = true,` |
+| Robux crates only (coin crates stay) | line 26: `RobuxCrates = true,` |
+| CRAZY skins' animations (rainbow, orbiting pieces, pulsing glow) | line 27: `SkinEffects = true,` |
+| The old first-round tutorial (already off) | line 28: `Tutorial = false,` |
 
 Good to know:
 - A switched-off lobby area (parkour, Candy Rush, crates, Ready pad) is taken out of the running game. Your saved place still has it, so switching it back on brings it back.
@@ -458,6 +466,7 @@ Shortcuts for testing by hand: press **F8** in a playtest (or the Admin button o
 - **+ Coins**, **Unlock all items**, **Reset daily reward**, **Rebuild hub**, **Repaint hub**, **Apply custom props** (swaps your `Custom > Props` models into the lobby and maps), **Reset my save**
 - **Start round now**, **Force mode**, and one "force next round" button per mode (Studio only)
 - **Parkour: teleport to start**, **Parkour: reset my best/cooldown**
+- **Tower: teleport to start**, **Tower: teleport to checkpoint 1/2/3**, **Tower: reset my progress**
 - **Candy Rush: start solo test**, **Web Scour: start**, **Easter eggs: reset mine**
 - **Crates: open free Pumpkin Crate**, **Crates: +100k coins**
 
@@ -466,7 +475,7 @@ Shortcuts for testing by hand: press **F8** in a playtest (or the Admin button o
 ## Known limits
 
 Things that are not done, or need your eyes in Studio:
-- **Tested in Studio on 6 October** (`/verify-v2`): solo, 2 players (Clients and Servers), an iPhone-sized screen and an iPad (Test > Device). What was fixed is listed in `docs/PROGRESS.md`. The longer parkour was climbed start to finish in a Studio playtest (all 7 checkpoints, coins paid). Still worth doing yourself: a 3-player ScareMaze (an OUT Survivor turning into a Haunter), a parkour climb with your own hands, and a live test with friends after publishing.
+- **Tested in Studio on 6 October** (`/verify-v2`): solo, 2 players (Clients and Servers), an iPhone-sized screen and an iPad (Test > Device). What was fixed is listed in `docs/PROGRESS.md`. The longer parkour was climbed start to finish in a Studio playtest (all 7 checkpoints, coins paid). The Tormented Tower was checked in Studio piece by piece (spinning bars, cogs and vanishing platforms moving, the last stage climbed, the skin and the announcement given); a full climb by hand is worth doing, it is meant to be very hard. Still worth doing yourself: a 3-player ScareMaze (an OUT Survivor turning into a Haunter), a parkour climb with your own hands, and a live test with friends after publishing.
 - **Lighting Technology** must be set to Future by hand once (see above).
 - **Sounds**: new features reuse sound ids that were already in the game (the hider giggle is a pitched-up bat squeak). Swap any you don't like in each feature's `Sounds` block.
 - **Art is still built from Parts**: the Pumpkin King, the round maps and the scare characters. Real models can replace them (see [Make it look like yours](#make-it-look-like-yours)).
@@ -477,5 +486,5 @@ Things that are not done, or need your eyes in Studio:
 - **Anti-cheat**: a very slow fly upwards on the parkour still passes the speed check (the 45-second minimum time stops instant wins). A Candy Rush auto-clicker could be about twice as fast as a person; coins are still capped. General speed hacks are possible in every Roblox game; pickups and rewards check speed.
 - **Crates**: the region check and real Robux purchases can only be tested on the published game. There is no "X unboxed a CRAZY skin!" announcement yet.
 - **Skins**: the 6 classic skins don't have the new rarity effects. The Menu's Skins tile opens all skins (not "owned only").
-- **Phones**: the full lobby is about 4,160 parts and 84 lights. That is inside the phone budget the tests check, but check the frame rate on a real phone.
+- **Phones**: the full lobby is about 4,230 parts and 88 lights (the phone budget is 4,300 parts and 90 lights). That is inside the phone budget the tests check, but check the frame rate on a real phone.
 - **Saves are not session-locked yet** (planned before any trading, see `docs/ROADMAP.md`).

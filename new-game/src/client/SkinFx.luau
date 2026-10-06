@@ -6,6 +6,7 @@
 	           skin's rainbow parts cycling through the colours
 	  Pulse    the skin's glow light pulses
 	  Orbit    little pieces (pumpkins, candies, ghosts...) flying around the character
+	  Effect   a special named effect (src/client/SkinEffects.luau), e.g. "Torment"
 	Only the closest Config.Skins.Effects.MaxAnimated CRAZY players animate, so phones stay
 	fast; nothing here changes what other players see. Disguised Hide & Seek hiders (player
 	attribute HideSeekRole = "Hider") never animate. On/off: Config.Features.SkinEffects.
@@ -27,6 +28,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local HeadPieces = require(ReplicatedStorage.Shared.HeadPieces)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Tags = require(ReplicatedStorage.Shared.Tags)
+local SkinEffects = require(script.Parent.SkinEffects)
 
 local SkinFx = {}
 
@@ -40,6 +42,7 @@ type Entry = {
 	Light: PointLight?,
 	Brightness: number,
 	Orbit: { Model },
+	Effect: SkinEffects.State?, -- Crazy.Effect (src/client/SkinEffects.luau)
 }
 
 local entries: { [Model]: Entry } = {}
@@ -131,6 +134,9 @@ local function activate(entry: Entry)
 			table.insert(entry.Orbit, piece)
 		end
 	end
+	if type(crazy.Effect) == "string" then
+		entry.Effect = SkinEffects.Create(crazy.Effect, fxFolder())
+	end
 end
 
 local function deactivate(entry: Entry)
@@ -157,6 +163,11 @@ local function deactivate(entry: Entry)
 		piece:Destroy()
 	end
 	entry.Orbit = {}
+	local effect = entry.Effect
+	if effect then
+		SkinEffects.Destroy(effect)
+		entry.Effect = nil
+	end
 end
 
 local function onTagged(instance: Instance)
@@ -178,6 +189,7 @@ local function onTagged(instance: Instance)
 		Light = nil,
 		Brightness = 0,
 		Orbit = {},
+		Effect = nil,
 	}
 	nextPick = 0 -- pick who animates on the next frame
 end
@@ -265,6 +277,10 @@ local function step()
 			light.Brightness = entry.Brightness * (fx.PulseLow + (1 - fx.PulseLow) * wave)
 		end
 		local root = rootOf(entry)
+		local effect = entry.Effect
+		if root and effect then
+			SkinEffects.Step(effect, root, now)
+		end
 		if root and #entry.Orbit > 0 then
 			local centre = root.Position + Vector3.new(0, fx.OrbitHeight, 0)
 			local turn = now * math.pi * 2 / fx.OrbitSeconds

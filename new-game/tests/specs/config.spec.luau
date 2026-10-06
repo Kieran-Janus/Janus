@@ -59,7 +59,7 @@ describe("Config.Shop", function()
 	it("prices items by rarity with Items.Price (own Price wins, VIP/crate-only unsold)", function()
 		for _, item in Config.Shop.Items do
 			local price = Items.Price(item)
-			if item.VipOnly or item.CrateOnly then
+			if item.VipOnly or item.CrateOnly or item.Exclusive then
 				expect(price).toBeNil()
 			else
 				local expected = if item.Price ~= nil

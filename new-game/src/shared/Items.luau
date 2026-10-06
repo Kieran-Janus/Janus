@@ -6,7 +6,8 @@
 	Items.Get(id) -> item?             the item with that Id (nil for unknown or non-strings)
 	Items.Price(item) -> number?       coins to buy it in the shop: its own Price if it has
 	                                   one, else its rarity's price. nil = can't be bought
-	                                   (CrateOnly or VipOnly)
+	                                   (CrateOnly, VipOnly, or Exclusive: won some other way,
+	                                   like the Tormented Tower skin)
 	Items.Rarity(item) -> string       its rarity id ("Common" if missing or misspelled)
 	Items.RarityInfo(item) -> level    Config.Rarity.Levels[rarity] (Name, Price, Color, ...)
 	Items.ForSlot(slot) -> { item }    every item for a slot, in Config order
@@ -73,7 +74,7 @@ function Items.RarityInfo(item: any): RarityLevel
 end
 
 function Items.Price(item: any): number?
-	if not item or item.CrateOnly or item.VipOnly then
+	if not item or item.CrateOnly or item.VipOnly or item.Exclusive then
 		return nil
 	end
 	if type(item.Price) == "number" then

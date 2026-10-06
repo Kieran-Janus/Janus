@@ -106,7 +106,7 @@ describe("Rarity and prices", function()
 	it("prices the shop by rarity, and VIP / crate-only items not at all", function()
 		for _, item in Config.Shop.Items do
 			local price = Items.Price(item)
-			if item.VipOnly or item.CrateOnly then
+			if item.VipOnly or item.CrateOnly or item.Exclusive then
 				expect(price).toBeNil()
 			else
 				expect(price).toBe(item.Price or Config.Rarity.Levels[item.Rarity].Price)
