@@ -120,7 +120,11 @@ function Hud.Mount(gui: ScreenGui)
 					if not ready then
 						table.insert(parts, 1, readyText.StandOnPad)
 					end
-				elseif state == "Playing" or state == "Results" then
+				elseif
+					state == "Playing"
+					or state == "Results"
+					or table.find(Config.Menu.RoundStates, state) ~= nil -- a mode's own states
+				then
 					table.insert(
 						parts,
 						1,

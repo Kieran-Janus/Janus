@@ -7,7 +7,8 @@
 	  Pulse    the skin's glow light pulses
 	  Orbit    little pieces (pumpkins, candies, ghosts...) flying around the character
 	Only the closest Config.Skins.Effects.MaxAnimated CRAZY players animate, so phones stay
-	fast; nothing here changes what other players see. On/off: Config.Features.SkinEffects.
+	fast; nothing here changes what other players see. Disguised Hide & Seek hiders (player
+	attribute HideSeekRole = "Hider") never animate. On/off: Config.Features.SkinEffects.
 
 	SkinFx.Start()                    starts watching (ShopUI.Mount calls it; safe to call twice)
 	SkinFx.AnimatePreview(model) -> stop
@@ -17,6 +18,7 @@
 ]]
 
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -188,6 +190,14 @@ local function onUntagged(instance: Instance)
 	end
 end
 
+-- A Hide & Seek hider is disguised as a pumpkin: the server hides their skin, and the tint and
+-- orbiting pieces must not give them away either.
+local function disguised(entry: Entry): boolean
+	local character = characterOf(entry)
+	local player = character and Players:GetPlayerFromCharacter(character)
+	return player ~= nil and player:GetAttribute("HideSeekRole") == "Hider"
+end
+
 -- Animates the closest CRAZY players (up to MaxAnimated, within MaxDistance).
 local function pick()
 	local fx = settings()
@@ -195,7 +205,9 @@ local function pick()
 	local from = if camera then camera.CFrame.Position else Vector3.zero
 	local near = {}
 	for model, entry in entries do
-		local root = if model:IsDescendantOf(Workspace) then rootOf(entry) else nil
+		local root = if model:IsDescendantOf(Workspace) and not disguised(entry)
+			then rootOf(entry)
+			else nil
 		local distance = if root then (root.Position - from).Magnitude else math.huge
 		if distance <= fx.MaxDistance then
 			table.insert(near, { Entry = entry, Distance = distance })

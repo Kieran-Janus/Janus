@@ -70,7 +70,8 @@ return {
 	},
 
 	-- Round states (the word at the top of the screen) the menu cares about.
-	RoundStates = { "Intermission", "Playing", "Results" }, -- "a round is on" (see Text.RoundRunning)
+	-- ("Hiding" is Hide & Seek's head start, "Get ready" ScareMaze's intro.)
+	RoundStates = { "Intermission", "Hiding", "Get ready", "Playing", "Results" }, -- "a round is on" (see Text.RoundRunning)
 	SpectateStates = { "Playing" }, -- the Spectate tile shows in these, for players not in the round
 
 	-- Messages shown at the bottom of the menu.
@@ -79,8 +80,6 @@ return {
 		NoVote = "Voting starts when enough players stand on the Ready pad.",
 		NoVoteNoPad = "Voting starts when enough players have joined.", -- when the Ready pad is off
 		RoundRunning = "A round is on right now. Voting starts after it ends.",
-		Parkour = "Find the parkour course in the lobby and reach the finish for %d %s!",
-		EasterEggs = "Secret pumpkins found: %d of %d. Keep exploring the lobby!",
 	},
 
 	Tiles = {

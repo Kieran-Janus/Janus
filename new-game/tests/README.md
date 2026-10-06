@@ -38,6 +38,15 @@ an event handler, a Script), even if the test itself didn't notice.
 | `cosmetics.spec` | Every shop item: `Cosmetics.Preview`, `Cosmetics.Build` (pivot at the design origin), `Cosmetics.Wear` / `TakeOff` on a character, skins restore the avatar, a custom model in `ReplicatedStorage.Custom.Cosmetics` replaces the placeholder and is scaled. |
 | `modules.spec` | Every ModuleScript requires cleanly (server, shared, client); `Main.server.luau` boots, waits while nobody stands on the hub's Ready pad, then plays a whole round once a player steps on it and sends them back to the lobby; `Main.client.luau` boots against what the server replicated and the Menu gets every tile. A `[Main] X failed to ...` warning (Main catches failing services and UIs) fails the test. |
 | `crates.spec` | `Config.Crates`: every crate has items, chances add up to 100, rarity crates hold only their rarity, 200,000 simulated rolls match the odds, the reel; `CrateService`: coins taken, skin given or duplicate refunded, spam / unknown crates / no coins / crates off refused, restricted and "no answer" players refused (PolicyService); Robux crates granted once, undone when the save fails, restricted buyers get coins; F8 crate commands; the crate stand's prompts; the crate panel shows every chance, hides buy buttons for restricted players and spins to the result. |
+| `HubLook.spec` | The lobby's look: real ovals instead of squashed balls, faces on the pumpkin surface, the phone budget (`Config.Hub.Budget` parts and lights, with every lobby feature on), decorations that never trip or block players, paths and signposts to every area that is switched on (and none to areas that are off), the view from the spawn. |
+| `skins.spec` | Crate skins (`Config/Skins/`): 6 themes x 20 skins with their rarities, ids, crates and prices; every Style option points at something real; the rarity looks; every skin previews, goes on R15 and R6 characters and comes off leaving the avatar as it was; the shop dressing a respawned character; the client `SkinFx` effects; the paged Skins tab. |
+| `parkour.spec` | The lobby parkour course: every jump in `Config.Parkour.Course` is doable, `ParkourLogic` (jump maths, checkpoint order, times, cooldowns), the built section (tags, Index order, inside its zone) and `ParkourService` (start, checkpoints, falls, anti-teleport, finish rewards, cooldown, Go to start, rounds, respawns, admin reset, a saved hub with no course), and `ParkourUI`. |
+| `candyrush.spec` | Candy Rush: the rules (lanes, candy spots, the winner, coins and daily cap), the stand the hub builds, whole races on the server (two players, a forfeit, a solo run, the admin test, a player leaving) and the client screen. |
+| `webscour.spec` | Web Scour: `WebScourRules`, the Spider Grove section, whole hunts against the real `WebScourService` (start at the lantern, catch critters, rejected catches, coins, best time, cooldowns, two hunters, leavers, the F8 command) and `WebScourUI`. |
+| `eggs.spec` | Easter eggs: `EasterEggRules`, the egg list, placing eggs next to their anchors in the built hub, collecting them through the real `EasterEggService` (button, touch, distance, rounds, once only, coins, toast, admin reset) and `EasterEggUI`. |
+| `hideseek.spec` | Pumpkin Hide & Seek: `HideSeekRules`, its two maps (Pumpkin Farm, Hedge Maze: every maze cell reaches the seeker hut) and whole rounds of `Modes/HideSeek.luau` with fake players (roles, the pumpkin disguise, the candy gun's server checks, tagging, leaving, results). |
+| `scaremaze.spec` | ScareMaze: the rules (teams, the keep-moving rule, scores), the map (a way from the entrance to the exit, traps along it, tags) and a whole round on the real map with three players (one escapes, one stands still, one Haunter BOOs). |
+| `mazegen.spec` | `MazeGen`: every maze is fully connected, rooms are open, wall runs match the walls. |
 | `harness.spec` | Self-tests of the harness (geometry, raycasts, scheduler, signals, services). If these fail, don't trust the others. |
 
 ## Writing a spec
@@ -115,6 +124,9 @@ lune run tests/preview -- hub out/hub.json            # or any output path
 node /tmp/claude-0/render/render.mjs tests/out/hub.json tests/out/hub --views overview,top,ground
 ```
 
+- `lune run tests/catwalk` (or `-- theme Pumpkin`, `-- ids A,B,C`, `--look preview`) dresses
+  mannequins in crate skins and writes `tests/out/catwalk.json` the same way (see the comment at
+  the top of `tests/catwalk.luau`).
 - `hub` runs `HubBuilder.Build()`; `map` runs `MapService.Load(id)` (the map's builder, or a model
   in `ServerStorage.Maps`); `section` builds `Sections/<Name>` into an empty hub Model with
   `Build(hub, HubLayout.Zone(<Name>))`, the same zone `HubBuilder` gives every section (the

@@ -52,7 +52,9 @@ do
 	local i = 1
 	while i <= #args do
 		local arg = args[i]
-		if arg == "--exporter" then
+		if arg == "--" then
+			-- Lune 0.10 passes the "--" separator through: skip it.
+		elseif arg == "--exporter" then
 			exporterPath = args[i + 1] or fail("--exporter needs a path")
 			i += 1
 		elseif arg == "--pretty" then

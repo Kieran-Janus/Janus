@@ -6,9 +6,9 @@
 	  Vote         the vote panel, or a short note saying when voting starts
 	  Spectate     watch the round from the lobby (during a round, if you're not in it)
 	  VIP & Packs  the shop on its Packs & VIP tab
-	  Parkour      a progress note (only while the parkour is on)
 	  Secret Pumpkins   the Easter egg list (EasterEggUI.Open; only while the eggs are on)
-	Shop, Settings, Codes and Invite come from their own panels (Layout.SideButton).
+	Shop, Settings, Codes and Invite come from their own panels (Layout.SideButton), and the
+	Parkour tile from src/client/ParkourUI.luau (its best time and reward panel).
 	Kept apart from MenuUI so feature screens can require MenuUI to add their own tiles
 	without a require loop. Main.client.luau mounts it right after MenuUI.
 ]]
@@ -101,20 +101,6 @@ function MenuTiles.Mount(_gui: ScreenGui)
 		Order = 9,
 		OnClick = function()
 			ShopUI.Open("Packs")
-		end,
-	})
-	MenuUI.AddTile({
-		Id = "Parkour",
-		Label = "Parkour",
-		Order = 10,
-		KeepOpen = true,
-		Visible = function()
-			return Config.Features.Parkour
-		end,
-		OnClick = function()
-			MenuUI.ShowMessage(
-				text.Parkour:format(Config.Parkour.Reward.Coins, Config.Economy.CurrencyName)
-			)
 		end,
 	})
 	MenuUI.AddTile({

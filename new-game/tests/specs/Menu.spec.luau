@@ -101,14 +101,10 @@ describe("Config.Menu", function()
 		expect(Config.Menu.Button.TextSize).toBeGreaterThanOrEqual(Config.UI.MinTextSize)
 		expect(Config.Menu.Button.IconWidth).toBeLessThanOrEqual(Config.Menu.Button.Width)
 		expect(typeof(Config.Menu.Key)).toBe("EnumItem")
-		for _, key in
-			{ "KeyHint", "NoVote", "NoVoteNoPad", "RoundRunning", "Parkour", "EasterEggs" }
-		do
+		for _, key in { "KeyHint", "NoVote", "NoVoteNoPad", "RoundRunning" } do
 			expect(Config.Menu.Text[key]).toBeA("string")
 		end
 		expect(Config.Menu.Text.KeyHint:format("M", "B")).toBeA("string") -- two key names
-		expect(Config.Menu.Text.Parkour:format(100, "Coins")).toBeA("string") -- coins and a name
-		expect(Config.Menu.Text.EasterEggs:format(1, 5)).toBeA("string") -- two numbers
 		-- The Spectate tile shows in the same round state lobby spectating works in.
 		expect(Config.Menu.SpectateStates).toContain("Playing")
 	end)

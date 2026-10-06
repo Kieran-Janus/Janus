@@ -18,7 +18,9 @@ local Runtime = require("./harness/Runtime")
 
 local filters = {}
 for _, arg in process.args do
-	if arg == "--verbose" or arg == "-v" then
+	if arg == "--" then
+		continue -- Lune 0.10 passes the "--" separator through
+	elseif arg == "--verbose" or arg == "-v" then
 		Runtime.defaults.echo = "all"
 	elseif arg == "--quiet" or arg == "-q" then
 		Runtime.defaults.echo = "none"

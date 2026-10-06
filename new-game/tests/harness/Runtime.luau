@@ -387,6 +387,14 @@ function Runtime:_require(target: any): any
 	end
 	local entry = self.modules[target]
 	if entry then
+		local here = coroutine.running()
+		if entry.state == "loading" and entry.thread ~= here and self.scheduler:owns(here) then
+			-- Like Roblox: another task thread is still running this module (it yielded, e.g.
+			-- in WaitForChild), so this thread waits for it to finish instead of failing.
+			while entry.state == "loading" do
+				self.scheduler:wait(0)
+			end
+		end
 		if entry.state == "loading" then
 			error(("Requested module was required recursively: %s"):format(Dom.fullName(target)), 2)
 		elseif entry.state == "failed" then
@@ -400,7 +408,7 @@ function Runtime:_require(target: any): any
 		end
 		return entry.value
 	end
-	entry = { state = "loading" }
+	entry = { state = "loading", thread = coroutine.running() }
 	self.modules[target] = entry
 	local fn = loadScript(self, target)
 	local traceback

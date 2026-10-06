@@ -33,7 +33,9 @@ describe("Hide & Seek rules", function()
 		end
 		expect(cfg.HeadStart + cfg.Duration).toBe(180) -- a 3 minute round
 		expect(cfg.TaggedBecomeSeekers).toBeA("boolean")
-		for _, key in { "FireCooldown", "DecoyPenalty", "MaxRange", "HitTolerance", "ProjectileSpeed" } do
+		for _, key in
+			{ "FireCooldown", "DecoyPenalty", "MaxRange", "HitTolerance", "ProjectileSpeed" }
+		do
 			expect(cfg.Gun[key]).toBeGreaterThan(0)
 		end
 		for _, key in { "PerTag", "HiderSurvived", "PerMinuteHidden", "WinningTeam", "Played" } do
@@ -46,7 +48,8 @@ describe("Hide & Seek rules", function()
 	end)
 
 	it("picks a quarter of the players as seekers, at least one, never everyone", function()
-		local expected = { [2] = 1, [3] = 1, [4] = 1, [7] = 1, [8] = 2, [12] = 3, [16] = 4, [32] = 8 }
+		local expected =
+			{ [2] = 1, [3] = 1, [4] = 1, [7] = 1, [8] = 2, [12] = 3, [16] = 4, [32] = 8 }
 		for players, seekers in expected do
 			expect(Rules.SeekerCount(players, cfg)).toBe(seekers)
 		end
@@ -56,8 +59,12 @@ describe("Hide & Seek rules", function()
 			expect(seekers).toBeLessThan(players)
 		end
 		expect(Rules.SeekerCount(0, cfg)).toBe(0)
-		expect(Rules.SeekerCount(1, { SoloRole = "Seeker", SeekerRatio = 0.25, MinSeekers = 1 })).toBe(1)
-		expect(Rules.SeekerCount(1, { SoloRole = "Hider", SeekerRatio = 0.25, MinSeekers = 1 })).toBe(0)
+		expect(Rules.SeekerCount(1, { SoloRole = "Seeker", SeekerRatio = 0.25, MinSeekers = 1 })).toBe(
+			1
+		)
+		expect(Rules.SeekerCount(1, { SoloRole = "Hider", SeekerRatio = 0.25, MinSeekers = 1 })).toBe(
+			0
+		)
 		-- Even a big MinSeekers leaves one hider.
 		expect(Rules.SeekerCount(3, { SeekerRatio = 0.25, MinSeekers = 5 })).toBe(2)
 	end)
@@ -80,7 +87,8 @@ describe("Hide & Seek rules", function()
 		end
 		-- Whoever sought last time is never picked again while others are free.
 		for seed = 1, 20 do
-			local again = Rules.PickSeekers(list, 2, Random.new(seed), { a = true, b = true, c = true })
+			local again =
+				Rules.PickSeekers(list, 2, Random.new(seed), { a = true, b = true, c = true })
 			for _, name in again do
 				expect(name == "a" or name == "b" or name == "c").toBe(false)
 			end
@@ -112,9 +120,30 @@ describe("Hide & Seek rules", function()
 	it("scores tags, hidden pumpkins and the winning side", function()
 		local r = cfg.Rewards
 		local entries = {
-			{ UserId = 1, Name = "Seeker", StartRole = "Seeker", Tags = 2, Found = false, HiddenSeconds = 0 },
-			{ UserId = 2, Name = "Found", StartRole = "Hider", Tags = 1, Found = true, HiddenSeconds = 125 },
-			{ UserId = 3, Name = "Hidden", StartRole = "Hider", Tags = 0, Found = false, HiddenSeconds = 165 },
+			{
+				UserId = 1,
+				Name = "Seeker",
+				StartRole = "Seeker",
+				Tags = 2,
+				Found = false,
+				HiddenSeconds = 0,
+			},
+			{
+				UserId = 2,
+				Name = "Found",
+				StartRole = "Hider",
+				Tags = 1,
+				Found = true,
+				HiddenSeconds = 125,
+			},
+			{
+				UserId = 3,
+				Name = "Hidden",
+				StartRole = "Hider",
+				Tags = 0,
+				Found = false,
+				HiddenSeconds = 165,
+			},
 		}
 		local rows = Rules.Results(entries, "Hiders", cfg)
 		expect(#rows).toBe(3)
@@ -262,7 +291,9 @@ local function newRound(playerCount: number)
 			end
 		end,
 		Teleport = function(player, spawn)
-			player.Character:PivotTo(rt.env.CFrame.new(spawn.Position + rt.env.Vector3.new(0, 4, 0)))
+			player.Character:PivotTo(
+				rt.env.CFrame.new(spawn.Position + rt.env.Vector3.new(0, 4, 0))
+			)
 		end,
 		AliveHumanoid = function(player)
 			local character = player.Character
@@ -324,7 +355,8 @@ local function newRound(playerCount: number)
 		local Vector3 = rt.env.Vector3
 		local CFrame = rt.env.CFrame
 		character:PivotTo(CFrame.new(target + Vector3.new(12, 1.5, 0), target))
-		local gun = seeker.Backpack:FindFirstChildOfClass("Tool") or character:FindFirstChildOfClass("Tool")
+		local gun = seeker.Backpack:FindFirstChildOfClass("Tool")
+			or character:FindFirstChildOfClass("Tool")
 		if gun then
 			gun.Parent = character -- (Humanoid:EquipTool is only recorded in the harness)
 		end
@@ -353,15 +385,21 @@ describe("A Hide & Seek round (4 players)", function()
 		for _, hider in hiders do
 			local pumpkin = round.pumpkinOf(hider)
 			expect(pumpkin).toBeInstanceOf("Model")
-			expect(rt.game:GetService("CollectionService"):HasTag(pumpkin, "HidingDecoy")).toBe(false)
+			expect(rt.game:GetService("CollectionService"):HasTag(pumpkin, "HidingDecoy")).toBe(
+				false
+			)
 			local head = hider.Character:FindFirstChild("Head")
 			expect(head.Transparency).toBe(1)
 			expect(head:FindFirstChild("face").Transparency).toBe(1)
-			expect(hider.Character:FindFirstChildOfClass("Humanoid").DisplayDistanceType.Name).toBe("None")
+			expect(hider.Character:FindFirstChildOfClass("Humanoid").DisplayDistanceType.Name).toBe(
+				"None"
+			)
 			-- The pumpkin sits on the ground under the hider and is welded to them.
 			local body = pumpkin.PrimaryPart
 			expect(body.Anchored).toBe(false)
-			expect(body:FindFirstChildOfClass("WeldConstraint").Part0).toBe(hider.Character.HumanoidRootPart)
+			expect(body:FindFirstChildOfClass("WeldConstraint").Part0).toBe(
+				hider.Character.HumanoidRootPart
+			)
 		end
 		-- The seeker waits in the hut, frozen.
 		expect(seeker.Character.HumanoidRootPart.Anchored).toBe(true)

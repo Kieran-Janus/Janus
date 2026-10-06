@@ -563,9 +563,9 @@ local Config = {
 	]]
 	Hub = {
 		Name = "Spooky Town Square",
-		-- Bump this number (3 -> 4) whenever the hub code or these settings change in a way the
+		-- Bump this number (4 -> 5) whenever the hub code or these settings change in a way the
 		-- saved hub should pick up: a saved hub with a lower number is rebuilt on the next start.
-		BuildVersion = 3,
+		BuildVersion = 4,
 		Center = Vector3.new(0, 0, 0), -- top of the baseplate
 		Seed = 31, -- random variation in decorations (change it for a different scatter)
 		Radius = 105, -- cobblestone plaza (room for 32 players)
@@ -581,8 +581,11 @@ local Config = {
 		},
 		NameTagDistance = 120, -- NPC name tags hide further away than this (studs)
 		-- Phones: the whole lobby (with the minigames and parkour) should stay under these.
-		-- tests/specs/HubLook.spec.luau checks them.
-		Budget = { MaxParts = 3500, MaxLights = 90 },
+		-- tests/specs/HubLook.spec.luau checks them. With every lobby feature switched on the
+		-- lobby is about 3,900 parts and 83 lights (decorations about 1,900; parkour, Candy Rush,
+		-- Web Scour, the crate stand and the eggs about 1,300). Most parts are anchored and cast no
+		-- shadow, which phones handle well; lights cost more, so keep MaxLights where it is.
+		Budget = { MaxParts = 4200, MaxLights = 90 },
 
 		--[[
 			Lighting. Dusk: a purple sky with an orange glow, warm lamps.
@@ -1368,7 +1371,18 @@ local Config = {
 			-- v2
 			EasterEggs = {} :: { [string]: boolean }, -- [eggId] = true once found
 			Parkour = { Best = 0, LastReward = 0, Runs = 0 }, -- best time (s), os.time() of the last reward, finishes
-			Minigames = { CandyRushWins = 0, WebScourBest = 0 },
+			-- Lobby minigames: Candy Rush wins, best solo time (s) and its coin limits (the UTC day
+			-- number, coins earned that day, os.time() of the last reward and of the last solo
+			-- race), and the best Web Scour time (s).
+			Minigames = {
+				CandyRushWins = 0,
+				CandyRushBest = 0,
+				CandyRushDay = 0,
+				CandyRushCoinsToday = 0,
+				CandyRushLastReward = 0,
+				CandyRushLastSolo = 0,
+				WebScourBest = 0,
+			},
 			Crates = { Opened = 0 }, -- crates opened, ever
 			Stats = { HideSeekTags = 0, HideSeekWins = 0, ScareMazeEscapes = 0 },
 		},
