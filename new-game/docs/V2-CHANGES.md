@@ -462,7 +462,7 @@ Shortcuts for testing by hand: press **F8** in a playtest (or the Admin button o
 ## Known limits
 
 Things that are not done, or need your eyes in Studio:
-- **Not tested in Roblox yet.** Everything passed offline tests, but feel, speed, sounds and phone layouts need a real playtest (`/verify-v2`).
+- **Tested in Studio on 6 October** (`/verify-v2`): solo, 2 players (Clients and Servers) and an iPhone-sized screen (Test > Device). What was fixed is listed in `docs/PROGRESS.md`. Still worth doing yourself: a tablet in Test > Device, a 3-player ScareMaze (an OUT Survivor turning into a Haunter), one real parkour climb (the brooms are narrow), and a live test with friends after publishing.
 - **Lighting Technology** must be set to Future by hand once (see above).
 - **Sounds**: new features reuse sound ids that were already in the game (the hider giggle is a pitched-up bat squeak). Swap any you don't like in each feature's `Sounds` block.
 - **Art is still built from Parts**: the Pumpkin King, the round maps and the scare characters. Real models can replace them (see [Make it look like yours](#make-it-look-like-yours)).

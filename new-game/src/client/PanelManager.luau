@@ -21,6 +21,7 @@
 ]]
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
+local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
 local PanelManager = {}
@@ -49,6 +50,14 @@ local function updateBinding()
 	local want = #openOrder > 0
 	if cursor then
 		cursor.Visible = want
+	end
+	-- Touch screens: Roblox's round action buttons (Run, HEY!) draw over panels; hide them
+	-- while one is open (nobody runs or shouts from a menu).
+	local player = Players.LocalPlayer
+	local playerGui = player and player:FindFirstChildOfClass("PlayerGui")
+	local actions = playerGui and playerGui:FindFirstChild("ContextActionGui")
+	if actions and actions:IsA("ScreenGui") then
+		actions.Enabled = not want
 	end
 	if want and not bound then
 		ContextActionService:BindActionAtPriority(CLOSE_ACTION, function(_, state)

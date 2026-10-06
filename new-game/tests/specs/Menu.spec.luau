@@ -289,6 +289,16 @@ describe("MenuUI (mounted)", function()
 		expect(cursor.Visible).toBe(false)
 	end)
 
+	it("hides Roblox's touch action buttons (Run, HEY!) while a panel is open", function()
+		local playerGui = rt.game:GetService("Players").LocalPlayer.PlayerGui
+		local actions = rt:create("ScreenGui", { Name = "ContextActionGui" }, playerGui)
+		MenuUI.Open()
+		expect(actions.Enabled).toBe(false)
+		MenuUI.Close()
+		expect(actions.Enabled).toBe(true)
+		actions:Destroy()
+	end)
+
 	it("closes when a tile is clicked, and replaces a tile with the same Id", function()
 		MenuUI.Open()
 		rt:fire(tilesWith("TestTile")[1], "Activated")
