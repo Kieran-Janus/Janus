@@ -1,0 +1,14 @@
+---
+description: Add a new crate skin to a theme. Usage: /add-skin <theme> <rarity> <what it looks like>
+---
+
+Add a crate skin: $ARGUMENTS
+
+1. Read `CLAUDE.md`, `docs/CUSTOMIZE.md` > "Crate skins", `src/shared/Config/Skins/init.luau`, `src/shared/Config/Skins/Settings.luau`, the style options at the top of `src/shared/Config/Skins/Pumpkin.luau`, and the theme file you will edit.
+2. Pick the theme (`Pumpkin`, `Candy`, `Spooky`, `Graveyard`, `Monster`, `Moonlight`) and the rarity (`Common`, `Uncommon`, `Rare`, `Crazy`). If I didn't say, choose and tell me why. Follow the rarity look rules: Common = colours, materials and an accent; Uncommon = + a head piece (`src/shared/HeadPieces.luau`); Rare = + `Glow` and an `Aura`; CRAZY = everything + `Crazy = { Rainbow, Pulse, Orbit, Count }`. Spooky-cute, never gory.
+3. In the theme file, copy a skin block of the same rarity and paste it at the end of that rarity's group. Give it a new `Id` = `<Theme>_<NameWithoutSpaces>` (search the whole Config folder to be sure it's unique), a `Name` and its `Style`. **Never change an existing `Id`.** Only add `Price`, `CrateOnly` or `Crate` if I asked.
+4. If no existing head piece or pattern fits, add a builder in `src/shared/HeadPieces.luau` (or a pattern in `src/shared/Cosmetics.luau`) in the same style, and list it in the style options comment at the top of `Pumpkin.luau`.
+5. Tell me how the odds changed: skins of one rarity share that rarity's chance, so adding one lowers the others' chance in that crate and in the rarity crate (`src/shared/CrateOdds.luau`, `CrateOdds.Chances`). A second CRAZY skin in one crate halves each CRAZY skin's chance.
+6. The offline tests guard the v2 catalogue on purpose: `tests/specs/skins.spec.luau` wants exactly 20 skins per theme (`COUNTS` = 12 Common, 5 Uncommon, 2 Rare, 1 CRAZY), and `tests/specs/crates.spec.luau` checks the Pumpkin Crate's 20 cards and its 5.833% Common chance and one CRAZY per theme in the CRAZY Crate. Update those rules to the new exact numbers (don't delete the checks) and say so in the commit message. Then run `stylua src`, `selene src` and `lune run tests/run`: all must pass.
+7. Playtest in Studio: F8 > "+ Coins", Menu > Skins, filter by the theme, buy it, wear it. Look from the front and side, reset the character, unequip (the avatar comes back). For a CRAZY skin, check the rainbow, orbit and pulse. Open the theme's crate preview: the skin is listed with its chance and the chances add up to 100%.
+8. Commit "Add skin: <name>" and push to the current branch. Tell me the Id, rarity, shop price, which crate it's in and its chance.

@@ -1,5 +1,7 @@
 # Overnight report (6 October)
 
+> Historical report from before v2. Since then: `src/shared/Config.luau` became the folder `src/shared/Config/` (`init.luau` plus one file per feature), and Witch Wanda, the Boo Guide and the tutorial were removed. Current state: `docs/V2-CHANGES.md` and `docs/PROGRESS.md`.
+
 Nine tasks, one commit each, all pushed to `claude/clever-clarke-3zqgma`. Every task was formatted (StyLua), linted (Selene: 0 errors, 0 warnings) and playtested in Studio with a clean Output window. Every new number, sound, colour and line of text is in `src/shared/Config.luau`.
 
 ## Look at these first

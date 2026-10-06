@@ -8,7 +8,7 @@ Over 90% of players start on Home, which is driven by the "Recommended For You" 
 | Signal | What it means | What we do about it |
 | --- | --- | --- |
 | Play-through rate | % of people who see the tile and click Play | Thumbnail + icon + title (M7); A/B test thumbnails in Creator Hub |
-| First-play bounce rate | People leaving after a short first session | Fun inside 30 s: no long waits, the Boo Guide tutorial, a round starts fast |
+| First-play bounce rate | People leaving after a short first session | Fun inside 30 s: no long waits, the Ready pad right in front of the spawn, lobby minigames while you wait, a round starts fast |
 | Play days per user | How many different days people play | Daily streak rewards, codes, weekly updates, limited events |
 | Playtime per user | Minutes per session | 5-minute rounds that chain, ghost modes so dead players stay |
 | Intentional co-play | Players joining *with friends* (invites, private servers) | Invite button, friend bonus, private servers |

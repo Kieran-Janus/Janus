@@ -1245,8 +1245,10 @@ local Config = {
 		TrailLifetime = 0.6,
 	},
 
-	-- Robux purchases. IDs are 0 until the owner creates them in Creator Hub (see
-	-- docs/PROGRESS.md, M6); with an ID of 0 the shop shows "Coming soon" and nothing prompts.
+	-- Robux purchases: the VIP game pass (VipGamePassId) and the coin packs (Products). IDs are 0
+	-- until the owner creates them in Creator Hub (Creations > this experience > Monetization)
+	-- and pastes them here; with an ID of 0 the shop shows "Coming soon" and nothing prompts.
+	-- Step by step: docs/V2-CHANGES.md > "Robux setup". Crate ids go in Config/Crates.luau.
 	Monetization = {
 		VipGamePassId = 0,
 		VipName = "VIP",

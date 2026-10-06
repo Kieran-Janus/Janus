@@ -73,7 +73,8 @@ Not needed for 20 October. Do them only if M5 finishes early.
 ## Spawn hub (lobby): "Spooky Town Square"
 Players spawn here between rounds. Spooky-cute, busy, and fun to stand around in.
 - Decorations: jack-o-lanterns, bunting, cobwebs, tombstones, a crooked clock tower, fog, floating candles, ambient music.
-- Interactive NPCs (all `Config.Npcs`): **Witch Wanda** (shop and cosmetics), **Boo Guide** (tutorial and tips), **Pumpkin Vendor** (buy pumpkin packs), **Voting Board** (map and difficulty votes), **Leaderboard Gravestone** (top pumpkin collectors).
+- Interactive NPCs (all `Config.Npcs`): the **Pumpkin Shop** keeper (the only shopkeeper: skins, hats, trails, pets), **Voting Board** (the playlist vote), **Leaderboard Gravestone** (top pumpkin collectors). v2 removed Witch Wanda, the Boo Guide and the tutorial pop-ups.
+- v2 lobby areas (each in its own `Config.Lobby.Zones` area): the **Ready pad** (stand on it to join the next round), the **Mystery Crates** stand, the **Spooky Sky Climb** parkour, **Candy Rush**, **Web Scour** and hidden **secret pumpkins**. See `docs/V2-CHANGES.md`.
 - Photo spot with emotes, a trick-or-treat door minigame for small rewards (optional).
 - Voice is on in the hub so players chat while waiting.
 

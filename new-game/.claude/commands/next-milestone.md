@@ -4,9 +4,9 @@ description: Build the next unfinished milestone from docs/PROGRESS.md, test it 
 
 Work through the next unfinished milestone for this game.
 
-1. Read `CLAUDE.md`, `docs/DESIGN.md` and `docs/PROGRESS.md`. Find the first row whose Status is `todo` or `in progress`. Tell me which milestone you picked and your plan in 5 lines or fewer.
-2. Build it following `docs/DESIGN.md`. Obey the rules in `CLAUDE.md`: every tunable in `src/shared/Config/` (`init.luau` plus one file per v2 feature), server-authoritative, `--!strict`, `Remotes` for networking, new services registered in `Main.server.luau`.
-3. Run `stylua src` and `selene src`, then fix what they report.
+1. Read `CLAUDE.md`, `docs/DESIGN.md`, `docs/V2-CHANGES.md` and `docs/PROGRESS.md`. Find the first row whose Status is `todo` or `in progress`. Tell me which milestone you picked and your plan in 5 lines or fewer. (If it is the v2 Studio check, run the steps in `.claude/commands/verify-v2.md`.)
+2. Build it following `docs/DESIGN.md` and `docs/V2-SPEC.md`. Obey the rules in `CLAUDE.md`: every tunable in `src/shared/Config/` (`init.luau` plus one file per v2 feature), a switch in `Config.Features` for anything new, server-authoritative, `--!strict`, `Remotes` for networking, new services registered in `Main.server.luau`, buttons as Menu tiles, working parts found by tag.
+3. Run `stylua src`, `selene src` and `lune run tests/run`, then fix what they report. Add a `tests/specs/<name>.spec.luau` for new logic.
 4. Playtest in Studio through the Studio connection (a local server with 2 players when the feature involves more than one player). Read Output. Fix any red errors and repeat. If the same error survives 3 attempts, stop and report it instead of guessing further.
 5. When it works, update `docs/PROGRESS.md` (set the row to `done`, add one line under Notes about what was built), then commit on the current branch with the message "<milestone>: <short summary>" and push to the current branch only.
 6. Stop and report in this format:

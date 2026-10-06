@@ -12,6 +12,7 @@ The `/next-milestone` command reads this file. Update the Status column when a m
 | M6 | Shop, pumpkin currency, saving, VIP pass and products | blocked | create gamepass/product IDs in Creator Hub |
 | V1 | Verify the overnight cloud work in Studio (run `/verify`): skins tab, custom models, codes, daily streak, invite, F8 admin panel, anti-teleport pumpkins | done | 2-player test (see notes) |
 | M7 | UI polish, thumbnails and icon, security audit, playtest | in progress | upload thumbnails, friends playtest |
+| V2 | v2 update: Ready pad, 3 modes and 5 maps, lobby redesign, parkour, Candy Rush, Web Scour, secret pumpkins, rarity prices, 126 skins and crates, top-left Menu, witch/Boo Guide/tutorial removed, Pumpkin Vendor fix (see `docs/V2-CHANGES.md`) | in progress: built and tested offline, needs a Studio check (`/verify-v2`) | yes: 2-player test, phone check, Robux ids |
 | Launch | Set the experience public on 20 October | todo | yes: only the owner does this |
 
 Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a note below).
@@ -19,7 +20,7 @@ Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a not
 ## Notes
 - M4: "Spooky Town Square" built from Parts by `src/server/Hub/HubBuilder.luau` (rebuilt at runtime only if `Workspace.Hub` is missing), with dusk lighting, particles, 5 NPCs plus a photo spot with emotes, a live Voting Board and a Leaderboard Gravestone; all tested in Studio. Save the place to keep the Studio copy. Hub lighting also darkens the maps, so M5 needs per-map lighting.
 - M5: `MinionService` adds Skeleton Patrols (slow + knockback + noise), Bat Swarms (zig-zag dart, slow) and Ghost Cats (steal a pumpkin that drops back later), all in `Config.Monsters`. Both maps are now themed builds in `src/server/Maps/` (Pumpkin Patch: corn maze, barn shortcut, risky pumpkin field, graveyard; Mansion: 9 furnished rooms, secret doors the King can't path through) with hiding spots, jump fences, hotspots, glowing pumpkins, particles and per-map lighting/ambient sound switched on the client (`ZoneLighting`); tested Easy and Hard in Studio. Still Part-built art: the owner can swap in Creator Store models and set `AmbientSound.SoundId` per map.
-- M6: Witch Wanda's shop (B key, Shop button, Witch Wanda, Pumpkin Vendor) sells 12 Part-built hats, trails and pets (`Config.Shop`, `src/shared/Cosmetics.luau`); buying/equipping is server-validated in `ShopService` and saved (Owned, Equipped). `MonetizationService` handles the VIP gamepass (+10% speed, King tracker on T, chat tag, 3 VIP-only cosmetics) and 3 coin packs with receipt-safe granting. Saving tested in Studio across sessions; all IDs are 0, so Robux buttons show "Coming soon".
+- M6 (before v2; v2 removed Witch Wanda, and the Pumpkin Shop is now the only shopkeeper): Witch Wanda's shop (B key, Shop button, Witch Wanda, Pumpkin Vendor) sells 12 Part-built hats, trails and pets (`Config.Shop`, `src/shared/Cosmetics.luau`); buying/equipping is server-validated in `ShopService` and saved (Owned, Equipped). `MonetizationService` handles the VIP gamepass (+10% speed, King tracker on T, chat tag, 3 VIP-only cosmetics) and 3 coin packs with receipt-safe granting. Saving tested in Studio across sessions; all IDs are 0, so Robux buttons show "Coming soon".
 - **M6 blocked: owner steps.** In Creator Hub (create.roblox.com) > this experience > Monetization:
   1. Passes > Create a Pass named "VIP" (icon optional) > set it On Sale with a price (suggested 249 Robux). Copy its Pass ID into `Config.Monetization.VipGamePassId`.
   2. Developer Products > create "Pumpkin Pouch" (suggested 25 R$), "Pumpkin Cart" (99 R$) and "Pumpkin Mountain" (249 R$). Copy each Product ID into the matching `Id` in `Config.Monetization.Products`.
@@ -56,13 +57,40 @@ Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a not
 - **Task 7, More cosmetics: done.** 6 new items in `Config.Shop.Items` with Part-built looks in `src/shared/Cosmetics.luau`: Candy Corn Hat (180, `CandyCornHat`), Bat Bow (220, `BatBow`), Candy Swirl trail (150, `CandySwirlTrail`), Purple Fog trail (280, `PurpleFogTrail`), Mini Cauldron pet (550, `MiniCauldron`), Itsy Spider pet (VIP-only, `SpiderPet`). Change colours in each item's Style, or drop a model named after the Id into `ReplicatedStorage.Custom.Cosmetics` to replace the look. Tested: bought, equipped, previews and on the character; spider refused without VIP and worn with it. (There was already a "Candy Corn" trail, so the new one is "Candy Swirl".)
 - **Task 8, Performance and safety: done (solo; 2-player still needed).** Leak check: two full rounds left server and client instance counts exactly where they started (no growing sounds, pop-ups, toasts or map parts). Every per-player table on the server is cleared on leave (added the missing one in PumpkinService). Every remote is validated and rate-limited; added light spam guards to GetShopState and Haunt (`Config.Performance`). Per-frame work: HubAmbience now only animates candles/lights near the camera and flickers at 20 Hz; fixed a long-standing bug where floating candles slid sideways instead of bobbing (they're rotated cylinders) and, with streaming on, could be skipped. Client-trusted things left as they are: your own movement (standard Roblox; pickups have the speed check), ghost flight, knockback (cosmetic).
 - **Task 9, Final verify: done.** Full solo pass (hub prompts, a full round, all 25 shop items, skins, codes, daily, invite, F8, custom models) with clean Output; fixed the gravestone showing "Unknown" for Studio test players. Full write-up: `docs/OVERNIGHT-REPORT.md`.
-- **First-round tutorial: done.** New players (RoundsPlayed = 0) get Boo Guide in a small speech bubble at the bottom with a tip at each moment: hub, round start, first pickup, King appears, caught, results. Each tip shows once and stays up at least 2.5 s. Skip (or the last tip) saves `TutorialDone` so it never shows again. On phones the bubble is compact and sits above any bottom panel, clear of the thumbstick and jump. Text and timings in `Config.Tutorial` (`TutorialService`, `src/client/TutorialUI.luau`). Tested: full sequence, Skip, saved across rejoin, phone layout.
+- **First-round tutorial: done (switched off in v2: `Config.Features.Tutorial = false`).** New players (RoundsPlayed = 0) get Boo Guide in a small speech bubble at the bottom with a tip at each moment: hub, round start, first pickup, King appears, caught, results. Each tip shows once and stays up at least 2.5 s. Skip (or the last tip) saves `TutorialDone` so it never shows again. On phones the bubble is compact and sits above any bottom panel, clear of the thumbstick and jump. Text and timings in `Config.Tutorial` (`TutorialService`, `src/client/TutorialUI.luau`). Tested: full sequence, Skip, saved across rejoin, phone layout.
 
 ## Needs Kieran
-- **Save the place (Ctrl+S).** I rebuilt the hub in Studio edit mode with the new decorations and terrain; it isn't saved yet. (If you don't save, the game still builds the new hub at runtime, but you won't see it in edit mode.)
+- ~~Save the place (Ctrl+S).~~ Replaced by v2: a lobby saved in the place is rebuilt automatically when it is older than `Config.Hub.BuildVersion` (unless Locked). See `docs/V2-CHANGES.md` > "First time after updating".
 - **Listen to the sounds.** I could check that every sound loads but not hear them. Play a round with sound on and swap any you don't like in `Config.Sounds` (and Hub.Music, Maps AmbientSound, King.Heard.RoarSoundId).
 - **Rojo plugin was disconnected** after Studio restarted, so I synced scripts into Studio through Rojo's local API. Reconnect the Rojo plugin (Plugins > Rojo > Connect) when you're back and save the place.
 - **Device emulator check:** I couldn't drive Studio's device emulator, so I tested phone/tablet layouts with a harness. Please open Test > Device (e.g. iPhone 14 landscape, iPad) once and check the side buttons, shop and vote panel, and that Roblox's Sprint/Shout/Track touch buttons don't sit on top of a panel.
 - **Speed hacks:** a cheater could raise their own walk speed (movement is client-side in Roblox). Pumpkin pickups already reject impossible speeds; a full server-side movement check would be a good post-launch job.
 - **Studio save was reset during testing** (F8 > Reset my save): your test Coins, owned items and codes are back to a new player.
 - **2-player tests:** the Studio connection can only start solo playtests. Multiplayer checks (3D sounds heard by others, ghost modes, friend bonus, voice) need Test > Clients and Servers > 2 players.
+
+## v2 (5-6 Oct, cloud session, not yet run in Studio)
+Spec: `docs/V2-SPEC.md`. Plain-English guide: `docs/V2-CHANGES.md`. Every feature below was built, reviewed, fixed and tested **offline** (the Lune suite, 1,100+ tests, plus scene renders in `docs/screenshots/`). None has been played in Roblox Studio yet: run `/verify-v2` and change each status to `verified in Studio` (or note what failed).
+
+| Feature | Switch (`Config.Features`) | Status |
+| --- | --- | --- |
+| Config split into `src/shared/Config/` (one file per feature), feature switches | | built + tested offline |
+| Pumpkin Vendor fix: `ShopKeeper` tag, spawn / Ready pad / shopkeeper always put back, custom keeper checks | | built + tested offline, needs a Studio check |
+| Witch Wanda, Boo Guide and the tutorial removed (Pumpkin Shop is the only shopkeeper) | `Tutorial` (off) | built + tested offline, needs a Studio check |
+| Ready pad, playlist vote, back to the lobby after a round | `ReadyPad` | built + tested offline, needs a Studio check |
+| Lobby spectating (Menu > Spectate, Watch the round) | `LobbySpectate` | built + tested offline, needs a 2-player Studio check |
+| Game modes framework (King Hunt moved into `Modes/KingHunt.luau`) | `KingHunt` | built + tested offline, needs a Studio check |
+| Pumpkin Hide & Seek + Pumpkin Farm and Hedge Maze maps | `HideSeek` | built + tested offline, needs a 2-player Studio check |
+| ScareMaze + cornfield maze map | `ScareMaze` | built + tested offline, needs a 3-player Studio check (Haunters) |
+| Lobby redesign (town square, prop kit, round Ready pad, shop stall) | | built + tested offline, needs a Studio look (Lighting > Technology = Future) |
+| Lobby editing: zones, sections, Bake, Locked, BuildVersion, palette, props override | | built + tested offline, needs a Studio check |
+| Parkour "Spooky Sky Climb" | `Parkour` | built + tested offline, needs a Studio check (difficulty for kids) |
+| Candy Rush | `CandyRush` | built + tested offline, needs a 2-player Studio check |
+| Web Scour | `WebScour` | built + tested offline, needs a Studio check |
+| Secret pumpkins (11 Easter eggs) | `EasterEggs` | built + tested offline, needs a Studio check (egg placement) |
+| Rarity prices (125 / 500 / 1,000 / 100,000), 5 coins per pumpkin | | built + tested offline |
+| 126 skins (120 crate skins in 6 themes), CRAZY effects, paged Skins tab | `SkinEffects` | built + tested offline, needs a Studio look (R15, R6, layered clothes) |
+| 10 crates with odds preview, coin and Robux crates, region rule | `Crates`, `RobuxCrates` | built + tested offline, needs a Studio check; Robux needs product ids |
+| Top-left Menu in the top bar, side buttons moved into it, one panel at a time | `Menu` | built + tested offline, needs a Studio and phone check |
+| Review fixes: Hide & Seek fair play, anti-teleport, saved-lobby repair, phone layouts, safer Robux receipts, saved Web Scour cooldown | | built + tested offline |
+
+Owner steps for v2: `git pull`, `rokit install`, restart `rojo serve`, set Lighting > Technology = Future, press Play, run `/verify-v2`; then the Robux ids for VIP, coin packs and crates (`docs/V2-CHANGES.md` > "Robux setup").

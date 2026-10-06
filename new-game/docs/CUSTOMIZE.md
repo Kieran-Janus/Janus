@@ -8,9 +8,13 @@ The game is built so you can change almost anything without touching code. There
 | **2. Custom models** | How every character, NPC, hat, pet and skin *looks* | Studio: `ReplicatedStorage > Custom` | Build or import a model, give it the right name. |
 | **3. Code** | New behaviour (a new monster, mode, item type) | `src/` | Ask Claude Code with a slash command (bottom of this page). |
 
-Test anything fast in a Studio playtest with **F8** (admin panel): +Coins, Unlock all items, Reset daily, **Rebuild hub**, **Repaint hub**, Reset my save. It only works in Studio unless you turn it on for live servers (`Config.Admin`).
+Test anything fast in a Studio playtest with **F8** (admin panel; phones get an Admin button at the top right): + Coins, Unlock all items, Reset daily reward, **Rebuild hub**, **Repaint hub**, Reset my save, Start round now, Force mode, plus buttons the v2 features add (parkour, Candy Rush, Web Scour, Easter eggs, crates). It only works in Studio unless you turn it on for live servers (`Config.Admin`).
+
+Every v2 feature has an on/off switch in `src/shared/Config/Features.luau`. New to v2? Start with [`docs/V2-CHANGES.md`](V2-CHANGES.md).
 
 Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See [Editing the lobby and maps by hand](#editing-the-lobby-and-maps-by-hand).
+
+Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Props](#swap-a-decoration-everywhere-props) · [Tags](#parts-that-do-something-tags)
 
 ---
 
@@ -30,21 +34,31 @@ Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See 
 | Player walk/sprint speed | `Config.Player` |
 | Ghost mode rules (fly speed, haunt) | `Config.Ghost` |
 | Voice range and echo | `Config.Voice` |
+| Turn any v2 feature on or off | `src/shared/Config/Features.luau` (one `true`/`false` line each) |
 | Hub layout, lighting, music, decorations | `Config.Hub` (then F8 > Rebuild hub to try it, and raise `Config.Hub.BuildVersion` so saved hubs update) |
 | Hub colours | `Config.Hub.Palette` (the `hubPalette` list at the top of `Config/init.luau`) |
-| Where the Ready pad, shop, minigames and parkour go | `Config.Lobby.Zones` |
+| Where the Ready pad, shop, crate stand, minigames and parkour go | `Config.Lobby.Zones` (`src/shared/Config/Lobby.luau`) |
+| Ready pad rules: players needed, who can vote, words | `Config.Lobby.Ready` (`src/shared/Config/Lobby.luau`) |
 | Ready pad look and sign text | `Config.Hub.ReadyArea` |
+| Watching the round from the lobby | `Config.Lobby.Spectate` |
 | Hub terrain, forest, mansion, statue, fence, glowing paths | `Config.Hub.Polish` (same rebuild) |
 | NPC names, positions, dialogue | `Config.Npcs.List` |
-| Shop items and prices (hats, trails, pets, skins) | `Config.Shop.Items` |
-| VIP perks, Robux products | `Config.Monetization` (IDs from Creator Hub) |
+| Shop items (hats, trails, pets, classic skins) | `Config.Shop.Items` |
+| Crate skins (120, six themes) | `src/shared/Config/Skins/<Theme>.luau` (see "Crate skins" below) |
+| Prices by rarity (Common, Uncommon, Rare, CRAZY), duplicate refunds | `Config.Rarity` (`src/shared/Config/Rarity.luau`) |
+| VIP perks, VIP pass, coin packs | `Config.Monetization` (IDs from Creator Hub) |
 | Crates: prices, odds, Robux products, the crate stand, words | `Config.Crates` (`src/shared/Config/Crates.luau`, see "Crates" below) |
 | Codes for YouTubers | `Config.Codes.List` |
 | Daily streak rewards | `Config.Daily.Rewards` |
-| First-round tutorial tips and timings | `Config.Tutorial` |
 | Friend/group bonus, invite button, favourite prompt | `Config.Social` |
-| Map lighting and ambient sound | `Lighting`, `AmbientSound` in the map's file, `src/shared/Config/Maps/<Id>.luau` |
-| Which maps and modes the vote offers | `Config.Modes.Playlists` (`src/shared/Config/Modes.luau`) |
+| Game modes, which mode + map pairs the vote offers | `Config.Modes` (`src/shared/Config/Modes.luau`) |
+| Hide & Seek rules, candy gun, coins | `Config.HideSeek` (`src/shared/Config/HideSeek.luau`) |
+| ScareMaze rules, BOO, scares, coins | `Config.ScareMaze` (`src/shared/Config/ScareMaze.luau`) |
+| Map size, lighting, ambient sound, layout | the map's file, `src/shared/Config/Maps/<Id>.luau` |
+| Parkour course, coins, times | `Config.Parkour` (`src/shared/Config/Parkour.luau`) |
+| Candy Rush | `src/shared/Config/CandyRush.luau` |
+| Web Scour | `src/shared/Config/WebScour.luau` |
+| Secret pumpkins (Easter eggs) | `src/shared/Config/EasterEggs.luau` |
 | Sound effects (clicks, pickups, King footsteps, minions, rewards) | `Config.Sounds` (SoundId "" = silent) |
 | Hub music, King roar | `Config.Hub.Music`, `Config.King.Heard.RoarSoundId` |
 | UI colours and font | `src/client/Theme.luau` |
@@ -107,35 +121,59 @@ Put a Model (or an Accessory from the Toolbox) named after the item's **Id** int
 Sizes are in `Config.Custom.CosmeticSize`.
 
 ### Add a brand new item
-Add an entry to `Config.Shop.Items`. For example, a new pet that only uses your model:
+Add an entry to `Config.Shop.Items` (in `src/shared/Config/init.luau`). For example, a new pet that only uses your model:
 ```lua
 {
 	Id = "SpiderPet",            -- also the name of your model in Custom > Cosmetics
 	Name = "Spooky Spider",      -- shown in the shop
 	Slot = "Pet",                -- "Skin", "Hat", "Trail" or "Pet"
-	Price = 750,                 -- coins
+	Rarity = "Uncommon",         -- sets the price: Common 125, Uncommon 500, Rare 1000, Crazy 100000
 	Style = { Kind = "Custom" }, -- look comes from the custom model
 },
 ```
-Add `VipOnly = true, Price = 0` to make it a VIP perk. Until the model exists, the shop shows a pink "?" box, so nothing breaks.
+The price comes from the item's `Rarity` (`src/shared/Config/Rarity.luau`). To give one item its own price, add `Price = 750`. Add `VipOnly = true, Price = 0` to make it a VIP perk. Until the model exists, the shop shows a pink "?" box, so nothing breaks. Or ask Claude Code: `/add-cosmetic a glowing bat hat`.
+
+### Rarity and prices
+`src/shared/Config/Rarity.luau` has one block per rarity: `Name` (what players see), `Price` (coins in the shop), `Color` (the tag colour) and `DuplicateRefund` (coins back when a crate gives you a skin you own). Change `Levels.Rare.Price` and every Rare item follows. Don't rename the ids (`Common`, `Uncommon`, `Rare`, `Crazy`): items and saves use them.
 
 ### Skin options (no model needed)
 ```lua
 {
-	Id = "Vampire", Name = "Vampire", Slot = "Skin", Price = 600,
+	Id = "Vampire", Name = "Vampire", Slot = "Skin", Rarity = "Uncommon",
 	Style = {
 		Kind = "Skin",
 		BodyColor = Color3.fromRGB(220, 220, 235), -- recolours the whole avatar (optional)
 		Material = Enum.Material.SmoothPlastic,    -- optional: Neon, Fabric, Glass, ...
 		Transparency = 0,                          -- optional: 0.3 = see-through
 		HideClothes = true,                        -- hide shirt and pants (optional)
-		Head = "SkinSkull",                        -- optional head piece: SkinPumpkin, SkinSkull, SkinKing
+		Head = "SkinSkull",                        -- optional head piece (full list: top of Config/Skins/Pumpkin.luau)
 		HeadColor = Color3.fromRGB(235, 228, 210), -- head piece colour
 		GlowColor = Color3.fromRGB(255, 0, 0),     -- eyes and mouth glow
 	},
 },
 ```
 Skins are removed cleanly when unequipped: the player's own avatar comes back.
+
+### Crate skins: add or change a skin
+The 120 crate skins live in `src/shared/Config/Skins/`, one file per theme: `Pumpkin.luau`, `Candy.luau`, `Spooky.luau`, `Graveyard.luau`, `Monster.luau`, `Moonlight.luau`. Each has 20 skins: 12 Common, 5 Uncommon, 2 Rare and 1 CRAZY. Every style option (colours, materials, patterns, head pieces, glow, auras, CRAZY effects) is explained at the top of `Pumpkin.luau`.
+
+**Add a skin:**
+1. Open the theme file, e.g. `src/shared/Config/Skins/Candy.luau`.
+2. Copy one whole skin block (from `{` to `},`) of the rarity you want and paste it below.
+3. Give it a new `Id` that starts with the theme (`Candy_BubbleGum`) and a `Name`.
+4. Set its `Rarity` and change its `Style` colours.
+5. Save. It is in the Shop (at its rarity price) and in that theme's crate straight away. The crate odds update by themselves: skins of one rarity share that rarity's chance.
+6. The offline tests (`lune run tests/run`) check that every theme has exactly 12 Common, 5 Uncommon, 2 Rare and 1 CRAZY, so after adding a skin they report the new count. That's expected: ask Claude Code to update the count in `tests/specs/skins.spec.luau`, or use `/add-skin`, which does it for you. (Changing an existing skin's look and name keeps the counts.)
+
+**Change a skin:** change its `Name` or anything in `Style` freely. **Never change an `Id`** once the game is live: it is saved in players' data.
+
+**Rules worth knowing:**
+- How rarities should look: Common = colours, materials and an accent; Uncommon = + a head piece; Rare = + glow and particles (`Glow`, `Aura`); CRAZY = everything + `Crazy = { Rainbow, Pulse, Orbit }`.
+- `CrateOnly = true` keeps a skin out of the Shop (crates only). `Price = 300` gives it its own price.
+- `Crate = "CandyCrate"` on one skin puts it in a different crate than its theme's.
+- **New theme:** copy a theme file, rename it and every `Id` in it, then add a line to `Themes` in `Skins/Settings.luau` (its `Id` is the file name, `Crate` is the crate it drops from). Add that crate too (see "Crates").
+- CRAZY animations can be switched off with `Config.Features.SkinEffects = false`; their speed and how many players animate at once are in `Skins/Settings.luau` > `Effects`.
+- Or ask Claude Code: `/add-skin a Candy skin made of bubble gum, Rare`.
 
 ### Trails
 A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
@@ -167,7 +205,8 @@ Mystery crates give a random skin. Everything about them is in `src/shared/Confi
   an invisible part tagged `CrateDisplay` with the attribute `CrateId`: move or copy them in
   Studio, or tag any part of your own. Your own crate look: a model named after the crate's Id
   (e.g. `PumpkinCrate`) in `ReplicatedStorage > Custom > Props`.
-- **Test it**: F8 > "Crates: open free Pumpkin Crate" and "Crates: +100k coins".
+- **Test it**: F8 > "Crates: open free Pumpkin Crate" and "Crates: +100k coins". Which crate the free button opens: `Admin.FreeCrate`. To see what players in a blocked region see, set `Policy.TestAsRestricted = true` (Studio only).
+- Or ask Claude Code: `/add-crate a Witchy crate with 20 new skins`.
 
 **Roblox's rule for paid random items (please keep it):** players must see every item and its
 exact chance *before* they pay (the crate panel always shows them), and players whose region
@@ -177,6 +216,19 @@ your region; you can still buy any skin directly in the Shop", and every crate s
 sale in the Shop at its rarity price. If Roblox can't answer, crates stay closed for that player
 (in Studio they stay open so you can test; set `Policy.TestAsRestricted = true` to see what those
 players see). If such a player still buys a Robux crate somehow, they get its coin price instead.
+
+---
+
+## Modes and playlists
+A **mode** is a way to play: King Hunt, Pumpkin Hide & Seek or ScareMaze. A **playlist** is one mode on one map ("Hide & Seek: Hedge Maze"). The vote before each round offers playlists, never bare maps. Everything is in `src/shared/Config/Modes.luau`:
+- `VoteChoices`: how many playlists the vote offers (3), picked at random from the ones that fit.
+- `List`: one block per mode. `Name` and `Description` are what players see, `MinPlayers` is the fewest ready players it works with, `Feature` is its switch in `Features.luau`.
+- `Playlists`: one block per mode + map pair. `Id` (never rename once live), `Mode`, `Map` (an Id from `Config.Maps.List`), `Name` (the vote button) and an optional `MinPlayers` if that map needs more players.
+- **Take a playlist out of the vote:** delete its block. **Take a whole mode out:** switch it off in `Features.luau` (`HideSeek = false`).
+- **Put a map in another mode:** add a playlist with that `Mode` and `Map`, and add the mode to the `Modes` list in the map's file (`src/shared/Config/Maps/<Id>.luau`). The map needs that mode's tagged parts (see "Maps" below). Or ask Claude Code: `/new-playlist Hide & Seek on the Spooky Mansion`.
+- **Test one mode alone:** in a Studio playtest, F8 > "<mode>: force next round" (works with any number of players), then step on the Ready pad.
+- Each mode's rules have their own file: `Config/HideSeek.luau` (head start, seeker share, giggles, glow, candy gun, coins) and `Config/ScareMaze.luau` (time, stop rule, Haunter share, BOO, scares, coins). King Hunt uses `Config.Round`, `Config.King`, `Config.Monsters` and `Config.Rewards` in `init.luau`.
+- A brand new mode needs code (`src/server/Modes/<Id>.luau`): ask Claude Code.
 
 ---
 
@@ -196,6 +248,79 @@ Easiest start: let the game build its own map into `ServerStorage > Maps` for yo
 2. Add it to `Config.Maps.List` in `src/shared/Config/init.luau`: one more line like `require(script.Maps.GhostTown) :: any,`.
 3. Add a playlist for it in `src/shared/Config/Modes.luau` > `Playlists`: `{ Id = "KingHuntGhostTown", Mode = "KingHunt", Map = "GhostTown", Name = "King Hunt: Ghost Town" },`. The vote only offers playlists, and the button shows the playlist's `Name`.
 4. Build the map as described above, name the Model after the Id and put it in `ServerStorage > Maps`. Besides `Floor` and `Spawns`, the other modes use tagged parts: a ScareMaze map needs at least one part tagged `MazeExit` (where Survivors escape) and can have `SurvivorSpawn`, `HauntSpawn` and `ScareTrigger`; a Hide & Seek map can have `SeekerSpawn`, `HiderSpawn`, `HidingDecoy` and `SeekerDoor`. Without the spawn tags everyone starts at `Spawns`. What each tag needs is at the top of `src/shared/Tags.luau`.
+
+---
+
+## The Ready pad
+Players stand on the Ready pad (the glowing rune circle in front of the spawn) to join the next round. Nobody else is pulled in.
+- **Rules:** `src/shared/Config/Lobby.luau` > `Ready`. `MinReady` = how many ready players start the vote (now 1; never fewer than the switched-on modes need). `VoteOnlyReady` = only ready players can vote. `LeaveGraceSeconds` = a wobble or jump off the pad doesn't un-ready you. `PadText` and `Text` = the words.
+- **Look:** `Config.Hub.ReadyArea` in `init.luau` (size, runes colour, standing stones, arch, "PLAY!" banner, the floating "READY x / y" sign).
+- **Move it:** change `Config.Lobby.Zones.ReadyArea` and rebuild the lobby. Or, in a baked lobby, drag the whole `ReadyArea` model (or just the pad, the part tagged `ReadyPad`) wherever you like.
+- **A second pad:** select the pad and press Ctrl+D. Any part tagged `ReadyPad` counts, square or round, and a tagged Model counts as its whole box.
+- **Switch it off** (`ReadyPad = false` in `Features.luau`) and everyone in the lobby plays every round, like before v2.
+- If there is no part tagged `ReadyPad` at all, everyone counts as ready (the Output window says so) and the game puts a pad back the next time it starts.
+
+---
+
+## Parkour jumps
+The "Spooky Sky Climb" behind the clock tower. Settings: `src/shared/Config/Parkour.luau`.
+- **Coins and times:** `Reward.Coins` (100), `Reward.CooldownHours` (20), `MinSeconds` (15: a faster finish doesn't count). These work straight away, also in a saved lobby.
+- **The course** is the `Course` list near the top: one line per piece, in climbing order. `Kind` is `Start`, `Pumpkin`, `Grave`, `Broom`, `Candy`, `Bat`, `Platform`, `Checkpoint`, `Finish` or `Hazard` (green slime). `Offset = Vector3.new(right, up, back)` is where the top of the piece is, in studs from the middle of the parkour zone, seen from the plaza. Optional: `Size`, `Rotation`, `Spicy = true` (a harder jump is allowed), `Label` (a checkpoint's stage name) and `Text` (words on a gravestone).
+- **Add a jump:** copy a line, paste it where it goes in the order and change its `Offset`. Keep `Start` first and `Finish` last. The Output window warns about any jump that is too far or too high for a normal player (limits in `Jumps`: 9 studs across and 5 up; 10 and 5.5 for a Spicy one).
+- **See it:** F8 > Rebuild hub tries it in a playtest. To keep it, run `Bake.Hub()` in edit mode (or `Bake.Hub(true)` for a Locked lobby) or raise `Config.Hub.BuildVersion`.
+- **Or move pieces by hand** in a baked lobby (`Workspace.Hub.Parkour`): the game finds the working parts by tag, not by name or place. `ParkourStart` (start pad), `ParkourCheckpoint` with the attribute `Index` = 1, 2, 3 in climbing order, `ParkourFinish` (the trophy), `ParkourHazard` (slime), `ParkourBoard` (best times). The jumps in between are just parts: move, copy or delete them freely.
+- Or ask Claude Code: `/add-parkour-jump a spooky ghost platform after the second checkpoint`.
+
+---
+
+## Candy Rush
+The candy stand on the west side of the lobby. Settings: `src/shared/Config/CandyRush.luau`.
+- **The race:** `Candies` (10 to win), `MinPlayers` (2), `CountdownSeconds`, `MaxRaceSeconds` (60).
+- **Solo runs:** `Solo.On`, `Solo.AfterSeconds` (6 s alone on a pad).
+- **Coins:** `Rewards.WinCoins` (25), `PlayCoins` (5), `SoloCoins` (5), `CooldownSeconds` (15), `DailyCap` (300 a day; 0 = no limit).
+- **Looks and words:** `Candy`, `Stand`, `Text`, `Sounds`.
+- **In Studio:** the stand is a Model tagged `CandyRushStation`; a copy of it is a second, separate race. The board is tagged `CandyRushBoard`. Each pad is tagged `CandyRushPad` with the attribute `Lane` (1 = the left column of the board as you look at it). Move or resize them freely.
+- Your own candies: models named `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn` in `Custom > Props`.
+- Test alone: F8 > "Candy Rush: start solo test".
+
+---
+
+## Web Scour
+The Spider Grove scavenger hunt. Settings: `src/shared/Config/WebScour.luau`.
+- **The game:** `Critters` (6 to find), `TimeLimit` (45 s), `MaxReach` (how close you must be to click one).
+- **Coins:** `CoinsPerCritter` (2), `FinishCoins` (20), `TimeBonusPerSecond` (0.5), `MaxCoins` (50), `RewardCooldown` (180 s between paid hunts, saved per player).
+- **Looks and words:** `Grove` (trees, webs, lantern, spider, colours), `Text`, `Sounds`.
+- **In Studio:** the lantern is the part tagged `WebScourStart` (your own lantern model works too: tag the Model). The hiding spots are invisible parts tagged `WebScourSpot`: move, copy or delete them. Delete the lantern and a new one is put back; the rest of the grove stays as you left it.
+- Test: F8 > "Web Scour: start".
+
+---
+
+## Secret pumpkins (Easter eggs)
+Hidden pumpkins, candies, skulls and ghosts around the lobby. Each pays its coins once per player, ever. Settings: `src/shared/Config/EasterEggs.luau`.
+- **Change coins or riddles:** each egg's `Coins` and `Hint` in `List`. Works straight away, also in a saved lobby.
+- **Add an egg:** copy a line in `List` and give it:
+  - a new `Id` (saved in players' data: never rename or reuse one that is live), a `Name` and a `Hint` (the riddle in Menu > Secret Pumpkins),
+  - a `Look`: `GoldenPumpkin`, `Candy`, `Lollipop`, `Skull` or `Ghost`,
+  - an `Anchor`, what it hides next to: a tag name (`ShopKeeper`, `ReadyPad`, `ParkourFinish`...), an NPC Id (`VotingBoard`, `Leaderboard`, `PhotoSpot`), a lobby zone (`Shop`, `WebScour`...), a landmark (`ClockTower`, `PumpkinPatch`, `Mansion`, `KingStatue`, `Graveyard`) or `Hub` (the middle),
+  - an `Offset = Vector3.new(right, up, back)` from that anchor.
+  New eggs appear the next time the game starts, also in a saved lobby.
+- **Or place one by hand:** give any part the tag `EasterEgg` and the attributes `EggId` (text) and `Coins` (number). An `EggId` from the list pays the list's coins.
+- **Move one:** drag it in a baked lobby (`Workspace.Hub.EasterEggs`).
+- Your own egg look: a model named `EggGoldenPumpkin` (or `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost`) in `Custom > Props`.
+- Test: F8 > "Easter eggs: reset mine" lets you find them all again.
+- Or ask Claude Code: `/add-secret-pumpkin a candy skull on top of the clock tower, 75 coins`.
+
+---
+
+## Menu tiles
+The orange **Menu** button at the top left (key **M**) opens a grid of tiles. Settings: `src/shared/Config/Menu.luau`.
+- **Order:** move a line up or down in `Tiles`.
+- **Words, picture, colour:** each tile's `Text`, `Icon` (any emoji) and `Color`.
+- **Hide a tile:** add `Hidden = true` to its line. Don't change a tile's `Id`: the code finds tiles by Id.
+- `Feature = "Crates"` means the tile only shows while that feature is on.
+- The button itself: `ButtonText`, `Key`, and `Button` (size, colour; `InTopBar = true` puts it in Roblox's own top bar).
+- Switch the whole Menu off (`Menu = false` in `Features.luau`) and the old column of Shop / Codes / Invite / Settings buttons comes back.
+- A tile that opens something new needs a little code (`MenuUI.AddTile`): ask Claude Code.
 
 ---
 
@@ -263,7 +388,29 @@ The game finds the parts that *do* something by their **tag**, not their name or
 | `HubSpawn` | Where players appear in the lobby and come back after a round | The `Spawn` pad. Your own SpawnLocation (Model > Spawn) works too: tag it `HubSpawn`, otherwise the game switches it off so it doesn't compete with the lobby spawn. |
 | `ShopKeeper` | Opens the Pumpkin Shop | On the `PumpkinVendor` stall. Tag **any** part or model `ShopKeeper`, anywhere in Workspace, and it opens the shop too (a "Shop" prompt is added). |
 
-Other features add their own tags (parkour checkpoints, Candy Rush pads, Easter eggs...): the list, with what each one needs, is at the top of `src/shared/Tags.luau`.
+The v2 features add their own tags:
+
+| Tag | What it does | Needs |
+| --- | --- | --- |
+| `CrateDisplay` | A crate on the stand: its prompt opens that crate. Tag any part or model to add one | attribute `CrateId` |
+| `ParkourStart`, `ParkourFinish` | Parkour start pad, finish trophy | |
+| `ParkourCheckpoint` | A parkour checkpoint | attribute `Index` (1, 2, 3 in climbing order) |
+| `ParkourHazard` | Green slime: sends you back to your checkpoint | |
+| `ParkourBoard` | The best-times board | |
+| `CandyRushStation` | A whole Candy Rush stand (a copy is a second race) | |
+| `CandyRushPad` | A Candy Rush join pad | attribute `Lane` (1, 2, 3...) |
+| `CandyRushBoard` | The board candies pop up on | |
+| `WebScourStart` | The Web Scour lantern | |
+| `WebScourSpot` | A place a critter can hide | |
+| `EasterEgg` | A secret pumpkin | attributes `EggId`, `Coins` |
+| `SeekerSpawn`, `HiderSpawn` | Hide & Seek start spots (maps) | |
+| `HidingDecoy` | A decoy pumpkin; hiders copy its look | |
+| `SeekerDoor` | The seeker hut door, opens when seekers are let out | |
+| `SurvivorSpawn`, `HauntSpawn` | ScareMaze start spots | |
+| `MazeExit` | Where ScareMaze Survivors escape | |
+| `ScareTrigger` | A scare trap | attribute `Kind` (Scarecrow, Zombie, Bats, Ghost, Patrol) |
+
+The full list, with notes, is at the top of `src/shared/Tags.luau`.
 
 ### Colours: the palette
 The lobby's colours are in `Config.Hub.Palette` (the `hubPalette` list at the top of `src/shared/Config/init.luau`): `Ground`, `Stone`, `Wood`, `Iron`, `Bone`, `Orange`, `Purple`, `Green`, `Glow`, `Gold`, `Cloth`, `Straw`, `Dark`, `Teal` (the Ready runes, mushrooms), `Foliage` (tree leaves), `Path` (paths and the promenade).
@@ -286,6 +433,15 @@ Put a model in `ReplicatedStorage > Custom > Props` named exactly after the deco
 | `Signpost`, `Mushroom`, `Bat`, `Cobweb` | signs, glowing toadstools, bats, spider webs |
 | `ClockTower`, `Cauldron`, `KingStatue` | the big centrepieces |
 | `VendorStall`, `ReadyPadArch` | the Pumpkin Shop stall, the arch over the Ready circle |
+| `ParkourArch`, `ParkourTrophy`, `ParkourBat` | the parkour start arch, the trophy pumpkin, the bat-wing jumps |
+| `CandyCane`, `GiantLollipop`, `CandyBucket`, `Gumdrop`, `SignCandyCorn` | the Candy Rush stand's decorations |
+| `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn` | the candies you click in Candy Rush |
+| `GroveSpider` | the friendly spider in the Spider Grove |
+| `EggGoldenPumpkin`, `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost` | the secret pumpkins (Easter eggs) |
+| a crate's Id, e.g. `PumpkinCrate` | that crate on the stand and in the crate panel |
+| `HidingPumpkin` | Hide & Seek pumpkins (when a map has no decoys of its own) |
+| `Scarecrow`, `Wheelbarrow`, `Well`, `Tractor`, `HarvestCart`, `RockingChair`, `AutumnTree`, `HayRoll`, `Fountain`, `Topiary` | Pumpkin Farm and Hedge Maze decorations |
+| `ScareScarecrow`, `ScareZombie`, `ScareBat`, `ScareGhost` | the ScareMaze scare characters |
 
 The code for all of them is in `src/server/Build/Props.luau` (and `Hub/NpcLooks.luau` for the stall).
 - Not sure of the name? Select the decoration and look at its `PropName` attribute.
@@ -295,7 +451,22 @@ The code for all of them is in `src/server/Build/Props.luau` (and `Hub/NpcLooks.
 - Removed your custom prop? Lobbies built while it existed still contain copies of it: run `Bake.Hub()` again (or F8 > Rebuild hub) to get the built ones back.
 
 ### Lobby areas (zones)
-`Config.Lobby.Zones` says where the Ready pad, the shop, the crate stand (`Crates`), Candy Rush, Web Scour and the parkour course go. Decorations are never placed inside a zone, so each area stays free. Move one by changing its `Offset`, then rebuild (`Bake.Hub()`, or raise `Config.Hub.BuildVersion`). The shop follows its zone.
+`Config.Lobby.Zones` (`src/shared/Config/Lobby.luau`) keeps one area of the lobby free for each thing. Decorations are never placed inside a zone.
+
+| Zone | What goes there | Where now (`Offset`, studs from the middle) |
+| --- | --- | --- |
+| `ReadyArea` | The Ready circle, right in front of the spawn | (0, 46): south |
+| `Shop` | The Pumpkin Shop stall | (40, -18): east |
+| `Crates` | The Mystery Crates stand, next to the shop | (46, 6): east |
+| `CandyRush` | The Candy Rush stand | (-60, 0): west |
+| `WebScour` | The Spider Grove | (-38, -32): north-west |
+| `Parkour` | The Spooky Sky Climb (60 tall) | (0, -80): north, behind the clock tower |
+
+- `Offset = Vector3.new(x, 0, z)`: x = east (+) / west (-), z = south (+) / north (-). `Size` = width and depth.
+- Each zone faces the middle of the lobby, so its front points at the plaza.
+- **Move an area:** change its `Offset`, then rebuild (F8 > Rebuild hub to try it; `Bake.Hub()` in edit mode, or raise `Config.Hub.BuildVersion`, to keep it). The paths and signposts follow.
+- In a baked lobby you can also just drag the area's Model (`Workspace.Hub.CandyRush` and so on): the working parts are found by tag.
+- Or ask Claude Code: `/edit-lobby move Candy Rush closer to the spawn`.
 
 ### Round maps
 1. In edit mode, run `require(game.ServerScriptService.Server.Tools.Bake).Map("PumpkinPatch")` (any Id from `Config.Maps.List`).
@@ -313,16 +484,23 @@ The code for all of them is in `src/server/Build/Props.luau` (and `Hub/NpcLooks.
 ## Claude Code commands (type them in Claude Code)
 | Command | What it does |
 | --- | --- |
+| `/verify-v2` | Studio test of every v2 feature (solo, 2 players, phones), then fixes, tests, commit and push |
+| `/verify` | Shorter playtest pass of the whole game, then fixes |
 | `/next-milestone` | Builds the next unfinished milestone in `docs/PROGRESS.md` |
-| `/verify` | Full playtest pass: every feature, every error, then fixes |
+| `/add-skin` | New crate skin in a theme file, with its rarity and look |
+| `/add-crate` | New crate: its skins, price, odds, stand display and Robux product |
+| `/add-parkour-jump` | New jump (or stage) on the parkour course, checked against the jump limits |
+| `/add-secret-pumpkin` | New hidden Easter egg with coins and a riddle |
+| `/edit-lobby` | Bake, lock, move or repair the lobby, or move its tagged parts |
+| `/new-playlist` | New mode + map pair in the vote |
 | `/add-cosmetic` | New hat, pet, trail or skin. Describe it and it builds the look too |
 | `/reskin` | Restyle a character or NPC (Part-built or from a model you name) |
-| `/add-npc` | New hub NPC with dialogue and a prompt |
-| `/add-monster` | New minion type with behaviour and config |
+| `/add-npc` | New lobby NPC with dialogue and a prompt |
+| `/add-monster` | New King Hunt minion type with behaviour and config |
 | `/add-map` | New round map, built from code, in the existing style |
 | `/new-code` | Adds a promo code with reward and expiry |
 | `/new-event` | Limited-time event (double pumpkins, Blood Moon round, event cosmetics) |
 | `/tweak` | Balance or tune anything from a plain-English request |
-| `/polish-hub` | Bigger, richer spawn hub (terrain, statue, more detail) |
+| `/polish-hub` | More detail and life in the lobby, within the phone budget |
 
-Each command reads `CLAUDE.md`, keeps numbers in Config, playtests in Studio, and commits.
+Each command reads `CLAUDE.md`, keeps numbers in Config, playtests in Studio when it can, runs the offline tests (`lune run tests/run`) and commits.
