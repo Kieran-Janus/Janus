@@ -260,7 +260,7 @@ return {
 	-- Every message players see ---------------------------------------------------------------------
 	Text = {
 		ScoreLabel = "Points",
-		MvpLine = "%s scored %d points!",
+		MvpLine = "%s got the most points: %d!",
 		Survivors = "Survivors",
 		Haunters = "Haunters",
 		YouAreSurvivor = "You're a SURVIVOR!",

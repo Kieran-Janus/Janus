@@ -380,9 +380,13 @@ function ResultsUI.Mount(gui: ScreenGui)
 		end
 		local listHeight = math.min(rowsHeight, cfg.MaxListHeight)
 		local screenHeight = Layout.Screen().Y
+		-- The space under the bar at the top (the Hud), so the panel never slides under it.
+		local hudBottom = Layout.HudBottom()
+		local firstY = if hudBottom then hudBottom + Config.UI.BelowHudGap else Config.UI.EdgeMargin
 		if screenHeight > 0 then -- (zero before the screen is laid out)
 			local room = screenHeight
-				- 2 * Config.UI.EdgeMargin
+				- firstY
+				- Config.UI.EdgeMargin
 				- contentHeight
 				- stack.Padding.Offset
 			listHeight = math.clamp(room, math.min(ROW_HEIGHT + 4, listHeight), listHeight)
@@ -390,12 +394,20 @@ function ResultsUI.Mount(gui: ScreenGui)
 		list.Size = UDim2.new(1, -24, 0, listHeight)
 		contentHeight += listHeight + stack.Padding.Offset
 		panel.Size = UDim2.fromOffset(WIDTH, contentHeight)
-		panel.Position = UDim2.fromScale(0.5, 0.62)
+		-- In the middle of the screen, or lower when the middle would put its top under the Hud.
+		local target = UDim2.fromScale(0.5, 0.5)
+		if screenHeight > 0 then
+			local half = contentHeight / 2
+			local middle = math.max(screenHeight / 2, firstY + half)
+			middle = math.min(middle, screenHeight - Config.UI.EdgeMargin - half)
+			target = UDim2.new(0.5, 0, 0, math.floor(middle + 0.5))
+		end
+		panel.Position = UDim2.new(0.5, 0, target.Y.Scale + 0.12, target.Y.Offset)
 		panel.Visible = true
 		TweenService:Create(
 			panel,
 			TweenInfo.new(cfg.PopSeconds, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-			{ Position = UDim2.fromScale(0.5, 0.5) }
+			{ Position = target }
 		):Play()
 
 		-- Rows one after another, then the coins count up.

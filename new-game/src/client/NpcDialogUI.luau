@@ -187,14 +187,14 @@ function NpcDialogUI.Mount(gui: ScreenGui)
 		pages = table.clone(def.Lines)
 		if def.Id == "VotingBoard" then
 			local state = ReplicatedStorage:GetAttribute("State")
+			local words = Config.Npcs.BoardText
 			table.insert(
 				pages,
 				1,
 				if state == "Voting"
-					then "Voting is open right now! Tap a choice on the board or on the vote panel."
-					else ("Right now: %s. The next vote starts after this round."):format(
-						tostring(state or "waiting")
-					)
+					then words.Voting
+					elseif state == nil or state == "Waiting for players" then words.Waiting
+					else words.Round:format(tostring(state))
 			)
 		elseif def.Id == "Leaderboard" then
 			local npcModel = prompt:FindFirstAncestorOfClass("Model")

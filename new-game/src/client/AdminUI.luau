@@ -66,6 +66,15 @@ local function build(gui: ScreenGui): Panel
 		b.TextColor3 = Theme.Text
 		b.Font = Theme.Font
 		b.TextSize = 15
+		b.TextScaled = true -- long labels shrink a little instead of running off both edges
+		local fit = Instance.new("UITextSizeConstraint")
+		fit.MaxTextSize = 15
+		fit.MinTextSize = 11
+		fit.Parent = b
+		local pad = Instance.new("UIPadding")
+		pad.PaddingLeft = UDim.new(0, 6)
+		pad.PaddingRight = UDim.new(0, 6)
+		pad.Parent = b
 		b.Text = command.Label
 		b.Parent = list
 		Theme.round(b, 8)

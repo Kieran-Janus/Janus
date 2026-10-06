@@ -166,7 +166,7 @@ return {
 		TapHint = "Tap a pumpkin to throw candy",
 		-- Results screen
 		ScoreLabel = "Tags",
-		MvpLine = "%s tagged %d pumpkins!",
+		MvpLine = "%s tagged the most pumpkins: %d!",
 		SeekersWin = "The Seekers found every pumpkin!",
 		HidersWin = "The Pumpkins win! %d never found.",
 		NoSeekers = "The seekers all left: the Pumpkins win!",

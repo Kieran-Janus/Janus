@@ -192,6 +192,20 @@ describe("Panels at full size on a short phone screen", function()
 		-- The rows scroll in the room that is left (at least one row shows).
 		expect(panel.Rows.Size.Y.Offset).toBeLessThan(8 * 38)
 		expect(panel.Rows.Size.Y.Offset).toBeGreaterThanOrEqual(38)
+		-- Once it has slid in, it sits below the Hud, or (too tall for that) as low as it can
+		-- go while staying on the screen.
+		p.rt:advance(2)
+		local topEdge = panel.Position.Y.Offset - panel.Size.Y.Offset / 2
+		local bottomEdge = panel.Position.Y.Offset + panel.Size.Y.Offset / 2
+		local margin = p.Config.UI.EdgeMargin
+		expect(bottomEdge <= p.height - margin + 1).toBe(true)
+		expect(topEdge >= p.hudBottom or bottomEdge >= p.height - margin - 1).toBe(true)
+		-- One result row: the same rule.
+		p.rt:fire(p.remotes.RoundResults, "OnClientEvent", resultRows(1), {})
+		p.rt:advance(2)
+		local top1 = panel.Position.Y.Offset - panel.Size.Y.Offset / 2
+		local bottom1 = panel.Position.Y.Offset + panel.Size.Y.Offset / 2
+		expect(top1 >= p.hudBottom or bottom1 >= p.height - margin - 1).toBe(true)
 	end)
 
 	it("keeps the full results screen on a big screen", function()

@@ -163,7 +163,7 @@ local Config = {
 		Text = {
 			Title = "Round over!",
 			Mvp = "MVP",
-			MvpLine = "%s collected %d pumpkins!", -- King Hunt: name, pumpkins
+			MvpLine = "%s collected the most pumpkins: %d!", -- King Hunt: name, pumpkins
 			MvpLineDefault = "%s got the top score: %d!", -- other modes, unless they send their own
 			ScoreLabel = "Pumpkins", -- King Hunt's score column (other modes send their own)
 			Survived = "Survived!",
@@ -898,6 +898,13 @@ local Config = {
 	-- src/shared/Config.luau and src/server/Hub/HubBuilder.luau).
 	Npcs = {
 		InteractCooldown = 0.5,
+		-- The Voting Board's first line, from what the game is doing right now (%s = the round's
+		-- state, e.g. "Playing").
+		BoardText = {
+			Voting = "Voting is open right now! Tap a choice on the board or on the vote panel.",
+			Waiting = "No vote yet: stand on the Ready pad and a vote opens.",
+			Round = "Right now: %s. The next vote opens after this round.",
+		},
 		List = {
 			{
 				Id = "PumpkinVendor", -- the shopkeeper (the Id stays the same so saved hubs keep working)
