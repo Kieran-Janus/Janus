@@ -21,7 +21,9 @@
 	Parkour.Build(hub, zone) -> Model    the whole course (an empty model when the feature is off)
 	Parkour.Repair(hub, zone) -> Model   builds what is missing in a saved hub: the whole course
 	                                     when it has no parkour parts, else only a missing start pad
-	Parkour.BoardGui(screen) -> SurfaceGui   the board's sign (made if the part has none)
+	Parkour.BoardGui(screen) -> SurfaceGui   the board's sign (made if the part has none; a
+	                                         saved one gets its title and reward line from
+	                                         Config again)
 	Parkour.WorldCFrame(zone, i) -> CFrame   where the top of Course[i] is in the world
 ]]
 
@@ -1064,13 +1066,30 @@ function Parkour.Repair(hub: Model, zone: Zone): Model
 	return Parkour.Build(hub, zone)
 end
 
--- The board's sign: title, BoardRows rows (Row1, Row2...) and a footer line.
+-- The board's fixed lines, from Config (the reward can change after the hub was saved).
+local function boardWords(): { [string]: string }
+	return {
+		Title = cfg.Name,
+		Subtitle = cfg.Text.BoardTitle,
+		Footer = cfg.Text.BoardReward:format(cfg.Reward.Coins, Config.Economy.CurrencyName),
+	}
+end
+
+-- The board's sign: title, BoardRows rows (Row1, Row2...) and a footer line. A board saved in
+-- the place keeps its sign, but its title and footer are written again from Config.
 function Parkour.BoardGui(screen: BasePart): SurfaceGui
 	local existing = screen:FindFirstChild("Board")
 	if existing and existing:IsA("SurfaceGui") then
+		for name, words in boardWords() do
+			local label = existing:FindFirstChild(name)
+			if label and label:IsA("TextLabel") and label.Text ~= words then
+				label.Text = words
+			end
+		end
 		return existing
 	end
 	local text = cfg.Text
+	local fixed = boardWords()
 	local gui = Instance.new("SurfaceGui")
 	gui.Name = "Board"
 	gui.Face = Enum.NormalId.Front
@@ -1098,8 +1117,8 @@ function Parkour.BoardGui(screen: BasePart): SurfaceGui
 		label.Parent = gui
 		return label
 	end
-	line("Title", 0.03, 0.17, cfg.Name, colors.Start, Enum.Font.Creepster)
-	line("Subtitle", 0.2, 0.1, text.BoardTitle, colors.Text, Enum.Font.GothamBold)
+	line("Title", 0.03, 0.17, fixed.Title, colors.Start, Enum.Font.Creepster)
+	line("Subtitle", 0.2, 0.1, fixed.Subtitle, colors.Text, Enum.Font.GothamBold)
 	local rows = math.max(cfg.BoardRows, 1)
 	local rowHeight = 0.56 / rows
 	for i = 1, rows do
@@ -1113,14 +1132,7 @@ function Parkour.BoardGui(screen: BasePart): SurfaceGui
 		)
 		row.TextXAlignment = Enum.TextXAlignment.Left
 	end
-	line(
-		"Footer",
-		0.89,
-		0.09,
-		text.BoardReward:format(cfg.Reward.Coins, Config.Economy.CurrencyName),
-		colors.Trophy,
-		Enum.Font.GothamBold
-	)
+	line("Footer", 0.89, 0.09, fixed.Footer, colors.Trophy, Enum.Font.GothamBold)
 	gui.Parent = screen
 	return gui
 end

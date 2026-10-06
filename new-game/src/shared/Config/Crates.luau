@@ -26,7 +26,10 @@
 	                 at 100 (the shop shows the exact numbers to players).
 	ADD A CRATE      copy one line in List, give it a new Id (never rename an Id once the game is
 	                 live), a Name and colours, then put Crate = "<new Id>" on the skins it gives.
-	                 It also appears on the crate stand in the lobby and in Menu > Crates.
+	                 It appears in Menu > Crates straight away. The crate stand in the lobby
+	                 shows it once the hub is rebuilt (F8 > Rebuild hub, or Bake.Hub()). A hub
+	                 you saved or Locked keeps its stand: copy a crate's <Id>Display model
+	                 there and set the CrateId attribute of its CratePrompt part instead.
 	SELL FOR ROBUX   make a Developer Product in Creator Hub (Monetization > Developer Products)
 	                 and paste its id into that crate's Robux.ProductId. 0 = "Coming soon".
 	                 SuggestedRobux is only a note for you: the real price is the one in Creator Hub.
@@ -128,6 +131,8 @@ return {
 	-- The crate stand in the lobby (src/server/Hub/Sections/CrateStand.luau), in the
 	-- Config.Lobby.Zones.Crates area next to the Pumpkin Shop. Every crate in List below is
 	-- shown: themed crates on the low front row, rarity crates raised up behind them.
+	-- Changes here show after the hub is rebuilt (F8 > Rebuild hub, or Bake.Hub()); a hub
+	-- saved in the place keeps the stand it was built with.
 	Stand = {
 		SignText = "MYSTERY CRATES",
 		CrateSize = 2.6, -- studs, the crate box

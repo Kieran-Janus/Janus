@@ -21,6 +21,9 @@
 	names and progress drawn on the board) to the stand while the game runs.
 
 	CandyRush.Build(hub, zone) -> Model
+	CandyRush.Repair(hub, zone) -> Model   a saved hub with no stand gets one (CandyRushService
+	                                       uses this): the whole area when it is empty, else
+	                                       only the stand, so hand edits around it stay
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -565,13 +568,35 @@ local function buildSign(standModel: Model, base: CFrame)
 	end
 end
 
-function CandyRush.Build(hub: Model, zone: Zone): Model
-	local area = Kit.model("CandyRush", hub)
-	if not Config.Features.CandyRush then
-		return area
+local function laneCount(): number
+	return math.clamp(math.floor(stand.Lanes), 2, 6)
+end
+
+-- The stand itself (the race happens on it): tag CandyRushStation.
+local function buildStand(area: Instance, base: CFrame, lanes: number): Model
+	local standModel = Kit.model("CandyStand", area)
+	CollectionService:AddTag(standModel, Tags.CandyRushStation)
+	buildBoard(standModel, base, lanes)
+	buildPads(standModel, base, lanes)
+	buildSign(standModel, base)
+	local caneX = stand.BoardWidth / 2 + 2.2
+	local caneHeight = stand.BoardLift + stand.BoardHeight + 6
+	for _, side in { -1, 1 } do
+		candyCane(
+			base * CFrame.new(side * caneX, 0, stand.BoardBack + 1.6),
+			caneHeight,
+			-side,
+			standModel
+		)
 	end
+	standModel.WorldPivot = base
+	return standModel
+end
+
+-- Everything in the area: the floor, the stand and the decorations around it.
+local function fill(area: Model, zone: Zone)
 	local base = zone.CFrame
-	local lanes = math.clamp(math.floor(stand.Lanes), 2, 6)
+	local lanes = laneCount()
 
 	-- The floor: a pink-and-white checkerboard with a coloured runner from each pad to the board.
 	local floor = Kit.model("Floor", area)
@@ -612,23 +637,7 @@ function CandyRush.Build(hub: Model, zone: Zone): Model
 		}, floor)
 	end
 
-	-- The stand itself (the race happens on it).
-	local standModel = Kit.model("CandyStand", area)
-	CollectionService:AddTag(standModel, Tags.CandyRushStation)
-	buildBoard(standModel, base, lanes)
-	buildPads(standModel, base, lanes)
-	buildSign(standModel, base)
-	local caneX = stand.BoardWidth / 2 + 2.2
-	local caneHeight = stand.BoardLift + stand.BoardHeight + 6
-	for _, side in { -1, 1 } do
-		candyCane(
-			base * CFrame.new(side * caneX, 0, stand.BoardBack + 1.6),
-			caneHeight,
-			-side,
-			standModel
-		)
-	end
-	standModel.WorldPivot = base
+	buildStand(area, base, lanes)
 
 	-- Decorations around it.
 	local decorations = Kit.model("Decorations", area)
@@ -660,7 +669,46 @@ function CandyRush.Build(hub: Model, zone: Zone): Model
 			decorations
 		)
 	end
+end
+
+function CandyRush.Build(hub: Model, zone: Zone): Model
+	local area = Kit.model("CandyRush", hub)
+	if Config.Features.CandyRush then
+		fill(area, zone)
+	end
 	return area
+end
+
+-- True when `area` holds nothing but NPC models (an NPC with this Zone stands inside it).
+local function onlyNpcs(area: Instance): boolean
+	for _, child in area:GetChildren() do
+		if child:GetAttribute("NpcId") == nil then
+			return false
+		end
+	end
+	return true
+end
+
+--[[
+	For a saved hub with no Candy Rush stand (no CandyRushStation in Workspace), e.g. one baked
+	while Config.Features.CandyRush was off: an empty area gets everything; an area you edited
+	by hand keeps your changes and only gets the stand back. Returns the area.
+]]
+function CandyRush.Repair(hub: Model, zone: Zone): Model
+	local existing = hub:FindFirstChild("CandyRush")
+	if not (existing and existing:IsA("Model")) then
+		local area = CandyRush.Build(hub, zone)
+		area:SetAttribute("HubPiece", true)
+		return area
+	end
+	if Config.Features.CandyRush then
+		if onlyNpcs(existing) then
+			fill(existing, zone)
+		else
+			buildStand(existing, zone.CFrame, laneCount())
+		end
+	end
+	return existing
 end
 
 return CandyRush

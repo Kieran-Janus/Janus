@@ -78,6 +78,8 @@ return {
 	},
 
 	-- The stand (src/server/Hub/Sections/CandyRush.luau builds it) ---------------------------------
+	-- Changes here show after the hub is rebuilt (F8 > Rebuild hub, or Bake.Hub()); a hub saved
+	-- in the place keeps the stand it was built with (move or resize its parts in Studio).
 	Stand = {
 		Lanes = 4, -- join pads / lanes the stand is built with (2 to 6)
 		BoardWidth = 24, -- the candy board, studs

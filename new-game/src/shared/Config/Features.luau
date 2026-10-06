@@ -3,7 +3,9 @@
 	FEATURE SWITCHES (Config.Features)
 
 	One line per feature: true = on, false = off. Turning a feature off hides it completely:
-	its server code does nothing and its buttons, panels and lobby pieces don't show.
+	its server code does nothing and its buttons, panels and lobby pieces don't show. (A lobby
+	saved in your place keeps those pieces, but the game takes them out while it runs; the
+	signposts pointing at them stay until the lobby is rebuilt: F8 > Rebuild hub or Bake.Hub().)
 	Something broken? Switch it off here and the rest of the game keeps working.
 ]]
 

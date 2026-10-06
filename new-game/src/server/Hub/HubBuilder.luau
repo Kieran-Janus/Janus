@@ -36,6 +36,8 @@
 	HubBuilder.RepairSection(hub, name) -> Model?  a section's Repair(), else its Build()
 	HubBuilder.ApplyLighting(), ApplyMusic(hub), ApplyCustomNpcs(hub), DisableDefaultSpawn()
 	HubBuilder.FindHubs(), RemoveLoosePieces(keep), PieceAttribute
+	HubBuilder.RemoveSwitchedOff(hub) -> { string }   empties the lobby areas whose
+	                                   Config.Features switch is off (running game only)
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -1328,10 +1330,24 @@ function HubBuilder.ApplyLighting()
 		created.Parent = parent
 		return created
 	end
+	-- Copies each setting onto the effect. A misspelt name or a wrong kind of value in
+	-- Config.Hub.Lighting is skipped with a warning, so the rest of the lobby still loads.
 	local function set(instance: Instance, values: { [string]: any })
 		for key, value in values do
-			if key ~= "Enabled" then
+			if key == "Enabled" then
+				continue
+			end
+			local ok, err = pcall(function()
 				(instance :: any)[key] = value
+			end)
+			if not ok then
+				warn(
+					("[HubBuilder] Config.Hub.Lighting: couldn't set %s.%s (check its spelling and value): %s"):format(
+						instance.ClassName,
+						tostring(key),
+						tostring(err)
+					)
+				)
 			end
 		end
 	end
@@ -1371,10 +1387,12 @@ function HubBuilder.ApplyLighting()
 	end
 end
 
--- The default baseplate SpawnLocation would compete with the hub spawn; switch it off.
+-- The default baseplate SpawnLocation would compete with the hub spawn; switch it off. A
+-- SpawnLocation you tagged HubSpawn yourself (e.g. one added with Model > Spawn) IS the hub
+-- spawn, so it is left on.
 function HubBuilder.DisableDefaultSpawn()
 	for _, child in workspace:GetChildren() do
-		if child:IsA("SpawnLocation") then
+		if child:IsA("SpawnLocation") and not CollectionService:HasTag(child, Tags.HubSpawn) then
 			child.Enabled = false
 			child.Transparency = 1
 			child.CanCollide = false
@@ -1474,6 +1492,122 @@ function HubBuilder.RemoveLoosePieces(keep: Model): number
 		child:Destroy()
 	end
 	return #candidates
+end
+
+-- Lobby areas whose feature is switched off ------------------------------------------------
+
+--[[
+	Lobby areas that have an on/off switch in Config.Features. A hub saved in the place (baked
+	or Locked) keeps the pieces it was built with, so when one of these switches is off, the
+	game takes that area out of the running game on every start (your saved place is not
+	changed): the area's model is emptied (NPCs standing in it stay) and every part or model
+	with one of its tags is removed, wherever it was moved or copied to. Web Scour and the
+	Easter eggs do the same in their own services.
+	  Feature  the switch in Config.Features
+	  Section  the area's model in Workspace.Hub (built by src/server/Hub/Sections/<Section>.luau)
+	  Tags     the tags of its working parts (src/shared/Tags.luau)
+]]
+local SWITCHED_AREAS: { { Feature: string, Section: string, Tags: { string } } } = {
+	{ Feature = "ReadyPad", Section = "ReadyArea", Tags = { Tags.ReadyPad, Tags.ReadySign } },
+	{
+		Feature = "Parkour",
+		Section = "Parkour",
+		Tags = {
+			Tags.ParkourStart,
+			Tags.ParkourCheckpoint,
+			Tags.ParkourFinish,
+			Tags.ParkourHazard,
+			Tags.ParkourBoard,
+		},
+	},
+	{
+		Feature = "CandyRush",
+		Section = "CandyRush",
+		Tags = { Tags.CandyRushStation, Tags.CandyRushPad, Tags.CandyRushBoard },
+	},
+	{ Feature = "Crates", Section = "CrateStand", Tags = { Tags.CrateDisplay } },
+}
+
+-- NPCs (and the shopkeeper) standing inside an area that is emptied are kept.
+local function isNpc(instance: Instance): boolean
+	if
+		instance:GetAttribute("NpcId") ~= nil or CollectionService:HasTag(instance, Tags.ShopKeeper)
+	then
+		return true
+	end
+	for _, d in instance:GetDescendants() do
+		if CollectionService:HasTag(d, Tags.ShopKeeper) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Easter eggs hiding next to a part with one of `tags` (their Anchor in Config.EasterEggs.List):
+-- with that part gone they would float in the air, so they go too (a hub built while the
+-- feature is off leaves them out the same way). Returns how many were removed.
+local function removeEggsAnchoredTo(tags: { string }): number
+	local anchored: { [string]: boolean } = {}
+	for _, egg in Config.EasterEggs.List do
+		if table.find(tags, egg.Anchor) then
+			anchored[egg.Id] = true
+		end
+	end
+	local count = 0
+	for _, instance in CollectionService:GetTagged(Tags.EasterEgg) do
+		local id = instance:GetAttribute("EggId")
+		if typeof(id) == "string" and anchored[id] and instance:IsDescendantOf(workspace) then
+			local m = instance.Parent
+			if m and m:IsA("Model") and m.PrimaryPart == instance then
+				m:Destroy() -- the whole egg model (its look and button)
+			else
+				instance:Destroy()
+			end
+			count += 1
+		end
+	end
+	return count
+end
+
+--[[
+	Takes every area in SWITCHED_AREAS whose switch is off out of the running game, with any
+	Easter egg hiding next to one of its tagged parts. Returns the names of those switches
+	that had pieces to remove (empty when there was nothing). HubService runs it on every
+	start; Bake never does, so the saved place keeps its pieces and turning the switch back on
+	brings them back.
+]]
+function HubBuilder.RemoveSwitchedOff(hub: Model): { string }
+	local features = Config.Features :: any
+	local removed: { string } = {}
+	for _, area in SWITCHED_AREAS do
+		if features[area.Feature] then
+			continue
+		end
+		local count = 0
+		local section = hub:FindFirstChild(area.Section)
+		if section then
+			for _, child in section:GetChildren() do
+				if not isNpc(child) then
+					child:Destroy()
+					count += 1
+				end
+			end
+		end
+		for _, tag in area.Tags do
+			for _, instance in CollectionService:GetTagged(tag) do
+				-- (a piece already removed with its area is no longer in Workspace)
+				if instance:IsDescendantOf(workspace) and not isNpc(instance) then
+					instance:Destroy()
+					count += 1
+				end
+			end
+		end
+		count += removeEggsAnchoredTo(area.Tags)
+		if count > 0 then
+			table.insert(removed, area.Feature)
+		end
+	end
+	return removed
 end
 
 -- Building -----------------------------------------------------------------------------------

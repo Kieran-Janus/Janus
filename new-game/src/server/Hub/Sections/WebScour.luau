@@ -21,8 +21,10 @@
 	WebScour.Build(hub, zone) -> Model
 	  zone = { Name, CFrame, Size }: CFrame is the zone's centre on the plaza, its front (-Z)
 	  facing the hub centre. Off (Config.Features.WebScour = false): only the empty model.
-	WebScour.Repair(hub, zone) -> Model   builds it again in place of an empty or broken one
-	                                      (WebScourService uses this for a hub saved without it)
+	WebScour.Repair(hub, zone) -> Model   for a hub saved without a lantern (WebScourService):
+	                                      a grove that still has hiding spots keeps everything
+	                                      and only gets a new lantern; an empty one is built
+	                                      again from scratch
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -758,6 +760,16 @@ end
 
 function WebScour.Repair(hub: Model, zone: Zone): Model
 	local old = hub:FindFirstChild("WebScour")
+	if old and old:IsA("Model") then
+		for _, d in old:GetDescendants() do
+			if CollectionService:HasTag(d, Tags.WebScourSpot) then
+				-- A grove (maybe edited by hand) that only lost its lantern: keep it and
+				-- just put a lantern back.
+				buildLantern(frameOf(zone), old)
+				return old
+			end
+		end
+	end
 	if old then
 		old:Destroy()
 	end

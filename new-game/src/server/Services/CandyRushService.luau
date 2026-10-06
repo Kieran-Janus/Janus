@@ -18,7 +18,8 @@
 	     CandyRushWins (races won), CandyRushBest (best solo time, seconds) and the cooldown
 	     fields CandyRushDay, CandyRushCoinsToday, CandyRushLastReward, CandyRushLastSolo.
 	Players in a round (player attribute InRound) are ignored. A stand is a Model tagged
-	CandyRushStation; a copy of it is a second, separate race.
+	CandyRushStation; a copy of it is a second, separate race. A saved hub with no stand gets
+	one for this server (src/server/Hub/Sections/CandyRush.luau Repair, with a warning).
 
 	Remote (created even when the feature is off):
 	  CandyRushState (server -> client): the State below for the stand you are on, or nil when
@@ -41,6 +42,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Kit = require(script.Parent.Parent.Build.Kit)
+local HubBuilder = require(script.Parent.Parent.Hub.HubBuilder)
 local CandyRushCandy = require(script.Parent.Parent.Minigames.CandyRushCandy)
 local Rules = require(script.Parent.Parent.Minigames.CandyRushRules)
 local AdminService = require(script.Parent.AdminService)
@@ -1306,11 +1308,34 @@ function CandyRushService.StartSolo(player: Player): (boolean, string)
 	return false, "Every stand is busy with a race right now: try again in a few seconds."
 end
 
+-- A saved hub with no stand (baked while Candy Rush was off, or the stand was deleted) gets one
+-- for this server.
+local function ensureStand()
+	for _, instance in CollectionService:GetTagged(Tags.CandyRushStation) do
+		if instance:IsDescendantOf(workspace) then
+			return
+		end
+	end
+	local hub = workspace:FindFirstChild("Hub")
+	if not (hub and hub:IsA("Model")) then
+		return
+	end
+	if HubBuilder.RepairSection(hub, "CandyRush") then
+		warn(
+			"[CandyRushService] The lobby had no Candy Rush stand (tag CandyRushStation), so it was built for this server. To keep it, F8 > Rebuild hub or run require(game.ServerScriptService.Server.Tools.Bake).Hub() in edit mode, then save."
+		)
+	end
+end
+
 function CandyRushService.Start()
 	-- Created even when Candy Rush is off, so a client never waits for it.
 	stateRemote = Remotes.Event("CandyRushState")
 	if not Config.Features.CandyRush then
-		return
+		return -- (HubService takes the stand out of the running game)
+	end
+	local ok, err = pcall(ensureStand :: any)
+	if not ok then
+		warn("[CandyRushService] Couldn't build the Candy Rush stand: " .. tostring(err))
 	end
 	AdminService.Register("CandyRushSolo", "Candy Rush: start solo test", function(player, _data)
 		local _, message = CandyRushService.StartSolo(player)
