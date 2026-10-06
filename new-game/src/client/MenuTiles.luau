@@ -6,7 +6,8 @@
 	  Vote         the vote panel, or a short note saying when voting starts
 	  Spectate     watch the round from the lobby (during a round, if you're not in it)
 	  VIP & Packs  the shop on its Packs & VIP tab
-	  Parkour, Secret Pumpkins   progress notes (only while their feature is on)
+	  Parkour      a progress note (only while the parkour is on)
+	  Secret Pumpkins   the Easter egg list (EasterEggUI.Open; only while the eggs are on)
 	Shop, Settings, Codes and Invite come from their own panels (Layout.SideButton).
 	Kept apart from MenuUI so feature screens can require MenuUI to add their own tiles
 	without a require loop. Main.client.luau mounts it right after MenuUI.
@@ -120,7 +121,6 @@ function MenuTiles.Mount(_gui: ScreenGui)
 		Id = "EasterEggs",
 		Label = "Secret Pumpkins",
 		Order = 11,
-		KeepOpen = true,
 		Visible = function()
 			return Config.Features.EasterEggs
 		end,
@@ -129,8 +129,7 @@ function MenuTiles.Mount(_gui: ScreenGui)
 			return if total > 0 then ("%d/%d"):format(found, total) else nil
 		end,
 		OnClick = function()
-			local found, total = EasterEggUI.Progress()
-			MenuUI.ShowMessage(text.EasterEggs:format(found, total))
+			EasterEggUI.Open() -- the list of found eggs and riddles (src/client/EasterEggUI.luau)
 		end,
 	})
 end

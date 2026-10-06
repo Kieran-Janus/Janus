@@ -2,12 +2,167 @@
 --[[
 	WEB SCOUR (Config.Minigames.WebScour)
 
-	A quick Halloween scavenger hunt in the spider webs: start it at the lantern, then find
-	and click the little critters hidden in the webs before time runs out.
-	On/off: Config.Features.WebScour. Where it is: Config.Lobby.Zones.WebScour.
+	A quick Halloween scavenger hunt in the "Spider Grove": walk up to the glowing lantern and
+	use "Scour the Web!". Little glowing critters (spiders, bats, candy, ghosts) appear in the
+	webs, only for you, and you have TimeLimit seconds to click or tap them all. Several
+	players can play at once, each with their own critters.
+	On/off: Config.Features.WebScour. Where it is: Config.Lobby.Zones.WebScour (move the zone
+	to move the whole grove). Built by src/server/Hub/Sections/WebScour.luau, played by
+	src/server/Services/WebScourService.luau and src/client/WebScourUI.luau.
+
+	Easy changes:
+	  - more or fewer critters: Critters       - more or less time: TimeLimit
+	  - coins: CoinsPerCritter, FinishCoins, TimeBonusPerSecond, MaxCoins, RewardCooldown
+	  - what it says on screen: Text            - sounds: Sounds (any rbxassetid, "" = silent)
+	In Studio the hiding spots are the invisible parts tagged WebScourSpot and the lantern is
+	the part tagged WebScourStart: move, copy or delete them and the game keeps working.
 ]]
 
+-- What one sound line may contain (leave this as it is).
+type Sound = { SoundId: string, Volume: number?, PitchMin: number?, PitchMax: number? }
+
 return {
-	-- TODO(minigames agent): the rest of the Web Scour settings go here.
-	FinishCoins = 20, -- coins for finding everything in time
+	-- The game ------------------------------------------------------------------------------
+	Critters = 6, -- critters to find in one go (fewer if the grove has fewer hiding spots)
+	TimeLimit = 45, -- seconds to find them all
+	MaxReach = 26, -- studs: you must be this close to a critter for your click to count
+	MinSecondsBetweenFinds = 0.3, -- faster clicks than this are ignored (stops auto-clickers)
+	FirstFindAfter = 0.5, -- seconds after the start before the first critter can be caught
+	StartCooldown = 3, -- seconds after a hunt ends before you can start the next one
+	LeaveDistance = 75, -- studs from the lantern: walk further away and the hunt stops
+	CheckSeconds = 0.5, -- how often the server checks that hunters are still in the grove
+	LagAllowance = 0.4, -- seconds after the clock runs out that a click still counts (slow internet)
+	MaxActionsPerSecond = 8, -- clicks the server listens to per player per second
+
+	-- Coins -----------------------------------------------------------------------------------
+	CoinsPerCritter = 2, -- coins for every critter you find (even if time runs out)
+	FinishCoins = 20, -- extra coins for finding everything in time
+	TimeBonusPerSecond = 0.5, -- and this many coins for every second left on the clock
+	MaxCoins = 50, -- never more than this from one hunt
+	RewardCooldown = 180, -- seconds between hunts that pay coins (in between: just for fun,
+	-- your best time still counts). Best times are saved in data.Minigames.WebScourBest.
+
+	-- The lantern's button ----------------------------------------------------------------------
+	Prompt = {
+		ActionText = "Scour the Web!",
+		ObjectText = "Web Scour",
+		HoldDuration = 0.2, -- seconds to hold (0 = a tap)
+		MaxActivationDistance = 12, -- studs
+	},
+
+	-- The critters (only the player hunting sees them) ------------------------------------------
+	-- Kinds: Spider, Bat, Candy, Ghost. Leave one out of the list and it never shows up.
+	CritterKinds = { "Spider", "Bat", "Candy", "Ghost" },
+	CritterSize = 1.7, -- studs across
+	CritterColors = { -- the glowing colour of each kind
+		Spider = Color3.fromRGB(190, 110, 255),
+		Bat = Color3.fromRGB(255, 150, 60),
+		Candy = Color3.fromRGB(255, 110, 190),
+		Ghost = Color3.fromRGB(140, 255, 230),
+	} :: { [string]: Color3 },
+	CritterLight = 7, -- studs of glow around each critter (0 = no light)
+	HintLastSeconds = 10, -- in the last seconds the critters glow brighter, to help
+	CatchPromptDistance = 9, -- gamepads: a "Catch!" button shows on critters this close
+
+	-- Sounds (only the hunter hears them) --------------------------------------------------------
+	Sounds = {
+		Start = { SoundId = "rbxassetid://17798541626", Volume = 0.5 },
+		Catch = {
+			SoundId = "rbxassetid://113730061669739",
+			Volume = 0.6,
+			PitchMin = 1.1,
+			PitchMax = 1.35,
+		},
+		Miss = { SoundId = "rbxassetid://139800881181209", Volume = 0.4 },
+		Tick = { SoundId = "rbxassetid://134410911353980", Volume = 0.4 }, -- last HintLastSeconds
+		AllFound = { SoundId = "rbxassetid://1841209502", Volume = 0.6 },
+		TimeUp = {
+			SoundId = "rbxassetid://9045119921",
+			Volume = 0.5,
+			PitchMin = 0.8,
+			PitchMax = 0.8,
+		},
+	} :: {
+		Start: Sound,
+		Catch: Sound,
+		Miss: Sound,
+		Tick: Sound,
+		AllFound: Sound,
+		TimeUp: Sound,
+	},
+
+	-- What it says on screen (%d = a number, %s = words) ------------------------------------------
+	Text = {
+		Title = "WEB SCOUR", -- also on the sign by the lantern
+		Sign = "Find %d critters!", -- the small sign under it (%d = Critters)
+		HintMouse = "Click the glowing critters in the webs!",
+		HintTouch = "Tap the glowing critters in the webs!",
+		HintGamepad = "Walk up to the glowing critters and catch them!",
+		Progress = "%d/%d found",
+		Stop = "Stop",
+		Catch = "Catch!", -- the gamepad button on a critter
+		TooFar = "Get closer!",
+		AllFound = "You found them all!",
+		TimeUp = "Time's up!",
+		Stopped = "Hunt stopped.",
+		Left = "You left the Spider Grove.",
+		Round = "Off to the round!",
+		Found = "%d/%d critters", -- in the finish banner
+		Time = "Time: %s",
+		NewBest = "New best time!",
+		Best = "Best: %s",
+		Coins = "+%d %s", -- coins and the currency name
+		JustForFun = "Just for fun: coins again in %s",
+		Busy = "You're already scouring the webs!",
+		Wait = "Catch your breath... try again in a moment.",
+		InRound = "You can scour the webs after the round.",
+		NotReady = "Loading your save... try again in a moment.",
+		NoSpots = "The webs are empty right now.",
+	},
+	BannerSeconds = 5, -- how long the finish banner stays up
+
+	-- The Spider Grove (the look) ---------------------------------------------------------------
+	-- Positions are in studs from the middle of the Web Scour zone, seen from the plaza:
+	-- Vector3.new(right, up, back): right + = to the right, back + = further from the plaza.
+	-- Changes here show after the hub is rebuilt (F8 > Rebuild hub, or bump
+	-- Config.Hub.BuildVersion so a saved hub rebuilds).
+	Grove = {
+		Seed = 7, -- random twists in the trees (change it for different trees)
+		Trees = { -- twisted trees the webs hang between (numbered 1, 2, 3... in this order)
+			{ Offset = Vector3.new(-12.5, 0, 8), Height = 22 }, -- 1: back left
+			{ Offset = Vector3.new(12.5, 0, 8), Height = 22 }, -- 2: back right
+			{ Offset = Vector3.new(-14, 0, -6), Height = 15 }, -- 3: front left
+			{ Offset = Vector3.new(14, 0, -6), Height = 15 }, -- 4: front right
+		},
+		-- Giant webs, each strung between two trees (their numbers above). Height = the web's
+		-- middle above the ground, Radius = its size. Spots = where critters can hide on it,
+		-- as clock hours seen from the front (12 = top, 3 = right, 6 = bottom, 9 = left).
+		Webs = {
+			{ Between = { 1, 2 }, Height = 10, Radius = 8.5, Spots = { 1, 3, 5, 7, 9, 11 } },
+			{ Between = { 3, 1 }, Height = 7, Radius = 5.2, Spots = { 2, 6, 10 } },
+			{ Between = { 2, 4 }, Height = 7, Radius = 5.2, Spots = { 2, 6, 10 } },
+		},
+		SpotDistance = 0.62, -- how far out on the web a spot is (0 = middle, 1 = the edge)
+		-- More hiding spots on the ground, among the roots and mushrooms.
+		GroundSpots = {
+			Vector3.new(-9, 0.9, 11),
+			Vector3.new(9, 0.9, 11),
+			Vector3.new(-15.5, 0.9, -9.5),
+			Vector3.new(15.5, 0.9, -9.5),
+		},
+		Lantern = Vector3.new(-6.5, 0, -10), -- the start lantern's post (where you press the button)
+		SpiderSize = 8, -- the big friendly spider sitting on top of the back web
+		Mushrooms = 7, -- glowing mushrooms scattered on the grove floor
+		Colors = {
+			Web = Color3.fromRGB(225, 220, 255), -- the glowing web strands
+			Bark = Color3.fromRGB(58, 40, 52), -- the twisted trees
+			Floor = Color3.fromRGB(46, 52, 48), -- the mossy ground
+			Spider = Color3.fromRGB(96, 56, 150), -- the big spider's body
+			SpiderLegs = Color3.fromRGB(64, 36, 104),
+			SpiderSpots = Color3.fromRGB(255, 150, 50),
+			Cheeks = Color3.fromRGB(255, 130, 170),
+			Lantern = Color3.fromRGB(150, 255, 120), -- the start lantern's glow
+			MushroomCaps = { Color3.fromRGB(80, 230, 210), Color3.fromRGB(190, 120, 255) },
+		},
+	},
 }

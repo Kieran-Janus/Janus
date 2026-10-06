@@ -16,8 +16,8 @@ return {
 	ScareMaze = false, -- ScareMaze: Survivors run the maze, Haunters scare them
 	Parkour = true, -- the parkour course in the lobby
 	CandyRush = true, -- lobby minigame: click your candies, first to clear them all wins
-	WebScour = false, -- lobby minigame: a quick scavenger hunt in the spider webs
-	EasterEggs = false, -- hidden pumpkins around the lobby that give coins once each
+	WebScour = true, -- lobby minigame: a quick scavenger hunt in the spider webs
+	EasterEggs = true, -- hidden pumpkins around the lobby that give coins once each
 	Crates = true, -- crates bought with coins that give a random skin
 	RobuxCrates = true, -- crates can also be bought with Robux (needs Crates on too)
 	SkinEffects = true, -- CRAZY skins' animated rainbow, orbiting pieces and pulsing glow
