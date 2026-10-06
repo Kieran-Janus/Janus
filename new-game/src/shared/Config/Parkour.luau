@@ -271,6 +271,9 @@ return {
 		-- false = the pumpkins, candies and graves glow (neon) without a light of their own: a
 		-- 60-piece course would use too many lights for phones (Config.Hub.Budget).
 		PieceLights = false,
+		-- The rock island under the finish: how many rings, how tall each, how much smaller each
+		-- ring is (share of the pad). Tiers x TierHeight must stay within Hang.Finish below.
+		Island = { Tiers = 2, TierHeight = 1.9, Shrink = 0.3 },
 		Colors = {
 			Pumpkin = Color3.fromRGB(255, 125, 25),
 			PumpkinStem = Color3.fromRGB(90, 140, 60),
@@ -310,6 +313,19 @@ return {
 		Checkpoint = Vector3.new(9, 1.4, 9),
 		Finish = Vector3.new(14, 1.6, 14),
 		Hazard = Vector3.new(4, 0.4, 4),
+	},
+
+	-- How far each kind's solid decoration hangs below its Size (the crypt's dirt, the
+	-- bat's round body, the rock island under the finish). The head-room check adds it, so
+	-- nothing solid can catch your head mid-jump. Make it bigger if you add something solid
+	-- underneath a piece.
+	Hang = {
+		Grave = 0,
+		Platform = 1.9,
+		Bat = 1.8,
+		Candy = 1,
+		Broom = 1.1,
+		Finish = 3.8,
 	},
 
 	Course = Course, -- the list at the top of this file

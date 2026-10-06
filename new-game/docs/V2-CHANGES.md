@@ -105,6 +105,7 @@ More views: [from the top](screenshots/lobby-top.png).
 - Behind the clock tower. About 60 jumps in 8 stages, spiralling up: Pumpkin Hop, Broomstick Bridge, Graveyard Steps, Candy Sky, Bat Wings, Crypt Lids, Lantern Leap and Moonlight Summit. Super easy at the start, only a little trickier at the top, with wide broomsticks.
 - Start on the START pad. The timer starts when you jump off it.
 - Touch the 7 checkpoints in order (one at the start of every stage). Fall (or touch green slime) and you go back to your last checkpoint, never all the way down.
+- Everything on the course you can see is solid: you bump into gravestones, their dirt mounds, crypts, candies and bats instead of walking through them. Only glow, words, moss and slime are walk-through.
 - Reach the golden trophy pumpkin at the top: **300 coins**, at most once every 20 hours. Your best time is saved and shown on a board.
 - **Menu > Parkour** shows your best time, when coins can be won again, and a "Go to start" button.
 

@@ -14,6 +14,7 @@
 	  ParkourLogic.StepCFrame(course, i) -> CFrame     top middle of step i, in course space
 	  ParkourLogic.CourseFrame(zoneCFrame) -> CFrame   course space -> world
 	  ParkourLogic.SizeOf(step) -> Vector3             its Size, or the Kind's default size
+  ParkourLogic.Depth(step) -> number               how far its solid parts reach below its top
 	  ParkourLogic.Footprint(step) -> Footprint        the part of its top you can stand on
 	  ParkourLogic.Jump(a, cfA, b, cfB) -> (gap, rise) edge-to-edge gap and height change
 	  ParkourLogic.Reach(rise, speed?, height?) -> number   longest gap a character can jump
@@ -91,6 +92,13 @@ function ParkourLogic.SizeOf(step: Step): Vector3
 	end
 	local default = (Config.Parkour.Sizes :: any)[step.Kind]
 	return if typeof(default) == "Vector3" then default else Vector3.new(6, 1, 6)
+end
+
+-- How far below its top a piece is solid: its height plus Config.Parkour.Hang (the bat's body, the
+-- rock island under the finish).
+function ParkourLogic.Depth(step: Step): number
+	local hang = (Config.Parkour.Hang :: any)[step.Kind]
+	return ParkourLogic.SizeOf(step).Y + (if type(hang) == "number" then hang else 0)
 end
 
 -- Rotation as written in Config: Vector3 degrees like Studio's Orientation (tip, turn, lean)
@@ -222,7 +230,7 @@ end
 --[[
 	Head room: nothing may hang over a jump (or over where you stand before and after it)
 	lower than rules.Headroom studs above it, or players bump their heads mid-jump and fall.
-	A piece hangs SizeOf(piece).Y studs below its top (a gravestone is tall). `jumps` = the
+	A piece hangs Depth(piece) studs below its top (a gravestone is tall; the finish has an island under it). `jumps` = the
 	indexes of `course` you jump on, in order; `cframes[i]` = the top middle of course[i].
 	Returns readable problems (empty = fine).
 ]]
@@ -262,7 +270,7 @@ function ParkourLogic.Headroom(
 			local over = toSegment(flat(pc), flat(pa), flat(pb)) < rc + rules.HeadroomMargin
 				or (flat(pc) - flat(pa)).Magnitude < rc + radius(course[ia])
 				or (flat(pc) - flat(pb)).Magnitude < rc + radius(course[ib])
-			local bottom = pc.Y - ParkourLogic.SizeOf(c).Y
+			local bottom = pc.Y - ParkourLogic.Depth(c)
 			if over and bottom - floor < rules.Headroom - 1e-6 then
 				table.insert(
 					problems,

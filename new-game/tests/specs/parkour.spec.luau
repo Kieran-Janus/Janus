@@ -333,6 +333,96 @@ describe("The parkour section", function()
 		hub:Destroy()
 	end)
 
+	-- Pieces you can see but walk through, and why. Everything else visible must be solid.
+	local walkThrough = {
+		Plaque = "words on a gravestone",
+		Sign = "words on a checkpoint sign, above your head",
+		NameBoard = "words on the start arch, above your head",
+		Moss = "moss on a gravestone",
+		Swirl = "a flat stripe painted on a candy",
+		WingBone = "flat lines painted on a bat wing",
+		PadCentre = "a flat inlay on a pad",
+		Fang = "a face detail",
+		Tooth = "a face detail",
+		Rib = "a jack-o-lantern up on the arch or the board, out of reach",
+		Stem = "a jack-o-lantern up on the arch or the board, out of reach",
+	}
+
+	-- Is `part` inside a model (below `root`) with this attribute?
+	local function inside(part: any, root: any, attribute: string): boolean
+		local node = part.Parent
+		while node and node ~= root do
+			if node:GetAttribute(attribute) == true then
+				return true
+			end
+			node = node.Parent
+		end
+		return false
+	end
+
+	it("makes every piece you can see and bump into solid, without catching heads", function()
+		local hub = rt:create("Model", { Name = "Hub" }, rt.workspace)
+		local zone = HubLayout.Zone("Parkour")
+		local area = Section.Build(hub, zone)
+		local course = Config.Parkour.Course
+		local Vector3 = rt.env.Vector3
+		for i, step in course do
+			local model = area.Course[Logic.StepName(course, i)]
+			local top = Section.WorldCFrame(zone, i).Position.Y
+			local lowest = top - Logic.Depth(step)
+			local looks = false
+			for _, part in model:GetDescendants() do
+				if not part:IsA("BasePart") then
+					continue
+				end
+				local inLook = inside(part, model, "PropLook")
+				looks = looks or inLook
+				local visible = part.Transparency < 0.6
+					and part.Material ~= rt.env.Enum.Material.Neon
+				if
+					visible
+					and not inLook
+					and not part.CanCollide
+					and not walkThrough[part.Name]
+				then
+					error(part:GetFullName() .. " can be seen but walked through")
+				end
+				if part.CanCollide then
+					-- Nothing solid hangs lower than Config.Parkour.Hang says (the head-room check).
+					for _, x in { -1, 1 } do
+						for _, y in { -1, 1 } do
+							for _, z in { -1, 1 } do
+								local corner = part.CFrame:PointToWorldSpace(
+									Vector3.new(
+										x * part.Size.X / 2,
+										y * part.Size.Y / 2,
+										z * part.Size.Z / 2
+									)
+								)
+								if corner.Y < lowest - 0.05 then
+									error(
+										("%s hangs %.2f studs below Config.Parkour.Hang.%s"):format(
+											part:GetFullName(),
+											lowest - corner.Y,
+											step.Kind
+										)
+									)
+								end
+							end
+						end
+					end
+				end
+			end
+			if looks then
+				-- A look is only visual (it may be your own model): an invisible solid core
+				-- stands in for it.
+				local core = model:FindFirstChild("Core")
+				expect(core and core.CanCollide).toBe(true)
+			end
+		end
+		hub:Destroy()
+	end)
+
 	it("builds nothing when the feature is off", function()
 		local saved = Config.Features.Parkour
 		Config.Features.Parkour = false

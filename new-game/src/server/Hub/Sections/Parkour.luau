@@ -56,17 +56,18 @@ local function decor(props: Kit.Props, parent: Instance): Part
 	return Kit.decor(props, parent)
 end
 
--- A decoration shaped like an egg / squashed ball that fills `size` (a Ball part is always a
--- perfect sphere, so this is a block with a sphere mesh).
+-- A shape like an egg / squashed ball that fills `size` (a Ball part is always a perfect
+-- sphere, so this is a block with a sphere mesh). `collide` = solid (it collides as its box).
 local function oval(
 	name: string,
 	cf: CFrame,
 	size: Vector3,
 	color: Color3,
 	parent: Instance,
-	material: Enum.Material?
+	material: Enum.Material?,
+	collide: boolean?
 ): Part
-	local p = decor({
+	local p = (if collide then solid else decor)({
 		Name = name,
 		Size = size,
 		CFrame = cf,
@@ -229,6 +230,19 @@ builders.Pumpkin = function(top, size, _step, m, index)
 		m,
 		true
 	)
+	-- The round body is only a look (it may be your own model), so an invisible solid core
+	-- under the lid makes the pumpkin something you bump into, not walk through.
+	local coreHeight = math.max(size.Y - 0.8, 0.5)
+	local solidCore = disc(
+		"Core",
+		top * CFrame.new(0, -0.6 - coreHeight / 2, 0),
+		width * 0.88,
+		coreHeight,
+		colors.Pumpkin,
+		m,
+		true
+	)
+	solidCore.Transparency = 1
 	local lit = index % 2 == 0 -- every other pumpkin is a glowing jack-o-lantern
 	local light: Kit.PropLight? = if lit
 			and look.Lights
@@ -280,13 +294,15 @@ end
 
 -- A rounded headstone (you stand on its rounded top) on a clump of earth.
 builders.Grave = function(top, size, step, m, index)
-	local radius = size.X / 2
+	-- The round top is never taller than the stone, so it can't poke out underneath (a wide,
+	-- short stone gets shoulders instead).
+	local radius = math.min(size.X, size.Y) / 2
 	local bodyHeight = math.max(size.Y - radius, 1)
 	local stoneColor = colors.Stone
 	local cap = solid({
 		Name = "Stone",
 		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(size.Z, size.X, size.X),
+		Size = Vector3.new(size.Z, radius * 2, radius * 2),
 		CFrame = top * CFrame.new(0, -radius, 0) * CFrame.Angles(0, math.rad(90), 0),
 		Color = stoneColor,
 		Material = Enum.Material.Slate,
@@ -307,9 +323,10 @@ builders.Grave = function(top, size, step, m, index)
 		Material = Enum.Material.Slate,
 	}, m)
 	lettering(plaque, step.Text or "RIP", colors.Text, Enum.NormalId.Back)
-	-- A wider foot, with moss creeping up the front corners.
+	-- A wider foot (solid, like everything you can see and bump into), with moss creeping up
+	-- the front corners (moss, the plaque, roots and the candle stay walk-through).
 	local bottom = top * CFrame.new(0, -size.Y, 0)
-	decor({
+	solid({
 		Name = "Foot",
 		Size = Vector3.new(size.X + 1, 0.9, size.Z + 0.8),
 		CFrame = bottom * CFrame.new(0, 0.45, 0),
@@ -325,40 +342,32 @@ builders.Grave = function(top, size, step, m, index)
 			Material = Enum.Material.Grass,
 		}, m)
 	end
-	-- The clump of earth it was pulled up with, and dangling roots.
+	-- A mound of earth round the foot (solid; it never pokes out below the stone, so it can't
+	-- catch the head of anyone jumping underneath: Config.Parkour.Hang).
 	oval(
 		"Dirt",
-		bottom * CFrame.new(0, -0.6, 0),
-		Vector3.new(size.X * 1.4, 3.2, size.Z * 1.8),
+		bottom * CFrame.new(0, 0.7, 0),
+		Vector3.new(size.X * 1.3, 1.4, size.Z * 1.55),
 		colors.Dirt,
 		m,
-		Enum.Material.Ground
+		Enum.Material.Ground,
+		true
 	)
 	oval(
 		"Grass",
-		bottom * CFrame.new(0, 0.2, 0),
-		Vector3.new(size.X * 1.3, 1, size.Z * 1.65),
+		bottom * CFrame.new(0, 0.9, 0),
+		Vector3.new(size.X * 1.2, 1, size.Z * 1.45),
 		colors.Moss,
 		m,
-		Enum.Material.Grass
+		Enum.Material.Grass,
+		true
 	)
-	for r = 0, 1 do -- (few parts per piece: the course is long and phones count parts)
-		local angle = math.rad(r * 180 + index * 17)
-		decor({
-			Name = "Root",
-			Size = Vector3.new(0.3, 2.4, 0.3),
-			CFrame = bottom
-				* CFrame.new(math.cos(angle) * size.X * 0.3, -2.4, math.sin(angle) * size.Z * 0.35)
-				* CFrame.Angles(math.rad(12), angle, 0),
-			Color = colors.Dirt,
-		}, m)
-	end
 	if index % 2 == 0 then
 		-- A ghostly green candle on the foot.
 		local flame = decor({
 			Name = "Candle",
 			Size = Vector3.new(0.5, 1.1, 0.5),
-			CFrame = bottom * CFrame.new(size.X / 2 + 0.1, 1.45, size.Z / 2),
+			CFrame = bottom * CFrame.new(size.X / 2 + 0.1, 1.95, size.Z / 2),
 			Color = colors.Slime,
 			Material = Enum.Material.Neon,
 		}, m)
@@ -396,14 +405,14 @@ builders.Broom = function(top, size, _step, m, index)
 	local bundleMesh = Instance.new("SpecialMesh")
 	bundleMesh.MeshType = Enum.MeshType.Sphere
 	bundleMesh.Parent = bristles
-	-- Loose straws fanning out of the end.
+	-- Loose straws fanning out of the end (solid: you can bump into them).
 	for i = 0, 2 do
 		local angle = (i / 3) * math.pi * 2 + index
 		local spread = Vector3.new(math.cos(angle), math.sin(angle), 0)
 		local from = tail
 			* CFrame.new(spread.X * size.X * 0.45, spread.Y * size.Y * 0.4, bundle.Z * 0.35)
 		local to = from * CFrame.new(spread.X * 0.8, spread.Y * 0.8, 2.2)
-		decor({
+		solid({
 			Name = "Straw",
 			Size = Vector3.new(0.25, 0.25, (to.Position - from.Position).Magnitude),
 			CFrame = CFrame.lookAt(from.Position:Lerp(to.Position, 0.5), to.Position),
@@ -419,14 +428,16 @@ builders.Broom = function(top, size, _step, m, index)
 		0.6,
 		colors.Bat,
 		m,
-		false
+		true -- (solid: it wraps the handle)
 	)
 	oval(
 		"Knob",
 		top * CFrame.new(0, -size.Y / 2, -size.Z / 2 + 0.2),
 		Vector3.new(size.X * 1.1, size.Y * 1.1, size.X * 1.1),
 		colors.Wood:Lerp(Color3.new(0, 0, 0), 0.2),
-		m
+		m,
+		nil,
+		true
 	)
 	local magic = Kit.holder("Magic", tail, Vector3.new(size.X, 1, bristleLength), m)
 	sparkles(magic, colors.Finish, 6)
@@ -456,7 +467,7 @@ builders.Candy = function(top, size, _step, m, _index)
 		size.Y * 0.35,
 		colors.CandyStripe,
 		m,
-		false
+		true
 	)
 	-- The see-through wrapper twisted at both sides.
 	for _, side in { -1, 1 } do
@@ -472,8 +483,8 @@ builders.Candy = function(top, size, _step, m, _index)
 				Color = colors.Wrapper,
 				Material = Enum.Material.Glass,
 				Transparency = 0.25,
-				CanCollide = false,
-				CanQuery = false,
+				CanCollide = true, -- (solid: you can see and bump into it)
+				CanQuery = true,
 				CanTouch = false,
 			}, m)
 		end
@@ -497,7 +508,7 @@ builders.Bat = function(top, size, _step, m, _index)
 	local under = top * CFrame.new(0, -size.Y, 0)
 	local bone = colors.Bat:Lerp(Color3.new(0, 0, 0), 0.35)
 	for _, side in { -1, 1 } do
-		-- Pointy wing tips.
+		-- Pointy wing tips (solid: flat, level with the wings, so they never get in a jump's way).
 		Kit.wedge({
 			Name = "WingTip",
 			Size = Vector3.new(size.Y, size.Z * 0.9, 2.4),
@@ -506,8 +517,8 @@ builders.Bat = function(top, size, _step, m, _index)
 				* CFrame.Angles(0, math.rad(90 * side), 0)
 				* CFrame.Angles(0, 0, math.rad(90)),
 			Color = colors.Bat,
-			CanCollide = false,
-			CanQuery = false,
+			CanCollide = true,
+			CanQuery = true,
 			CanTouch = false,
 		}, m)
 		-- Wing bones fanning out from the shoulders (flat on top, only for looks).
@@ -524,9 +535,9 @@ builders.Bat = function(top, size, _step, m, _index)
 				Color = bone,
 			}, m)
 		end
-		-- Scalloped back edge.
+		-- Scalloped back edge (solid).
 		for s = 0, 0 do
-			decor({
+			solid({
 				Name = "Scallop",
 				Shape = Enum.PartType.Cylinder,
 				Size = Vector3.new(size.Y * 0.9, size.Z * 0.45, size.Z * 0.45),
@@ -537,23 +548,26 @@ builders.Bat = function(top, size, _step, m, _index)
 		end
 	end
 	-- The little body underneath and the head at the front (the plaza side when not turned).
+	-- (Both solid; the head sits at the side edge, away from the line you jump along.)
 	oval(
 		"Body",
 		under * CFrame.new(0, -0.6, 0),
 		Vector3.new(2.6, 2.4, size.Z * 0.75),
 		colors.Bat,
-		m
+		m,
+		nil,
+		true
 	)
 	local head = top * CFrame.new(0, 0.45, size.Z / 2 - 0.5)
-	oval("Head", head, Vector3.new(2.4, 2.1, 2), colors.Bat, m)
+	oval("Head", head, Vector3.new(2.4, 2.1, 2), colors.Bat, m, nil, true)
 	for _, side in { -1, 1 } do
 		Kit.wedge({
 			Name = "Ear",
 			Size = Vector3.new(0.3, 1.2, 0.9),
 			CFrame = head * CFrame.new(side * 0.7, 1.3, 0),
 			Color = colors.Bat,
-			CanCollide = false,
-			CanQuery = false,
+			CanCollide = true, -- (solid, like the head they sit on)
+			CanQuery = true,
 			CanTouch = false,
 		}, m)
 		decor({
@@ -585,9 +599,9 @@ builders.Platform = function(top, size, _step, m, _index)
 		Color = colors.Stone:Lerp(Color3.new(0, 0, 0), 0.1),
 		Material = Enum.Material.Slate,
 	}, m)
-	-- A crypt lid: a raised border and a clump of earth underneath.
+	-- A crypt lid: a raised border and a clump of earth underneath (both solid).
 	for _, side in { -1, 1 } do
-		decor({
+		solid({
 			Name = "Trim",
 			Size = Vector3.new(0.4, size.Y + 0.2, size.Z + 0.2),
 			CFrame = top * CFrame.new(side * (size.X / 2 - 0.1), -size.Y / 2, 0),
@@ -601,7 +615,8 @@ builders.Platform = function(top, size, _step, m, _index)
 		Vector3.new(size.X * 1.2, 2.6, size.Z * 1.05),
 		colors.Dirt,
 		m,
-		Enum.Material.Ground
+		Enum.Material.Ground,
+		true
 	)
 	return slab
 end
@@ -687,7 +702,7 @@ end
 -- A signpost on the edge of a pad, facing `facing` (a flat direction), with two lines.
 local function signpost(base: CFrame, facing: Vector3, title: string, text: string?, m: Model)
 	local cf = CFrame.lookAt(base.Position, base.Position + facing)
-	decor({ -- (no collision, so it never blocks a jump onto the pad)
+	solid({ -- (a thin post at the side edge of the pad, away from the line you jump along)
 		Name = "SignPost",
 		Size = Vector3.new(0.5, 6, 0.5),
 		CFrame = cf * CFrame.new(0, 3, 0),
@@ -857,11 +872,13 @@ local function buildFinish(top: CFrame, size: Vector3, m: Model): BasePart
 	local pad = ringPad(top, size, colors.Finish, colors.Stone:Lerp(colors.Finish, 0.25), m)
 	CollectionService:AddTag(pad, Tags.ParkourFinish)
 	local diameter = math.min(size.X, size.Z)
-	-- The island under it: rocky rings getting smaller, with a glowing tip.
+	-- The island under it: solid rocky rings getting smaller, with a glowing tip. Few and flat,
+	-- so it doesn't hang over the laps below (Config.Parkour.Look.Island, Config.Parkour.Hang).
+	local island = cfg.Look.Island
 	local y = -size.Y
-	for tier = 1, 5 do
-		local d = diameter * (1 - tier * 0.17)
-		local h = 2.2
+	for tier = 1, island.Tiers do
+		local d = diameter * (1 - tier * island.Shrink)
+		local h = island.TierHeight
 		disc(
 			"Island",
 			top * CFrame.new(0, y - h / 2, 0) * CFrame.Angles(0, math.rad(tier * 23), 0),
@@ -869,7 +886,7 @@ local function buildFinish(top: CFrame, size: Vector3, m: Model): BasePart
 			h,
 			colors.Dirt:Lerp(colors.Bat, tier / 6),
 			m,
-			false,
+			true,
 			Enum.Material.Rock
 		)
 		y -= h
@@ -905,7 +922,8 @@ local function buildFinish(top: CFrame, size: Vector3, m: Model): BasePart
 			Vector3.new(5.6, 4.4, 5.6),
 			colors.Trophy,
 			trophy,
-			Enum.Material.Foil
+			Enum.Material.Foil,
+			true
 		)
 		for i = 0, 3 do
 			oval(
@@ -914,7 +932,8 @@ local function buildFinish(top: CFrame, size: Vector3, m: Model): BasePart
 				Vector3.new(5.9, 4.3, 3.2),
 				colors.Trophy:Lerp(Color3.new(0, 0, 0), if i % 2 == 0 then 0.12 else 0.04),
 				trophy,
-				Enum.Material.Foil
+				Enum.Material.Foil,
+				true
 			)
 		end
 		carveFace(center * CFrame.Angles(0, math.rad(180), 0), 2.9, 2.2, 2.9, trophy)
@@ -922,8 +941,8 @@ local function buildFinish(top: CFrame, size: Vector3, m: Model): BasePart
 		sparkles(pumpkin, colors.Trophy, 10)
 		-- The witch hat: a wide brim, a band with a buckle and a bent point.
 		local hat = center * CFrame.new(0, 2.1, 0)
-		disc("HatBrim", hat, 7, 0.3, colors.Hat, trophy, false)
-		disc("HatBand", hat * CFrame.new(0, 0.55, 0), 3.9, 0.7, colors.HatBand, trophy, false)
+		disc("HatBrim", hat, 7, 0.3, colors.Hat, trophy, true)
+		disc("HatBand", hat * CFrame.new(0, 0.55, 0), 3.9, 0.7, colors.HatBand, trophy, true)
 		decor({
 			Name = "HatBuckle",
 			Size = Vector3.new(0.9, 0.7, 0.15),
@@ -943,7 +962,7 @@ local function buildFinish(top: CFrame, size: Vector3, m: Model): BasePart
 				1,
 				colors.Hat,
 				trophy,
-				false
+				true
 			)
 			tierY += 0.95
 		end
@@ -952,7 +971,9 @@ local function buildFinish(top: CFrame, size: Vector3, m: Model): BasePart
 			hat * CFrame.new(-1.2, tierY + 0.4, 0),
 			Vector3.new(0.9, 0.9, 0.9),
 			colors.Hat,
-			trophy
+			trophy,
+			nil,
+			true
 		)
 		return trophy
 	end)
