@@ -14,7 +14,7 @@
 
 return {
 	Zones = {
-		ReadyArea = { Offset = Vector3.new(0, 0, 48), Size = Vector3.new(22, 0, 18) },
+		ReadyArea = { Offset = Vector3.new(0, 0, 46), Size = Vector3.new(22, 0, 18) }, -- right in front of the spawn
 		Shop = { Offset = Vector3.new(40, 0, -18), Size = Vector3.new(22, 0, 18) },
 		CandyRush = { Offset = Vector3.new(-60, 0, 0), Size = Vector3.new(30, 0, 26) },
 		WebScour = { Offset = Vector3.new(-38, 0, -32), Size = Vector3.new(32, 0, 26) },

@@ -4,21 +4,30 @@
 	Config.Lobby. HubService decides WHEN to build (a saved hub is kept, see its header); this
 	module knows HOW. Runs fine in Studio's edit mode too (src/server/Tools/Bake.luau).
 
+	The look: a cobbled town square at dusk. The spawn is in the south, looking north through
+	the pumpkin arch of the glowing Ready circle at the bubbling cauldron in the middle and the
+	crooked clock tower behind it. A stone promenade rings the cauldron; paths with signposts
+	lead to every lobby area.
+
 	What it builds (every group is a Model with a readable name):
 	  Workspace.Hub   attributes HubName, BuildVersion, PaletteColors (and Locked, if you set it)
-	    Plaza         the cobbled ground
-	    Spawn         where players appear (tag HubSpawn)
-	    CandyRush, EasterEggs, Parkour, ReadyArea, Shop, WebScour
+	    Plaza         the ground: cobbles (Ground, the PrimaryPart), the promenade ring, the
+	                  stone step round the cauldron (Dais), Walkways, Curb, Cracks, Puddles, Leaves
+	    Spawn         where players appear (tag HubSpawn): an invisible SpawnLocation on a round
+	                  stone (SpawnStone)
+	    CandyRush, Crates, EasterEggs, Parkour, ReadyArea, Shop, WebScour
 	                  the lobby sections: src/server/Hub/Sections/<Name>.luau builds each one in
 	                  its Config.Lobby.Zones area. The Pumpkin Shop keeper stands in Shop.
 	    Npcs          the Voting Board, Leaderboard Gravestone and Photo Spot (Hub/Npcs.luau)
-	    Decor         only for looks: ClockTower, Cauldron, Lamps, Bunting, JackOLanterns, Candles,
-	                  Graveyard, Trees, Ambience, and (HubExtras.luau) Forest, HauntedMansion,
-	                  KingStatue, PumpkinPatch, OldGraves, Fence, Paths
+	    Decor         only for looks: ClockTower, Cauldron, Lamps (round the edge), PathLamps,
+	                  Bunting, JackOLanterns, Candles, Benches, Graveyard, Trees, Clutter,
+	                  Signposts, Ambience, and (HubExtras.luau) Forest, HauntedMansion,
+	                  KingStatue, PumpkinPatch, OldGraves, Fence, Paths (glowing stones)
 	    Music
 	Decorations never go inside a lobby zone. Parts coloured from Config.Hub.Palette carry the
-	attribute PaletteRole. Props (Lamppost, JackOLantern, DeadTree, ...) are swapped for your own
-	model when ReplicatedStorage.Custom.Props has one with the same name (Kit.prop).
+	attribute PaletteRole. Decorations are props (src/server/Build/Props.luau: Pumpkin,
+	JackOLantern, Lamppost, SpookyTree, Bench, ...), swapped for your own model when
+	ReplicatedStorage.Custom.Props has one with the same name (Kit.prop).
 
 	HubBuilder.Build() -> Model             a fresh hub in Workspace (old ones are removed)
 	HubBuilder.BuildFallback() -> Model     plain plaza + spawn + Ready pad (if Build fails)
@@ -37,9 +46,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Kit = require(script.Parent.Parent.Build.Kit)
+local Props = require(script.Parent.Parent.Build.Props)
 local HubExtras = require(script.Parent.HubExtras)
 local HubLayout = require(script.Parent.HubLayout)
 local HubPalette = require(script.Parent.HubPalette)
+local HubPaths = require(script.Parent.HubPaths)
 local Npcs = require(script.Parent.Npcs)
 
 local HubBuilder = {}
@@ -63,69 +74,286 @@ local at = HubLayout.At
 local facingCenter = HubLayout.FacingCenter
 local blocked = HubLayout.Blocked
 
-local function jackOLantern(cf: CFrame, size: number, parent: Instance): Model
-	return Kit.prop("JackOLantern", cf, parent, size * 1.2, function()
-		return Kit.jackOLantern(cf, size, hubCfg.Palette :: any, parent)
-	end)
+local function glowLight(
+	parent: BasePart,
+	role: string,
+	range: number,
+	brightness: number,
+	flicker: boolean?
+)
+	light(parent, color(role), range, brightness, flicker ~= false):SetAttribute(
+		"PaletteRole",
+		role
+	)
 end
 
-local function cobweb(cf: CFrame, size: number, parent: Instance): Model
-	return Kit.prop("Cobweb", cf, parent, size, function()
-		local web = Kit.cobweb(cf, size, color("Bone"), parent)
-		Kit.setRole(web, "Bone")
-		return web
-	end, { Anchor = "Center" })
+-- The plaza top at (x, z) offset from the hub centre, plus `y`.
+local function ground(x: number, z: number, y: number?): Vector3
+	return at(Vector3.new(x, 1 + (y or 0), z))
 end
 
-local function glowLight(parent: BasePart, role: string, range: number, brightness: number)
-	light(parent, color(role), range, brightness, true):SetAttribute("PaletteRole", role)
+-- A flat round slab centred on `centre` (x/z), its top at `top` (world y).
+local function disc(
+	name: string,
+	centre: Vector3,
+	radius: number,
+	top: number,
+	thickness: number,
+	props: Kit.Props,
+	parent: Instance,
+	solid: boolean?
+): Part
+	local p = table.clone(props)
+	p.Name = name
+	p.Shape = Enum.PartType.Cylinder
+	p.Size = Vector3.new(thickness, radius * 2, radius * 2)
+	p.CFrame = upright(CFrame.new(centre.X, top - thickness / 2, centre.Z))
+	p.CastShadow = false
+	return if solid then part(p, parent) else decor(p, parent)
 end
 
--- Ground and spawn -----------------------------------------------------------------------
+-- A flat strip from a to b (x/z), `width` wide, its top at `top`.
+local function strip(
+	name: string,
+	a: Vector3,
+	b: Vector3,
+	width: number,
+	top: number,
+	props: Kit.Props,
+	parent: Instance
+): Part?
+	local flatA = Vector3.new(a.X, top - 0.03, a.Z)
+	local flatB = Vector3.new(b.X, top - 0.03, b.Z)
+	local length = (flatB - flatA).Magnitude
+	if length < 0.05 then
+		return nil
+	end
+	local p = table.clone(props)
+	p.Name = name
+	p.Size = Vector3.new(width, 0.06, length)
+	p.CFrame = CFrame.lookAt((flatA + flatB) / 2, flatB)
+	p.CastShadow = false
+	return decor(p, parent)
+end
+
+-- The flat stone heights, bottom to top (studs above the plaza), so nothing flickers.
+local LAYER = {
+	Field = 0.02,
+	Detail = 0.035,
+	PromenadeEdge = 0.04,
+	Promenade = 0.06,
+	InnerEdge = 0.08,
+	InnerField = 0.1,
+	PathEdge = 0.12,
+	Path = 0.14,
+}
+
+-- Ground ----------------------------------------------------------------------------------
+
+local function plazaTop(): number
+	return hubCfg.Center.Y + 1
+end
+
+-- A walkway along `points`: a darker edge and a smooth stone top, round at every bend.
+local function walkway(name: string, points: { Vector3 }, width: number, parent: Instance)
+	local top = plazaTop()
+	local edge = { PaletteRole = "Path", PaletteShade = 0.32, Material = Enum.Material.Slate }
+	local stone = { PaletteRole = "Path", Material = Enum.Material.Slate }
+	for i = 1, #points - 1 do
+		strip(
+			name .. "Edge",
+			points[i],
+			points[i + 1],
+			width + 1.2,
+			top + LAYER.PathEdge,
+			edge,
+			parent
+		)
+		strip(name, points[i], points[i + 1], width, top + LAYER.Path, stone, parent)
+	end
+	for _, point in points do
+		disc(name .. "Edge", point, (width + 1.2) / 2, top + LAYER.PathEdge, 0.06, edge, parent)
+		disc(name, point, width / 2, top + LAYER.Path, 0.06, stone, parent)
+	end
+end
 
 local function buildPlaza(hub: Model): BasePart
+	local cfg = hubCfg.Plaza
 	local plaza = model("Plaza", hub)
 	local radius = hubCfg.Radius
-	local ground = part({
+	local centre = at(Vector3.zero)
+	local top = plazaTop()
+	-- The ground players walk on; its outer band is darker (the field on top is lighter).
+	local groundPart = part({
 		Name = "Ground",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(1, radius * 2, radius * 2),
 		CFrame = upright(CFrame.new(at(Vector3.new(0, 0.5, 0)))),
 		PaletteRole = "Ground",
+		PaletteShade = 0.22,
 		Material = hubCfg.GroundMaterial,
 	}, plaza)
-	-- A darker ring path around the square.
-	part({
-		Name = "PathRing",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1.05, radius * 1.45, radius * 1.45),
-		CFrame = upright(CFrame.new(at(Vector3.new(0, 0.5, 0)))),
+	disc("Field", centre, radius - cfg.EdgeBand, top + LAYER.Field, 0.1, {
 		PaletteRole = "Ground",
-		PaletteShade = 0.25,
+		Material = hubCfg.GroundMaterial,
+	}, plaza)
+	-- The promenade: a smooth stone ring round the middle, with darker edges.
+	local ring = cfg.Promenade
+	local outer = ring.Radius + ring.Width / 2
+	local inner = ring.Radius - ring.Width / 2
+	disc("PromenadeEdge", centre, outer + 0.7, top + LAYER.PromenadeEdge, 0.1, {
+		PaletteRole = "Path",
+		PaletteShade = 0.32,
 		Material = Enum.Material.Slate,
 	}, plaza)
-	part({
-		Name = "InnerRing",
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(1.1, radius * 1.3, radius * 1.3),
-		CFrame = upright(CFrame.new(at(Vector3.new(0, 0.5, 0)))),
+	disc("Promenade", centre, outer, top + LAYER.Promenade, 0.1, {
+		PaletteRole = "Path",
+		Material = Enum.Material.Slate,
+	}, plaza)
+	disc("PromenadeEdge", centre, inner, top + LAYER.InnerEdge, 0.1, {
+		PaletteRole = "Path",
+		PaletteShade = 0.32,
+		Material = Enum.Material.Slate,
+	}, plaza)
+	disc("InnerCobbles", centre, inner - 0.7, top + LAYER.InnerField, 0.1, {
 		PaletteRole = "Ground",
+		PaletteShade = -0.06,
 		Material = hubCfg.GroundMaterial,
 	}, plaza)
-	plaza.PrimaryPart = ground
-	return ground
+	-- The round stone step the cauldron stands on (players can walk up it).
+	local cauldron = hubCfg.Cauldron
+	local daisCentre = at(cauldron.Offset)
+	disc("Dais", daisCentre, cauldron.DaisRadius, top + 0.5, 0.6, {
+		PaletteRole = "Stone",
+		PaletteShade = 0.12,
+		Material = Enum.Material.Slate,
+	}, plaza, true)
+	disc("DaisRim", daisCentre, cauldron.DaisRadius + 0.5, top + 0.3, 0.3, {
+		PaletteRole = "Path",
+		PaletteShade = 0.35,
+		Material = Enum.Material.Slate,
+	}, plaza)
+	disc("DaisTop", daisCentre, cauldron.DaisRadius - 3.2, top + 1, 0.6, {
+		PaletteRole = "Stone",
+		PaletteShade = 0.05,
+		Material = Enum.Material.Slate,
+	}, plaza, true)
+	disc("DaisRing", daisCentre, cauldron.DaisRadius - 2.6, top + 0.55, 0.1, {
+		PaletteRole = "Teal",
+		Material = Enum.Material.Neon,
+		Transparency = 0.35,
+	}, plaza)
+
+	-- Walkways: from the spawn, and out to every lobby area.
+	local walkways = model("Walkways", plaza)
+	for _, path in HubPaths.Network() do
+		walkway(path.Name, path.Points, path.Width, walkways)
+	end
+
+	-- The curb round the edge of the plaza.
+	local curb = model("Curb", plaza)
+	for i = 1, cfg.Curbs do
+		local a = (i / cfg.Curbs) * math.pi * 2
+		local pos = ground(math.cos(a) * (radius - 0.6), math.sin(a) * (radius - 0.6), -0.4)
+		if blocked(pos, 1) then
+			continue
+		end
+		decor({
+			Name = "CurbStone",
+			Size = Vector3.new(1.6, 1.1, 2 * math.pi * radius / cfg.Curbs - 0.25),
+			CFrame = CFrame.lookAt(pos, pos + Vector3.new(-math.sin(a), 0, math.cos(a))),
+			PaletteRole = "Stone",
+			PaletteShade = 0.28 + (i % 3) * 0.05,
+			Material = Enum.Material.Slate,
+		}, curb)
+	end
+
+	-- Small details on the cobbles: cracks, puddles and fallen leaves.
+	local details = model("Details", plaza)
+	local function freeSpot(minR: number, maxR: number, margin: number): Vector3?
+		for _ = 1, 12 do
+			local a = rng:NextNumber(0, math.pi * 2)
+			local r = rng:NextNumber(minR, maxR)
+			local pos = ground(math.cos(a) * r, math.sin(a) * r)
+			if not blocked(pos, margin) and not HubPaths.OnPath(pos, margin) then
+				return pos
+			end
+		end
+		return nil
+	end
+	for _ = 1, cfg.Cracks do
+		local pos = freeSpot(inner + 2, radius - 8, 1)
+		if not pos then
+			continue
+		end
+		local point = pos
+		local heading = rng:NextNumber(0, math.pi * 2)
+		for _ = 1, 3 do
+			heading += rng:NextNumber(-0.9, 0.9)
+			local nextPoint = point
+				+ Vector3.new(math.cos(heading), 0, math.sin(heading))
+					* rng:NextNumber(1.4, 2.6)
+			strip("Crack", point, nextPoint, 0.22, top + LAYER.Detail, {
+				PaletteRole = "Dark",
+				PaletteShade = 0.2,
+			}, details)
+			point = nextPoint
+		end
+	end
+	for _ = 1, cfg.Puddles do
+		local pos = freeSpot(outer + 3, radius - 10, 2)
+		if not pos then
+			continue
+		end
+		local s = rng:NextNumber(3, 6)
+		decor({
+			Name = "Puddle",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(s, 0.08, s * rng:NextNumber(0.55, 0.8)),
+			CFrame = CFrame.new(pos + Vector3.new(0, LAYER.Detail + 0.01, 0))
+				* CFrame.Angles(0, rng:NextNumber(0, math.pi), 0),
+			PaletteRole = "Dark",
+			PaletteShade = -0.25,
+			Material = Enum.Material.Glass,
+			Reflectance = 0.35,
+			Transparency = 0.1,
+		}, details)
+	end
+	local leafRoles = { "Orange", "Gold", "Wood", "Orange" }
+	for i = 1, cfg.Leaves do
+		local a = rng:NextNumber(0, math.pi * 2)
+		local r = rng:NextNumber(inner + 1, radius - 2)
+		local pos = ground(math.cos(a) * r, math.sin(a) * r, 0.16)
+		if blocked(pos, 0) then
+			continue
+		end
+		decor({
+			Name = "Leaf",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(0.9, 0.05, 0.5),
+			CFrame = CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0),
+			PaletteRole = leafRoles[i % #leafRoles + 1],
+			PaletteShade = rng:NextNumber(-0.05, 0.3),
+		}, details)
+	end
+
+	plaza.PrimaryPart = groundPart
+	return groundPart
 end
 
 function HubBuilder.BuildSpawn(hub: Model): SpawnLocation
+	local cfg = hubCfg.Spawn
 	local s = Instance.new("SpawnLocation")
 	s.Name = "Spawn"
 	s.Anchored = true
 	s.Neutral = true
 	s.Duration = 0
-	s.Size = hubCfg.Spawn.Size
-	s.CFrame = facingCenter(at(hubCfg.Spawn.Offset + Vector3.new(0, 1.1, 0)))
-	s.Color = color("Purple")
-	s:SetAttribute("PaletteRole", "Purple")
+	s.Size = cfg.Size
+	local pos = at(cfg.Offset + Vector3.new(0, 1.1, 0))
+	local look = at(cfg.LookAt)
+	local flat = Vector3.new(look.X - pos.X, 0, look.Z - pos.Z)
+	s.CFrame = if flat.Magnitude > 0.1 then CFrame.lookAt(pos, pos + flat) else CFrame.new(pos)
+	s.Transparency = 1 -- the round stone below is what you see
 	s.Material = Enum.Material.SmoothPlastic
 	s.TopSurface = Enum.SurfaceType.Smooth
 	s.Parent = hub
@@ -133,7 +361,30 @@ function HubBuilder.BuildSpawn(hub: Model): SpawnLocation
 	if decal then
 		decal:Destroy()
 	end
-	Kit.surfaceText(s, "BOO!", color("Orange"), Enum.NormalId.Top)
+	local top = s.Position.Y + s.Size.Y / 2
+	local base = CFrame.new(s.Position.X, top, s.Position.Z) * s.CFrame.Rotation
+	local d = cfg.Diameter
+	disc("SpawnStone", base.Position, d / 2, top, 0.8, {
+		PaletteRole = "Path",
+		PaletteShade = 0.05,
+		Material = Enum.Material.Slate,
+	}, s, true)
+	disc("SpawnRim", base.Position, d / 2 + 0.6, top - 0.25, 0.6, {
+		PaletteRole = "Path",
+		PaletteShade = 0.35,
+		Material = Enum.Material.Slate,
+	}, s)
+	disc("SpawnGlow", base.Position, d / 2 - 1.2, top + 0.03, 0.06, {
+		PaletteRole = "Glow",
+		Material = Enum.Material.Neon,
+		Transparency = 0.3,
+	}, s)
+	disc("SpawnInlay", base.Position, d / 2 - 1.55, top + 0.06, 0.06, {
+		PaletteRole = "Purple",
+		PaletteShade = 0.3,
+		Material = Enum.Material.Slate,
+	}, s)
+	Kit.surfaceText(s, cfg.Text, color("Orange"), Enum.NormalId.Top)
 	CollectionService:AddTag(s, Tags.HubSpawn)
 	return s
 end
@@ -143,105 +394,238 @@ end
 local function buildClockTower(parent: Instance)
 	local cfg = hubCfg.ClockTower
 	local base = facingCenter(at(cfg.Offset + Vector3.new(0, 1, 0)))
-	local height = cfg.Floors * cfg.FloorHeight + 15
+	local height = cfg.Floors * cfg.FloorHeight + 22
+	local batSpots = {}
+	for i = 1, cfg.Bats do
+		batSpots[i] = {
+			Angle = i / cfg.Bats * math.pi * 2 + rng:NextNumber(-0.3, 0.3),
+			Up = rng:NextNumber(-3, 5),
+		}
+	end
 	Kit.prop("ClockTower", base, parent, height, function()
 		local tower = model("ClockTower", parent)
-		local cf = base
-		local faceFloor: CFrame = cf
-		local width: number = cfg.Width
+		local w0 = cfg.Width
+		part({
+			Name = "Step",
+			Size = Vector3.new(w0 + 5, 0.8, w0 + 5),
+			CFrame = base * CFrame.new(0, 0.4, 0),
+			PaletteRole = "Stone",
+			PaletteShade = 0.28,
+			Material = Enum.Material.Slate,
+		}, tower)
+		part({
+			Name = "Step",
+			Size = Vector3.new(w0 + 2.4, 0.8, w0 + 2.4),
+			CFrame = base * CFrame.new(0, 1.2, 0),
+			PaletteRole = "Stone",
+			PaletteShade = 0.18,
+			Material = Enum.Material.Slate,
+		}, tower)
+		-- An arched door with two lanterns.
+		decor({
+			Name = "Door",
+			Size = Vector3.new(4, 5.5, 0.3),
+			CFrame = base * CFrame.new(0, 4.35, -w0 / 2 - 0.1),
+			PaletteRole = "Wood",
+			PaletteShade = 0.3,
+			Material = Enum.Material.WoodPlanks,
+		}, tower)
+		decor({
+			Name = "DoorArch",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.3, 4, 4),
+			CFrame = base * CFrame.new(0, 7.1, -w0 / 2 - 0.1) * CFrame.Angles(0, math.rad(90), 0),
+			PaletteRole = "Wood",
+			PaletteShade = 0.3,
+			Material = Enum.Material.WoodPlanks,
+		}, tower)
+		for _, side in { -1, 1 } do
+			Props.Lantern(
+				paint,
+				base * CFrame.new(side * 3.2, 6.2, -w0 / 2 - 0.7),
+				1.4,
+				tower,
+				{ Light = side < 0, Range = 14 }
+			)
+		end
+
+		local cf = base * CFrame.new(0, 1.6, 0)
+		local clockFloor = math.max(cfg.Floors - 1, 1)
+		local width = w0
 		for i = 1, cfg.Floors do
-			width = cfg.Width * (1 - 0.06 * (i - 1))
+			width = w0 * (1 - 0.05 * (i - 1))
 			local floorCf = cf * CFrame.new(0, cfg.FloorHeight / 2, 0)
 			part({
 				Name = "TowerFloor" .. i,
 				Size = Vector3.new(width, cfg.FloorHeight, width),
 				CFrame = floorCf,
 				PaletteRole = "Stone",
-				PaletteShade = if i % 2 == 0 then 0 else 0.15,
+				PaletteShade = if i % 2 == 0 then 0.04 else 0.1,
 				Material = Enum.Material.Brick,
 			}, tower)
-			-- A glowing window on each side of the floor.
-			for _, side in { 0, 90, 180, 270 } do
-				part({
-					Name = "Window",
-					Size = Vector3.new(width * 0.25, cfg.FloorHeight * 0.4, 0.2),
-					CFrame = floorCf
-						* CFrame.Angles(0, math.rad(side), 0)
-						* CFrame.new(0, 0, -width / 2 - 0.05),
-					PaletteRole = "Glow",
-					Material = Enum.Material.Neon,
+			-- Corner stones and a jutting ledge at the top: a layered, crooked silhouette.
+			for _, corner in { { -1, -1 }, { 1, -1 }, { 1, 1 }, { -1, 1 } } do
+				decor({
+					Name = "CornerStone",
+					Size = Vector3.new(width * 0.14, cfg.FloorHeight - 0.4, width * 0.14),
+					CFrame = floorCf * CFrame.new(
+						corner[1] * (width / 2 - width * 0.05),
+						0,
+						corner[2] * (width / 2 - width * 0.05)
+					),
+					PaletteRole = "Stone",
+					PaletteShade = -0.08,
+					Material = Enum.Material.Slate,
 				}, tower)
 			end
-			if i == cfg.Floors - 1 then
-				faceFloor = floorCf
-			end
-			cf = cf * CFrame.new(0, cfg.FloorHeight, 0) * CFrame.Angles(0, 0, math.rad(cfg.Lean))
-		end
-		-- Pointy roof from shrinking slabs, with a glowing tip.
-		for i = 0, 5 do
-			local w = width * (1.1 - i * 0.18)
-			part({
-				Name = "RoofTier",
-				Size = Vector3.new(w, 2, w),
-				CFrame = cf * CFrame.new(0, 1 + i * 2, 0),
+			decor({
+				Name = "Ledge",
+				Size = Vector3.new(width + 1.3, 0.7, width + 1.3),
+				CFrame = floorCf * CFrame.new(0, cfg.FloorHeight / 2 - 0.2, 0),
 				PaletteRole = "Purple",
-				PaletteShade = 0.4,
+				PaletteShade = 0.45,
 				Material = Enum.Material.Slate,
 			}, tower)
+			if i ~= clockFloor and i > 1 then
+				-- An arched, glowing window on each side.
+				for side = 0, 3 do
+					local face = floorCf
+						* CFrame.Angles(0, side * math.pi / 2, 0)
+						* CFrame.new(0, -0.4, -width / 2 - 0.05)
+					local ww = width * 0.22
+					decor({
+						Name = "Window",
+						Size = Vector3.new(ww, cfg.FloorHeight * 0.36, 0.2),
+						CFrame = face,
+						PaletteRole = "Glow",
+						Material = Enum.Material.Neon,
+					}, tower)
+					decor({
+						Name = "WindowArch",
+						Shape = Enum.PartType.Cylinder,
+						Size = Vector3.new(0.2, ww, ww),
+						CFrame = face
+							* CFrame.new(0, cfg.FloorHeight * 0.18, 0)
+							* CFrame.Angles(0, math.rad(90), 0),
+						PaletteRole = "Glow",
+						Material = Enum.Material.Neon,
+					}, tower)
+				end
+			elseif i == clockFloor then
+				-- Glowing clock faces on the front and both sides (the back faces the parkour).
+				local t = cfg.ClockTime
+				for side = -1, 1 do
+					local faceCf = floorCf
+						* CFrame.Angles(0, side * math.pi / 2, 0)
+						* CFrame.new(0, 0, -width / 2 - 0.25)
+					local diameter = width * (if side == 0 then 0.78 else 0.6)
+					decor({
+						Name = "ClockRim",
+						Shape = Enum.PartType.Cylinder,
+						Size = Vector3.new(0.5, diameter + 1, diameter + 1),
+						CFrame = faceCf * CFrame.Angles(0, math.rad(90), 0),
+						PaletteRole = "Iron",
+						Material = Enum.Material.Metal,
+					}, tower)
+					local face = decor({
+						Name = "ClockFace",
+						Shape = Enum.PartType.Cylinder,
+						Size = Vector3.new(0.5, diameter, diameter),
+						CFrame = faceCf
+							* CFrame.new(0, 0, -0.1)
+							* CFrame.Angles(0, math.rad(90), 0),
+						PaletteRole = "Glow",
+						PaletteShade = -0.35,
+						Material = Enum.Material.Neon,
+					}, tower)
+					if side == 0 then
+						glowLight(face, "Glow", 34, 1.6, false)
+					end
+					local function hand(name: string, angle: number, length: number, thick: number)
+						decor({
+							Name = name,
+							Size = Vector3.new(thick, length, 0.2),
+							CFrame = faceCf
+								* CFrame.Angles(0, 0, -angle)
+								* CFrame.new(0, length / 2 - 0.3, -0.45),
+							PaletteRole = "Iron",
+						}, tower)
+					end
+					hand(
+						"HourHand",
+						((t.Hour % 12) + t.Minute / 60) / 12 * math.pi * 2,
+						diameter * 0.28,
+						0.55
+					)
+					hand("MinuteHand", t.Minute / 60 * math.pi * 2, diameter * 0.42, 0.35)
+					local marks = if side == 0 then 12 else 4
+					for m = 0, marks - 1 do
+						decor({
+							Name = "HourMark",
+							Size = Vector3.new(0.35, if m % 3 == 0 then 1 else 0.6, 0.2),
+							CFrame = faceCf
+								* CFrame.Angles(0, 0, m / marks * math.pi * 2)
+								* CFrame.new(0, diameter * 0.4, -0.4),
+							PaletteRole = "Iron",
+						}, tower)
+					end
+				end
+			end
+			local turn = if i % 2 == 0 then cfg.Twist else -cfg.Twist
+			cf = cf
+				* CFrame.new(0, cfg.FloorHeight, 0)
+				* CFrame.Angles(0, math.rad(turn), math.rad(cfg.Lean))
 		end
-		local tip = part({
+		-- The roof: wide eaves and a crooked two-tier spire with a glowing tip.
+		decor({
+			Name = "Eaves",
+			Size = Vector3.new(width + 3, 0.8, width + 3),
+			CFrame = cf * CFrame.new(0, 0.4, 0),
+			PaletteRole = "Purple",
+			PaletteShade = 0.5,
+			Material = Enum.Material.Slate,
+		}, tower)
+		local tip = Props.spire(paint, tower, cf * CFrame.new(0, 0.8, 0), (width + 2.4) / 2, 20, {
+			PaletteRole = "Purple",
+			PaletteShade = 0.3,
+		})
+		local orb = decor({
 			Name = "Tip",
 			Shape = Enum.PartType.Ball,
-			Size = Vector3.one * 2.4,
-			CFrame = cf * CFrame.new(0, 14, 0),
+			Size = Vector3.one * 2.2,
+			CFrame = tip,
 			PaletteRole = "Orange",
 			Material = Enum.Material.Neon,
 		}, tower)
-		glowLight(tip, "Orange", 30, 2)
-
-		-- Clock face just outside the front of the second-to-top floor.
-		local faceWidth = cfg.Width * (1 - 0.06 * (cfg.Floors - 2))
-		local faceCf = faceFloor * CFrame.new(0, 0, -faceWidth / 2 - 0.3)
-		local diameter = faceWidth * 0.75
-		part({
-			Name = "ClockFace",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.4, diameter, diameter),
-			CFrame = faceCf * CFrame.Angles(0, math.rad(90), 0),
-			PaletteRole = "Bone",
-			Material = Enum.Material.Neon,
-		}, tower)
-		local function hand(name: string, angle: number, length: number, thickness: number)
-			part({
-				Name = name,
-				Size = Vector3.new(thickness, length, 0.2),
-				CFrame = faceCf * CFrame.Angles(0, 0, -angle) * CFrame.new(0, length / 2, -0.35),
-				PaletteRole = "Iron",
-			}, tower)
+		glowLight(orb, "Orange", 26, 1.6)
+		-- Bats round the roof.
+		local roof = cf * CFrame.new(0, 6, 0)
+		for _, spot in batSpots do
+			local pos = (roof * CFrame.new(
+				math.cos(spot.Angle) * (width + 3),
+				spot.Up,
+				math.sin(spot.Angle) * (width + 3)
+			)).Position
+			if blocked(pos, 0) then
+				continue
+			end
+			Props.Bat(
+				paint,
+				CFrame.lookAt(
+					pos,
+					pos + Vector3.new(-math.sin(spot.Angle), 0, math.cos(spot.Angle))
+				),
+				2.2,
+				tower,
+				rng
+			)
 		end
-		local t = cfg.ClockTime
-		hand("HourHand", ((t.Hour % 12) + t.Minute / 60) / 12 * math.pi * 2, diameter * 0.28, 0.5)
-		hand("MinuteHand", t.Minute / 60 * math.pi * 2, diameter * 0.42, 0.3)
-		for i = 0, 3 do
-			part({
-				Name = "HourMark",
-				Size = Vector3.new(0.4, 0.9, 0.2),
-				CFrame = faceCf
-					* CFrame.Angles(0, 0, math.rad(i * 90))
-					* CFrame.new(0, diameter * 0.4, -0.3),
-				PaletteRole = "Iron",
-			}, tower)
-		end
-
 		-- Cobwebs in the bottom front corners.
 		for _, side in { -1, 1 } do
-			cobweb(
+			Props.Cobweb(
+				paint,
 				base
-					* CFrame.new(
-						side * (cfg.Width / 2 - 0.2),
-						cfg.FloorHeight - 1.5,
-						-cfg.Width / 2 - 0.15
-					)
+					* CFrame.new(side * (w0 / 2 - 0.4), cfg.FloorHeight + 0.4, -w0 / 2 - 0.2)
 					* CFrame.Angles(0, 0, math.rad(side * 45)),
 				hubCfg.Cobwebs.Size,
 				tower
@@ -253,45 +637,121 @@ end
 
 local function buildCauldron(parent: Instance)
 	local cfg = hubCfg.Cauldron
-	local base = CFrame.new(at(cfg.Offset + Vector3.new(0, 1, 0)))
+	local base = facingCenter(at(cfg.Offset + Vector3.new(0, 2, 0)))
+		* CFrame.Angles(0, math.rad(180), 0)
 	local r = cfg.Radius
-	Kit.prop("Cauldron", base, parent, r * 1.8 + 1, function()
+	Kit.prop("Cauldron", base, parent, r * 1.9 + 1.6, function()
 		local m = model("Cauldron", parent)
+		-- A little fire under the pot.
 		for i = 0, 2 do
-			local a = i / 3 * math.pi * 2
-			part({
-				Name = "Leg",
-				Size = Vector3.new(0.8, 2, 0.8),
-				CFrame = base * CFrame.new(math.cos(a) * r * 0.6, 1, math.sin(a) * r * 0.6),
-				PaletteRole = "Iron",
+			decor({
+				Name = "Log",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(r * 1.3, 0.9, 0.9),
+				CFrame = base * CFrame.new(0, 0.45, 0) * CFrame.Angles(0, i * math.pi / 3, 0),
+				PaletteRole = "Wood",
+				PaletteShade = 0.3,
+				Material = Enum.Material.Wood,
 			}, m)
 		end
-		part({
-			Name = "Pot",
+		local embers = decor({
+			Name = "Embers",
 			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(r * 2, r * 1.6, r * 2),
-			CFrame = base * CFrame.new(0, r * 0.9 + 1, 0),
+			Size = Vector3.new(r * 0.8, 0.7, r * 0.8),
+			CFrame = base * CFrame.new(0, 0.6, 0),
+			PaletteRole = "Orange",
+			Material = Enum.Material.Neon,
+		}, m)
+		glowLight(embers, "Orange", 16, 1.4)
+		local fire = Instance.new("Fire")
+		fire.Size = 4
+		fire.Heat = 2
+		fire.Color = color("Orange")
+		fire.SecondaryColor = color("Glow")
+		fire.Parent = embers
+		for i = 0, 2 do
+			local a = i / 3 * math.pi * 2 + math.pi / 6
+			decor({
+				Name = "Leg",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.new(1.3, 2.4, 1.3),
+				CFrame = base
+					* CFrame.new(math.cos(a) * r * 0.72, 1.1, math.sin(a) * r * 0.72)
+					* CFrame.Angles(0, -a, math.rad(-18)),
+				PaletteRole = "Iron",
+				Material = Enum.Material.Metal,
+			}, m)
+		end
+		-- The pot: a fat rounded drum with a round belly.
+		local potBottom = 1.4
+		local potHeight = r * 1.25
+		local pot = paint.rounded({
+			Name = "Pot",
+			Size = Vector3.new(r * 1.9, potHeight, r * 1.9),
+			CFrame = base * CFrame.new(0, potBottom + potHeight / 2, 0),
 			PaletteRole = "Iron",
 			Material = Enum.Material.Metal,
 		}, m)
-		part({
+		decor({
+			Name = "Belly",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(r * 2.1, potHeight * 0.9, r * 2.1),
+			CFrame = base * CFrame.new(0, potBottom + potHeight * 0.42, 0),
+			PaletteRole = "Iron",
+			Material = Enum.Material.Metal,
+		}, m)
+		local rimY = potBottom + potHeight
+		decor({
 			Name = "Rim",
 			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.6, r * 1.8, r * 1.8),
-			CFrame = upright(base * CFrame.new(0, r * 1.55 + 1, 0)),
+			Size = Vector3.new(0.8, r * 2, r * 2),
+			CFrame = upright(base * CFrame.new(0, rimY + 0.1, 0)),
 			PaletteRole = "Iron",
+			PaletteShade = -0.15,
 			Material = Enum.Material.Metal,
 		}, m)
-		local brew = part({
+		local brew = decor({
 			Name = "Brew",
 			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.3, r * 1.6, r * 1.6),
-			CFrame = upright(base * CFrame.new(0, r * 1.65 + 1, 0)),
+			Size = Vector3.new(0.3, r * 1.7, r * 1.7),
+			CFrame = upright(base * CFrame.new(0, rimY + 0.4, 0)),
 			PaletteRole = "Green",
 			Material = Enum.Material.Neon,
-			CanCollide = false,
 		}, m)
-		glowLight(brew, "Green", 20, 2)
+		glowLight(brew, "Green", 24, 2)
+		for i, s in { 1.4, 0.9, 0.7 } do
+			local a = i * 2.1
+			decor({
+				Name = "Bubble",
+				Shape = Enum.PartType.Ball,
+				Size = Vector3.one * s,
+				CFrame = base
+					* CFrame.new(math.cos(a) * r * 0.45, rimY + 0.45, math.sin(a) * r * 0.45),
+				PaletteRole = "Green",
+				PaletteShade = -0.3,
+				Material = Enum.Material.Neon,
+			}, m)
+		end
+		for _, side in { -1, 1 } do
+			decor({
+				Name = "Handle",
+				Shape = Enum.PartType.Cylinder,
+				Size = Vector3.new(0.35, 2, 2),
+				CFrame = base * CFrame.new(side * r * 1.02, rimY - 1.2, 0),
+				PaletteRole = "Iron",
+				Material = Enum.Material.Metal,
+			}, m)
+		end
+		decor({
+			Name = "Ladle",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(r * 1.3, 0.4, 0.4),
+			CFrame = base
+				* CFrame.new(r * 0.35, rimY + 1.6, r * 0.2)
+				* CFrame.Angles(0, math.rad(30), math.rad(55)),
+			PaletteRole = "Wood",
+			Material = Enum.Material.Wood,
+		}, m)
 		local p = hubCfg.Particles.Bubbles
 		particles(brew, {
 			Rate = p.Rate,
@@ -308,14 +768,15 @@ local function buildCauldron(parent: Instance)
 			Lifetime = NumberRange.new(1, 2),
 			Speed = NumberRange.new(2, 4),
 			SpreadAngle = Vector2.new(15, 15),
-			EmissionDirection = Enum.NormalId.Right, -- the disc is rotated, so +X points up
+			EmissionDirection = Enum.NormalId.Right, -- the disc is turned, so +X points up
 		})
-		local fire = Instance.new("Fire")
-		fire.Size = 4
-		fire.Heat = 2
-		fire.Color = color("Orange")
-		fire.SecondaryColor = color("Glow")
-		fire.Parent = holder("Embers", base * CFrame.new(0, 0.5, 0), Vector3.one, m)
+		local smoke = Instance.new("Smoke")
+		smoke.Color = color("Teal")
+		smoke.Opacity = 0.08
+		smoke.RiseVelocity = 3
+		smoke.Size = 3
+		smoke.Parent = brew
+		m.PrimaryPart = pot
 		return m
 	end)
 end
@@ -325,79 +786,55 @@ local function buildLamps(parent: Instance)
 	local lamps = model("Lamps", parent)
 	local tops: { [number]: Vector3 } = {}
 	for i = 1, cfg.Count do
-		local a = (i / cfg.Count) * math.pi * 2
-		local pos = at(Vector3.new(math.cos(a) * cfg.Radius, 1, math.sin(a) * cfg.Radius))
+		local a = (i / cfg.Count) * math.pi * 2 + math.pi / 2
+		local pos = ground(math.cos(a) * cfg.Radius, math.sin(a) * cfg.Radius)
 		if blocked(pos, 2) then
 			continue
 		end
-		local base = facingCenter(pos)
-		Kit.prop("Lamppost", base, lamps, cfg.Height + 2.5, function()
-			local lamp = model("Lamppost", lamps)
-			local pole = part({
-				Name = "Pole",
-				Shape = Enum.PartType.Cylinder,
-				Size = Vector3.new(cfg.Height, 0.7, 0.7),
-				CFrame = upright(CFrame.new(pos + Vector3.new(0, cfg.Height / 2, 0))),
-				PaletteRole = "Iron",
-				Material = Enum.Material.Metal,
-			}, lamp)
-			local lantern = part({
-				Name = "Lantern",
-				Size = Vector3.new(1.6, 2, 1.6),
-				CFrame = CFrame.new(pos + Vector3.new(0, cfg.Height + 1, 0)),
-				PaletteRole = "Glow",
-				Material = Enum.Material.Neon,
-			}, lamp)
-			part({
-				Name = "Cap",
-				Size = Vector3.new(2.2, 0.5, 2.2),
-				CFrame = CFrame.new(pos + Vector3.new(0, cfg.Height + 2.25, 0)),
-				PaletteRole = "Iron",
-			}, lamp)
-			glowLight(lantern, "Glow", 22, 1.5)
-			if i % 3 == 0 then
-				cobweb(base * CFrame.new(0, cfg.Height - 2, -0.5), hubCfg.Cobwebs.Size * 0.6, lamp)
-			end
-			lamp.PrimaryPart = pole
-			return lamp
-		end)
-		tops[i] = pos + Vector3.new(0, cfg.Height - 0.5, 0)
+		Props.Lamppost(paint, facingCenter(pos), cfg.Height, lamps)
+		tops[i] = pos + Vector3.new(0, cfg.Height - 1.4, 0)
+	end
+	-- More lamps by the cauldron and along the spawn path.
+	local pathLamps = model("PathLamps", parent)
+	local inner: { Vector3 } = {}
+	for i = 1, cfg.Inner.Count do
+		local a = (i - 0.5) / cfg.Inner.Count * math.pi * 2 + math.pi / 4
+		local pos = ground(math.cos(a) * cfg.Inner.Radius, math.sin(a) * cfg.Inner.Radius)
+		if blocked(pos, 1) then
+			continue
+		end
+		Props.Lamppost(paint, facingCenter(pos), cfg.Height - 1, pathLamps)
+		table.insert(inner, pos + Vector3.new(0, cfg.Height - 2.4, 0))
+	end
+	for _, offset in cfg.Spawn do
+		local pos = ground(offset.X, offset.Z)
+		if not blocked(pos, 1) then
+			Props.Lamppost(paint, facingCenter(pos), cfg.Height - 2, pathLamps)
+		end
 	end
 
-	-- Bunting: a sagging rope between neighbouring lamps with diamond flags.
+	-- Bunting: flags on sagging ropes between neighbouring lamps (and round the cauldron).
 	local bunting = model("Bunting", parent)
+	local ropes = holder("Ropes", CFrame.new(at(Vector3.new(0, 10, 0))), Vector3.one * 0.2, bunting)
 	local b = hubCfg.Bunting
+	local options: Props.BuntingOptions = { Flags = b.FlagsPerSpan, Sag = b.Sag, Colors = b.Colors }
 	for i = 1, cfg.Count do
 		local a, c = tops[i], tops[i % cfg.Count + 1]
-		if not (a and c) then
-			continue -- a lamp was left out (it stood in a lobby zone)
+		if a and c then
+			Props.Bunting(paint, ropes, a, c, options, bunting)
 		end
-		local function point(t: number): Vector3
-			return a:Lerp(c, t) - Vector3.new(0, b.Sag * 4 * t * (1 - t), 0)
-		end
-		local segments = b.FlagsPerSpan + 1
-		for s = 0, segments - 1 do
-			local p1, p2 = point(s / segments), point((s + 1) / segments)
-			decor({
-				Name = "Rope",
-				Size = Vector3.new(0.12, 0.12, (p2 - p1).Magnitude),
-				CFrame = CFrame.lookAt((p1 + p2) / 2, p2),
-				PaletteRole = "Bone",
-			}, bunting)
-		end
-		local along = (c - a).Unit
-		local normal = along:Cross(Vector3.yAxis).Unit
-		for f = 1, b.FlagsPerSpan do
-			local p = point(f / segments)
-			local colorName = b.Colors[(f - 1) % #b.Colors + 1]
-			-- A square turned 45 degrees hangs as a diamond from the rope.
-			decor({
-				Name = "Flag",
-				Size = Vector3.new(0.1, 1.4, 1.4),
-				CFrame = CFrame.fromMatrix(p - Vector3.new(0, 1, 0), normal, Vector3.yAxis)
-					* CFrame.Angles(math.rad(45), 0, 0),
-				PaletteRole = colorName,
-			}, bunting)
+	end
+	for i = 1, #inner do
+		local a, c = inner[i], inner[i % #inner + 1]
+		if #inner > 1 then
+			Props.Bunting(
+				paint,
+				ropes,
+				a,
+				c,
+				{ Flags = 4, Sag = 1.8, Colors = b.Colors, FlagSize = 1.2 },
+				bunting
+			)
 		end
 	end
 end
@@ -406,55 +843,62 @@ local function buildJackOLanterns(parent: Instance)
 	local cfg = hubCfg.JackOLanterns
 	local folder = model("JackOLanterns", parent)
 	for i = 1, cfg.Count do
-		local a = (i / cfg.Count) * math.pi * 2 + math.pi / cfg.Count
-		local pos = at(Vector3.new(math.cos(a) * cfg.Radius, 1, math.sin(a) * cfg.Radius))
+		local a = (i / cfg.Count) * math.pi * 2 + math.pi / cfg.Count + math.pi / 2
+		local pos = ground(math.cos(a) * cfg.Radius, math.sin(a) * cfg.Radius)
 		local size = cfg.Size * rng:NextNumber(0.75, 1.25)
 		local turn = rng:NextNumber(-0.3, 0.3)
-		if blocked(pos, 2) then
+		if blocked(pos, 2) or HubPaths.OnPath(pos, 1) then
 			continue
 		end
-		jackOLantern(facingCenter(pos) * CFrame.Angles(0, turn, 0), size, folder)
+		Props.JackOLantern(paint, facingCenter(pos) * CFrame.Angles(0, turn, 0), size, folder, {
+			Light = cfg.LightEvery > 0 and i % cfg.LightEvery == 0,
+			Detail = "Simple",
+		})
+		if cfg.Friends > 0 and i % cfg.Friends == 0 then
+			-- A small plain pumpkin keeps it company.
+			local side = if i % 4 == 0 then 1 else -1
+			Props.Pumpkin(
+				paint,
+				facingCenter(pos) * CFrame.new(side * size * 0.9, 0, 0.6),
+				size * 0.5,
+				folder,
+				{ Solid = false, Leaf = false }
+			)
+		end
 	end
 end
 
 local function buildCandles(parent: Instance)
 	local cfg = hubCfg.Candles
 	local folder = model("Candles", parent)
-	for _ = 1, cfg.Count do
+	for i = 1, cfg.Count do
 		local a = rng:NextNumber(0, math.pi * 2)
 		local r = rng:NextNumber(cfg.MinRadius, cfg.MaxRadius)
 		local y = rng:NextNumber(cfg.MinHeight, cfg.MaxHeight)
-		local height = rng:NextNumber(1.2, 2.2)
+		local height = rng:NextNumber(cfg.MinSize, cfg.MaxSize)
 		local phase = rng:NextNumber(0, math.pi * 2)
 		-- The bottom of the candle (it floats: the wax runs up from here).
 		local foot = at(Vector3.new(math.cos(a) * r, y - height / 2, math.sin(a) * r))
 		if blocked(foot, 1) then
 			continue
 		end
-		local m = Kit.prop("Candle", CFrame.new(foot), folder, height + 0.6, function()
-			local candle = model("Candle", folder)
-			local wax = decor({
-				Name = "Wax",
-				Shape = Enum.PartType.Cylinder,
-				Size = Vector3.new(height, 0.6, 0.6),
-				CFrame = upright(CFrame.new(foot + Vector3.new(0, height / 2, 0))),
-				PaletteRole = "Bone",
-			}, candle)
-			local flame = decor({
-				Name = "Flame",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.new(0.35, 0.6, 0.35),
-				CFrame = CFrame.new(foot + Vector3.new(0, height + 0.3, 0)),
-				PaletteRole = "Glow",
-				Material = Enum.Material.Neon,
-			}, candle)
-			light(flame, color("Glow"), 8, 0.8, true):SetAttribute("PaletteRole", "Glow")
-			candle.PrimaryPart = wax
-			return candle
-		end)
-		m:SetAttribute("BobHeight", cfg.BobHeight)
-		m:SetAttribute("Phase", phase)
-		CollectionService:AddTag(m, Tags.HubFloat)
+		local m = Props.Candle(paint, CFrame.new(foot), height, folder, {
+			Light = cfg.LightEvery > 0 and i % cfg.LightEvery == 0,
+		})
+		Props.floatTag(m, cfg.BobHeight, phase)
+	end
+end
+
+local function buildBenches(parent: Instance)
+	local cfg = hubCfg.Benches
+	local folder = model("Benches", parent)
+	for i = 1, cfg.Count do
+		local a = (i - 0.5) / cfg.Count * math.pi * 2 + math.pi / 2
+		local pos = ground(math.cos(a) * cfg.Radius, math.sin(a) * cfg.Radius)
+		if blocked(pos, 2) then
+			continue
+		end
+		Props.Bench(paint, facingCenter(pos), folder)
 	end
 end
 
@@ -464,100 +908,224 @@ local function buildGraveyard(parent: Instance)
 	-- Draw every random number first, so leaving a stone out never moves the others.
 	local tilts = {}
 	for i in cfg.Epitaphs do
-		tilts[i] =
-			CFrame.Angles(math.rad(rng:NextNumber(-6, 6)), 0, math.rad(rng:NextNumber(-8, 8)))
+		tilts[i] = CFrame.Angles(
+			math.rad(rng:NextNumber(-6, 6)),
+			math.rad(rng:NextNumber(-10, 10)),
+			math.rad(rng:NextNumber(-8, 8))
+		)
 	end
 	if blocked(origin.Position, 2) then
 		return
 	end
 	local folder = model("Graveyard", parent)
+	local styles = { "Round", "Cross", "Pointed" }
 	for i, epitaph in cfg.Epitaphs do
 		local row = (i - 1) // 3
 		local col = (i - 1) % 3
-		local spot = origin * CFrame.new((col - 1) * 7, 0, row * 7)
+		local spot = origin * CFrame.new((col - 1) * 7, 0, 2 + row * 7.5)
 		if blocked(spot.Position, 2) then
 			continue
 		end
 		local cf = spot * tilts[i]
-		HubExtras.Gravestone(cf, 3.6, 0, epitaph, folder)
-		-- Little mound of dirt in front.
-		part({
+		Props.Gravestone(paint, cf, 3.6 + (i % 2) * 0.5, folder, {
+			Style = styles[(i - 1) % #styles + 1],
+			Shade = (i % 3) * 0.06,
+			Epitaph = epitaph,
+		})
+		-- A little mound of dirt in front.
+		decor({
 			Name = "DirtMound",
 			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(3, 0.8, 4.5),
-			CFrame = cf * CFrame.new(0, 0, -2.8),
+			Size = Vector3.new(3, 0.8, 4.2),
+			CFrame = spot * CFrame.new(0, 0.05, -2.9),
 			PaletteRole = "Wood",
-			PaletteShade = 0.3,
+			PaletteShade = 0.35,
 			Material = Enum.Material.Ground,
 		}, folder)
 	end
-	-- Iron fence on three sides, open towards the plaza.
+	-- Iron fence on three sides with little pumpkins on the posts, open towards the plaza.
 	local fence = model("GraveyardFence", folder)
 	local corners = {
-		origin * CFrame.new(-12, 0, -5),
+		origin * CFrame.new(-12, 0, -4),
 		origin * CFrame.new(-12, 0, 18),
 		origin * CFrame.new(12, 0, 18),
-		origin * CFrame.new(12, 0, -5),
+		origin * CFrame.new(12, 0, -4),
 	}
 	for c = 1, 3 do
 		local a, b = corners[c].Position, corners[c + 1].Position
 		if blocked(a, 1) or blocked(b, 1) then
 			continue
 		end
-		local posts = math.floor((b - a).Magnitude / 3)
+		local posts = math.max(math.floor((b - a).Magnitude / 5.5), 1)
 		for p = 0, posts do
 			local pos = a:Lerp(b, p / posts)
-			part({
-				Name = "FencePost",
-				Size = Vector3.new(0.4, 4, 0.4),
-				CFrame = CFrame.new(pos + Vector3.new(0, 2, 0)),
-				PaletteRole = "Iron",
-			}, fence)
+			if c > 1 and p == 0 then
+				continue -- the corner post is already there
+			end
+			Props.FencePost(paint, CFrame.new(pos), 3.6, fence)
 		end
-		for _, y in { 1.2, 3.4 } do
-			part({
-				Name = "FenceRail",
-				Size = Vector3.new(0.25, 0.25, (b - a).Magnitude),
-				CFrame = CFrame.lookAt(
-					(a + b) / 2 + Vector3.new(0, y, 0),
-					b + Vector3.new(0, y, 0)
-				),
-				PaletteRole = "Iron",
-			}, fence)
+		for p = 0, posts - 1 do
+			Props.FenceSpan(
+				paint,
+				a:Lerp(b, p / posts),
+				a:Lerp(b, (p + 1) / posts),
+				3.2,
+				fence,
+				{ Pickets = 2 }
+			)
+		end
+	end
+	-- A bare tree with a lantern at the back, glowing mushrooms, and mist.
+	Props.Tree(
+		paint,
+		origin * CFrame.new(8, 0, 15),
+		15,
+		4242,
+		folder,
+		{ Bare = true, Lanterns = 2, LanternLight = true }
+	)
+	Props.Mushrooms(paint, origin * CFrame.new(-9, 0, 14), 1.6, folder, rng)
+	Kit.ambientParticles(
+		origin.Position + origin.LookVector * -7,
+		Vector3.new(24, 0, 22),
+		{ Mist = { Rate = 3, Color = hubCfg.Particles.Mist.Color } },
+		folder
+	)
+end
+
+local function buildTrees(parent: Instance)
+	local cfg = hubCfg.DeadTrees
+	local folder = model("Trees", parent)
+	for i, offset in cfg.Offsets do
+		local base = CFrame.new(at(offset + Vector3.new(0, 1, 0)))
+			* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+		local height = rng:NextNumber(cfg.MinHeight, cfg.MaxHeight)
+		local seed = rng:NextInteger(1, 1000000)
+		if blocked(base.Position, 5) then
+			continue
+		end
+		local bare = cfg.Bare[i] == true
+		local tree = Props.Tree(paint, base, height, seed, folder, {
+			Bare = bare,
+			Lanterns = if bare then 2 else 0,
+			LanternLight = bare and i % 2 == 0,
+		})
+		if not bare then
+			-- Falling leaves from the crown.
+			local canopy = holder(
+				"Leaves",
+				base * CFrame.new(0, height * 0.75, 0),
+				Vector3.new(10, 1, 10),
+				tree
+			)
+			local p = hubCfg.Particles.Leaves
+			particles(canopy, {
+				Rate = p.Rate,
+				Color = ColorSequence.new(p.Color),
+				Size = NumberSequence.new(0.35),
+				Lifetime = NumberRange.new(5, 8),
+				Speed = NumberRange.new(0.5, 1.5),
+				Acceleration = Vector3.new(0.5, -1.2, 0),
+				Rotation = NumberRange.new(0, 360),
+				RotSpeed = NumberRange.new(-90, 90),
+				EmissionDirection = Enum.NormalId.Bottom,
+				Shape = Enum.ParticleEmitterShape.Box,
+			})
+		elseif tree:GetAttribute("CustomProp") ~= true then
+			Props.Cobweb(
+				paint,
+				base * CFrame.new(0, height * 0.45, -1.4),
+				hubCfg.Cobwebs.Size * 0.7,
+				tree
+			)
 		end
 	end
 end
 
-local function buildTrees(parent: Instance)
-	local folder = model("Trees", parent)
-	for _, offset in hubCfg.DeadTrees.Offsets do
-		local base = CFrame.new(at(offset + Vector3.new(0, 1, 0)))
-			* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
-		local height = rng:NextNumber(14, 20)
-		local seed = rng:NextInteger(1, 1000000)
-		if blocked(base.Position, 4) then
+local function buildClutter(parent: Instance)
+	local cfg = hubCfg.Clutter
+	local folder = model("Clutter", parent)
+	local function place(offset: Vector3, margin: number): CFrame?
+		local pos = ground(offset.X, offset.Z)
+		if blocked(pos, margin) then
+			return nil
+		end
+		return facingCenter(pos) * CFrame.Angles(0, rng:NextNumber(-0.6, 0.6), 0)
+	end
+	for _, offset in cfg.HayBales do
+		local cf = place(offset, 2)
+		if cf then
+			Props.HayBale(paint, cf, 2.6, folder)
+		end
+	end
+	for _, offset in cfg.Crates do
+		local cf = place(offset, 2)
+		if cf then
+			Props.Crate(paint, cf, 2.4, folder)
+			Props.Crate(
+				paint,
+				cf * CFrame.new(0.3, 2.4, 0.2) * CFrame.Angles(0, 0.4, 0),
+				1.8,
+				folder
+			)
+		end
+	end
+	for _, offset in cfg.Barrels do
+		local cf = place(offset, 2)
+		if cf then
+			Props.Barrel(paint, cf, 3, folder)
+		end
+	end
+	for _, offset in cfg.Mushrooms do
+		local cf = place(offset, 1)
+		if cf then
+			Props.Mushrooms(paint, cf, rng:NextNumber(1.4, 2.2), folder, rng)
+		end
+	end
+end
+
+local function buildSignposts(parent: Instance)
+	local cfg = hubCfg.Signposts
+	local folder = model("Signposts", parent)
+	local enabled = {}
+	for _, entry in cfg.Zones do
+		if HubPaths.Enabled(entry) then
+			table.insert(enabled, entry)
+		end
+	end
+	-- Big signposts by the spawn and by the cauldron, pointing at every area.
+	for _, spot in { cfg.Spawn, cfg.Centre } do
+		local pos = ground(spot.X, spot.Z)
+		if blocked(pos, 1) then
 			continue
 		end
-		local tree = HubExtras.DeadTree(base, height, seed, folder)
-		-- Falling leaves and a cobweb on the trunk (kept with the tree when it is moved).
-		local canopy =
-			holder("Leaves", base * CFrame.new(0, height, 0), Vector3.new(10, 1, 10), tree)
-		local p = hubCfg.Particles.Leaves
-		particles(canopy, {
-			Rate = p.Rate,
-			Color = ColorSequence.new(p.Color),
-			Size = NumberSequence.new(0.35),
-			Lifetime = NumberRange.new(5, 8),
-			Speed = NumberRange.new(0.5, 1.5),
-			Acceleration = Vector3.new(0.5, -1.2, 0),
-			Rotation = NumberRange.new(0, 360),
-			RotSpeed = NumberRange.new(-90, 90),
-			EmissionDirection = Enum.NormalId.Bottom,
-			Shape = Enum.ParticleEmitterShape.Box,
-		})
-		if tree:GetAttribute("CustomProp") ~= true then
-			cobweb(base * CFrame.new(0, height * 0.6, -1.15), hubCfg.Cobwebs.Size * 0.7, tree)
+		local arms: { Props.SignArm } = {}
+		for i, entry in enabled do
+			local target = HubLayout.Zone(entry.Zone).CFrame.Position
+			table.insert(arms, {
+				Text = entry.Text,
+				Direction = target - pos,
+				Role = if i % 2 == 0 then "Wood" else "Purple",
+			})
 		end
+		if #arms > 0 then
+			Props.Signpost(paint, facingCenter(pos), arms, folder)
+		end
+	end
+	-- A little sign at the front of each area, beside its path.
+	local width = hubCfg.Plaza.PathWidth
+	for _, entry in enabled do
+		if entry.Zone == "ReadyArea" then
+			continue
+		end
+		local zone = HubLayout.Zone(entry.Zone)
+		local front = zone.CFrame * CFrame.new(width / 2 + 2, 0, -zone.Size.Z / 2 - 2.5)
+		if blocked(front.Position, 0.5) then
+			continue
+		end
+		Props.Signpost(paint, front, {
+			{ Text = entry.Text, Direction = -zone.CFrame.LookVector, Role = "Purple" },
+		}, folder)
 	end
 end
 
@@ -589,13 +1157,13 @@ local function buildAmbience(parent: Instance)
 		ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume,
 	})
 	local m = hubCfg.Particles.Mist
-	local ground = holder(
+	local mist = holder(
 		"Mist",
 		CFrame.new(at(Vector3.new(0, 1.5, 0))),
 		Vector3.new(radius * 2, 1, radius * 2),
 		folder
 	)
-	particles(ground, {
+	particles(mist, {
 		Rate = m.Rate,
 		Color = ColorSequence.new(m.Color),
 		Size = NumberSequence.new({
@@ -724,6 +1292,12 @@ function HubBuilder.ApplyCustomNpcs(hub: Model)
 	Npcs.ApplyCustom(hub)
 end
 
+--[[
+	Lighting from Config.Hub.Lighting: the main settings plus HubAtmosphere,
+	HubColorCorrection, HubBloom (src/client/ZoneLighting.luau fades these between the hub and
+	the round map), HubSky, HubDepthOfField and HubClouds (on Workspace.Terrain).
+	Lighting.Technology can't be set from a script: set it to Future once in Studio.
+]]
 function HubBuilder.ApplyLighting()
 	local cfg = hubCfg.Lighting
 	Lighting.ClockTime = cfg.ClockTime
@@ -731,33 +1305,48 @@ function HubBuilder.ApplyLighting()
 	Lighting.Ambient = cfg.Ambient
 	Lighting.OutdoorAmbient = cfg.OutdoorAmbient
 
-	local function ensure(className: string, name: string): Instance
-		local existing = Lighting:FindFirstChild(name)
+	local function ensure(parent: Instance, className: string, name: string): Instance
+		local existing = parent:FindFirstChild(name)
 		if existing and existing.ClassName == className then
 			return existing
 		end
+		if existing then
+			existing:Destroy()
+		end
 		local created = Instance.new(className)
 		created.Name = name
-		created.Parent = Lighting
+		created.Parent = parent
 		return created
 	end
-	local atmosphere = ensure("Atmosphere", "HubAtmosphere") :: Atmosphere
-	for key, value in cfg.Atmosphere do
-		(atmosphere :: any)[key] = value
+	local function set(instance: Instance, values: { [string]: any })
+		for key, value in values do
+			if key ~= "Enabled" then
+				(instance :: any)[key] = value
+			end
+		end
 	end
-	local cc = ensure("ColorCorrectionEffect", "HubColorCorrection") :: ColorCorrectionEffect
-	for key, value in cfg.ColorCorrection do
-		(cc :: any)[key] = value
-	end
-	local bloom = ensure("BloomEffect", "HubBloom") :: BloomEffect
-	for key, value in cfg.Bloom do
-		(bloom :: any)[key] = value
-	end
-	-- Only one Atmosphere is used by the engine; drop any other one.
+	local atmosphere = ensure(Lighting, "Atmosphere", "HubAtmosphere") :: Atmosphere
+	set(atmosphere, cfg.Atmosphere)
+	set(ensure(Lighting, "ColorCorrectionEffect", "HubColorCorrection"), cfg.ColorCorrection)
+	set(ensure(Lighting, "BloomEffect", "HubBloom"), cfg.Bloom)
+	-- Only one Atmosphere (and one Sky) is used by the engine; drop any other one.
+	local sky = ensure(Lighting, "Sky", "HubSky") :: Sky
+	set(sky, cfg.Sky)
 	for _, child in Lighting:GetChildren() do
-		if child:IsA("Atmosphere") and child ~= atmosphere then
+		if
+			(child:IsA("Atmosphere") and child ~= atmosphere) or (child:IsA("Sky") and child ~= sky)
+		then
 			child:Destroy()
 		end
+	end
+	local dof = ensure(Lighting, "DepthOfFieldEffect", "HubDepthOfField") :: DepthOfFieldEffect
+	set(dof, cfg.DepthOfField)
+	dof.Enabled = cfg.DepthOfField.Enabled
+	local terrain = workspace:FindFirstChildOfClass("Terrain")
+	if terrain then
+		local clouds = ensure(terrain, "Clouds", "HubClouds") :: Clouds
+		set(clouds, cfg.Clouds)
+		clouds.Enabled = cfg.Clouds.Enabled
 	end
 end
 
@@ -878,9 +1467,9 @@ local function newHub(): Model
 	return hub
 end
 
-local function finish(hub: Model, ground: BasePart)
+local function finish(hub: Model, groundPart: BasePart)
 	HubBuilder.ApplyMusic(hub)
-	hub.PrimaryPart = ground
+	hub.PrimaryPart = groundPart
 	for _, child in hub:GetChildren() do
 		child:SetAttribute(HubBuilder.PieceAttribute, true)
 	end
@@ -892,7 +1481,7 @@ end
 function HubBuilder.Build(): Model
 	rng = Random.new(hubCfg.Seed)
 	local hub = newHub()
-	local ground = buildPlaza(hub)
+	local groundPart = buildPlaza(hub)
 	HubBuilder.BuildSpawn(hub)
 	buildSections(hub) -- the Ready area, shop, minigames... each in its zone
 	Npcs.BuildAll(hub) -- NPCs with a Zone go inside that section's model
@@ -902,14 +1491,17 @@ function HubBuilder.Build(): Model
 	buildLamps(decorModel)
 	buildJackOLanterns(decorModel)
 	buildCandles(decorModel)
+	buildBenches(decorModel)
 	buildGraveyard(decorModel)
 	buildTrees(decorModel)
+	buildClutter(decorModel)
+	buildSignposts(decorModel)
 	buildAmbience(decorModel)
 	HubExtras.Build(hub, decorModel) -- terrain, forest, mansion, statue, fence, paths (Config.Hub.Polish)
 	-- (A custom shopkeeper model is swapped in by HubService when the game runs, so a hub baked
 	-- into the place keeps the built keeper underneath.)
 	hub:SetAttribute("BuildVersion", hubCfg.BuildVersion)
-	finish(hub, ground)
+	finish(hub, groundPart)
 	return hub
 end
 
@@ -923,7 +1515,7 @@ function HubBuilder.BuildFallback(): Model
 	hub:SetAttribute("Fallback", true)
 	local plaza = model("Plaza", hub)
 	local radius = hubCfg.Radius
-	local ground = part({
+	local groundPart = part({
 		Name = "Ground",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(1, radius * 2, radius * 2),
@@ -931,10 +1523,10 @@ function HubBuilder.BuildFallback(): Model
 		PaletteRole = "Ground",
 		Material = hubCfg.GroundMaterial,
 	}, plaza)
-	plaza.PrimaryPart = ground
+	plaza.PrimaryPart = groundPart
 	HubBuilder.BuildSpawn(hub)
 	HubBuilder.BuildSection(hub, "ReadyArea")
-	finish(hub, ground)
+	finish(hub, groundPart)
 	return hub
 end
 

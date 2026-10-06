@@ -179,14 +179,19 @@ describe("Ready pad", function()
 		local pad = pads[1]
 		expect(pad:IsDescendantOf(hub)).toBe(true)
 		local cfg = Config.Lobby.Ready
+		-- A square pad (Block) or a round one (a Cylinder stood up: its X axis points up).
+		local round = pad.Shape.Name == "Cylinder"
+		local shape = if round then "Cylinder" else "Block"
+		local thickness = if round then pad.Size.X else pad.Size.Y
+		local across = if round then math.min(pad.Size.Y, pad.Size.Z) else pad.Size.X
 		local function on(position): boolean
-			return inside(position, pad.CFrame, pad.Size, "Block", cfg.EdgeMargin, cfg.PadHeight)
+			return inside(position, pad.CFrame, pad.Size, shape, cfg.EdgeMargin, cfg.PadHeight)
 		end
 		-- A character's root is about 3 studs above its feet.
-		local top = pad.Position + Vector3.new(0, pad.Size.Y / 2, 0)
+		local top = pad.Position + Vector3.new(0, thickness / 2, 0)
 		expect(on(top + Vector3.new(0, 3, 0))).toBe(true)
-		expect(on(top + Vector3.new(pad.Size.X / 2 - 0.5, 3, 0))).toBe(true)
-		expect(on(top + Vector3.new(pad.Size.X / 2 + cfg.EdgeMargin + 2, 3, 0))).toBe(false)
+		expect(on(top + Vector3.new(across / 2 - 0.5, 3, 0))).toBe(true)
+		expect(on(top + Vector3.new(across / 2 + cfg.EdgeMargin + 2, 3, 0))).toBe(false)
 		hub:Destroy()
 	end)
 

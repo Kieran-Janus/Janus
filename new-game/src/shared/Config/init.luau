@@ -18,13 +18,15 @@
 ]]
 
 -- One hub NPC (Npcs.List below). Give it a Zone (it stands in the middle of that lobby zone)
--- or an Offset (studs from Hub.Center). OpensShop is optional.
+-- or an Offset (studs from Hub.Center). It faces the middle of the hub, or LookAt (studs from
+-- Hub.Center) if it has one. OpensShop is optional.
 export type NpcDef = {
 	Id: string,
 	Kind: string,
 	DisplayName: string,
 	Zone: string?,
 	Offset: Vector3?,
+	LookAt: Vector3?,
 	Prompt: { ActionText: string, ObjectText: string },
 	OpensShop: string?,
 	Lines: { string },
@@ -39,19 +41,22 @@ export type NpcDef = {
 	keeps your colour until this colour changes; delete its PaletteRole to keep it for good.
 ]]
 local hubPalette: { [string]: Color3 } = {
-	Ground = Color3.fromRGB(88, 78, 96), -- the plaza cobbles
-	Stone = Color3.fromRGB(120, 118, 128), -- clock tower, tombstones, statue, Ready pad
+	Ground = Color3.fromRGB(92, 80, 102), -- the plaza cobbles
+	Stone = Color3.fromRGB(128, 120, 138), -- clock tower, tombstones, statue, Ready pad
 	Wood = Color3.fromRGB(92, 62, 40), -- stall, posts, trees, signs
 	Iron = Color3.fromRGB(35, 32, 40), -- lamps, fences, cauldron
 	Bone = Color3.fromRGB(235, 228, 210), -- candles, cobwebs, ropes
 	Orange = Color3.fromRGB(255, 130, 20), -- pumpkins, awning stripes
-	Purple = Color3.fromRGB(120, 60, 170), -- roofs, awning stripes, spawn pad
+	Purple = Color3.fromRGB(128, 64, 182), -- roofs, awning stripes, banners
 	Green = Color3.fromRGB(110, 200, 90), -- pumpkin stems, the cauldron brew, the Ready glow
 	Glow = Color3.fromRGB(255, 200, 90), -- lights, lit windows, flames, carved faces
 	Gold = Color3.fromRGB(255, 210, 60), -- the King statue's crown
 	Cloth = Color3.fromRGB(70, 110, 160), -- the shopkeeper's shirt
 	Straw = Color3.fromRGB(200, 170, 90), -- the shopkeeper's hat
-	Dark = Color3.fromRGB(30, 22, 40), -- screens and backdrops
+	Dark = Color3.fromRGB(30, 22, 40), -- screens, backdrops, bats
+	Teal = Color3.fromRGB(70, 225, 200), -- the Ready circle's runes, glowing mushrooms
+	Foliage = Color3.fromRGB(70, 48, 92), -- the puffy leaves on the spooky trees
+	Path = Color3.fromRGB(150, 128, 128), -- the smooth stone paths and the promenade ring
 }
 
 local Config = {
@@ -540,9 +545,15 @@ local Config = {
 
 	--[[
 		THE LOBBY ("Spooky Town Square", Workspace.Hub). Built by src/server/Hub/HubBuilder.luau
-		from these settings; each lobby area (Ready pad, shop, minigames) is its own file in
-		src/server/Hub/Sections/ and sits in its Config.Lobby.Zones area. Positions are relative
-		to Center. The hub saved in your place file is used as it is, except:
+		(and HubExtras.luau) from these settings; each lobby area (Ready pad, shop, minigames)
+		is its own file in src/server/Hub/Sections/ and sits in its Config.Lobby.Zones area.
+		Decorations are props (src/server/Build/Props.luau): drop a model with the same name in
+		ReplicatedStorage.Custom.Props to swap every copy (docs/CUSTOMIZE.md > props).
+
+		Directions: positions are studs from Center. x = east (+) / west (-), z = south (+) /
+		north (-). The spawn is in the south, the clock tower in the north.
+
+		The hub saved in your place file is used as it is, except:
 		  - it is rebuilt from code when its BuildVersion is lower than the one below, unless you
 		    set the attribute Locked = true on Workspace.Hub (do that once you edit it by hand);
 		  - a missing spawn, Ready pad or shopkeeper is always put back, even on a Locked hub.
@@ -550,36 +561,74 @@ local Config = {
 	]]
 	Hub = {
 		Name = "Spooky Town Square",
-		-- Bump this number (2 -> 3) whenever the hub code or these settings change in a way the
+		-- Bump this number (3 -> 4) whenever the hub code or these settings change in a way the
 		-- saved hub should pick up: a saved hub with a lower number is rebuilt on the next start.
-		BuildVersion = 2,
+		BuildVersion = 3,
 		Center = Vector3.new(0, 0, 0), -- top of the baseplate
-		Seed = 31, -- random variation in decorations
+		Seed = 31, -- random variation in decorations (change it for a different scatter)
 		Radius = 105, -- cobblestone plaza (room for 32 players)
 		GroundMaterial = Enum.Material.Cobblestone, -- colour: Palette.Ground
-		Spawn = { Offset = Vector3.new(0, 0, 24), Size = Vector3.new(14, 1, 14) },
+		-- Where players appear: a round stone in the south, looking north at the Ready circle.
+		-- Size is the SpawnLocation's (it is invisible: you see the round stone around it).
+		Spawn = {
+			Offset = Vector3.new(0, 0, 72),
+			Size = Vector3.new(14, 1, 14),
+			LookAt = Vector3.new(0, 0, 0), -- players face this spot when they appear
+			Diameter = 17, -- the round stone players stand on
+			Text = "BOO!", -- written on the stone
+		},
 		NameTagDistance = 120, -- NPC name tags hide further away than this (studs)
+		-- Phones: the whole lobby (with the minigames and parkour) should stay under these.
+		-- tests/specs/HubLook.spec.luau checks them.
+		Budget = { MaxParts = 3500, MaxLights = 90 },
 
+		--[[
+			Lighting. Dusk: a purple sky with an orange glow, warm lamps.
+			For soft shadows from the lamps, set Lighting > Technology to "Future" once in
+			Studio (Properties window): scripts are not allowed to change it.
+			Sky: StarCount, CelestialBodiesShown (sun + moon), MoonAngularSize (a big moon).
+			Clouds: drifting clouds (Cover 0-1 = how much of the sky, Density 0-1 = how thick).
+			DepthOfField: far things get a little soft (Enabled = false to turn it off).
+		]]
 		Lighting = {
-			ClockTime = 19.6, -- dusk
-			Brightness = 1.6,
-			Ambient = Color3.fromRGB(70, 55, 95),
-			OutdoorAmbient = Color3.fromRGB(95, 75, 120),
+			ClockTime = 19.4, -- dusk
+			Brightness = 1.7,
+			Ambient = Color3.fromRGB(78, 60, 104),
+			OutdoorAmbient = Color3.fromRGB(104, 82, 132),
 			Atmosphere = {
-				Density = 0.38,
-				Offset = 0.15,
-				Color = Color3.fromRGB(150, 120, 190),
-				Decay = Color3.fromRGB(255, 140, 70),
-				Glare = 0.2,
-				Haze = 1.6,
+				Density = 0.34,
+				Offset = 0.12,
+				Color = Color3.fromRGB(150, 116, 196),
+				Decay = Color3.fromRGB(255, 136, 72),
+				Glare = 0.25,
+				Haze = 1.8,
 			},
 			ColorCorrection = {
-				Brightness = 0.02,
-				Contrast = 0.12,
-				Saturation = 0.18,
-				TintColor = Color3.fromRGB(255, 238, 255),
+				Brightness = 0.03,
+				Contrast = 0.14,
+				Saturation = 0.22,
+				TintColor = Color3.fromRGB(255, 240, 255),
 			},
-			Bloom = { Intensity = 0.7, Size = 28, Threshold = 0.92 },
+			Bloom = { Intensity = 0.8, Size = 30, Threshold = 0.9 },
+			Sky = {
+				StarCount = 3000,
+				CelestialBodiesShown = true,
+				MoonAngularSize = 22, -- the default is 11
+				SunAngularSize = 14,
+			},
+			Clouds = {
+				Enabled = true,
+				Cover = 0.55,
+				Density = 0.45,
+				Color = Color3.fromRGB(176, 140, 206),
+			},
+			DepthOfField = {
+				Enabled = true,
+				FarIntensity = 0.12,
+				FocusDistance = 70,
+				InFocusRadius = 90,
+				NearIntensity = 0,
+			},
 		},
 
 		Music = {
@@ -591,20 +640,25 @@ local Config = {
 		Palette = hubPalette,
 		Colors = hubPalette, -- the old name for Palette (the same colours), still used by some code
 
-		-- The Ready area (src/server/Hub/Sections/ReadyArea.luau): a glowing pad players stand
-		-- on to join the next round, inside the lobby zone Config.Lobby.Zones.ReadyArea (move it
-		-- there). The pad is the part tagged ReadyPad: resize or move it in Studio and it still works.
+		-- The Ready area (src/server/Hub/Sections/ReadyArea.luau): a glowing rune circle players
+		-- stand on to join the next round, ringed by little standing stones, with a pumpkin
+		-- arch facing the spawn. It sits in the lobby zone Config.Lobby.Zones.ReadyArea (move
+		-- it there). The pad is the round part tagged ReadyPad: resize or move it in Studio
+		-- and it still works.
 		ReadyArea = {
-			PadSize = Vector3.new(16, 0.6, 16), -- the stone platform: width, thickness, depth (studs)
-			GlowRole = "Green", -- the Palette colour of the glowing ring on the pad
-			ArchHeight = 16, -- the jack-o-lantern arch over the front of the pad (studs)
-			ArchLanterns = 9, -- jack-o-lanterns along the arch
-			SideLanterns = 3, -- jack-o-lanterns along each side of the pad
-			LanternSize = 1.8,
+			PadSize = Vector3.new(16, 0.6, 16), -- the round stone: diameter (x/z), thickness (y)
+			GlowRole = "Teal", -- the Palette colour of the glowing runes
+			Stones = 16, -- little standing stones around the circle (0 = none)
+			StoneGap = 100, -- degrees left open on the arch side, so players walk in there
+			ArchHeight = 13, -- the arch over the entrance (studs)
+			ArchWidth = 11, -- between its pillars (studs)
+			ArchPumpkins = 5, -- little pumpkins along the arch
+			LanternSize = 2.4, -- the jack-o-lanterns on the pillars
+			Banner = "PLAY!", -- the cloth banner under the arch ("" = no banner)
 			-- The floating sign above the arch. The client fills in the numbers
 			-- (src/client/ReadySign.luau); %d is replaced by a number.
 			Sign = {
-				Height = 22, -- studs above the plaza
+				Height = 18, -- studs above the plaza
 				MaxDistance = 300, -- hidden further away than this (studs)
 				Title = "READY %d / %d", -- players ready / players needed to start
 				TitleEnough = "READY %d", -- once enough players are ready
@@ -621,28 +675,81 @@ local Config = {
 			},
 		},
 
+		-- The Pumpkin Shop stall (src/server/Hub/NpcLooks.luau) and the dressing around it
+		-- (src/server/Hub/Sections/Shop.luau). It stands in Config.Lobby.Zones.Shop.
+		ShopStall = {
+			SignText = "PUMPKIN SHOP", -- the big sign on top
+			Chalkboard = "NEW SKINS!", -- the little board out front ("" = no board)
+			ShelfItems = 4, -- goodies on each of the 3 shelves behind the keeper
+			Pumpkins = 3, -- pumpkins piled on each side of the stall
+		},
+
+		-- The ground: cobbles, a walking ring (promenade) round the middle, paths out to every
+		-- lobby area, and small details (cracks, puddles, leaves).
+		Plaza = {
+			EdgeBand = 4, -- darker cobbles round the edge (studs)
+			Curbs = 40, -- stones in the curb round the edge
+			Promenade = { Radius = 30, Width = 8 }, -- the smooth stone ring round the cauldron
+			PathWidth = 7, -- paths from the promenade to each area
+			Cracks = 14,
+			Puddles = 6,
+			Leaves = 44, -- fallen leaves scattered on the ground
+		},
+
+		-- Paths and signposts lead to these lobby zones (only while their feature is on).
+		-- Text is what the signs say. Feature = the Config.Features switch ("" = always).
+		Signposts = {
+			Zones = {
+				{ Zone = "ReadyArea", Text = "Ready!", Feature = "ReadyPad" },
+				{ Zone = "Shop", Text = "Pumpkin Shop", Feature = "" },
+				{ Zone = "Crates", Text = "Crates", Feature = "Crates" },
+				{ Zone = "Parkour", Text = "Parkour", Feature = "Parkour" },
+				{ Zone = "CandyRush", Text = "Candy Rush", Feature = "CandyRush" },
+				{ Zone = "WebScour", Text = "Web Scour", Feature = "WebScour" },
+			} :: { { Zone: string, Text: string, Feature: string } },
+			Spawn = Vector3.new(11, 0, 66), -- the big signpost next to the spawn
+			Centre = Vector3.new(-10, 0, -15), -- the one by the cauldron (pointing everywhere)
+		},
+
 		ClockTower = {
-			Offset = Vector3.new(0, 0, -50),
+			Offset = Vector3.new(0, 0, -47),
 			Floors = 5,
-			FloorHeight = 9,
-			Width = 14,
-			Lean = 2.5, -- degrees each floor tilts, for the crooked look
+			FloorHeight = 8.5,
+			Width = 15,
+			Lean = 2.2, -- degrees each floor tilts, for the crooked look
+			Twist = 4, -- degrees each floor turns
 			ClockTime = { Hour = 11, Minute = 55 }, -- the hands are frozen just before midnight
+			Bats = 4, -- bats flapping round the roof
 		},
-		Cauldron = { Offset = Vector3.new(0, 0, 0), Radius = 5 },
-		Lampposts = { Count = 14, Radius = 92, Height = 14 },
-		Bunting = { FlagsPerSpan = 9, Sag = 2.5, Colors = { "Orange", "Purple", "Green" } },
-		JackOLanterns = { Count = 16, Radius = 78, Size = 3 },
-		Candles = {
-			Count = 26,
+		-- The bubbling cauldron in the middle, on a round stone step (Dais).
+		Cauldron = { Offset = Vector3.new(0, 0, 0), Radius = 5.5, DaisRadius = 13 },
+		-- Lampposts round the edge of the plaza (Count, Radius) with bunting between them, and
+		-- a few more by the cauldron (Inner) and along the spawn path (Spawn).
+		Lampposts = {
+			Count = 12,
+			Radius = 93,
+			Height = 14,
+			Inner = { Count = 4, Radius = 19 },
+			Spawn = { Vector3.new(-15, 0, 67), Vector3.new(15, 0, 67) },
+		},
+		Bunting = { FlagsPerSpan = 5, Sag = 2.5, Colors = { "Orange", "Purple", "Teal" } },
+		-- Jack-o-lanterns round the plaza; every LightEvery-th one lights up the ground, and every
+		-- Friends-th one has a little plain pumpkin next to it.
+		JackOLanterns = { Count = 14, Radius = 82, Size = 3, LightEvery = 4, Friends = 2 },
+		Candles = { -- floating candles over the middle
+			Count = 16,
 			MinRadius = 10,
-			MaxRadius = 34,
-			MinHeight = 8,
+			MaxRadius = 30,
+			MinHeight = 10,
 			MaxHeight = 16,
+			MinSize = 0.8, -- studs of wax (random in this range)
+			MaxSize = 1.4,
 			BobHeight = 0.8,
+			LightEvery = 4, -- every 4th candle lights up (lights cost a little on phones)
 		},
+		Benches = { Count = 6, Radius = 22 }, -- round the cauldron, between the paths
 		Graveyard = {
-			Offset = Vector3.new(-48, 0, 34),
+			Offset = Vector3.new(-58, 0, 42),
 			Epitaphs = {
 				"RIP Mr. Bones",
 				"Here lies my homework",
@@ -653,6 +760,39 @@ local Config = {
 			},
 		},
 		Cobwebs = { Size = 5 },
+		-- Big twisted trees round the plaza (Bare = no leaves, with hanging lanterns).
+		DeadTrees = {
+			Offsets = {
+				Vector3.new(-70, 0, -46),
+				Vector3.new(68, 0, -52),
+				Vector3.new(-36, 0, 80),
+				Vector3.new(62, 0, 66),
+				Vector3.new(-88, 0, 24),
+				Vector3.new(90, 0, -10),
+			},
+			Bare = { false, true, false, true, true, false },
+			MinHeight = 16,
+			MaxHeight = 22,
+		},
+		-- Little things dotted around: hay bales, crates, barrels, glowing mushrooms.
+		Clutter = {
+			HayBales = {
+				Vector3.new(60, 0, -34),
+				Vector3.new(64, 0, -28),
+				Vector3.new(-78, 0, -24),
+			},
+			Crates = { Vector3.new(56, 0, -40), Vector3.new(-30, 0, 70) },
+			Barrels = { Vector3.new(53, 0, -36), Vector3.new(-26, 0, 72) },
+			Mushrooms = {
+				Vector3.new(-66, 0, -40),
+				Vector3.new(-82, 0, 30),
+				Vector3.new(58, 0, 70),
+				Vector3.new(-40, 0, 76),
+				Vector3.new(-70, 0, 60),
+				Vector3.new(92, 0, -4),
+			},
+			Puddles = true,
+		},
 		-- Extra dressing around the plaza (src/server/Hub/HubExtras.luau).
 		Polish = {
 			Terrain = {
@@ -662,48 +802,58 @@ local Config = {
 				Hills = 16,
 				HillRingMin = 160, -- hills stay this far out...
 				HillRingMax = 300, -- ...and inside this
-				HillMinRadius = 22,
-				HillMaxRadius = 46,
+				HillMinRadius = 24,
+				HillMaxRadius = 50,
 				MudPatches = 12,
+				GrassColor = Color3.fromRGB(64, 92, 66), -- the grass terrain's colour (dusky green)
 				HideBaseplate = true, -- the default Baseplate becomes invisible (still solid underneath)
 			},
-			Forest = { Count = 26, RingMin = 125, RingMax = 200, MinHeight = 16, MaxHeight = 28 },
+			-- The forest ring outside the fence. Simple trees (fewer parts), some bare.
+			Forest = {
+				Count = 30,
+				RingMin = 122,
+				RingMax = 200,
+				MinHeight = 16,
+				MaxHeight = 30,
+				BareChance = 0.35,
+			},
 			Mansion = { -- a dark haunted house on a hill far behind the clock tower
 				Offset = Vector3.new(0, 0, -330),
 				HillRadius = 70,
 				HillSink = 45, -- how far the hill's centre is below the ground (higher = flatter hill)
 				Size = Vector3.new(64, 30, 30),
 				WindowColor = Color3.fromRGB(255, 170, 60),
-				Color = Color3.fromRGB(28, 22, 36),
+				Color = Color3.fromRGB(46, 34, 58),
+				RoofColor = Color3.fromRGB(70, 40, 92),
 			},
-			KingStatue = { Offset = Vector3.new(0, 0, -30), Height = 16 },
-			PumpkinPatch = { Offset = Vector3.new(76, 0, 8), Radius = 12, Pumpkins = 14 },
-			ExtraGraves = { Offset = Vector3.new(-80, 0, 50), Spread = 14, Count = 10 },
-			Fence = { Radius = 110, PostSpacing = 10, Height = 4.5, Gaps = 4, GapWidth = 16 },
-			-- Glowing stepping stones from the spawn pad to each NPC.
+			KingStatue = { Offset = Vector3.new(26, 0, -44), Height = 16 },
+			PumpkinPatch = { Offset = Vector3.new(74, 0, 34), Radius = 13, Pumpkins = 12 },
+			ExtraGraves = { Offset = Vector3.new(-84, 0, 62), Spread = 13, Count = 8 },
+			-- The iron fence round the plaza: posts with little pumpkins on top.
+			Fence = {
+				Radius = 110,
+				PostSpacing = 15,
+				Height = 4.5,
+				Pickets = 2, -- upright bars between two posts
+				Gaps = 4,
+				GapWidth = 18,
+			},
+			-- Glowing stepping stones along the paths.
 			Paths = {
-				Spacing = 4.5,
-				StoneSize = 2.4,
-				StopShort = 7, -- studs before the NPC
-				Color = Color3.fromRGB(200, 105, 35), -- dim orange: Neon glows a lot
+				Spacing = 9,
+				StoneSize = 1.4,
+				StopShort = 3, -- studs before the area
+				Color = Color3.fromRGB(255, 150, 60), -- Neon glows a lot
 				Transparency = 0.55,
 			},
-			Cobwebs = 8, -- on fence posts
+			Cobwebs = 6, -- on fence posts
 			FogRate = 5, -- ground fog along the fence
 		},
-		DeadTrees = {
-			Offsets = {
-				Vector3.new(-62, 0, -30),
-				Vector3.new(62, 0, -34),
-				Vector3.new(-30, 0, 62),
-				Vector3.new(58, 0, 52),
-			},
-		},
 		Particles = {
-			Fireflies = { Rate = 6, Color = Color3.fromRGB(210, 255, 120) },
+			Fireflies = { Rate = 8, Color = Color3.fromRGB(210, 255, 160) },
 			Mist = { Rate = 4, Color = Color3.fromRGB(190, 175, 220) },
-			Bubbles = { Rate = 8, Color = Color3.fromRGB(120, 255, 110) },
-			Leaves = { Rate = 2, Color = Color3.fromRGB(205, 110, 40) },
+			Bubbles = { Rate = 10, Color = Color3.fromRGB(120, 255, 170) },
+			Leaves = { Rate = 2, Color = Color3.fromRGB(215, 110, 40) },
 		},
 		PhotoSpot = {
 			Sign = "Spooky Town Square",
@@ -746,7 +896,8 @@ local Config = {
 				Id = "VotingBoard",
 				Kind = "Board",
 				DisplayName = "Voting Board",
-				Offset = Vector3.new(16, 0, 36),
+				Offset = Vector3.new(-24, 0, 56), -- by the Ready circle...
+				LookAt = Vector3.new(0, 0, 44), -- ...facing it, so ready players can read it
 				Prompt = { ActionText = "Vote", ObjectText = "Voting Board" },
 				Lines = {
 					"Voting opens between rounds. Pick a map and Easy or Hard on the board or the vote panel.",
@@ -756,7 +907,7 @@ local Config = {
 				Id = "Leaderboard",
 				Kind = "Gravestone",
 				DisplayName = "Leaderboard Gravestone",
-				Offset = Vector3.new(-30, 0, 46),
+				Offset = Vector3.new(-50, 0, 36), -- at the front of the graveyard
 				Prompt = { ActionText = "Read", ObjectText = "Top Pumpkin Collectors" },
 				Lines = { "Here lie the greatest pumpkin collectors of all time..." },
 			},
@@ -764,7 +915,8 @@ local Config = {
 				Id = "PhotoSpot",
 				Kind = "PhotoSpot",
 				DisplayName = "Photo Spot",
-				Offset = Vector3.new(44, 0, 30),
+				Offset = Vector3.new(36, 0, 62), -- near the spawn...
+				LookAt = Vector3.new(0, 0, 62), -- ...facing it
 				Prompt = { ActionText = "Strike a pose", ObjectText = "Photo Spot" },
 				Lines = { "Say pumpkin!" },
 			},
