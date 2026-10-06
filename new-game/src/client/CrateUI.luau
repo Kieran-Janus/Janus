@@ -18,7 +18,8 @@
 	CrateUI.Mount(gui)
 	CrateUI.Open(crateId?)        opens the panel, on that crate's preview if given. Safe to call
 	                              before Mount (does nothing until then).
-	CrateUI.SetShopOpener(fn)     fn(themeId?) opens the Shop's Skins tab (ShopUI sets this; the
+	CrateUI.SetShopOpener(fn)     fn({ Theme?, Rarity? }) opens the Shop's Skins tab on those
+	                              filters (ShopUI sets this; the
 	                              crate preview's "Buy in the Shop" button uses it)
 ]]
 
@@ -74,7 +75,9 @@ type LazyView = {
 }
 
 local openPanel: ((string?) -> ())? = nil
-local shopOpener: ((string?) -> ())? = nil
+export type ShopFilters = { Theme: string?, Rarity: string? }
+
+local shopOpener: ((ShopFilters) -> ())? = nil
 
 function CrateUI.Open(crateId: string?)
 	if not Config.Features.Crates then
@@ -85,7 +88,7 @@ function CrateUI.Open(crateId: string?)
 	end
 end
 
-function CrateUI.SetShopOpener(fn: (string?) -> ())
+function CrateUI.SetShopOpener(fn: (ShopFilters) -> ())
 	shopOpener = fn
 end
 
@@ -119,6 +122,20 @@ end
 local function rarityLevel(rarity: string?): any
 	return (Config.Rarity.Levels :: any)[rarity or ""]
 		or (Config.Rarity.Levels :: any)[Config.Rarity.Default]
+end
+
+-- 80000 -> "80,000" (easier to read for big prices).
+local function commas(n: number): string
+	local whole = tostring(math.floor(n))
+	local out = whole
+	while true do
+		local swapped, count = out:gsub("^(-?%d+)(%d%d%d)", "%1,%2")
+		out = swapped
+		if count == 0 then
+			break
+		end
+	end
+	return out
 end
 
 -- "FF8014" for RichText colours.
@@ -261,13 +278,14 @@ function CrateUI.Mount(gui: ScreenGui)
 	message.TextColor3 = Theme.Muted
 	message.TextXAlignment = Enum.TextXAlignment.Left
 	message.Position = UDim2.fromOffset(16, 42)
-	message.Size = UDim2.new(1, -32, 0, 34)
+	local messageHeight = if compact then 44 else 34 -- room for 3 lines on narrow phones
+	message.Size = UDim2.new(1, -32, 0, messageHeight)
 
 	local body = Instance.new("Frame")
 	body.Name = "Body"
 	body.BackgroundTransparency = 1
-	body.Position = UDim2.fromOffset(12, 80)
-	body.Size = UDim2.new(1, -24, 1, -90)
+	body.Position = UDim2.fromOffset(12, 46 + messageHeight)
+	body.Size = UDim2.new(1, -24, 1, -(56 + messageHeight))
 	body.Parent = panel
 
 	local function view(name: string): Frame
@@ -305,7 +323,7 @@ function CrateUI.Mount(gui: ScreenGui)
 	end
 
 	local function updateCoins()
-		coinsLabel.Text = ("%d %s"):format(coins, currency)
+		coinsLabel.Text = ("%s %s"):format(commas(coins), currency)
 	end
 
 	-- Lazy 3D previews -------------------------------------------------------------------------
@@ -457,8 +475,11 @@ function CrateUI.Mount(gui: ScreenGui)
 		name.Position = UDim2.new(0, 4, 1, -26)
 		name.Size = UDim2.new(1, -8, 0, 30)
 		local price = CrateOdds.CoinPrice(crate)
-		local priceLabel =
-			label(if price then ("%d %s"):format(price, currency) else text.RobuxOnly, 14, card)
+		local priceLabel = label(
+			if price then ("%s %s"):format(commas(price), currency) else text.RobuxOnly,
+			14,
+			card
+		)
 		priceLabel.Name = "Price"
 		priceLabel.TextColor3 = Theme.Selected
 		priceLabel.AnchorPoint = Vector2.new(0, 1)
@@ -649,12 +670,14 @@ function CrateUI.Mount(gui: ScreenGui)
 		blurb.Font = Enum.Font.Gotham
 		blurb.TextColor3 = Theme.Muted
 		blurb.LayoutOrder = 3
-		blurb.Size = UDim2.new(1, -8, 0, 34)
+		blurb.Size = UDim2.new(1, -8, 0, 0)
+		blurb.AutomaticSize = Enum.AutomaticSize.Y
 		local odds = label(oddsLine(crate), 14, side)
 		odds.Name = "Odds"
 		odds.RichText = true
 		odds.LayoutOrder = 4
-		odds.Size = UDim2.new(1, -8, 0, 36)
+		odds.Size = UDim2.new(1, -8, 0, 0)
+		odds.AutomaticSize = Enum.AutomaticSize.Y
 
 		local function row(order: number, height: number): Frame
 			local f = Instance.new("Frame")
@@ -676,7 +699,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		local robuxOn = Config.Features.RobuxCrates
 		local half = UDim2.new(0.5, -3, 1, 0)
 		if price then
-			local openButton = button(text.OpenCoins:format(price), buyRow, Theme.Selected)
+			local openButton = button(text.OpenCoins:format(commas(price)), buyRow, Theme.Selected)
 			openButton.Name = "OpenCoins"
 			openButton.Size = if robuxOn then half else UDim2.fromScale(1, 1)
 			if closed == nil then
@@ -726,7 +749,7 @@ function CrateUI.Mount(gui: ScreenGui)
 				local open = shopOpener
 				if open then
 					panel.Visible = false
-					open(themeOf(crate))
+					open({ Theme = themeOf(crate), Rarity = crate.Rarity })
 				end
 			end)
 		end
@@ -762,8 +785,8 @@ function CrateUI.Mount(gui: ScreenGui)
 	reel.BackgroundColor3 = Color3.fromRGB(14, 12, 22)
 	reel.BackgroundTransparency = 0.1
 	reel.ClipsDescendants = true
-	reel.AnchorPoint = Vector2.new(0.5, 0)
-	reel.Position = UDim2.new(0.5, 0, 0, 6)
+	reel.AnchorPoint = Vector2.new(0.5, 0.5)
+	reel.Position = UDim2.fromScale(0.5, 0.4)
 	reel.Size = UDim2.new(1, 0, 0, reelHeight)
 	reel.Parent = openView
 	Theme.round(reel, 10)
@@ -809,13 +832,13 @@ function CrateUI.Mount(gui: ScreenGui)
 
 	local status = label("", 16, openView)
 	status.Name = "Status"
-	status.Position = UDim2.fromOffset(0, reelHeight + 14)
+	status.Position = UDim2.new(0, 0, 0.4, reelHeight / 2 + 12)
 	status.Size = UDim2.new(1, -120, 0, 30)
 	status.TextXAlignment = Enum.TextXAlignment.Left
 	local skip = button(text.Skip, openView)
 	skip.Name = "Skip"
 	skip.AnchorPoint = Vector2.new(1, 0)
-	skip.Position = UDim2.new(1, 0, 0, reelHeight + 14)
+	skip.Position = UDim2.new(1, 0, 0.4, reelHeight / 2 + 12)
 	skip.Size = UDim2.fromOffset(100, 32)
 
 	local reveal = Instance.new("Frame")
@@ -873,11 +896,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		name.AnchorPoint = Vector2.new(0, 1)
 		name.Position = UDim2.new(0, 2, 1, -8)
 		name.Size = UDim2.new(1, -4, 0, 26)
-		name.TextScaled = true
-		local textLimit = Instance.new("UITextSizeConstraint")
-		textLimit.MaxTextSize = 14
-		textLimit.MinTextSize = 9
-		textLimit.Parent = name
+		name.TextTruncate = Enum.TextTruncate.AtEnd
 		return card
 	end
 

@@ -144,7 +144,7 @@ local function sign(parent: Instance, cf: CFrame, width: number)
 			PaletteShade = -0.2,
 			Material = Enum.Material.Neon,
 		}, m)
-		Kit.light(orb, color("Purple", -0.3), 14, 1.2, true):SetAttribute("PaletteRole", "Purple")
+		Kit.setRole(Kit.light(orb, color("Purple", -0.3), 14, 1.2, true), "Purple", -0.3)
 	end
 	local boardHeight = 2.6
 	local boardY = postHeight - boardHeight / 2 - 0.4

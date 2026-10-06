@@ -527,7 +527,7 @@ function ShopUI.Mount(gui: ScreenGui)
 	end
 	local themeChip = chip("Theme", "", 130, 20)
 	-- Crates (Skins tab): opens the crate panel on the shown theme's crate.
-	local cratesChip = chip("Crates", "🎁 Crates", 100, 30)
+	local cratesChip = chip("Crates", Config.Crates.Text.ShopChip, 100, 30)
 	cratesChip.BackgroundColor3 = Color3.fromRGB(170, 60, 120)
 	cratesChip.Activated:Connect(function()
 		local crateId: string? = nil
@@ -539,8 +539,8 @@ function ShopUI.Mount(gui: ScreenGui)
 		panel.Visible = false
 		CrateUI.Open(crateId)
 	end)
-	CrateUI.SetShopOpener(function(theme: string?)
-		ShopUI.Open("Skin", { Theme = theme })
+	CrateUI.SetShopOpener(function(wanted: CrateUI.ShopFilters)
+		ShopUI.Open("Skin", { Theme = wanted.Theme, Rarity = wanted.Rarity })
 	end)
 	themeChip.Activated:Connect(function()
 		local index = table.find(themeIds, filters.Theme) or 1

@@ -206,8 +206,13 @@ function CrateArt.Build(crate: any, size: number?): Model
 		end
 		local _, scaled = topper:GetBoundingBox()
 		topper.Name = "Topper"
+		-- A star stands on a point (a sparkle), not on its side (it would read as an "X").
+		local roll = if crate.Topper == "Stars" then math.rad(45) else 0
 		topper:PivotTo(
-			base * CFrame.new(0, h + lidH + scaled.Y / 2, 0) * CFrame.Angles(0, math.rad(-20), 0)
+			base
+				* CFrame.new(0, h + lidH + scaled.Y / 2, 0)
+				* CFrame.Angles(0, math.rad(-20), 0)
+				* CFrame.Angles(0, 0, roll)
 		)
 		topper.Parent = m
 		for _, d in topper:GetDescendants() do

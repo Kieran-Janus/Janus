@@ -141,7 +141,7 @@ return {
 		Hint = "Tap a crate to see every skin inside and its chance.",
 		Restricted = "Crates aren't available in your region; you can still buy any skin directly in the Shop.",
 		Checking = "Checking...",
-		OpenCoins = "Open  %d", -- %d = the price in coins
+		OpenCoins = "Open  %s", -- %s = the price in coins
 		OpenRobux = "R$ %d",
 		ComingSoon = "Coming soon",
 		RobuxOnly = "Robux only",
@@ -156,6 +156,7 @@ return {
 		Back = "Back",
 		Skip = "Skip",
 		ShopButton = "Buy in the Shop",
+		ShopChip = "🎁 Crates", -- the button on the Shop's Skins tab that opens the crates
 		Prompt = "Open %s", -- the stand's prompt; %s = the crate's name
 		PromptObject = "Mystery Crate",
 		-- Messages from the server
