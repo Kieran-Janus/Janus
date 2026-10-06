@@ -74,7 +74,13 @@ function ShopService.Push(player: Player)
 end
 
 -- Puts every equipped (and still allowed) cosmetic on the player's character.
+-- Not while they hide as a pumpkin in Hide & Seek (src/server/Modes/HideSeek.luau): changing
+-- clothes would make their invisible body show again. What they equip is still saved; the
+-- mode dresses them once they are found, and the next character is dressed as normal.
 function ShopService.Dress(player: Player)
+	if player:GetAttribute("HideSeekRole") == "Hider" then
+		return
+	end
 	local character = player.Character
 	local data = DataService.Get(player)
 	if not character or not data then

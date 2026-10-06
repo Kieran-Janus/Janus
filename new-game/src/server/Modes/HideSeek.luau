@@ -8,10 +8,11 @@
 	  1. Roles: Config.HideSeek.SeekerRatio of the players are seekers (at least 1, never
 	     everyone; last round's seekers are picked last), the rest hide.
 	  2. Hiders go to parts tagged HiderSpawn and turn into pumpkins: their character is made
-	     invisible and a pumpkin that looks exactly like the map's decoys (tag HidingDecoy) is
-	     welded on, sitting on the ground. Seekers wait in the closed seeker hut (parts tagged
-	     SeekerSpawn), frozen, with a "COUNTING..." blindfold on screen, for HeadStart seconds
-	     (State "Hiding").
+	     invisible and a copy of one of the map's decoys (tag HidingDecoy) is welded on,
+	     sitting on the ground. While hidden, the shop doesn't dress them (ShopService.Dress);
+	     their look comes back when they are found. Seekers wait in the closed seeker hut
+	     (parts tagged SeekerSpawn; extra seekers line up in front of the pads), frozen, with a
+	     "COUNTING..." blindfold on screen, for HeadStart seconds (State "Hiding").
 	  3. The hut door (tag SeekerDoor) swings open and every seeker gets a candy gun (State
 	     "Playing"). The client sends where the player aimed (remote HideSeekShoot); the server
 	     checks it's a seeker in this round, with the gun out and off cooldown, casts a ray from
@@ -19,7 +20,9 @@
 	     hits. Hitting a decoy adds Gun.DecoyPenalty to the cooldown.
 	  4. Tagged hiders join the seekers (TaggedBecomeSeekers) or watch as ghosts. Hiders giggle
 	     every GiggleInterval, leave a leaf trail while moving and glow in the last
-	     GlowLastSeconds, so they are fairly easy to find.
+	     GlowLastSeconds, so they are fairly easy to find. A hider who resets (or dies) after
+	     the seekers are out leaves their pumpkin in place (it can still be tagged) and comes
+	     back to it.
 	  5. The round ends when every pumpkin is found (seekers win), at 0:00 (pumpkins still
 	     hidden win) or when every seeker leaves (pumpkins win; during the head start a hider
 	     is made a seeker instead). Scores: tags; coins: Config.HideSeek.Rewards; saved stats:
@@ -51,6 +54,7 @@ local Services = script.Parent.Parent.Services
 local DataService = require(Services.DataService)
 local GhostService = require(Services.GhostService)
 local MapService = require(Services.MapService)
+local ShopService = require(Services.ShopService)
 local CandyGun = require(script.Parent.CandyGun)
 local Rules = require(script.Parent.HideSeekRules)
 local Types = require(script.Parent.Types)
@@ -64,6 +68,9 @@ type Disguise = {
 	Model: Model,
 	Body: BasePart,
 	Radius: number, -- half the pumpkin's width (for near-miss hits)
+	Source: Instance?, -- the map decoy it is a copy of (nil = built by HidingPumpkin)
+	FloorOffset: CFrame, -- where the pumpkin's bottom middle is, seen from Body
+	Frozen: CFrame?, -- set while the hider is dead: the pumpkin waits on this spot (its bottom)
 	Trail: ParticleEmitter,
 	Light: PointLight,
 	Highlight: Highlight,
@@ -83,6 +90,7 @@ type Round = {
 	NextGiggle: { [Player]: number },
 	HiderSpawns: { BasePart },
 	SeekerSpawns: { BasePart },
+	Decoys: { Instance }, -- the map's decoy pumpkins (tag HidingDecoy): hiders copy one
 	Pumpkins: Folder,
 	Released: boolean,
 	ReleasedAt: number,
@@ -201,10 +209,28 @@ local function addStat(player: Player, key: string, amount: number)
 	end
 end
 
--- Stands the character on top of `spawn` (a little spread out so players don't stack).
-local function placeOn(r: Round, player: Player, spawn: BasePart?)
+-- Stands the character with its feet on `floor` (a position and the way to face).
+local function placeAt(player: Player, floor: CFrame)
 	local character, humanoid, root = alive(player)
-	if not character or not humanoid or not root or not spawn then
+	if not character or not humanoid or not root then
+		return
+	end
+	character:PivotTo(
+		CFrame.new(floor.Position + Vector3.new(0, rootHeight(humanoid, root) + 0.1, 0))
+			* yaw(floor)
+	)
+end
+
+-- Where players stand on `spawn`: `row` 0 is the pad itself, rows 1, 2... are lined up in
+-- front of it, Config.HideSeek.SpawnRowSpacing apart (more seekers than seeker pads).
+local function spotOn(spawn: BasePart, row: number): Vector3
+	local ahead = row * Config.HideSeek.SpawnRowSpacing
+	return (spawn.CFrame * CFrame.new(0, 0, -ahead)).Position + Vector3.new(0, spawn.Size.Y / 2, 0)
+end
+
+-- Stands the character on top of `spawn` (a little spread out so players don't stack).
+local function placeOn(r: Round, player: Player, spawn: BasePart?, row: number?)
+	if not spawn then
 		return
 	end
 	local spread = Vector3.new(
@@ -212,10 +238,8 @@ local function placeOn(r: Round, player: Player, spawn: BasePart?)
 		0,
 		r.Rng:NextNumber(-1, 1) * math.max(0, spawn.Size.Z / 2 - 1.5)
 	)
-	local top = (spawn.CFrame * CFrame.new(spread)).Position + Vector3.new(0, spawn.Size.Y / 2, 0)
-	character:PivotTo(
-		CFrame.new(top + Vector3.new(0, rootHeight(humanoid, root) + 0.1, 0)) * yaw(spawn.CFrame)
-	)
+	local top = spotOn(spawn, row or 0) + spawn.CFrame:VectorToWorldSpace(spread)
+	placeAt(player, CFrame.new(top) * yaw(spawn.CFrame))
 end
 
 local function pick(list: { BasePart }, rng: Random): BasePart?
@@ -223,6 +247,40 @@ local function pick(list: { BasePart }, rng: Random): BasePart?
 		return nil
 	end
 	return list[rng:NextInteger(1, #list)]
+end
+
+--[[
+	The seeker pad (and row) for `player`: the first spot nobody else in the round stands on,
+	trying every pad before starting a row in front of them (at most Config.HideSeek.SpawnRows
+	rows). The seeker hut has 4 small pads, so with 5+ seekers nobody ends up frozen inside
+	someone else (they would be flung about when the door opens).
+]]
+local function seekerSpot(r: Round, player: Player): (BasePart?, number)
+	local cfg = Config.HideSeek
+	local roots: { BasePart } = {}
+	for other in r.Role do
+		local _, _, root = alive(other)
+		if other ~= player and root then
+			table.insert(roots, root)
+		end
+	end
+	for row = 0, math.max(cfg.SpawnRows, 1) - 1 do
+		for _, spawn in r.SeekerSpawns do
+			local spot = spotOn(spawn, row)
+			local free = true
+			for _, root in roots do
+				local dx, dz = root.Position.X - spot.X, root.Position.Z - spot.Z
+				if dx * dx + dz * dz < (cfg.SpawnRowSpacing * 0.6) ^ 2 then
+					free = false
+					break
+				end
+			end
+			if free then
+				return spawn, row
+			end
+		end
+	end
+	return pick(r.SeekerSpawns, r.Rng), 0
 end
 
 -- Seekers can't move while they count (anchored on the server, so nobody can cheat it).
@@ -339,8 +397,89 @@ local function makeEffects(model: Model, body: BasePart): (ParticleEmitter, Poin
 	return trail, light, highlight
 end
 
+--[[
+	A pumpkin for a hider, its bottom middle on `floor`: a copy of one of the map's decoys
+	(`like` if given), so it looks exactly like them even on a map that was baked or edited by
+	hand before the pumpkin look changed. Maps without decoys get a new one from
+	src/server/Build/HidingPumpkin.luau. Returns the model and the decoy it copies.
+]]
+local function newPumpkin(r: Round, floor: CFrame, like: Instance?): (Model, Instance?)
+	local source: Instance? = nil
+	if like and like:IsDescendantOf(r.Map.Model) then
+		source = like
+	else
+		for _ = 1, 5 do -- (a decoy may have been deleted during the round)
+			local candidate = if #r.Decoys > 0
+				then r.Decoys[r.Rng:NextInteger(1, #r.Decoys)]
+				else nil
+			if candidate and candidate:IsDescendantOf(r.Map.Model) then
+				source = candidate
+				break
+			end
+		end
+	end
+	if not source then
+		return HidingPumpkin.Build(floor, r.Rng, r.Pumpkins), nil
+	end
+	local copy = source:Clone()
+	local model: Model
+	if copy:IsA("Model") then
+		model = copy
+	else
+		model = Instance.new("Model")
+		copy.Parent = model
+		if copy:IsA("BasePart") then
+			model.PrimaryPart = copy
+		end
+	end
+	model.Name = "Pumpkin"
+	-- Not a decoy any more (candy that hits it finds a hider), and never any scripts.
+	CollectionService:RemoveTag(model, Tags.HidingDecoy)
+	for _, d in model:GetDescendants() do
+		if d:IsA("LuaSourceContainer") then
+			d:Destroy()
+		else
+			CollectionService:RemoveTag(d, Tags.HidingDecoy)
+		end
+	end
+	local box, size = model:GetBoundingBox()
+	local bottom = box.Position - box.UpVector * (size.Y / 2)
+	model:PivotTo(model:GetPivot() + (floor.Position - bottom))
+	model.Parent = r.Pumpkins
+	return model, source
+end
+
+-- The hider died: their pumpkin stays where it is (anchored, it can still be found) and they
+-- come back there (setUp), so resetting is no way to escape a seeker.
+local function freeze(d: Disguise)
+	local spot = d.Body.CFrame * d.FloorOffset
+	local level = CFrame.new(spot.Position) * yaw(spot)
+	d.Frozen = level
+	d.Trail.Enabled = false
+	for _, part in d.Model:GetDescendants() do
+		if part:IsA("BasePart") then
+			part.Anchored = true
+		elseif part:IsA("WeldConstraint") then
+			local other = part.Part0
+			if other and not other:IsDescendantOf(d.Model) then
+				part:Destroy() -- the weld to the dead character
+			end
+		end
+	end
+	d.Model:PivotTo(level * spot:ToObjectSpace(d.Model:GetPivot()))
+end
+
+-- Still on the map (not fallen into the void or out of the world)?
+local function onMap(r: Round, part: BasePart): boolean
+	local floor = r.Map.Floor
+	return part:IsDescendantOf(workspace)
+		and part.Position.Y > floor.Position.Y - floor.Size.Y / 2 - Config.HideSeek.FallMargin
+end
+
 -- Turns a hider's character into a pumpkin (again, after a respawn).
 local function disguise(r: Round, player: Player)
+	local before = r.Disguises[player]
+	local like = if before then before.Source else nil
 	undisguise(r, player)
 	local character, humanoid, root = alive(player)
 	if not character or not humanoid or not root then
@@ -384,9 +523,17 @@ local function disguise(r: Round, player: Player)
 
 	-- The pumpkin lives in the map (not in the character) so candy rays that skip characters
 	-- still hit it; it is welded to the root part, its bottom on the floor under the feet.
-	local floor = root.Position - Vector3.new(0, rootHeight(humanoid, root), 0)
-	local model = HidingPumpkin.Build(CFrame.new(floor) * yaw(root.CFrame), r.Rng, r.Pumpkins)
+	-- After a respawn it copies the same decoy as before, so it doesn't change its look.
+	local floorAt = root.Position - Vector3.new(0, rootHeight(humanoid, root), 0)
+	local floor = CFrame.new(floorAt) * yaw(root.CFrame)
+	local model, source = newPumpkin(r, floor, like)
 	model:SetAttribute("HiderUserId", player.UserId)
+	-- (its width, for near misses: measured before it is welded on)
+	local width = model:GetAttribute("PumpkinWidth")
+	if typeof(width) ~= "number" then
+		local _, size = model:GetBoundingBox()
+		width = math.max(size.X, size.Z)
+	end
 	local body: BasePart? = model.PrimaryPart
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
@@ -411,12 +558,14 @@ local function disguise(r: Round, player: Player)
 		end
 		return
 	end
-	local width = model:GetAttribute("PumpkinWidth")
 	local trail, light, highlight = makeEffects(model, body)
 	local d: Disguise = {
 		Model = model,
 		Body = body,
 		Radius = (if typeof(width) == "number" then width else Config.HideSeek.Pumpkin.Width) / 2,
+		Source = source,
+		FloorOffset = body.CFrame:ToObjectSpace(floor),
+		Frozen = nil,
 		Trail = trail,
 		Light = light,
 		Highlight = highlight,
@@ -434,11 +583,18 @@ local function disguise(r: Round, player: Player)
 			end)
 		end)
 	)
-	-- A dead character's welds break: take the pumpkin away so it doesn't roll off.
+	-- A dead character's welds break. Once the seekers are out, the pumpkin stays put (it can
+	-- still be found) and the hider comes back to it; before that, or if it fell off the
+	-- map, it goes away and the hider starts again on a hider spawn.
 	table.insert(
 		d.Connections,
 		humanoid.Died:Connect(function()
-			if r.Disguises[player] == d then
+			if r.Disguises[player] ~= d then
+				return
+			end
+			if r.Released and not r.Over and onMap(r, d.Body) then
+				freeze(d)
+			else
 				undisguise(r, player)
 			end
 		end)
@@ -479,12 +635,19 @@ local function setUp(r: Round, player: Player, move: boolean)
 	local role = r.Role[player]
 	if role == "Hider" then
 		if move then
-			placeOn(r, player, pick(r.HiderSpawns, r.Rng))
+			local old = r.Disguises[player]
+			local waiting = if old then old.Frozen else nil
+			if waiting then
+				placeAt(player, waiting) -- back to the pumpkin they left when they died
+			else
+				placeOn(r, player, pick(r.HiderSpawns, r.Rng))
+			end
 		end
 		disguise(r, player)
 	elseif role == "Seeker" then
 		if move then
-			placeOn(r, player, pick(r.SeekerSpawns, r.Rng))
+			local spawn, row = seekerSpot(r, player)
+			placeOn(r, player, spawn, row)
 		end
 		if r.Released then
 			giveGun(r, player)
@@ -578,6 +741,8 @@ local function tag(r: Round, hider: Player, seeker: Player, position: Vector3)
 	})
 	if cfg.TaggedBecomeSeekers then
 		hider:SetAttribute("HideSeekRole", "Seeker")
+		-- Their own look back (with anything they equipped while hidden).
+		task.spawn(ShopService.Dress, hider)
 		task.delay(cfg.TaggedSeekerDelay, function()
 			if round == r and not r.Over and r.Role[hider] == "Seeker" then
 				giveGun(r, hider)
@@ -585,6 +750,7 @@ local function tag(r: Round, hider: Player, seeker: Player, position: Vector3)
 		end)
 	else
 		hider:SetAttribute("HideSeekRole", "Out")
+		task.spawn(ShopService.Dress, hider)
 		GhostService.MarkOut(hider, true)
 	end
 end
@@ -806,6 +972,15 @@ function HideSeek.Run(ctx: Types.RoundContext): Types.RoundResult
 	folder.Parent = map.Model
 	local hiderSpawns = tagged(map, Tags.HiderSpawn)
 	local seekerSpawns = tagged(map, Tags.SeekerSpawn)
+	local decoys: { Instance } = {}
+	for _, instance in CollectionService:GetTagged(Tags.HidingDecoy) do
+		if
+			(instance:IsA("Model") or instance:IsA("BasePart"))
+			and instance:IsDescendantOf(map.Model)
+		then
+			table.insert(decoys, instance)
+		end
+	end
 	local r: Round = {
 		Map = map,
 		Rng = rng,
@@ -819,6 +994,7 @@ function HideSeek.Run(ctx: Types.RoundContext): Types.RoundResult
 		-- Maps without the tags still work: everyone uses the map's normal spawns.
 		HiderSpawns = if #hiderSpawns > 0 then hiderSpawns else map.Spawns,
 		SeekerSpawns = if #seekerSpawns > 0 then seekerSpawns else map.Spawns,
+		Decoys = decoys,
 		Pumpkins = folder,
 		Released = false,
 		ReleasedAt = 0,
@@ -859,8 +1035,9 @@ function HideSeek.Run(ctx: Types.RoundContext): Types.RoundResult
 		placeOn(r, player, spawnOrder[(i - 1) % #spawnOrder + 1])
 		disguise(r, player)
 	end
-	for i, player in seekers do
-		placeOn(r, player, r.SeekerSpawns[(i - 1) % #r.SeekerSpawns + 1])
+	for _, player in seekers do
+		local spawn, row = seekerSpot(r, player)
+		placeOn(r, player, spawn, row)
 		setFrozen(player, true)
 	end
 
@@ -910,6 +1087,7 @@ function HideSeek.Run(ctx: Types.RoundContext): Types.RoundResult
 						entry.StartRole = "Seeker"
 					end
 					promoted:SetAttribute("HideSeekRole", "Seeker")
+					task.spawn(ShopService.Dress, promoted)
 					setUp(r, promoted, true)
 				end
 			end

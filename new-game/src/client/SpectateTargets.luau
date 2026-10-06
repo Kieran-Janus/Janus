@@ -5,7 +5,9 @@
 	Not a screen itself (not in Main.client.luau's ORDER).
 
 	A target is a Player in the round who isn't out (InRound and not Out), or a Pumpkin King
-	(a Model named "PumpkinKing" in Workspace.Map, King Hunt only).
+	(a Model named "PumpkinKing" in Workspace.Map, King Hunt only). In Hide & Seek the hidden
+	pumpkins (HideSeekRole "Hider") can't be watched, so nobody can tell the seekers where they
+	are (Config.HideSeek.SpectateHiders = true allows it).
 
 	SpectateTargets.Kings() -> { Model }
 	SpectateTargets.List() -> { Instance }          Kings first, then the players still in
@@ -39,6 +41,16 @@ function SpectateTargets.Kings(): { Model }
 	return list
 end
 
+-- A player in the round you may watch: not out, and not a hidden Hide & Seek pumpkin.
+local function watchablePlayer(other: Player): boolean
+	if other:GetAttribute("InRound") ~= true or other:GetAttribute("Out") == true then
+		return false
+	end
+	return Config.HideSeek.SpectateHiders
+		or ReplicatedStorage:GetAttribute("Mode") ~= "HideSeek"
+		or other:GetAttribute("HideSeekRole") ~= "Hider"
+end
+
 -- Everything you can watch: the Kings first, then the players still in the round.
 function SpectateTargets.List(): { Instance }
 	local list: { Instance } = {}
@@ -46,7 +58,7 @@ function SpectateTargets.List(): { Instance }
 		table.insert(list, king)
 	end
 	for _, other in Players:GetPlayers() do
-		if other:GetAttribute("InRound") and not other:GetAttribute("Out") then
+		if watchablePlayer(other) then
 			table.insert(list, other)
 		end
 	end
@@ -68,7 +80,7 @@ function SpectateTargets.Watchable(target: Instance?): boolean
 		return false
 	end
 	if target:IsA("Player") then
-		return target:GetAttribute("InRound") == true and target:GetAttribute("Out") ~= true
+		return watchablePlayer(target)
 	end
 	return true
 end

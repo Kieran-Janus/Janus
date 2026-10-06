@@ -7,6 +7,8 @@
 	  - the seekers' blindfold while the hiders hide (State "Hiding"): "COUNTING... 15"
 	  - a bar under the top Hud: your role, pumpkins left, seekers, your tags
 	  - a short message line: who found whom, "The pumpkins are glowing!", decoy misses
+	  - no chat bubbles while a round is on (they float over a hider's head, right on their
+	    pumpkin); the chat window still works. Config.HideSeek.HideChatBubbles = false keeps them.
 	The candy gun's aiming, crosshair and world effects are in src/client/CandyGunClient.luau,
 	mounted from here once the first Hide & Seek round starts.
 	On/off: Config.Features.HideSeek (off = Mount does nothing and nothing shows).
@@ -19,6 +21,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -202,6 +205,30 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	peekSize.MaxTextSize = 24
 	peekSize.Parent = peek
 
+	-- Chat bubbles: off on this screen while a round is on, back as they were afterwards.
+	local bubblesHidden = false
+	local bubblesBefore = true
+	local function hideBubbles(hide: boolean)
+		if hide == bubblesHidden or (hide and not cfg.HideChatBubbles) then
+			return
+		end
+		local bubbles = TextChatService:FindFirstChildOfClass("BubbleChatConfiguration")
+		if not bubbles then
+			return
+		end
+		local ok = pcall(function()
+			if hide then
+				bubblesBefore = bubbles.Enabled
+				bubbles.Enabled = false
+			else
+				bubbles.Enabled = bubblesBefore
+			end
+		end)
+		if ok then
+			bubblesHidden = hide
+		end
+	end
+
 	-- Refreshing ---------------------------------------------------------------------------------
 	local function myRole(): string?
 		local role = player:GetAttribute("HideSeekRole")
@@ -213,6 +240,7 @@ function HideSeekUI.Mount(gui: ScreenGui)
 		local on = roundOn()
 		local role = myRole()
 		local state = ReplicatedStorage:GetAttribute("State")
+		hideBubbles(on)
 
 		-- Blindfold with the head start's countdown.
 		local blindfolded = on and state == "Hiding" and role == "Seeker"

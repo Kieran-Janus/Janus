@@ -121,15 +121,19 @@ describe("Playlists", function()
 			end
 		end)
 		withFeatures({ KingHunt = false, HideSeek = true, ScareMaze = false }, function()
-			-- Not enough players for Hide & Seek and King Hunt is off: still one choice.
-			local offer = Playlists.Offer(1, 3)
-			expect(#offer).toBe(1)
-			expect(offer[1].Mode).toBe(Config.Modes.FallbackMode)
+			-- Not enough players for Hide & Seek and King Hunt is off: King Hunt is never
+			-- offered; the round waits for 2 ready players instead.
+			expect(#Playlists.Offer(1, 3)).toBe(0)
+			expect(Playlists.FewestPlayers()).toBe(2)
 			expect(ids(Playlists.Offer(2, 3))).toBe("HideSeekFarm,HideSeekHedgeMaze")
 		end)
+		withFeatures({ KingHunt = true, HideSeek = true, ScareMaze = true }, function()
+			expect(Playlists.FewestPlayers()).toBe(1)
+		end)
 		withFeatures({ KingHunt = false, HideSeek = false, ScareMaze = false }, function()
-			-- Everything off: the fallback.
+			-- Everything off: the fallback, with anyone.
 			expect(#Playlists.Enabled()).toBe(0)
+			expect(Playlists.FewestPlayers()).toBe(1)
 			expect(ids(Playlists.Offer(10, 3))).toBe("KingHuntPatch")
 		end)
 	end)
@@ -203,6 +207,23 @@ describe("Ready pad", function()
 			expect(ReadyService.Count()).toBe(0)
 		end)
 		expect(ReplicatedStorage:GetAttribute("ReadyNeeded")).toBe(ReadyService.Needed())
+	end)
+
+	it("waits for enough ready players for the modes that are on", function()
+		withFeatures({ KingHunt = false, HideSeek = true, ScareMaze = false }, function()
+			expect(ReadyService.Needed()).toBe(2)
+			-- Too few ready players for Hide & Seek: no vote (and no King Hunt instead).
+			local VotingService = rt:require("ServerScriptService.Server.Services.VotingService")
+			local id, difficulty = VotingService.Run({
+				SetState = function() end,
+				AbortIf = function()
+					return false
+				end,
+			})
+			expect(id).toBeNil()
+			expect(difficulty).toBeNil()
+		end)
+		expect(ReadyService.Needed()).toBe(math.max(1, Config.Lobby.Ready.MinReady))
 	end)
 
 	it("has its settings and the spectate settings", function()

@@ -15,7 +15,8 @@
 	ReadyService.List() -> { Player }    the players who are ready right now
 	ReadyService.IsReady(player) -> boolean
 	ReadyService.Count() -> number
-	ReadyService.Needed() -> number      Config.Lobby.Ready.MinReady (at least 1)
+	ReadyService.Needed() -> number      Config.Lobby.Ready.MinReady (at least 1, and at least
+	                                     Playlists.FewestPlayers(): what the modes switched on need)
 	ReadyService.PadsActive() -> boolean true when a pad decides who is ready
 	ReadyService.Reset(players)          after a round: not ready again until they step on the pad again
 	ReadyService.Inside(position, cframe, size, shape, margin, height) -> boolean
@@ -30,6 +31,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Playlists = require(ReplicatedStorage.Shared.Playlists)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 
 local ReadyService = {}
@@ -203,7 +205,9 @@ local function check(): number
 end
 
 function ReadyService.Needed(): number
-	return math.max(1, Config.Lobby.Ready.MinReady)
+	-- (and never fewer than the smallest switched-on mode needs, e.g. 2 for Hide & Seek when
+	-- King Hunt is switched off)
+	return math.max(1, Config.Lobby.Ready.MinReady, Playlists.FewestPlayers())
 end
 
 function ReadyService.PadsActive(): boolean

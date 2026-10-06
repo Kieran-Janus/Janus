@@ -28,7 +28,9 @@ return {
 	-- With no ReadyPad part in the game, everyone in the lobby counts as ready (a warning
 	-- in the Output window says so), so rounds still start.
 	Ready = {
-		MinReady = 1, -- a vote starts once this many players are ready (2 = never alone)
+		-- A vote starts once this many players are ready (2 = never alone). Never fewer than the
+		-- switched-on modes need (Config.Modes MinPlayers): with only Hide & Seek on, that's 2.
+		MinReady = 1,
 		CheckSeconds = 0.25, -- how often the server checks who is standing on the pad
 		PadHeight = 12, -- studs above the pad's top that still count as standing on it (jumping is fine)
 		EdgeMargin = 1, -- studs past the pad's edge that still count (feet hanging over the side)

@@ -17,6 +17,8 @@
 	     after every scare). Reaching a part tagged MazeExit = escaped. Walking into a part
 	     tagged ScareTrigger sets off its scare (attribute Kind), then it waits Traps.Cooldown.
 	     Kind "Patrol": a scarecrow walks up and down that part; walking into it scares you.
+	     Moving faster than anyone can run (a teleport or fly cheat, src/shared/SpeedCheck.luau)
+	     puts the Survivor back where they were, measured from their start spot.
 	     Out Survivors join the Haunters (OutBecomeHaunters) or watch as ghosts.
 	  4. Ends when no Survivor is still running, or at 0:00 (whoever is still running is out).
 	Scores (Rules.Score): escaping = EscapePoints + time bonus; Haunters get points for every
@@ -40,6 +42,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Rules = require(ReplicatedStorage.Shared.ScareMazeRules)
+local SpeedCheck = require(ReplicatedStorage.Shared.SpeedCheck)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Types = require(script.Parent.Types)
 local Kit = require(script.Parent.Parent.Build.Kit)
@@ -59,8 +62,7 @@ local TAG_NAME = "ScareMazeTag" -- the Haunter name tag over a character's head
 
 type Runner = {
 	Tracker: Rules.Tracker,
-	LastPos: Vector3?,
-	LastTime: number,
+	Speed: SpeedCheck.Check, -- anti-cheat: the last good position (server time)
 	LockedUntil: number, -- can't escape before this (moved impossibly fast)
 	ScaredAt: number, -- last jumpscare
 	CreditBy: Player?, -- the Haunter whose BOO (or trap) scared them last
@@ -211,8 +213,22 @@ local function place(r: Round, player: Player, spawns: { BasePart }, index: numb
 	end
 	local runner = r.Runners[player]
 	if runner then
-		runner.LastPos = nil -- a teleport isn't cheating
+		-- The server moved them (not cheating): the anti-cheat measures from this spot.
+		local root = aliveRoot(player)
+		SpeedCheck.Reset(runner.Speed, if root then root.Position else spawn.Position, now())
 	end
+end
+
+-- How fast a Survivor can really move (Config.ScareMaze, read each time so tweaks apply).
+local function speedLimits(): SpeedCheck.Limits
+	local cfg = Config.ScareMaze
+	return {
+		MaxSpeed = cfg.MaxMoveSpeed,
+		Slack = cfg.SlackStuds,
+		MaxRiseSpeed = cfg.MaxRiseSpeed,
+		RiseSlack = cfg.RiseSlack,
+		WindowSeconds = cfg.SpeedWindowSeconds,
+	}
 end
 
 -- Scares ---------------------------------------------------------------------------------------
@@ -568,14 +584,16 @@ local function knockOut(r: Round, player: Player, reason: string, position: Vect
 		creditCatch(r, player, runner, position)
 	end
 	countAlive(r)
-	if reason == "TimeUp" or not r.Active then
+	if reason == "TimeUp" then
 		return
 	end
+	-- (Also during "Get ready": someone who resets then becomes a Haunter or a ghost too,
+	-- instead of waiting in the lobby for the whole round.)
 	if cfg.OutBecomeHaunters then
 		track(
 			r,
 			task.delay(cfg.OutToHaunterDelay, function()
-				if round == r and r.Active and player.Parent == Players then
+				if round == r and player.Parent == Players then
 					becomeHaunter(r, player)
 				end
 			end)
@@ -622,15 +640,18 @@ local function sample(r: Round)
 			continue
 		end
 		local position = root.Position
-		local last = runner.LastPos
-		if
-			last
-			and Rules.TooFast(last, position, t - runner.LastTime, cfg.MaxMoveSpeed, cfg.SlackStuds)
-		then
+		if SpeedCheck.Step(runner.Speed, position, t, speedLimits()) then
+			-- Moved impossibly fast (a teleport or fly cheat): back to the last good spot, and
+			-- no escaping for a moment.
 			runner.LockedUntil = t + cfg.EscapeLockSeconds
+			local back = runner.Speed.Last
+			local character = player.Character
+			if back and character then
+				character:PivotTo(character:GetPivot() + (back - position))
+				position = back
+			end
+			SpeedCheck.Reset(runner.Speed, back, t)
 		end
-		runner.LastPos = position
-		runner.LastTime = t
 		if Rules.Update(runner.Tracker, position, t, cfg.MinMoveStuds) >= cfg.StopSeconds then
 			knockOut(r, player, "Stopped", position)
 			continue
@@ -882,8 +903,7 @@ function ScareMaze.Run(ctx: Types.RoundContext): Types.RoundResult
 		player:SetAttribute(ATTR.State, "Running")
 		r.Runners[player] = {
 			Tracker = Rules.NewTracker(t0),
-			LastPos = nil,
-			LastTime = t0,
+			Speed = SpeedCheck.new(),
 			LockedUntil = 0,
 			ScaredAt = -math.huge,
 			CreditBy = nil,
@@ -979,7 +999,9 @@ function ScareMaze.Run(ctx: Types.RoundContext): Types.RoundResult
 	for player, runner in r.Runners do
 		runner.Tracker = Rules.NewTracker(start)
 		Rules.Grace(runner.Tracker, start + cfg.StartGraceSeconds)
-		runner.LastPos = nil
+		-- Still measured from their start spot (set by place()): nobody could move during
+		-- "Get ready", so a cheat that moved them then is caught on the first check.
+		SpeedCheck.Reset(runner.Speed, runner.Speed.Last, start)
 		player:SetAttribute(ATTR.GraceUntil, runner.Tracker.GraceUntil)
 	end
 	for _, trap in r.Traps do

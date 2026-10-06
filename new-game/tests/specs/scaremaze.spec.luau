@@ -522,6 +522,140 @@ describe("A ScareMaze round", function()
 	end)
 end)
 
+describe("ScareMaze anti-cheat and resets", function()
+	local server = Runtime.new()
+	local SConfig = server:require("ReplicatedStorage.Shared.Config")
+	local SRules = server:require("ReplicatedStorage.Shared.ScareMazeRules")
+	local RS = server.game:GetService("ReplicatedStorage")
+	local SV3, SCF = server.env.Vector3, server.env.CFrame
+	local cfg = SConfig.ScareMaze
+	local DataService = server:require("ServerScriptService.Server.Services.DataService")
+	local MapService = server:require("ServerScriptService.Server.Services.MapService")
+	local Mode = server:require("ServerScriptService.Server.Modes.ScareMaze")
+	local ATTR = SRules.Attributes
+	local cheat, resetter, exitPos, start
+
+	local function at(player: any): any
+		return player.Character.HumanoidRootPart.Position
+	end
+	local function flat(a: any, b: any): number
+		return math.sqrt((a.X - b.X) ^ 2 + (a.Z - b.Z) ^ 2)
+	end
+
+	it("catches a Survivor who teleports to the exit during 'Get ready'", function()
+		DataService.Start()
+		local players = {
+			server:addPlayer({ Name = "Cheat" }),
+			server:addPlayer({ Name = "Resetter" }),
+			server:addPlayer({ Name = "Boo" }),
+		}
+		server:advance(1)
+		local map = MapService.Load("ScareMaze")
+		for _, d in map.Model:GetDescendants() do
+			if d:HasTag("MazeExit") then
+				exitPos = d.Position
+			end
+		end
+		server.env.task.spawn(function()
+			Mode.Run({
+				Map = map,
+				Players = players,
+				Difficulty = SConfig.Difficulty.Default,
+				Playlist = SConfig.Modes.Playlists[1],
+				SetState = function(state: string, timeLeft: number)
+					RS:SetAttribute("State", state)
+					RS:SetAttribute("TimeLeft", timeLeft)
+				end,
+				Countdown = function(state: string, seconds: number, stopIf: (() -> boolean)?)
+					for remaining = seconds, 1, -1 do
+						if stopIf and stopIf() then
+							return
+						end
+						RS:SetAttribute("State", state)
+						RS:SetAttribute("TimeLeft", remaining)
+						server.env.task.wait(1)
+					end
+				end,
+				Teleport = function(player: any, spawn: any)
+					player.Character:PivotTo(
+						SCF.new(spawn.Position + SV3.new(0, SConfig.Maps.SpawnHeight, 0))
+					)
+				end,
+				AliveHumanoid = function(player: any): any
+					local character = player.Character
+					return character and character:FindFirstChildOfClass("Humanoid")
+				end,
+			})
+		end)
+		server:flush()
+		for _, player in players do
+			if player:GetAttribute(ATTR.Team) == "Survivors" then
+				if cheat then
+					resetter = player
+				else
+					cheat = player
+				end
+			end
+		end
+		expect(cheat).toBeTruthy()
+		expect(resetter).toBeTruthy()
+		expect(RS:GetAttribute("State")).toBe("Get ready")
+		start = at(cheat)
+		-- An exploit moves the character while everyone is frozen; the other one resets.
+		cheat.Character:PivotTo(SCF.new(exitPos))
+		resetter.Character:FindFirstChildOfClass("Humanoid").Health = 0
+		server:advance(cfg.IntroSeconds + 0.3)
+		expect(RS:GetAttribute("State")).toBe("Playing")
+		expect(cheat:GetAttribute(ATTR.State)).toBe("Running") -- not escaped...
+		expect(flat(at(cheat), start)).toBeLessThan(1) -- ...but back at the start
+	end)
+
+	it("turns a Survivor who reset during 'Get ready' into a Haunter", function()
+		expect(resetter:GetAttribute(ATTR.State)).toBe("Out")
+		expect(resetter:GetAttribute(ATTR.Team)).toBe("Haunters")
+		server:spawnCharacter(resetter)
+		server:advance(0.2)
+		local head = resetter.Character:FindFirstChild("Head")
+		expect(head:FindFirstChild("ScareMazeTag")).toBeTruthy()
+	end)
+
+	it("puts a Survivor who teleports or flies mid-run back where they were", function()
+		-- Walks (legally, 15 studs/s) towards the exit for a second.
+		for _ = 1, 10 do
+			local now = at(cheat)
+			local step = SV3.new(exitPos.X - now.X, 0, exitPos.Z - now.Z).Unit * 1.5
+			cheat.Character:PivotTo(SCF.new(now + step))
+			server:advance(0.1)
+		end
+		local walked = at(cheat)
+		expect(flat(walked, start)).toBeGreaterThan(10)
+		server:advance(cfg.SampleSeconds + 0.05)
+		cheat.Character:PivotTo(SCF.new(exitPos)) -- teleport
+		server:advance(cfg.SampleSeconds + 0.05)
+		expect(cheat:GetAttribute(ATTR.State)).toBe("Running")
+		expect(flat(at(cheat), walked)).toBeLessThan(1)
+		cheat.Character:PivotTo(SCF.new(walked + SV3.new(0, 40, 0))) -- flying up
+		server:advance(cfg.SampleSeconds + 0.05)
+		expect(at(cheat).Y).toBeLessThan(walked.Y + 1)
+		-- Slack doesn't add up: small hops of 12 studs every check are caught within a second.
+		local caught = false
+		for _ = 1, 10 do
+			local before = at(cheat)
+			local step = SV3.new(exitPos.X - before.X, 0, exitPos.Z - before.Z).Unit * 12
+			cheat.Character:PivotTo(SCF.new(before + step))
+			server:advance(cfg.SampleSeconds)
+			if flat(at(cheat), before) < 1 then
+				caught = true
+				break
+			end
+		end
+		expect(caught).toBe(true)
+		expect(cheat:GetAttribute(ATTR.State)).toBe("Running")
+		Mode.Cleanup()
+		MapService.Unload()
+	end)
+end)
+
 describe("ScareMaze screen", function()
 	local client = Runtime.new({ client = true })
 	local CConfig = client:require("ReplicatedStorage.Shared.Config")

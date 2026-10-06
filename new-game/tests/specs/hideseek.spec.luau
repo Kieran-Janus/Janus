@@ -255,8 +255,9 @@ describe("Hide & Seek maps", function()
 	end)
 end)
 
--- A round of Hide & Seek on the Pumpkin Farm, driven step by step.
-local function newRound(playerCount: number)
+-- A round of Hide & Seek on the Pumpkin Farm, driven step by step. `setup(rt, players, map)`
+-- (optional) runs once the players' saves and the map are loaded, just before the round.
+local function newRound(playerCount: number, setup: ((any, { any }, any) -> ())?)
 	local rt = Runtime.new()
 	local Config = rt:require("ReplicatedStorage.Shared.Config")
 	local DataService = rt:require("ServerScriptService.Server.Services.DataService")
@@ -270,6 +271,9 @@ local function newRound(playerCount: number)
 	end
 	rt:advance(1)
 	local map = MapService.Load("PumpkinFarm")
+	if setup then
+		setup(rt, players, map)
+	end
 	local state = { Result = nil :: any, Done = false }
 	local ctx = {
 		Map = map,
@@ -571,5 +575,250 @@ describe("Hide & Seek with players leaving", function()
 		round.rt:advance(10)
 		expect(round.state.Done).toBe(true)
 		expect(round.state.Result.Winner).toBeA("string")
+	end)
+end)
+
+-- Every BasePart and Decal of a character that can be seen (1 = invisible).
+local function visibleParts(character: any): { string }
+	local list = {}
+	for _, d in character:GetDescendants() do
+		if (d:IsA("BasePart") or d:IsA("Decal")) and d.Transparency < 1 then
+			table.insert(list, d:GetFullName())
+		end
+	end
+	return list
+end
+
+describe("Hide & Seek fair play", function()
+	it("keeps a hider hidden when the shop dresses them; found, their look comes back", function()
+		local skin
+		local round = newRound(2, function(rt, players)
+			local Config = rt:require("ReplicatedStorage.Shared.Config")
+			local DataService = rt:require("ServerScriptService.Server.Services.DataService")
+			local ShopService = rt:require("ServerScriptService.Server.Services.ShopService")
+			-- A see-through skin (Ghost-like): wearing it again used to show the whole body.
+			for _, item in Config.Shop.Items do
+				local style = item.Style
+				if item.Slot == "Skin" and style and type(style.Transparency) == "number" then
+					skin = item
+					break
+				end
+			end
+			expect(skin).toBeTruthy()
+			for _, player in players do
+				local data = DataService.Get(player)
+				data.Owned[skin.Id] = true
+				data.Equipped.Skin = skin.Id
+				ShopService.Dress(player)
+			end
+		end)
+		local rt = round.rt
+		local ShopService = rt:require("ServerScriptService.Server.Services.ShopService")
+		local hider = round.withRole("Hider")[1]
+		local seeker = round.withRole("Seeker")[1]
+		expect(#visibleParts(hider.Character)).toBe(0)
+		-- Equipping (or buying) anything mid-round dresses the character again.
+		round.DataService.Get(hider).Equipped.Skin = ""
+		ShopService.Dress(hider)
+		round.DataService.Get(hider).Equipped.Skin = skin.Id
+		ShopService.Dress(hider)
+		rt:advance(0.1)
+		expect(#visibleParts(hider.Character)).toBe(0)
+		expect(round.DataService.Get(hider).Equipped.Skin).toBe(skin.Id) -- still saved
+		-- Found: their own look (the skin they had on) comes back.
+		rt:advance(round.Config.HideSeek.HeadStart + 0.5)
+		round.shootAt(seeker, round.pumpkinOf(hider).PrimaryPart.Position)
+		expect(round.role(hider)).toBe("Seeker")
+		rt:advance(0.1)
+		local head = hider.Character:FindFirstChild("Head")
+		expect(head.Transparency).toBeLessThan(1)
+		expect(head:GetAttribute("Skin_Transparency")).never.toBeNil() -- the skin is on again
+		round.HideSeek.Cleanup()
+	end)
+
+	it(
+		"keeps a reset hider's pumpkin in place (it can still be found) and brings them back",
+		function()
+			local round = newRound(3)
+			local rt, cfg = round.rt, round.Config.HideSeek
+			rt:advance(cfg.HeadStart + 0.5)
+			expect(round.RS:GetAttribute("State")).toBe("Playing")
+			local seeker = round.withRole("Seeker")[1]
+			local hiders = round.withRole("Hider")
+			local stayer, caught = hiders[1], hiders[2]
+
+			-- Esc > Reset: the pumpkin stays (anchored), the hider is still a hider.
+			local pumpkin = round.pumpkinOf(stayer)
+			local spot = pumpkin:GetPivot().Position
+			stayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
+			rt:advance(0.1)
+			expect(round.pumpkinOf(stayer)).toBe(pumpkin)
+			expect(pumpkin.PrimaryPart.Anchored).toBe(true)
+			expect(round.role(stayer)).toBe("Hider")
+			expect(round.RS:GetAttribute("HidersLeft")).toBe(2)
+			-- Respawning puts them back on that spot as the same pumpkin, not on a hider spawn.
+			local color = pumpkin.PrimaryPart.Color
+			rt:spawnCharacter(stayer)
+			rt:advance(0.5)
+			local again = round.pumpkinOf(stayer)
+			expect(again).toBeTruthy()
+			expect(again).never.toBe(pumpkin)
+			expect(pumpkin.Parent).toBeNil()
+			expect(again.PrimaryPart.Color).toBeNear(color)
+			local root = stayer.Character.HumanoidRootPart.Position
+			expect(math.abs(root.X - spot.X) + math.abs(root.Z - spot.Z)).toBeLessThan(0.5)
+			expect(#visibleParts(stayer.Character)).toBe(0)
+
+			-- A seeker can still tag the pumpkin of a hider who is waiting to respawn.
+			caught.Character:FindFirstChildOfClass("Humanoid").Health = 0
+			rt:advance(0.1)
+			local waiting = round.pumpkinOf(caught)
+			expect(waiting).toBeTruthy()
+			round.shootAt(seeker, waiting.PrimaryPart.Position)
+			expect(round.role(caught)).toBe("Seeker")
+			expect(round.RS:GetAttribute("HidersLeft")).toBe(1)
+			expect(waiting.Parent).toBeNil()
+			round.HideSeek.Cleanup()
+		end
+	)
+
+	it("lines extra seekers up in the hut instead of stacking them on the 4 pads", function()
+		local round = newRound(24) -- 6 seekers
+		local seekers = round.withRole("Seeker")
+		expect(#seekers).toBe(6)
+		local hut = round.map.Model:FindFirstChild("SeekerHut", true)
+		for i, a in seekers do
+			local pa = a.Character.HumanoidRootPart.Position
+			local offset = hut:GetPivot():PointToObjectSpace(pa)
+			expect(math.abs(offset.X)).toBeLessThan(7)
+			expect(math.abs(offset.Z)).toBeLessThan(7)
+			for j = i + 1, #seekers do
+				local pb = seekers[j].Character.HumanoidRootPart.Position
+				local apart = math.sqrt((pa.X - pb.X) ^ 2 + (pa.Z - pb.Z) ^ 2)
+				expect(apart).toBeGreaterThan(2.5)
+			end
+		end
+		round.HideSeek.Cleanup()
+	end)
+
+	it(
+		"dresses hiders as copies of the map's own decoys (a hand-edited map still matches)",
+		function()
+			local color = nil
+			local round = newRound(3, function(rt, _players, map)
+				-- As if the decoys of a baked map had been recoloured by hand.
+				color = rt.env.Color3.fromRGB(40, 200, 250)
+				for _, decoy in rt.game:GetService("CollectionService"):GetTagged("HidingDecoy") do
+					if decoy:IsDescendantOf(map.Model) then
+						for _, d in decoy:GetDescendants() do
+							if d:IsA("BasePart") then
+								d.Color = color
+							end
+						end
+					end
+				end
+			end)
+			local CollectionService = round.rt.game:GetService("CollectionService")
+			for _, hider in round.withRole("Hider") do
+				local pumpkin = round.pumpkinOf(hider)
+				expect(pumpkin).toBeTruthy()
+				expect(pumpkin.PrimaryPart.Color).toBeNear(color)
+				expect(pumpkin:GetAttribute("PumpkinWidth")).toBeA("number")
+				expect(CollectionService:HasTag(pumpkin, "HidingDecoy")).toBe(false)
+			end
+			round.HideSeek.Cleanup()
+		end
+	)
+end)
+
+describe("Hide & Seek on the lobby's screens", function()
+	local client = Runtime.new({ client = true })
+	local RS = client.game:GetService("ReplicatedStorage")
+	local me = client.localPlayer
+	-- What the server would have replicated once a Hide & Seek round is on.
+	local remotes = client:create("Folder", { Name = "Remotes" }, RS)
+	client:create("RemoteEvent", { Name = "HideSeekEvent" }, remotes)
+	client:create("RemoteEvent", { Name = "HideSeekShoot" }, remotes)
+	local SpectateTargets =
+		client:require("StarterPlayer.StarterPlayerScripts.Client.SpectateTargets")
+
+	it("never lets spectators watch a hidden pumpkin", function()
+		local hider = client:addPlayer({ Name = "Pumpkin", character = false })
+		local seeker = client:addPlayer({ Name = "Seeker", character = false })
+		for _, player in { hider, seeker } do
+			player:SetAttribute("InRound", true)
+		end
+		hider:SetAttribute("HideSeekRole", "Hider")
+		seeker:SetAttribute("HideSeekRole", "Seeker")
+		RS:SetAttribute("Mode", "HideSeek")
+		local list = SpectateTargets.List()
+		expect(table.find(list, seeker)).toBeTruthy()
+		expect(table.find(list, hider)).toBeNil()
+		expect(SpectateTargets.Watchable(hider)).toBe(false)
+		expect(SpectateTargets.Watchable(seeker)).toBe(true)
+		-- Found: now a seeker, so they can be watched.
+		hider:SetAttribute("HideSeekRole", "Seeker")
+		expect(SpectateTargets.Watchable(hider)).toBe(true)
+		hider:SetAttribute("HideSeekRole", "Hider")
+		RS:SetAttribute("Mode", "KingHunt") -- other modes: everyone in the round
+		expect(SpectateTargets.Watchable(hider)).toBe(true)
+		RS:SetAttribute("Mode", nil)
+		expect(me:GetAttribute("InRound")).toBeNil()
+	end)
+
+	it("switches chat bubbles off while a round is on, and back on afterwards", function()
+		local chat = client.game:GetService("TextChatService")
+		local bubbles = client:create("BubbleChatConfiguration", {}, chat)
+		bubbles.Enabled = true
+		local gui = client:create("ScreenGui", { Name = "GameUI" }, me:FindFirstChild("PlayerGui"))
+		local UI = client:require("StarterPlayer.StarterPlayerScripts.Client.HideSeekUI")
+		UI.Mount(gui)
+		client:advance(0.1)
+		expect(bubbles.Enabled).toBe(true)
+		RS:SetAttribute("Mode", "HideSeek")
+		RS:SetAttribute("State", "Hiding")
+		client:advance(0.1)
+		expect(bubbles.Enabled).toBe(false)
+		RS:SetAttribute("State", "Playing")
+		client:advance(0.1)
+		expect(bubbles.Enabled).toBe(false)
+		RS:SetAttribute("State", "Results")
+		client:advance(0.1)
+		expect(bubbles.Enabled).toBe(true)
+		RS:SetAttribute("Mode", nil)
+	end)
+end)
+
+describe("Hide & Seek through the real round loop", function()
+	local server = Runtime.new({ studio = true })
+	local RS = server.game:GetService("ReplicatedStorage")
+
+	it("refuses 'Start round now' while the hiders hide", function()
+		local ok, err = server:runScript("ServerScriptService.Server.Main")
+		if not ok then
+			error(err, 0)
+		end
+		server:advance(1)
+		local players = { server:addPlayer({ Name = "One" }), server:addPlayer({ Name = "Two" }) }
+		server:advance(2)
+		local admin = server:find("ReplicatedStorage.Remotes.AdminCommand")
+		local forced, message = server:invokeServer(admin, players[1], "ForceHideSeek")
+		expect(forced).toBe(true)
+		expect(message).toMatch("Hide")
+		local pad = server.game:GetService("CollectionService"):GetTagged("ReadyPad")[1]
+		for i, player in players do
+			player.Character:PivotTo(
+				pad.CFrame + server.env.Vector3.new(i * 2 - 3, pad.Size.Y / 2 + 3, 0)
+			)
+		end
+		local waited = 0
+		while RS:GetAttribute("State") ~= "Hiding" and waited < 120 do
+			server:advance(1)
+			waited += 1
+		end
+		expect(RS:GetAttribute("State")).toBe("Hiding")
+		server:advance(0.5)
+		local _, answer = server:invokeServer(admin, players[1], "StartRoundNow")
+		expect(answer).toMatch("already")
 	end)
 end)
