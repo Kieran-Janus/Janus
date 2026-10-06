@@ -986,8 +986,8 @@ local function buildFinish(top: CFrame, size: Vector3, m: Model): BasePart
 end
 
 -- Decorations around the course (bats flying about, a few lanterns).
-local function buildDecor(zone: Zone, area: Model)
-	local folder = Kit.model("Decor", area)
+local function buildDecor(zone: Zone, area: Instance)
+	local folder = Kit.group("Decor", area)
 	local frame = courseFrame(zone)
 	local rng = Random.new(Config.Hub.Seed + 7)
 	local spots = {
@@ -1060,15 +1060,15 @@ end
 
 -- Building -------------------------------------------------------------------------------------
 
-function Parkour.Build(hub: Model, zone: Zone): Model
-	local area = Kit.model("Parkour", hub)
+function Parkour.Build(hub: Instance, zone: Zone): Instance
+	local area = Kit.group("Parkour", hub)
 	if not Config.Features.Parkour then
 		return area
 	end
 	for _, problem in ParkourLogic.Check(cfg.Course :: { Step }, zone.Size) do
 		warn("[Parkour] " .. problem)
 	end
-	local course = Kit.model("Course", area)
+	local course = Kit.group("Course", area)
 	for i, step in cfg.Course :: { Step } do
 		if type(step) ~= "table" or typeof(step.Offset) ~= "Vector3" then
 			continue -- Check() above already explained what is wrong with this line
@@ -1096,12 +1096,12 @@ local function hasTagged(root: Instance, tag: string): boolean
 	return false
 end
 
-function Parkour.Repair(hub: Model, zone: Zone): Model
+function Parkour.Repair(hub: Instance, zone: Zone): Instance
 	local existing = hub:FindFirstChild("Parkour")
 	if not Config.Features.Parkour then
-		return if existing and existing:IsA("Model") then existing else Kit.model("Parkour", hub)
+		return if existing and Kit.isGroup(existing) then existing else Kit.group("Parkour", hub)
 	end
-	if existing and existing:IsA("Model") then
+	if existing and Kit.isGroup(existing) then
 		local others = hasTagged(existing, Tags.ParkourCheckpoint)
 			or hasTagged(existing, Tags.ParkourFinish)
 		if others then

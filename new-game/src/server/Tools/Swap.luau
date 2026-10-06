@@ -27,6 +27,13 @@
 	      called "Pumpkin", a gravestone's slab "Tombstone"), are left alone: a prop name
 	      (Pumpkin, Gravestone...) goes in Custom.Props and Swap.Props() instead.
 
+	  require(game.ServerScriptService.Server.Tools.Swap).Toolbox("Pumpkin", 11600489662)
+	      Downloads that Toolbox (Creator Store) model (scripts removed), puts it in
+	      Custom.Props as "Pumpkin" and runs Props(): every pumpkin gets that look. A list of
+	      names works too. The code can be the number or the Creator Store link.
+	  require(game.ServerScriptService.Server.Tools.Swap).Selected(11600489662)
+	      Only what you selected in Studio gets that look; every other copy stays as it is.
+
 	Each one prints what it did and returns how many it changed (and that message).
 	Step by step: docs/CUSTOMIZE.md > "Swap every copy of something at once".
 ]]
@@ -202,6 +209,35 @@ local function restore(custom: Model, original: Model)
 	custom:Destroy()
 end
 
+-- Swaps one prop for its custom model (or `model`, another Custom.Props name), keeping the
+-- built look as a backup (Revert); a custom one is just replaced. Returns the new one.
+local function swapOne(old: Model, model: string?): Model?
+	local new = Kit.swapProp(old, model)
+	if not new then
+		return nil
+	end
+	local original = originalOf(old)
+	if not original and old:GetAttribute("CustomProp") ~= true then
+		original = old
+	end
+	if original then
+		local link = Instance.new("ObjectValue")
+		link.Name = ORIGINAL
+		link.Value = original
+		link.Parent = new
+	end
+	if original == old then
+		for _, tag in CollectionService:GetTags(old) do
+			-- (a backup must never count as a working piece)
+			CollectionService:RemoveTag(old, tag)
+		end
+		old.Parent = backupFolder()
+	else
+		old:Destroy()
+	end
+	return new
+end
+
 --[[
 	Swaps every prop (Model with a PropName attribute) in Workspace and ServerStorage.Maps for
 	its model in ReplicatedStorage.Custom.Props. Returns how many props it changed and the
@@ -222,7 +258,7 @@ function Swap.Props(options: (PropsOptions | string)?): (number, string)
 				-- Custom props whose model is no longer in Custom.Props: back to the built look.
 				local gone = Kit.findProps(root, function(m: Model): boolean
 					return m:GetAttribute("CustomProp") == true
-						and not CustomAssets.Has("Props", m:GetAttribute("PropName") :: string)
+						and not CustomAssets.Has("Props", Kit.customName(m) or "")
 						and not inUse(m)
 				end)
 				for _, custom in gone do
@@ -238,7 +274,7 @@ function Swap.Props(options: (PropsOptions | string)?): (number, string)
 				end
 			end
 			local list = Kit.findProps(root, function(m: Model): boolean
-				if not CustomAssets.Has("Props", m:GetAttribute("PropName") :: string) then
+				if not CustomAssets.Has("Props", Kit.customName(m) or "") then
 					return false
 				end
 				if inUse(m) then
@@ -249,29 +285,8 @@ function Swap.Props(options: (PropsOptions | string)?): (number, string)
 			end)
 			for _, old in list do
 				local name = old:GetAttribute("PropName") :: string
-				local new = Kit.swapProp(old)
-				if not new then
+				if not swapOne(old) then
 					continue
-				end
-				-- Keep the built look as a backup (Revert); a custom one is just replaced.
-				local original = originalOf(old)
-				if not original and old:GetAttribute("CustomProp") ~= true then
-					original = old
-				end
-				if original then
-					local link = Instance.new("ObjectValue")
-					link.Name = ORIGINAL
-					link.Value = original
-					link.Parent = new
-				end
-				if original == old then
-					for _, tag in CollectionService:GetTags(old) do
-						-- (a backup must never count as a working piece)
-						CollectionService:RemoveTag(old, tag)
-					end
-					old.Parent = backupFolder()
-				else
-					old:Destroy()
 				end
 				swapped[name] = (swapped[name] or 0) + 1
 				total += 1
@@ -525,6 +540,287 @@ function Swap.Replace(name: string, model: Instance, root: Instance?): (number, 
 	end
 	say(message)
 	return count, message
+end
+
+-- Toolbox models -----------------------------------------------------------------------------
+
+local CUSTOM_BACKUPS = "CustomBackups" -- ServerStorage.CustomBackups: custom models replaced
+
+-- The asset id in a Toolbox code: a number, "12345678" or a Creator Store link.
+local function assetId(code: unknown): number?
+	if type(code) == "number" then
+		return if code > 0 then math.floor(code) else nil
+	end
+	if type(code) == "string" then
+		local digits = code:match("(%d%d%d%d%d+)")
+		return if digits then tonumber(digits) else nil
+	end
+	return nil
+end
+
+--[[
+	Downloads a Toolbox (Creator Store) model as one Model with every script removed (free
+	models can hide bad ones). Only works in Studio (the command bar). Returns the model, or nil
+	and why not.
+]]
+local function loadToolbox(id: number): (Model?, string?)
+	local items: { Instance } = {}
+	local ok, result = pcall(function()
+		return (game :: any):GetObjects("rbxassetid://" .. id)
+	end)
+	if ok and type(result) == "table" then
+		items = result
+	end
+	if #items == 0 then
+		local loaded, container = pcall(function()
+			return game:GetService("InsertService"):LoadAsset(id)
+		end)
+		if loaded and container then
+			items = container:GetChildren()
+		end
+	end
+	if #items == 0 then
+		return nil,
+			("Couldn't load Toolbox code %d. Check it is a free Model (not a decal, mesh or sound), and run this in the command bar while the game is NOT running."):format(
+				id
+			)
+	end
+	local model: Model
+	if #items == 1 and items[1]:IsA("Model") then
+		model = items[1] :: Model
+	else
+		model = Instance.new("Model")
+		for _, item in items do
+			if item:IsA("Accessory") then
+				-- A hat from the Toolbox: keep its parts, not the hat itself.
+				for _, child in item:GetChildren() do
+					child.Parent = model
+				end
+				item:Destroy()
+			else
+				item.Parent = model
+			end
+		end
+	end
+	for _, d in model:GetDescendants() do
+		if
+			d:IsA("LuaSourceContainer") or (d:IsA("JointInstance") and d.Name == "AccessoryWeld")
+		then
+			d:Destroy()
+		end
+	end
+	if not model:FindFirstChildWhichIsA("BasePart", true) then
+		model:Destroy()
+		return nil, ("Toolbox code %d has nothing you can see in it (no parts)."):format(id)
+	end
+	return model, nil
+end
+
+-- (Tests swap this for a fake download.)
+Swap.LoadToolbox = loadToolbox
+
+-- ReplicatedStorage.Custom.Props (made if missing).
+local function customProps(): Instance
+	local custom = ReplicatedStorage:FindFirstChild("Custom")
+	if not custom then
+		custom = Instance.new("Folder")
+		custom.Name = "Custom"
+		custom.Parent = ReplicatedStorage
+	end
+	local props = (custom :: Instance):FindFirstChild("Props")
+	if not props then
+		props = Instance.new("Folder")
+		props.Name = "Props"
+		props.Parent = custom
+	end
+	return props :: Instance
+end
+
+-- Puts `model` in Custom.Props as `name`; a model already there moves to
+-- ServerStorage.CustomBackups (so you can drag it back).
+local function storeCustom(name: string, model: Model, id: number)
+	local props = customProps()
+	local existing = props:FindFirstChild(name)
+	if existing then
+		local backups = ServerStorage:FindFirstChild(CUSTOM_BACKUPS)
+		if not backups then
+			backups = Instance.new("Folder")
+			backups.Name = CUSTOM_BACKUPS
+			backups.Parent = ServerStorage
+		end
+		local older = (backups :: Instance):FindFirstChild(name)
+		if older then
+			older:Destroy()
+		end
+		existing.Parent = backups
+	end
+	model.Name = name
+	model:SetAttribute("ToolboxId", id)
+	model.Parent = props
+end
+
+local function notCode(example: string): (number, string)
+	local message = ("That isn't a Toolbox code: use the number from the model's page, e.g. %s."):format(
+		example
+	)
+	say(message)
+	return 0, message
+end
+
+--[[
+	Every copy of a prop gets the look of a Toolbox model:
+	  require(game.ServerScriptService.Server.Tools.Swap).Toolbox("Pumpkin", 12345678)
+	  require(game.ServerScriptService.Server.Tools.Swap).Toolbox({ "Pumpkin", "ParkourPumpkin" }, 12345678)
+	The code can also be the Creator Store link. It downloads the model (scripts removed), puts
+	it in ReplicatedStorage.Custom.Props under each name, then runs Swap.Props(): every copy in
+	the lobby and baked maps changes now, and everything built later (round maps, a rebuilt
+	lobby) uses it too. Things given a look of their own (Swap.Selected) keep theirs. Run it in
+	edit mode, then save (Ctrl+S).
+]]
+function Swap.Toolbox(names: string | { string }, code: number | string): (number, string)
+	local list: { string } = if type(names) == "table" then names else { names :: string }
+	local id = assetId(code)
+	if not id then
+		return notCode('Toolbox("Pumpkin", 12345678)')
+	end
+	local model, problem = Swap.LoadToolbox(id)
+	if not model then
+		say(problem :: string)
+		return 0, problem :: string
+	end
+	undoable("Toolbox model", function()
+		for i, name in list do
+			storeCustom(name, if i == #list then model else model:Clone(), id)
+		end
+	end)
+	say(
+		("Toolbox model %d is now Custom.Props.%s."):format(
+			id,
+			table.concat(list, ", Custom.Props.")
+		)
+	)
+	return Swap.Props()
+end
+
+-- The prop to give a new look when you selected `thing` (itself, the one it is inside, or the
+-- only one inside it), or nil and why not.
+local function selectedProp(thing: Instance): (Model?, string?)
+	local node: Instance? = thing
+	while node and node ~= workspace do
+		if node:IsA("Model") and typeof(node:GetAttribute("PropName")) == "string" then
+			return node, nil
+		end
+		node = node.Parent
+	end
+	local inside = Kit.findProps(thing, function(): boolean
+		return true
+	end)
+	if #inside == 1 then
+		return inside[1], nil
+	end
+	if #inside > 1 then
+		local names = {}
+		for _, m in inside do
+			table.insert(names, m:GetAttribute("PropName") :: string)
+		end
+		return nil,
+			("%s has several things in it (%s): Alt+click the one you want and run it again."):format(
+				thing.Name,
+				table.concat(names, ", ")
+			)
+	end
+	return nil,
+		("%s can't change its look this way (it isn't a prop). Swap.Replace can replace hand-placed things by name."):format(
+			thing.Name
+		)
+end
+
+--[[
+	Only the thing(s) you selected in Studio get the look of a Toolbox model; every other copy
+	stays as it is:
+	  require(game.ServerScriptService.Server.Tools.Swap).Selected(12345678)
+	Click one thing (or several with Ctrl+click), then run it in the command bar. The model is
+	kept in Custom.Props as "<name>_<code>" (e.g. Pumpkin_12345678) and the thing remembers it
+	(attribute CustomModel), so Swap.Toolbox and Swap.Props never change it back. Ctrl+Z undoes
+	it. To give it the normal look again: delete that model from Custom.Props and run
+	Swap.Props({ Revert = true }).
+	`things` (optional) is a list to use instead of the Studio selection.
+]]
+function Swap.Selected(code: number | string, things: { Instance }?): (number, string)
+	local id = assetId(code)
+	if not id then
+		return notCode("Selected(12345678)")
+	end
+	local selected: { Instance } = things or {}
+	if not things then
+		pcall(function()
+			selected = game:GetService("Selection"):Get()
+		end)
+	end
+	if #selected == 0 then
+		local message = "Nothing is selected: click the thing you want to change in Studio first."
+		say(message)
+		return 0, message
+	end
+	local targets: { Model } = {}
+	local seen: { [Model]: boolean } = {}
+	local lines: { string } = {}
+	for _, thing in selected do
+		local prop, why = selectedProp(thing)
+		if prop and not seen[prop] then
+			seen[prop] = true
+			table.insert(targets, prop)
+		elseif why then
+			table.insert(lines, why)
+		end
+	end
+	local changed = 0
+	if #targets > 0 then
+		local model, problem = Swap.LoadToolbox(id)
+		if not model then
+			say(problem :: string)
+			return 0, problem :: string
+		end
+		local news: { Instance } = {}
+		undoable("Toolbox look for the selection", function()
+			local stored: { [string]: boolean } = {}
+			for _, prop in targets do
+				local custom = ("%s_%d"):format(prop:GetAttribute("PropName") :: string, id)
+				if not stored[custom] then
+					stored[custom] = true
+					storeCustom(custom, model:Clone(), id)
+				end
+				local new = swapOne(prop, custom)
+				if new then
+					changed += 1
+					table.insert(news, new)
+				end
+			end
+		end)
+		model:Destroy()
+		if not things then
+			pcall(function()
+				game:GetService("Selection"):Set(news)
+			end)
+		end
+		table.insert(
+			lines,
+			1,
+			("Gave %d selected thing(s) the look of Toolbox model %d; every other copy is unchanged."):format(
+				changed,
+				id
+			)
+		)
+		table.insert(
+			lines,
+			if RunService:IsRunning()
+				then "(This playtest only: stop the game and run it in the command bar to keep it.)"
+				else "Save the place (Ctrl+S) to keep it. Ctrl+Z undoes it."
+		)
+	end
+	local message = table.concat(lines, " ")
+	say(message)
+	return changed, message
 end
 
 return Swap

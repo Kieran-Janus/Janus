@@ -439,7 +439,7 @@ local function ensureGrove()
 		return
 	end
 	local hub = workspace:FindFirstChild("Hub")
-	if not (hub and hub:IsA("Model")) then
+	if not (hub and (hub:IsA("Folder") or hub:IsA("Model"))) then
 		return
 	end
 	local sections = Hub:FindFirstChild("Sections")

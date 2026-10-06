@@ -177,7 +177,7 @@ function Npcs.AddPrompt(def: NpcDef, anchor: BasePart): ProximityPrompt
 	return p
 end
 
-local function npcsFolder(hub: Model): Instance
+local function npcsFolder(hub: Instance): Instance
 	local folder = hub:FindFirstChild("Npcs")
 	if folder then
 		return folder
@@ -188,7 +188,7 @@ local function npcsFolder(hub: Model): Instance
 	return created
 end
 
-function Npcs.Build(def: NpcDef, hub: Model): Model?
+function Npcs.Build(def: NpcDef, hub: Instance): Model?
 	local build = builders[def.Kind]
 	if not build then
 		warn(("[Npcs] %s has an unknown Kind %q"):format(def.Id, tostring(def.Kind)))
@@ -229,14 +229,14 @@ function Npcs.AttachPrompt(def: NpcDef, m: Model, cf: CFrame): BasePart
 	return anchor
 end
 
-function Npcs.BuildAll(hub: Model)
+function Npcs.BuildAll(hub: Instance)
 	npcsFolder(hub)
 	for _, def in Config.Npcs.List do
 		Npcs.Build(def, hub)
 	end
 end
 
-function Npcs.Find(hub: Model, id: string): Model?
+function Npcs.Find(hub: Instance, id: string): Model?
 	for _, d in hub:GetDescendants() do
 		if d:IsA("Model") and d:GetAttribute("NpcId") == id then
 			return d
@@ -336,7 +336,7 @@ end
 	It stands behind the stall's counter, measured from the stall's pivot (so a stall moved in
 	Studio keeps its keeper), turned left/right only.
 ]]
-function Npcs.ApplyCustom(hub: Model)
+function Npcs.ApplyCustom(hub: Instance)
 	for _, def in Config.Npcs.List do
 		if not CHARACTER_KINDS[def.Kind] then
 			continue

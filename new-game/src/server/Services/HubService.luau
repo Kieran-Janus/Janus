@@ -26,7 +26,7 @@
 	Edit the hub by hand: docs/CUSTOMIZE.md > "Editing the lobby and maps by hand", or build it
 	into the place from the command bar: require(game.ServerScriptService.Server.Tools.Bake).Hub()
 
-	HubService.Get() -> Model?
+	HubService.Get() -> Instance?
 	HubService.Screen(npcId) -> BasePart?   an NPC's "Screen" part (Voting Board, Leaderboard)
 	HubService.IsOutdated(hub) -> boolean
 	HubService.EnsureRequired(hub) -> { string }   what was put back
@@ -54,9 +54,9 @@ local HubService = {}
 -- Config.Npcs.List.
 local RETIRED_NPCS = { "WitchWanda", "BooGuide" }
 
-function HubService.Get(): Model?
+function HubService.Get(): Instance?
 	local hub = workspace:FindFirstChild("Hub")
-	return if hub and hub:IsA("Model") then hub else nil
+	return if hub and (hub:IsA("Folder") or hub:IsA("Model")) then hub else nil
 end
 
 -- The part on an NPC model that carries a SurfaceGui (Voting Board, Gravestone).
@@ -67,7 +67,7 @@ function HubService.Screen(npcId: string): BasePart?
 	return if screen and screen:IsA("BasePart") then screen else nil
 end
 
-function HubService.IsOutdated(hub: Model): boolean
+function HubService.IsOutdated(hub: Instance): boolean
 	local version = hub:GetAttribute("BuildVersion")
 	return typeof(version) ~= "number" or version < Config.Hub.BuildVersion
 end
@@ -106,7 +106,7 @@ local function safeBuild(): Model?
 	return nil
 end
 
-function HubService.RemoveRetired(hub: Model): number
+function HubService.RemoveRetired(hub: Instance): number
 	local inConfig: { [string]: boolean } = {}
 	for _, def in Config.Npcs.List do
 		inConfig[def.Id] = true
@@ -180,7 +180,7 @@ local function shopPrompt(root: Instance, ids: { [string]: boolean }): Proximity
 	return nil
 end
 
-local function ensureSpawn(hub: Model, notes: { string })
+local function ensureSpawn(hub: Instance, notes: { string })
 	for _, instance in CollectionService:GetTagged(Tags.HubSpawn) do
 		if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
 			return
@@ -196,7 +196,7 @@ local function ensureSpawn(hub: Model, notes: { string })
 	table.insert(notes, "the spawn (tag HubSpawn)")
 end
 
-local function ensureShopKeeper(hub: Model, notes: { string })
+local function ensureShopKeeper(hub: Instance, notes: { string })
 	local defs = Npcs.ShopDefs()
 	if #defs == 0 then
 		return
@@ -267,7 +267,7 @@ local function ensureShopKeeper(hub: Model, notes: { string })
 	table.insert(notes, ("the shopkeeper %s (tag ShopKeeper)"):format(def.Id))
 end
 
-local function ensureReadyPad(hub: Model, notes: { string })
+local function ensureReadyPad(hub: Instance, notes: { string })
 	if not Config.Features.ReadyPad then
 		return
 	end
@@ -285,7 +285,7 @@ end
 	Puts back the pieces the game can't work without, also on a Locked hub. Returns what was
 	added (empty when nothing was missing) and warns about each one.
 ]]
-function HubService.EnsureRequired(hub: Model): { string }
+function HubService.EnsureRequired(hub: Instance): { string }
 	local notes: { string } = {}
 	for _, step in { ensureSpawn, ensureShopKeeper, ensureReadyPad } do
 		local ok, err = pcall(step :: any, hub, notes)
@@ -316,7 +316,7 @@ end
 
 -- Everything that runs on a hub after it is chosen or built (also on a Locked hub). Each step
 -- runs on its own: one failing never stops the others or the server.
-local function prepare(hub: Model)
+local function prepare(hub: Instance)
 	local steps: { () -> () } = {
 		-- First, so the checks below never count a loose copy that is about to be removed.
 		function()

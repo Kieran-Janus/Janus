@@ -154,11 +154,27 @@ function Kit.wedge(props: Props, parent: Instance, palette: ColorPalette?): Wedg
 	return w
 end
 
+-- One thing (a pumpkin, a bench, a stall): a Model, so clicking it in Studio selects all of it.
 function Kit.model(name: string, parent: Instance): Model
 	local m = Instance.new("Model")
 	m.Name = name
 	m.Parent = parent
 	return m
+end
+
+-- A group of separate things (the hub, an area, "Benches", "Trees"): a Folder, so clicking one
+-- thing in Studio selects just that thing (Studio selects the outermost Model you click on).
+function Kit.group(name: string, parent: Instance): Folder
+	local f = Instance.new("Folder")
+	f.Name = name
+	f.Parent = parent
+	return f
+end
+
+-- Is it a group the builders made: a Folder, or a Model from a hub saved before groups were
+-- Folders?
+function Kit.isGroup(instance: Instance?): boolean
+	return instance ~= nil and (instance:IsA("Folder") or instance:IsA("Model"))
 end
 
 -- Upright cylinder (Roblox cylinders point along X, so rotate onto Y).
@@ -248,6 +264,8 @@ export type PropOptions = {
 	-- (Creator Store models are usually solid) doesn't become something to hide behind
 	Hitbox: Vector3?, -- a custom model gets an invisible solid part this big, standing on
 	-- cframe (named "Hitbox", its PrimaryPart), that collides and gets hit instead of it
+	Model: string?, -- use the model with this name in Custom.Props instead of `name` (one thing
+	-- with a look of its own: Swap.Selected). It is remembered in the attribute CustomModel.
 }
 
 -- Attributes Kit itself puts on props (not copied from an old prop to its replacement).
@@ -259,6 +277,7 @@ local PROP_ATTRIBUTES = {
 	PropVisual = true,
 	PropLook = true,
 	CustomProp = true,
+	CustomModel = true,
 }
 
 -- Tags that only change how something looks (everything else in Tags does something).
@@ -430,9 +449,10 @@ function Kit.prop(
 ): Model
 	local o: PropOptions = options or {}
 	local anchor = if o.Anchor == "Center" then "Center" else nil
-	local custom = CustomAssets.Clone("Props", name)
+	local custom = CustomAssets.Clone("Props", o.Model or name)
 	if custom then
 		dressCustom(custom, name, cframe, size, o, anchor == "Center")
+		custom:SetAttribute("CustomModel", o.Model)
 	end
 	local m = custom or build()
 	m:SetAttribute("PropName", name)
@@ -571,6 +591,16 @@ local function fallbackHitbox(old: Model): Vector3?
 	return if found then high - low else nil
 end
 
+-- The Custom.Props name a prop takes its look from: its own (CustomModel), else its PropName.
+function Kit.customName(m: Instance): string?
+	local own = m:GetAttribute("CustomModel")
+	if typeof(own) == "string" and own ~= "" then
+		return own
+	end
+	local name = m:GetAttribute("PropName")
+	return if typeof(name) == "string" then name else nil
+end
+
 --[[
 	Replaces prop `old` (a Model with a PropName attribute) with a fresh copy of the custom
 	model of that name in ReplicatedStorage.Custom.Props: at old's pivot (so props moved by
@@ -579,11 +609,17 @@ end
 	the new model, so nothing the game needs is lost. A look (Kit.look) hides its working part.
 	Returns the new model, or nil when there is no custom model of that name. `old` is NOT
 	destroyed: the caller destroys it, or keeps it as a backup (src/server/Tools/Swap.luau).
+	`model` (optional) is another Custom.Props name to use for just this one; a prop that
+	already has a look of its own (attribute CustomModel) keeps it.
 ]]
-function Kit.swapProp(old: Model): Model?
+function Kit.swapProp(old: Model, model: string?): Model?
 	local name = old:GetAttribute("PropName")
 	local parent = old.Parent
-	if typeof(name) ~= "string" or not parent or not CustomAssets.Has("Props", name) then
+	if typeof(name) ~= "string" or not parent then
+		return nil
+	end
+	local source = model or Kit.customName(old)
+	if not source or not CustomAssets.Has("Props", source) then
 		return nil
 	end
 	local rawSize = old:GetAttribute("PropSize")
@@ -602,6 +638,7 @@ function Kit.swapProp(old: Model): Model?
 		Visual = visual,
 		Hitbox = if typeof(rawHitbox) == "Vector3" then rawHitbox else fallbackHitbox(old),
 		Light = lightOf(old, name, size),
+		Model = if source ~= name then source else nil,
 	})
 	if custom == old then
 		return nil
@@ -668,7 +705,7 @@ end
 function Kit.applyCustomProps(root: Instance): number
 	local list = Kit.findProps(root, function(m: Model): boolean
 		return m:GetAttribute("CustomProp") ~= true
-			and CustomAssets.Has("Props", m:GetAttribute("PropName") :: string)
+			and CustomAssets.Has("Props", Kit.customName(m) or "")
 	end)
 	local swapped = 0
 	for _, d in list do

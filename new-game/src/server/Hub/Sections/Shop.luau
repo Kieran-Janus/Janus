@@ -61,8 +61,8 @@ local function chalkboard(cf: CFrame, text: string, parent: Instance)
 	end
 end
 
-function Shop.Build(hub: Model, zone: Zone): Model
-	local area = Kit.model("Shop", hub)
+function Shop.Build(hub: Instance, zone: Zone): Instance
+	local area = Kit.group("Shop", hub)
 	local width = math.max(zone.Size.X - 2, 4)
 	local depth = math.max(zone.Size.Z - 2, 4)
 	local base = zone.CFrame
@@ -74,7 +74,7 @@ function Shop.Build(hub: Model, zone: Zone): Model
 		PaletteShade = 0.15,
 		Material = Enum.Material.WoodPlanks,
 	}, area)
-	local dressing = Kit.model("Dressing", area)
+	local dressing = Kit.group("Dressing", area)
 	local edge = width / 2 - 1.6
 	-- Pumpkin piles on both sides of the counter.
 	for _, side in { -1, 1 } do

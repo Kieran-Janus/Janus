@@ -374,13 +374,18 @@ Put **one** model in `ReplicatedStorage > Custom > Props`, named exactly like th
 
 A Locked lobby or a baked map swaps by itself when you press Play. To keep it in the place file, run `require(game.ServerScriptService.Server.Tools.Swap).Props()` in the command bar (edit mode; Ctrl+Z undoes it), or try it with **F8 > Apply custom props** (a round being played is left alone). Things that aren't props, like rocks you placed by hand, can be replaced by name: `Swap.Replace("Rock", workspace.MyRock)` (it never touches props or the parts inside them). Your model in place of a walk-through decoration (field pumpkins, cobwebs, candles...) is walk-through too. Full guide with sizes: [`docs/CUSTOMIZE.md` > Swap every copy of something at once](CUSTOMIZE.md#swap-every-copy-of-something-at-once), or ask Claude Code: `/swap-prop Pumpkin`.
 
+**With a Toolbox code** (the number in a free model's link, or right-click it in the Toolbox > Copy Asset ID), in the command bar while the game is stopped:
+- every copy: `require(game.ServerScriptService.Server.Tools.Swap).Toolbox("Pumpkin", 11600489662)`
+- only the thing(s) you clicked: `require(game.ServerScriptService.Server.Tools.Swap).Selected(11600489662)` (every other copy stays as it is, and keeps its own look later)
+Then save (Ctrl+S). Or just send Claude Code the code and say what it should replace. Guide: [`docs/CUSTOMIZE.md` > With a Toolbox code](CUSTOMIZE.md#with-a-toolbox-code-one-line-no-dragging).
+
 ### Your own characters
 Put a model in `ReplicatedStorage > Custom > Characters` named `PumpkinKing`, `SkeletonPatrol`, `Bat`, `GhostCat` or `PumpkinVendor` (the shopkeeper). Sizes are in `Config.Custom.Heights`. Keep a copy in git: right-click > **Save to File...** into `new-game/assets/Characters/`. Or ask Claude Code: `/reskin PumpkinKing a giant jack-o-lantern king with a purple cape`.
 
 ### Edit the lobby by hand (Bake + Locked)
 1. Stop the game. Open **View > Command Bar**.
 2. Run `require(game.ServerScriptService.Server.Tools.Bake).Hub()`. The lobby appears in `Workspace.Hub` as real parts.
-3. Move, resize, recolour, delete or add anything.
+3. Move, resize, recolour, delete or add anything. Each thing (one pumpkin, one bench, one tree) is its own Model inside folders, so a click selects just that one and moving it moves nothing else (Alt+click picks a single part of it). A lobby saved before BuildVersion 9 was one big Model (a click picked the whole lobby): run `Bake.Hub(true)` once for the new layout.
 4. Run `require(game.ServerScriptService.Server.Tools.Bake).Lock()`. **Locked** means the game never rebuilds this lobby, even when the code's BuildVersion goes up. Do this as soon as you start editing.
 5. Save the place (Ctrl+S). Back it up: right-click `Workspace.Hub` > **Save to File...**
 

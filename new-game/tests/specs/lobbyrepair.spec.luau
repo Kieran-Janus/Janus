@@ -153,7 +153,7 @@ describe("HubService on a hand-edited saved hub", function()
 		end
 		expect(w.warned("MoonSize", before)).toBe(true)
 		local hub = w.rt.workspace:FindFirstChild("Hub")
-		expect(hub).toBeInstanceOf("Model")
+		expect(hub).toBeInstanceOf("Folder")
 		expect(#w.tagged(w.Tags.HubSpawn)).toBe(1)
 		-- The good settings next to the typo were still applied.
 		local sky = w.rt.game:GetService("Lighting"):FindFirstChild("HubSky")

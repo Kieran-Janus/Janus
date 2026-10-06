@@ -3,7 +3,7 @@
 	Glowing floor signs (Config.Lobby.FloorSigns): a flat pad lying on the ground in front of each
 	lobby area, with the area's name in big glowing letters facing the players walking up to it.
 
-	FloorSigns.Build(parent) -> Model   a Model "FloorSigns" with one part per sign whose area
+	FloorSigns.Build(parent) -> Folder  a Folder "FloorSigns" with one part per sign whose area
 	                                    and feature are on, named "<Zone>FloorSign", tagged
 	                                    FloorSign (attribute Zone). Walk-through and never hit
 	                                    by raycasts (it's floor text).
@@ -129,8 +129,8 @@ function FloorSigns.FeatureOf(zone: string): string?
 	return nil
 end
 
-function FloorSigns.Build(parent: Instance): Model
-	local model = Instance.new("Model")
+function FloorSigns.Build(parent: Instance): Folder
+	local model = Instance.new("Folder")
 	model.Name = "FloorSigns"
 	model.Parent = parent
 	local cfg = Config.Lobby.FloorSigns

@@ -581,7 +581,7 @@ end
 -- The ground ----------------------------------------------------------------------------------------
 
 local function buildFloor(frame: Frame, zone: Zone, trees: { Tree }, rng: Random, parent: Instance)
-	local m = Kit.model("GroveFloor", parent)
+	local m = Kit.group("GroveFloor", parent)
 	local width, depth = zone.Size.X, zone.Size.Z
 	local patches: { { Offset: Vector3, Size: number } } = {
 		{ Offset = Vector3.new(0, 0, 2), Size = math.min(width, depth) * 0.95 },
@@ -672,21 +672,21 @@ end
 
 -- Build ----------------------------------------------------------------------------------------------------
 
-function WebScour.Build(hub: Model, zone: Zone): Model
-	local area = Kit.model("WebScour", hub)
+function WebScour.Build(hub: Instance, zone: Zone): Instance
+	local area = Kit.group("WebScour", hub)
 	if not Config.Features.WebScour then
 		return area
 	end
 	local frame = frameOf(zone)
 	local rng = Random.new(grove.Seed)
 
-	local treeModel = Kit.model("Trees", area)
+	local treeModel = Kit.group("Trees", area)
 	local trees: { Tree } = {}
 	for i, def in grove.Trees do
 		trees[i] = buildTree(frame.Point(def.Offset), def.Height, rng, treeModel)
 	end
 
-	local webModel = Kit.model("Webs", area)
+	local webModel = Kit.group("Webs", area)
 	local viewer = frame.Point(Vector3.new(0, 0, -zone.Size.Z)) -- in front of the grove
 	local webs: { Web } = {}
 	for i, def in grove.Webs do
@@ -729,7 +729,7 @@ function WebScour.Build(hub: Model, zone: Zone): Model
 
 	-- Hiding spots: on each web's knots (where a ring thread crosses a spoke) nearest its clock
 	-- hours, so every critter sits on a strand, never on the ground or a tree.
-	local spots = Kit.model("HidingSpots", area)
+	local spots = Kit.group("HidingSpots", area)
 	local count = 0
 	for _, web in webs do
 		local used: { [string]: boolean } = {}
@@ -778,9 +778,9 @@ function WebScour.Build(hub: Model, zone: Zone): Model
 	return area
 end
 
-function WebScour.Repair(hub: Model, zone: Zone): Model
+function WebScour.Repair(hub: Instance, zone: Zone): Instance
 	local old = hub:FindFirstChild("WebScour")
-	if old and old:IsA("Model") then
+	if old and Kit.isGroup(old) then
 		for _, d in old:GetDescendants() do
 			if CollectionService:HasTag(d, Tags.WebScourSpot) then
 				-- A grove (maybe edited by hand) that only lost its lantern: keep it and

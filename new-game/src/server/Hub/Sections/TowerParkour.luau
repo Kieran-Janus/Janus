@@ -280,7 +280,7 @@ end
 
 local function buildLanterns(parent: Instance, floors: { TowerLogic.Floor })
 	local lights = cfg.Walls.Lights
-	local folder = Kit.model("Lanterns", parent)
+	local folder = Kit.group("Lanterns", parent)
 	for n, up in lights.Heights do
 		local spine, floor = TowerLogic.Spine(up, floors)
 		local half = TowerLogic.InsideHalf(floor)
@@ -300,14 +300,14 @@ end
 
 -- Build ---------------------------------------------------------------------------------------
 
-function TowerParkour.Build(hub: Model, _zone: any): Model
-	local area = Kit.model("TowerParkour", hub)
+function TowerParkour.Build(hub: Instance, _zone: any): Instance
+	local area = Kit.group("TowerParkour", hub)
 	if not Config.Features.TowerParkour then
 		return area
 	end
 	local floors = TowerLogic.Floors()
 	local course = cfg.Course
-	local courseModel = Kit.model("Course", area)
+	local courseModel = Kit.group("Course", area)
 	vanishCount, checkpointCount = 0, 0
 	for i, step in course do
 		local build = builders[step.Kind]
@@ -469,7 +469,7 @@ local function buildShell(area: Instance, floors: { TowerLogic.Floor })
 	}, shell)
 end
 
-function TowerParkour.Fit(hub: Model): number
+function TowerParkour.Fit(hub: Instance): number
 	if not Config.Features.TowerParkour then
 		return 0
 	end

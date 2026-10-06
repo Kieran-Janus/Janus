@@ -51,7 +51,7 @@ describe("server boot", function()
 		end
 		server:advance(1)
 		noMainFailures(server)
-		expect(server.workspace:FindFirstChild("Hub")).toBeInstanceOf("Model")
+		expect(server.workspace:FindFirstChild("Hub")).toBeInstanceOf("Folder")
 		expect(server:find("ReplicatedStorage.Remotes")).toBeInstanceOf("Folder")
 	end)
 

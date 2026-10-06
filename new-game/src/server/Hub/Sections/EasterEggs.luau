@@ -56,19 +56,19 @@ local LOOKS = { GoldenPumpkin = true, Candy = true, Lollipop = true, Skull = tru
 local SNAP_DEPTH = 12 -- studs below the spot the drop still finds the ground
 local warned: { [string]: boolean } = {}
 
--- The hub's EasterEggs model (made if it is missing).
-local function folderOf(hub: Model): Model
+-- The hub's EasterEggs group (made if it is missing).
+local function folderOf(hub: Instance): Instance
 	local existing = hub:FindFirstChild("EasterEggs")
-	if existing and existing:IsA("Model") then
+	if existing and Kit.isGroup(existing) then
 		return existing
 	end
-	local m = Kit.model("EasterEggs", hub)
+	local m = Kit.group("EasterEggs", hub)
 	m:SetAttribute("HubPiece", true)
 	return m
 end
 
 -- Is there an egg with this id in the hub (or anywhere in the game) already?
-local function hasEgg(hub: Model, id: string): boolean
+local function hasEgg(hub: Instance, id: string): boolean
 	for _, instance in CollectionService:GetTagged(Tags.EasterEgg) do
 		if
 			instance:GetAttribute("EggId") == id
@@ -87,7 +87,7 @@ local function facing(position: Vector3, turn: CFrame): CFrame
 end
 
 -- The spot an NPC stands on (from its prompt holder, so it follows the NPC when it is moved).
-local function npcSpot(hub: Model, def: any): CFrame
+local function npcSpot(hub: Instance, def: any): CFrame
 	local m = Npcs.Find(hub, def.Id)
 	local holder = m and m:FindFirstChild("PromptAnchor", true)
 	if holder and holder:IsA("BasePart") then
@@ -98,7 +98,7 @@ local function npcSpot(hub: Model, def: any): CFrame
 	return facing(spot.Position, spot)
 end
 
-local function taggedSpot(hub: Model, tag: string): CFrame?
+local function taggedSpot(hub: Instance, tag: string): CFrame?
 	local inHub: { Instance } = {}
 	local elsewhere: { Instance } = {}
 	for _, instance in CollectionService:GetTagged(tag) do
@@ -151,7 +151,7 @@ local function landmark(name: string): Vector3?
 	return nil
 end
 
-function EasterEggs.Anchor(hub: Model, name: string): CFrame?
+function EasterEggs.Anchor(hub: Instance, name: string): CFrame?
 	if name == "Hub" then
 		return CFrame.new(HubLayout.At(Vector3.new(0, 1, 0)))
 	end
@@ -195,7 +195,7 @@ end
 
 -- Where an egg goes ---------------------------------------------------------------------------------
 
-local function ignoreList(hub: Model): { Instance }
+local function ignoreList(hub: Instance): { Instance }
 	local list: { Instance } = { folderOf(hub) }
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
@@ -526,7 +526,7 @@ end
 
 -- Placing ----------------------------------------------------------------------------------------------
 
-function EasterEggs.PlaceMissing(hub: Model): { string }
+function EasterEggs.PlaceMissing(hub: Instance): { string }
 	local placed = {}
 	if not Config.Features.EasterEggs then
 		return placed
@@ -559,8 +559,8 @@ function EasterEggs.PlaceMissing(hub: Model): { string }
 	return placed
 end
 
-function EasterEggs.Build(hub: Model, _zone: Zone): Model
-	local area = Kit.model("EasterEggs", hub)
+function EasterEggs.Build(hub: Instance, _zone: Zone): Instance
+	local area = Kit.group("EasterEggs", hub)
 	if not Config.Features.EasterEggs then
 		return area
 	end

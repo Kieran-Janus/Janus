@@ -6,7 +6,7 @@
 	every visible piece you would bump into or stand on solid, except:
 	  - tiny pieces (longest side under MinSize) and low ones you'd step over (StepHeight)
 	  - see-through pieces (mist, glow, light beams: more than MaxTransparency)
-	  - decorations in KeepWalkThrough (by PropName) and Models named in KeepAreas
+	  - decorations in KeepWalkThrough (by PropName) and groups (Folders or Models) named in KeepAreas
 	  - parts that DO something (a tag from Tags.luau on the part itself, e.g. a secret pumpkin
 	    you walk into) and the looks of such parts (Kit.look, attribute PropLook): a parkour
 	    step's look must not change the jump, the working part already collides

@@ -1317,7 +1317,7 @@ local function ensureStand()
 		end
 	end
 	local hub = workspace:FindFirstChild("Hub")
-	if not (hub and hub:IsA("Model")) then
+	if not (hub and (hub:IsA("Folder") or hub:IsA("Model"))) then
 		return
 	end
 	if HubBuilder.RepairSection(hub, "CandyRush") then

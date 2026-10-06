@@ -57,16 +57,16 @@ local function playtestNote()
 	end
 end
 
-local function currentHub(): Model?
+local function currentHub(): Instance?
 	local hub = workspace:FindFirstChild("Hub")
-	return if hub and hub:IsA("Model") then hub else nil
+	return if hub and (hub:IsA("Folder") or hub:IsA("Model")) then hub else nil
 end
 
 local function hubService(): any
 	return (require :: any)(Server.Services.HubService)
 end
 
-function Bake.Hub(force: boolean?): Model?
+function Bake.Hub(force: boolean?): Instance?
 	playtestNote()
 	local old = currentHub()
 	if old and old:GetAttribute("Locked") == true then
@@ -95,7 +95,7 @@ function Bake.Hub(force: boolean?): Model?
 	return hub
 end
 
-function Bake.Lock(): Model?
+function Bake.Lock(): Instance?
 	local hub = currentHub()
 	if not hub then
 		say("There is no Workspace.Hub to lock. Run Bake.Hub() first.")
@@ -106,7 +106,7 @@ function Bake.Lock(): Model?
 	return hub
 end
 
-function Bake.Unlock(): Model?
+function Bake.Unlock(): Instance?
 	local hub = currentHub()
 	if not hub then
 		say("There is no Workspace.Hub.")

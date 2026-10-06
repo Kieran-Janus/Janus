@@ -157,7 +157,7 @@ return {
 			"Mushroom",
 			"GroveSpider",
 		},
-		-- Lobby parts in a Model with one of these names stay walk-through (the Web Scour webs,
+		-- Lobby parts in a group (Folder or Model) with one of these names stay walk-through (the Web Scour webs,
 		-- the glowing rune circle, mist and fireflies, and the parkour course's decorations:
 		-- its steps are solid already and the jumps are measured without the decorations).
 		KeepAreas = { "Webs", "Runes", "Mist", "Fireflies", "FloatingCandles", "Course" },

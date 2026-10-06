@@ -260,7 +260,7 @@ describe("HubService", function()
 		local w = world()
 		w.HubService.Start()
 		local hub = w.hub()
-		expect(hub).toBeInstanceOf("Model")
+		expect(hub).toBeInstanceOf("Folder")
 		expect(hub:GetAttribute("BuildVersion")).toBe(w.Config.Hub.BuildVersion)
 		local spawn = w.tagged(w.Tags.HubSpawn, hub)[1]
 		expect(w.MapService.LobbyCFrame().Position).toBeNear(
@@ -450,14 +450,14 @@ describe("Bake", function()
 		local w = world()
 		local Bake, Config, ServerStorage = w.Bake, w.Config, w.ServerStorage
 		local hub = Bake.Hub()
-		expect(hub).toBeInstanceOf("Model")
+		expect(hub).toBeInstanceOf("Folder")
 		expect(hub.Parent).toBe(w.rt.workspace)
 		expect(hub:GetAttribute("BuildVersion")).toBe(Config.Hub.BuildVersion)
 		Bake.Lock()
 		expect(hub:GetAttribute("Locked")).toBe(true)
 		expect(Bake.Hub()).toBeNil() -- a Locked hub is not replaced
-		expect(Bake.Hub(true)).toBeInstanceOf("Model") -- Hub(true) replaces it
-		expect(ServerStorage:FindFirstChild("HubBackup")).toBeInstanceOf("Model") -- old one kept
+		expect(Bake.Hub(true)).toBeInstanceOf("Folder") -- Hub(true) replaces it
+		expect(ServerStorage:FindFirstChild("HubBackup")).toBeInstanceOf("Folder") -- old one kept
 		expect(#Bake.Repair()).toBe(0) -- nothing to repair on a fresh hub
 		expect(Bake.Repaint()).toBeGreaterThanOrEqual(0)
 

@@ -71,7 +71,7 @@ local function encode(color: Color3): string
 	)
 end
 
-function HubPalette.Stamp(hub: Model)
+function HubPalette.Stamp(hub: Instance)
 	local roles = {}
 	for role in palette() do
 		table.insert(roles, role)
@@ -84,7 +84,7 @@ function HubPalette.Stamp(hub: Model)
 	hub:SetAttribute(STAMP, table.concat(parts, ";"))
 end
 
-function HubPalette.Sync(hub: Model): number
+function HubPalette.Sync(hub: Instance): number
 	local stamp = hub:GetAttribute(STAMP)
 	local old: { [string]: string } = {}
 	if typeof(stamp) == "string" then

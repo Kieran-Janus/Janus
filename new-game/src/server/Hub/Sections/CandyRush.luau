@@ -594,12 +594,12 @@ local function buildStand(area: Instance, base: CFrame, lanes: number): Model
 end
 
 -- Everything in the area: the floor, the stand and the decorations around it.
-local function fill(area: Model, zone: Zone)
+local function fill(area: Instance, zone: Zone)
 	local base = zone.CFrame
 	local lanes = laneCount()
 
 	-- The floor: a pink-and-white checkerboard with a coloured runner from each pad to the board.
-	local floor = Kit.model("Floor", area)
+	local floor = Kit.group("Floor", area)
 	local tile = 6
 	local columns, rows = 5, 4
 	local floorCentre = base * CFrame.new(0, 0, 1)
@@ -640,7 +640,7 @@ local function fill(area: Model, zone: Zone)
 	buildStand(area, base, lanes)
 
 	-- Decorations around it.
-	local decorations = Kit.model("Decorations", area)
+	local decorations = Kit.group("Decorations", area)
 	local halfX, halfZ = zone.Size.X / 2, zone.Size.Z / 2
 	local front = -halfZ + 2.5
 	for i, side in { -1, 1 } do
@@ -671,8 +671,8 @@ local function fill(area: Model, zone: Zone)
 	end
 end
 
-function CandyRush.Build(hub: Model, zone: Zone): Model
-	local area = Kit.model("CandyRush", hub)
+function CandyRush.Build(hub: Instance, zone: Zone): Instance
+	local area = Kit.group("CandyRush", hub)
 	if Config.Features.CandyRush then
 		fill(area, zone)
 	end
@@ -694,9 +694,9 @@ end
 	while Config.Features.CandyRush was off: an empty area gets everything; an area you edited
 	by hand keeps your changes and only gets the stand back. Returns the area.
 ]]
-function CandyRush.Repair(hub: Model, zone: Zone): Model
+function CandyRush.Repair(hub: Instance, zone: Zone): Instance
 	local existing = hub:FindFirstChild("CandyRush")
-	if not (existing and existing:IsA("Model")) then
+	if not Kit.isGroup(existing) then
 		local area = CandyRush.Build(hub, zone)
 		area:SetAttribute("HubPiece", true)
 		return area

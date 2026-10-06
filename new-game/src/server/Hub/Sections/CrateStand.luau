@@ -193,8 +193,8 @@ local function sign(parent: Instance, cf: CFrame, width: number)
 	end
 end
 
-function CrateStand.Build(hub: Model, _zone: Zone): Model
-	local area = Kit.model("CrateStand", hub)
+function CrateStand.Build(hub: Instance, _zone: Zone): Instance
+	local area = Kit.group("CrateStand", hub)
 	if not Config.Features.Crates then
 		return area
 	end
@@ -256,7 +256,7 @@ function CrateStand.Build(hub: Model, _zone: Zone): Model
 	sign(area, cf * CFrame.new(0, 0, depth / 2 - 0.6), math.min(width - 2, 16))
 
 	-- Jack-o-lanterns beside the raised back row.
-	local lanterns = Kit.model("Lanterns", area)
+	local lanterns = Kit.group("Lanterns", area)
 	for _, side in { -1, 1 } do
 		local spot = cf * CFrame.new(side * (width / 2 - 0.9), 0, depth / 2 - 2.6)
 		jackOLantern(spot * CFrame.Angles(0, math.rad(side * 25), 0), 1.6, lanterns)

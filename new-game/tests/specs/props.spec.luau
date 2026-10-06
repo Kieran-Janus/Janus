@@ -836,6 +836,88 @@ describe("Swap tool (src/server/Tools/Swap.luau)", function()
 		expect(copies).toBe(2)
 	end)
 
+	it("gives one thing, or every copy, the look of a Toolbox model", function()
+		local w = world()
+		local rt = w.rt
+		local Bake = rt:require("ServerScriptService.Server.Tools.Bake")
+		local Swap = rt:require("ServerScriptService.Server.Tools.Swap")
+		local hub = Bake.Hub()
+		Bake.Lock()
+		-- (Lune can't download from the Toolbox: a fake download, named after its code)
+		local downloads = 0
+		Swap.LoadToolbox = function(id: number)
+			downloads += 1
+			return w.model("Download" .. id), nil
+		end
+		local function pumpkins(): { any }
+			local list = {}
+			for _, m in w.props(hub) do
+				if m:GetAttribute("PropName") == "Pumpkin" then
+					table.insert(list, m)
+				end
+			end
+			return list
+		end
+		local before = pumpkins()
+		expect(#before).toBeGreaterThan(5)
+
+		-- One pumpkin (clicked on one of its parts), moved by hand, gets a look of its own.
+		local chosen = before[1]
+		chosen:PivotTo(chosen:GetPivot() + w.Vector3.new(0, 0, 5))
+		local spot = chosen:GetPivot().Position
+		local changed = Swap.Selected("https://create.roblox.com/store/asset/111111/Spooky", {
+			chosen:FindFirstChildWhichIsA("BasePart", true),
+		})
+		expect(changed).toBe(1)
+		local props = rt:find("ReplicatedStorage.Custom.Props")
+		expect(props:FindFirstChild("Pumpkin_111111"):GetAttribute("ToolboxId")).toBe(111111)
+		local mine
+		for _, m in pumpkins() do
+			if m:GetAttribute("CustomModel") == "Pumpkin_111111" then
+				expect(mine).toBe(nil)
+				mine = m
+			else
+				expect(m:GetAttribute("CustomProp")).toBe(nil) -- every other copy unchanged
+			end
+		end
+		expect(mine.Look).toBeTruthy()
+		expect((mine:GetPivot().Position - spot).Magnitude).toBeLessThan(0.01) -- stays moved
+
+		-- Every pumpkin gets another Toolbox model; the one with its own look keeps it.
+		local all = Swap.Toolbox("Pumpkin", 222222)
+		expect(all).toBeGreaterThanOrEqual(#before)
+		expect(props.Pumpkin:GetAttribute("ToolboxId")).toBe(222222)
+		local own = 0
+		for _, m in pumpkins() do
+			expect(m:GetAttribute("CustomProp")).toBe(true)
+			if m:GetAttribute("CustomModel") == "Pumpkin_111111" then
+				own += 1
+				expect((m:GetPivot().Position - spot).Magnitude).toBeLessThan(0.01)
+			end
+		end
+		expect(own).toBe(1)
+		-- A second Toolbox model for the same name keeps the first as a backup.
+		Swap.Toolbox("Pumpkin", 333333)
+		expect(props.Pumpkin:GetAttribute("ToolboxId")).toBe(333333)
+		expect(w.ServerStorage.CustomBackups.Pumpkin:GetAttribute("ToolboxId")).toBe(222222)
+
+		-- A parkour step: its pumpkin look changes, the lid you land on stays and keeps working.
+		local step = hub.Parkour.Course:FindFirstChild("Step02_Pumpkin")
+		expect(Swap.Selected(444444, { step })).toBe(1)
+		expect(step.PrimaryPart.Transparency).toBe(1)
+		expect(step.PrimaryPart.CanCollide).toBe(true)
+		local look = step:FindFirstChild("ParkourPumpkin", true)
+		expect(look:GetAttribute("CustomModel")).toBe("ParkourPumpkin_444444")
+
+		-- Something holding several things, or a bad code, changes nothing.
+		local n, message = Swap.Selected(555555, { hub.Parkour.Course.Step01_Start })
+		expect(n).toBe(0)
+		expect(message:find("several things", 1, true)).toBeTruthy()
+		local downloaded = downloads
+		expect(Swap.Toolbox("Pumpkin", "pumpkin please")).toBe(0)
+		expect(downloads).toBe(downloaded)
+	end)
+
 	it("swaps a baked map's decoration to a walk-through custom model", function()
 		-- (a map baked before props remembered PropVisual swaps the same way)
 		local w = world()

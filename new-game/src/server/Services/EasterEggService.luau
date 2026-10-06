@@ -278,7 +278,7 @@ function EasterEggService.Start()
 	end
 	-- Eggs the lobby doesn't have yet (a hub saved before them, or ones deleted by hand).
 	local hub = workspace:FindFirstChild("Hub")
-	if hub and hub:IsA("Model") then
+	if hub and (hub:IsA("Folder") or hub:IsA("Model")) then
 		local ok, result = pcall(EggSection.PlaceMissing, hub)
 		if not ok then
 			warn("[EasterEggs] Couldn't place the eggs: " .. tostring(result))

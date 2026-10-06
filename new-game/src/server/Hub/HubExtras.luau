@@ -104,7 +104,7 @@ end
 
 local function buildForest(parent: Instance, rng: Random)
 	local f = cfg.Forest
-	local folder = Kit.model("Forest", parent)
+	local folder = Kit.group("Forest", parent)
 	for _ = 1, f.Count do
 		local offset = ringPoint(rng, f.RingMin, f.RingMax)
 		local base = CFrame.new(at(offset)) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
@@ -410,7 +410,7 @@ local function buildPumpkinPatch(parent: Instance, rng: Random)
 	if blocked(centre, p.Radius) then
 		return
 	end
-	local folder = Kit.model("PumpkinPatch", parent)
+	local folder = Kit.group("PumpkinPatch", parent)
 	decor({
 		Name = "Dirt",
 		Shape = Enum.PartType.Ball,
@@ -470,7 +470,7 @@ end
 
 local function buildExtraGraves(parent: Instance, rng: Random)
 	local g = cfg.ExtraGraves
-	local folder = Kit.model("OldGraves", parent)
+	local folder = Kit.group("OldGraves", parent)
 	local styles = { "Round", "Cross", "Pointed" }
 	for i = 1, g.Count do
 		local offset = g.Offset + ringPoint(rng, 0, g.Spread)
@@ -496,7 +496,7 @@ end
 
 local function buildFence(parent: Instance, rng: Random)
 	local f = cfg.Fence
-	local folder = Kit.model("Fence", parent)
+	local folder = Kit.group("Fence", parent)
 	local circumference = 2 * math.pi * f.Radius
 	local posts = math.floor(circumference / f.PostSpacing)
 	local gapHalf = (f.GapWidth / f.Radius) / 2 -- half a gap, in radians
@@ -551,7 +551,7 @@ end
 local function buildPaths(parent: Instance)
 	-- Coloured from Config.Hub.Polish.Paths (not the palette).
 	local p = cfg.Paths
-	local folder = Kit.model("Paths", parent)
+	local folder = Kit.group("Paths", parent)
 	for _, path in HubPaths.Network() do
 		local carry = p.Spacing / 2
 		for i = 1, #path.Points - 1 do
@@ -585,7 +585,7 @@ local function buildPaths(parent: Instance)
 end
 
 -- Builds all the extras into `decor` (Workspace.Hub.Decor) and the Terrain around it.
-function HubExtras.Build(_hub: Model, decorModel: Model)
+function HubExtras.Build(_hub: Instance, decorModel: Instance)
 	local rng = Random.new(hubCfg.Seed + 1)
 	buildTerrain(rng)
 	buildForest(decorModel, rng)

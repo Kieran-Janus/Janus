@@ -61,14 +61,72 @@ describe("HubBuilder", function()
 
 	it("builds the hub into Workspace", function()
 		hub = HubBuilder.Build()
-		expect(hub).toBeInstanceOf("Model")
+		expect(hub).toBeInstanceOf("Folder")
 		expect(hub.Parent).toBe(rt.workspace)
 		expect(hub.Name).toBe("Hub")
-		expect(hub.PrimaryPart).toBeInstanceOf("BasePart")
+		expect(hub.Plaza:FindFirstChild("Ground")).toBeInstanceOf("BasePart")
 		local parts = checkParts(hub)
 		expect(parts).toBeGreaterThan(0)
 		T.note(("%d parts, %d instances"):format(parts, #hub:GetDescendants()))
 		noteSquashedBalls(hub)
+	end)
+
+	-- Things that carry props as part of themselves (the pumpkins on the arch, the bats round
+	-- the clock tower): clicking one of those props selects the whole thing, on purpose.
+	local carriesProps = {
+		ReadyPadArch = true,
+		PumpkinVendor = true,
+		ClockTower = true,
+		PhotoSpot = true,
+		CandyStand = true,
+		Step01_Start = true,
+	}
+
+	it("lets you click and move one thing in Studio without moving the rest", function()
+		-- Studio selects the outermost Model of the part you click, so every group (the hub,
+		-- an area, "Benches", "Trees") is a Folder and only single things are Models.
+		for _, child in hub:GetChildren() do
+			if not (child:IsA("BasePart") or child:IsA("Sound")) then
+				expect(child).toBeInstanceOf("Folder")
+			end
+		end
+		local targets = {}
+		for _, part in hub:GetDescendants() do
+			if part:IsA("BasePart") then
+				local target = part
+				local node = part.Parent
+				while node and node ~= hub do
+					if node:IsA("Model") then
+						target = node
+					end
+					node = node.Parent
+				end
+				targets[target] = true
+			end
+		end
+		local count = 0
+		for target in targets do
+			count += 1
+			if target:IsA("Model") and not carriesProps[target.Name] then
+				-- A click target holding several copies of one prop is really a group.
+				local props = {}
+				for _, d in target:GetDescendants() do
+					local name = d:IsA("Model") and d:GetAttribute("PropName")
+					if name then
+						props[name] = (props[name] or 0) + 1
+						if props[name] >= 3 then
+							error(
+								("%s holds several %s: make it a group (Kit.group)"):format(
+									target:GetFullName(),
+									name
+								)
+							)
+						end
+					end
+				end
+			end
+		end
+		T.note(("%d separate things to click"):format(count))
 	end)
 
 	it("has a spawn pad and every NPC with a prompt", function()

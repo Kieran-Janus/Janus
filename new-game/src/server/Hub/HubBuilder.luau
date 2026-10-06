@@ -9,9 +9,10 @@
 	crooked clock tower behind it. A stone promenade rings the cauldron; paths with signposts
 	lead to every lobby area.
 
-	What it builds (every group is a Model with a readable name):
+	What it builds. Every group is a Folder and every single thing (a bench, a pumpkin) a Model,
+	each with a readable name, so clicking one thing in Studio selects and moves just that one:
 	  Workspace.Hub   attributes HubName, BuildVersion, PaletteColors (and Locked, if you set it)
-	    Plaza         the ground: cobbles (Ground, the PrimaryPart), the promenade ring, the
+	    Plaza         the ground: cobbles (Ground), the promenade ring, the
 	                  stone step round the cauldron (Dais), Walkways, Curb, Cracks, Puddles, Leaves
 	    Spawn         where players appear (tag HubSpawn): an invisible SpawnLocation on a round
 	                  stone (SpawnStone)
@@ -29,11 +30,11 @@
 	JackOLantern, Lamppost, SpookyTree, Bench, ...), swapped for your own model when
 	ReplicatedStorage.Custom.Props has one with the same name (Kit.prop).
 
-	HubBuilder.Build() -> Model             a fresh hub in Workspace (old ones are removed)
-	HubBuilder.BuildFallback() -> Model     plain plaza + spawn + Ready pad (if Build fails)
+	HubBuilder.Build() -> Folder            a fresh hub in Workspace (old ones are removed)
+	HubBuilder.BuildFallback() -> Folder    plain plaza + spawn + Ready pad (if Build fails)
 	HubBuilder.BuildSpawn(hub) -> SpawnLocation
-	HubBuilder.BuildSection(hub, name) -> Model?   one section (Sections/<name>.luau)
-	HubBuilder.RepairSection(hub, name) -> Model?  a section's Repair(), else its Build()
+	HubBuilder.BuildSection(hub, name) -> Instance?   one section (Sections/<name>.luau)
+	HubBuilder.RepairSection(hub, name) -> Instance?  a section's Repair(), else its Build()
 	HubBuilder.ApplyLighting(), ApplyMusic(hub), ApplyCustomNpcs(hub), DisableDefaultSpawn()
 	HubBuilder.FindHubs(), RemoveLoosePieces(keep), PieceAttribute
 	HubBuilder.RemoveSwitchedOff(hub) -> { string }   empties the lobby areas whose
@@ -180,9 +181,9 @@ local function walkway(name: string, points: { Vector3 }, width: number, parent:
 	end
 end
 
-local function buildPlaza(hub: Model): BasePart
+local function buildPlaza(hub: Instance): BasePart
 	local cfg = hubCfg.Plaza
-	local plaza = model("Plaza", hub)
+	local plaza = Kit.group("Plaza", hub)
 	local radius = hubCfg.Radius
 	local centre = at(Vector3.zero)
 	local top = plazaTop()
@@ -248,13 +249,13 @@ local function buildPlaza(hub: Model): BasePart
 	}, plaza)
 
 	-- Walkways: from the spawn, and out to every lobby area.
-	local walkways = model("Walkways", plaza)
+	local walkways = Kit.group("Walkways", plaza)
 	for _, path in HubPaths.Network() do
 		walkway(path.Name, path.Points, path.Width, walkways)
 	end
 
 	-- The curb round the edge of the plaza.
-	local curb = model("Curb", plaza)
+	local curb = Kit.group("Curb", plaza)
 	for i = 1, cfg.Curbs do
 		local a = (i / cfg.Curbs) * math.pi * 2
 		local pos = ground(math.cos(a) * (radius - 0.6), math.sin(a) * (radius - 0.6), -0.4)
@@ -272,7 +273,7 @@ local function buildPlaza(hub: Model): BasePart
 	end
 
 	-- Small details on the cobbles: cracks, puddles and fallen leaves.
-	local details = model("Details", plaza)
+	local details = Kit.group("Details", plaza)
 	local function freeSpot(minR: number, maxR: number, margin: number): Vector3?
 		for _ = 1, 12 do
 			local a = rng:NextNumber(0, math.pi * 2)
@@ -340,11 +341,10 @@ local function buildPlaza(hub: Model): BasePart
 		}, details)
 	end
 
-	plaza.PrimaryPart = groundPart
 	return groundPart
 end
 
-function HubBuilder.BuildSpawn(hub: Model): SpawnLocation
+function HubBuilder.BuildSpawn(hub: Instance): SpawnLocation
 	local cfg = hubCfg.Spawn
 	local s = Instance.new("SpawnLocation")
 	s.Name = "Spawn"
@@ -916,7 +916,7 @@ end
 
 local function buildLamps(parent: Instance)
 	local cfg = hubCfg.Lampposts
-	local lamps = model("Lamps", parent)
+	local lamps = Kit.group("Lamps", parent)
 	local tops: { [number]: Vector3 } = {}
 	for i = 1, cfg.Count do
 		local a = (i / cfg.Count) * math.pi * 2 + math.pi / 2
@@ -928,7 +928,7 @@ local function buildLamps(parent: Instance)
 		tops[i] = pos + Vector3.new(0, cfg.Height - 1.4, 0)
 	end
 	-- More lamps by the cauldron and along the spawn path.
-	local pathLamps = model("PathLamps", parent)
+	local pathLamps = Kit.group("PathLamps", parent)
 	local inner: { Vector3 } = {}
 	for i = 1, cfg.Inner.Count do
 		local a = (i - 0.5) / cfg.Inner.Count * math.pi * 2 + math.pi / 4
@@ -947,7 +947,7 @@ local function buildLamps(parent: Instance)
 	end
 
 	-- Bunting: flags on sagging ropes between neighbouring lamps (and round the cauldron).
-	local bunting = model("Bunting", parent)
+	local bunting = Kit.group("Bunting", parent)
 	local ropes = holder("Ropes", CFrame.new(at(Vector3.new(0, 10, 0))), Vector3.one * 0.2, bunting)
 	local b = hubCfg.Bunting
 	local options: Props.BuntingOptions = { Flags = b.FlagsPerSpan, Sag = b.Sag, Colors = b.Colors }
@@ -974,7 +974,7 @@ end
 
 local function buildJackOLanterns(parent: Instance)
 	local cfg = hubCfg.JackOLanterns
-	local folder = model("JackOLanterns", parent)
+	local folder = Kit.group("JackOLanterns", parent)
 	for i = 1, cfg.Count do
 		local a = (i / cfg.Count) * math.pi * 2 + math.pi / cfg.Count + math.pi / 2
 		local pos = ground(math.cos(a) * cfg.Radius, math.sin(a) * cfg.Radius)
@@ -1003,7 +1003,7 @@ end
 
 local function buildCandles(parent: Instance)
 	local cfg = hubCfg.Candles
-	local folder = model("Candles", parent)
+	local folder = Kit.group("Candles", parent)
 	for i = 1, cfg.Count do
 		local a = rng:NextNumber(0, math.pi * 2)
 		local r = rng:NextNumber(cfg.MinRadius, cfg.MaxRadius)
@@ -1024,7 +1024,7 @@ end
 
 local function buildBenches(parent: Instance)
 	local cfg = hubCfg.Benches
-	local folder = model("Benches", parent)
+	local folder = Kit.group("Benches", parent)
 	for i = 1, cfg.Count do
 		local a = (i - 0.5) / cfg.Count * math.pi * 2 + math.pi / 2
 		local pos = ground(math.cos(a) * cfg.Radius, math.sin(a) * cfg.Radius)
@@ -1050,7 +1050,7 @@ local function buildGraveyard(parent: Instance)
 	if blocked(origin.Position, 2) then
 		return
 	end
-	local folder = model("Graveyard", parent)
+	local folder = Kit.group("Graveyard", parent)
 	local styles = { "Round", "Cross", "Pointed" }
 	for i, epitaph in cfg.Epitaphs do
 		local row = (i - 1) // 3
@@ -1077,7 +1077,7 @@ local function buildGraveyard(parent: Instance)
 		}, folder)
 	end
 	-- Iron fence on three sides with little pumpkins on the posts, open towards the plaza.
-	local fence = model("GraveyardFence", folder)
+	local fence = Kit.group("GraveyardFence", folder)
 	local corners = {
 		origin * CFrame.new(-12, 0, -4),
 		origin * CFrame.new(-12, 0, 18),
@@ -1128,7 +1128,7 @@ end
 
 local function buildTrees(parent: Instance)
 	local cfg = hubCfg.DeadTrees
-	local folder = model("Trees", parent)
+	local folder = Kit.group("Trees", parent)
 	for i, offset in cfg.Offsets do
 		local base = CFrame.new(at(offset + Vector3.new(0, 1, 0)))
 			* CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
@@ -1177,7 +1177,7 @@ end
 
 local function buildClutter(parent: Instance)
 	local cfg = hubCfg.Clutter
-	local folder = model("Clutter", parent)
+	local folder = Kit.group("Clutter", parent)
 	local function place(offset: Vector3, margin: number): CFrame?
 		local pos = ground(offset.X, offset.Z)
 		if blocked(pos, margin) then
@@ -1219,7 +1219,7 @@ end
 
 local function buildSignposts(parent: Instance)
 	local cfg = hubCfg.Signposts
-	local folder = model("Signposts", parent)
+	local folder = Kit.group("Signposts", parent)
 	local enabled = {}
 	for _, entry in cfg.Zones do
 		if HubPaths.Enabled(entry) then
@@ -1249,7 +1249,7 @@ local function buildSignposts(parent: Instance)
 end
 
 local function buildAmbience(parent: Instance)
-	local folder = model("Ambience", parent)
+	local folder = Kit.group("Ambience", parent)
 	local radius = hubCfg.Radius
 	local f = hubCfg.Particles.Fireflies
 	local air = holder(
@@ -1332,7 +1332,7 @@ end
 
 -- Runs one section's function (`fnName`, or Build if it has none); a broken section is
 -- skipped with a warning, the rest of the hub still builds.
-local function runSection(name: string, fnName: string, hub: Model): Model?
+local function runSection(name: string, fnName: string, hub: Instance): Instance?
 	local ok, result = pcall(function()
 		local section = sectionModule(name)
 		if not section then
@@ -1353,18 +1353,18 @@ local function runSection(name: string, fnName: string, hub: Model): Model?
 		)
 		return nil
 	end
-	return if typeof(result) == "Instance" and result:IsA("Model") then result else nil
+	return if typeof(result) == "Instance" and Kit.isGroup(result) then result else nil
 end
 
-function HubBuilder.BuildSection(hub: Model, name: string): Model?
+function HubBuilder.BuildSection(hub: Instance, name: string): Instance?
 	return runSection(name, "Build", hub)
 end
 
-function HubBuilder.RepairSection(hub: Model, name: string): Model?
+function HubBuilder.RepairSection(hub: Instance, name: string): Instance?
 	return runSection(name, "Repair", hub)
 end
 
-local function buildSections(hub: Model)
+local function buildSections(hub: Instance)
 	for _, module in sectionModules() do
 		HubBuilder.BuildSection(hub, module.Name)
 	end
@@ -1377,7 +1377,7 @@ end
 	in SoundService's "Music" group (players can mute it in Settings). Also run on a hub saved
 	in Studio, so changing the SoundId in Config always takes effect.
 ]]
-function HubBuilder.ApplyMusic(hub: Model)
+function HubBuilder.ApplyMusic(hub: Instance)
 	local cfg = hubCfg.Music
 	local existing = hub:FindFirstChild("Music")
 	if cfg.SoundId == "" then
@@ -1407,7 +1407,7 @@ function HubBuilder.ApplyMusic(hub: Model)
 	sound.Playing = true
 end
 
-function HubBuilder.ApplyCustomNpcs(hub: Model)
+function HubBuilder.ApplyCustomNpcs(hub: Instance)
 	Npcs.ApplyCustom(hub)
 end
 
@@ -1519,11 +1519,11 @@ end
 -- directly in Workspace (an ungrouped or pasted hub) can be recognised and removed.
 HubBuilder.PieceAttribute = "HubPiece"
 
--- All Models named "Hub" directly in Workspace.
-function HubBuilder.FindHubs(): { Model }
+-- Everything named "Hub" directly in Workspace (a Folder, or a Model saved by an older version).
+function HubBuilder.FindHubs(): { Instance }
 	local hubs = {}
 	for _, child in workspace:GetChildren() do
-		if child.Name == "Hub" and child:IsA("Model") then
+		if child.Name == "Hub" and Kit.isGroup(child) then
 			table.insert(hubs, child)
 		end
 	end
@@ -1697,7 +1697,7 @@ end
 	start; Bake never does, so the saved place keeps its pieces and turning the switch back on
 	brings them back.
 ]]
-function HubBuilder.RemoveSwitchedOff(hub: Model): { string }
+function HubBuilder.RemoveSwitchedOff(hub: Instance): { string }
 	local features = Config.Features :: any
 	local removed: { string } = {}
 	for _, area in SWITCHED_AREAS do
@@ -1745,19 +1745,18 @@ end
 
 -- Building -----------------------------------------------------------------------------------
 
-local function newHub(): Model
+local function newHub(): Folder
 	for _, existing in HubBuilder.FindHubs() do
 		existing:Destroy()
 	end
-	local hub = Instance.new("Model")
+	local hub = Instance.new("Folder")
 	hub.Name = "Hub"
 	hub:SetAttribute("HubName", hubCfg.Name)
 	return hub
 end
 
-local function finish(hub: Model, groundPart: BasePart)
+local function finish(hub: Instance)
 	HubBuilder.ApplyMusic(hub)
-	hub.PrimaryPart = groundPart
 	for _, child in hub:GetChildren() do
 		child:SetAttribute(HubBuilder.PieceAttribute, true)
 	end
@@ -1766,14 +1765,14 @@ local function finish(hub: Model, groundPart: BasePart)
 	HubBuilder.DisableDefaultSpawn()
 end
 
-function HubBuilder.Build(): Model
+function HubBuilder.Build(): Folder
 	rng = Random.new(hubCfg.Seed)
 	local hub = newHub()
-	local groundPart = buildPlaza(hub)
+	buildPlaza(hub)
 	HubBuilder.BuildSpawn(hub)
 	buildSections(hub) -- the Ready area, shop, minigames... each in its zone
 	Npcs.BuildAll(hub) -- NPCs with a Zone go inside that section's model
-	local decorModel = model("Decor", hub)
+	local decorModel = Kit.group("Decor", hub)
 	buildClockTower(decorModel)
 	buildCauldron(decorModel)
 	buildLamps(decorModel)
@@ -1790,7 +1789,7 @@ function HubBuilder.Build(): Model
 	-- (A custom shopkeeper model is swapped in by HubService when the game runs, so a hub baked
 	-- into the place keeps the built keeper underneath.)
 	hub:SetAttribute("BuildVersion", hubCfg.BuildVersion)
-	finish(hub, groundPart)
+	finish(hub)
 	return hub
 end
 
@@ -1799,12 +1798,12 @@ end
 	adds the shopkeeper afterwards. It has no BuildVersion, so the next start tries the full
 	hub again.
 ]]
-function HubBuilder.BuildFallback(): Model
+function HubBuilder.BuildFallback(): Folder
 	local hub = newHub()
 	hub:SetAttribute("Fallback", true)
-	local plaza = model("Plaza", hub)
+	local plaza = Kit.group("Plaza", hub)
 	local radius = hubCfg.Radius
-	local groundPart = part({
+	part({
 		Name = "Ground",
 		Shape = Enum.PartType.Cylinder,
 		Size = Vector3.new(1, radius * 2, radius * 2),
@@ -1812,10 +1811,9 @@ function HubBuilder.BuildFallback(): Model
 		PaletteRole = "Ground",
 		Material = hubCfg.GroundMaterial,
 	}, plaza)
-	plaza.PrimaryPart = groundPart
 	HubBuilder.BuildSpawn(hub)
 	HubBuilder.BuildSection(hub, "ReadyArea")
-	finish(hub, groundPart)
+	finish(hub)
 	return hub
 end
 

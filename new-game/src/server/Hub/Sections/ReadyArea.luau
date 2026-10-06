@@ -78,7 +78,7 @@ local function buildPad(parent: Instance, base: CFrame): BasePart
 	}, parent)
 	CollectionService:AddTag(pad, Tags.ReadyPad)
 
-	local runes = Kit.model("Runes", parent)
+	local runes = Kit.group("Runes", parent)
 	local glow = cfg.GlowRole
 	local top = size.Y
 	disc("PadRim", base, d + 1.4, top - 0.25, 0.5, {
@@ -162,7 +162,7 @@ local function buildStones(parent: Instance, base: CFrame)
 	if count < 2 then
 		return
 	end
-	local stones = Kit.model("Stones", parent)
+	local stones = Kit.group("Stones", parent)
 	local d = math.min(cfg.PadSize.X, cfg.PadSize.Z)
 	local radius = d / 2 + 1.35
 	local gap = math.rad(cfg.StoneGap)
@@ -350,8 +350,8 @@ local function buildSign(parent: Instance, base: CFrame): BasePart
 	return anchor
 end
 
-function ReadyArea.Build(hub: Model, zone: Zone): Model
-	local area = Kit.model("ReadyArea", hub)
+function ReadyArea.Build(hub: Instance, zone: Zone): Instance
+	local area = Kit.group("ReadyArea", hub)
 	if not Config.Features.ReadyPad then
 		return area
 	end
@@ -367,7 +367,7 @@ function ReadyArea.Build(hub: Model, zone: Zone): Model
 	end)
 
 	-- Pumpkins and candles by the entrance.
-	local extras = Kit.model("Pumpkins", area)
+	local extras = Kit.group("Pumpkins", area)
 	local halfSpan = cfg.ArchWidth / 2 + 0.9
 	for _, side in { -1, 1 } do
 		local spot = archCf * CFrame.new(side * (halfSpan + 2.4), 0, 0.6)
@@ -380,11 +380,11 @@ function ReadyArea.Build(hub: Model, zone: Zone): Model
 	return area
 end
 
-function ReadyArea.Repair(hub: Model, zone: Zone): Model
+function ReadyArea.Repair(hub: Instance, zone: Zone): Instance
 	local existing = hub:FindFirstChild("ReadyArea")
-	local area = if existing and existing:IsA("Model")
+	local area = if existing and Kit.isGroup(existing)
 		then existing
-		else Kit.model("ReadyArea", hub)
+		else Kit.group("ReadyArea", hub)
 	buildPad(area, zone.CFrame)
 	local hasSign = false
 	for _, sign in CollectionService:GetTagged(Tags.ReadySign) do

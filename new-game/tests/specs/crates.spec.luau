@@ -775,7 +775,7 @@ describe("Crate stand (lobby)", function()
 		function()
 			local hub = HubBuilder.Build()
 			local stand = hub:FindFirstChild("CrateStand")
-			expect(stand).toBeInstanceOf("Model")
+			expect(stand).toBeInstanceOf("Folder")
 			local CS = rt.game:GetService("CollectionService")
 			local found = {}
 			for _, holder in CS:GetTagged(Tags.CrateDisplay) do

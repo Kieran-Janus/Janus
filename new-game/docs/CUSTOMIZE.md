@@ -16,7 +16,7 @@ Want every pumpkin (or lantern, tree, gravestone...) to be **your** model, every
 
 Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See [Editing the lobby and maps by hand](#editing-the-lobby-and-maps-by-hand).
 
-Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Tags](#parts-that-do-something-tags)
+Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Toolbox codes](#with-a-toolbox-code-one-line-no-dragging) · [Move one thing](#move-just-one-thing) · [Tags](#parts-that-do-something-tags)
 
 ---
 
@@ -141,6 +141,24 @@ Good to know:
 - **Gameplay pieces keep working with any model.** For `CollectPumpkin`, `HidingPumpkin`, `ParkourPumpkin` and `Haystack` your model is only the *look*: an invisible part still does the job (the pickup you touch, the hitbox candy hits, the lid you land on, the spot that hides you from the King).
 - **Not sure what something is called?** Select it in Studio (in a playtest, or a baked lobby/map) and look at its **PropName** attribute (Properties > Attributes).
 - Take your model out of the folder and the built look comes back next time you press Play (in a lobby or map saved in your place, use Revert: see below).
+
+### With a Toolbox code (one line, no dragging)
+Every free model in the Toolbox (Creator Store) has a code: the number in its link, e.g. `https://create.roblox.com/store/asset/11600489662/Pumpkin` has the code `11600489662`. In the Toolbox, right-click a model > **Copy Asset ID** to get it.
+1. Stop the game (edit mode). Open **View > Command Bar**.
+2. **Every copy** of a prop gets that look (here: every lobby pumpkin):
+   `require(game.ServerScriptService.Server.Tools.Swap).Toolbox("Pumpkin", 11600489662)`
+   Several names at once: `.Toolbox({ "Pumpkin", "ParkourPumpkin" }, 11600489662)`. You can paste the whole link instead of the number.
+   It downloads the model (scripts removed), puts it in `ReplicatedStorage > Custom > Props` under that name, and swaps every copy in the lobby and baked maps (the Output window says how many). Round maps built from code use it by themselves.
+3. **Only one thing** (or a few): click it in the viewport (Ctrl+click for more), then run
+   `require(game.ServerScriptService.Server.Tools.Swap).Selected(11600489662)`
+   Only what you selected changes; every other copy stays as it is. It remembers its own look (attribute `CustomModel`, the model is kept as `Custom > Props > Pumpkin_11600489662`), so a later `.Toolbox(...)` or `.Props()` for every pumpkin leaves it alone. Clicking a parkour pumpkin changes only its look: the lid you land on keeps working. If what you clicked holds several things (the parkour START with its arch and lanterns), the Output window lists them: **Alt+click** the one you want and run it again.
+4. Save the place (**Ctrl+S**). **Ctrl+Z** undoes it.
+
+- Run `.Toolbox` again with another code to change your mind: the model you had is kept in `ServerStorage > CustomBackups`.
+- Normal look back for **every copy**: delete the model from `Custom > Props` and run `require(game.ServerScriptService.Server.Tools.Swap).Props({ Revert = true })`. For **one thing**: delete its `Pumpkin_<code>` model from `Custom > Props`, then the same Revert line.
+- Pumpkins have several names: lobby pumpkins `Pumpkin`, carved ones `JackOLantern`, parkour pumpkins `ParkourPumpkin`, King Hunt pickups `CollectPumpkin`, Hide & Seek pumpkins `HidingPumpkin`. Use the list for "all pumpkins".
+- Or just tell Claude Code the code and what it should replace ("make every lobby pumpkin 11600489662", "make the pumpkin by the shop 11600489662").
+- It only works in Studio's command bar while the game is stopped (a running game can't download free models).
 
 ### Every name you can use
 Sizes are studs tall (each copy is scaled to its own size, so this is just a guide).
@@ -387,7 +405,7 @@ Easiest start: let the game build its own map into `ServerStorage > Maps` for yo
 Players stand on the Ready pad (the glowing rune circle in front of the spawn) to join the next round. Nobody else is pulled in.
 - **Rules:** `src/shared/Config/Lobby.luau` > `Ready`. `MinReady` = how many ready players start the vote (now 1; never fewer than the switched-on modes need). `VoteOnlyReady` = only ready players can vote. `LeaveGraceSeconds` = a wobble or jump off the pad doesn't un-ready you. `PadText` and `Text` = the words.
 - **Look:** `Config.Hub.ReadyArea` in `init.luau` (size, runes colour, standing stones, arch, "PLAY!" banner, the floating "READY x / y" sign).
-- **Move it:** change `Config.Lobby.Zones.ReadyArea` and rebuild the lobby. Or, in a baked lobby, drag the whole `ReadyArea` model (or just the pad, the part tagged `ReadyPad`) wherever you like.
+- **Move it:** change `Config.Lobby.Zones.ReadyArea` and rebuild the lobby. Or, in a baked lobby, move the whole area: in the Explorer open the `ReadyArea` folder, click its first child, Shift+click its last child, then drag (or move just the pad, the part tagged `ReadyPad`).
 - **A second pad:** select the pad and press Ctrl+D. Any part tagged `ReadyPad` counts, square or round, and a tagged Model counts as its whole box.
 - **Switch it off** (`ReadyPad = false` in `Features.luau`) and everyone in the lobby plays every round, like before v2.
 - If there is no part tagged `ReadyPad` at all, everyone counts as ready (the Output window says so) and the game puts a pad back the next time it starts.
@@ -532,13 +550,24 @@ The lobby ("Spooky Town Square", `Workspace.Hub`) and the round maps are built b
 2. Open View > **Command Bar**.
 3. Paste this and press Enter: `require(game.ServerScriptService.Server.Tools.Bake).Hub()`
    `Workspace.Hub` is (re)built from code. Ctrl+Z undoes it.
-4. Edit it. In the Explorer it is grouped into Models with readable names:
+4. Edit it. In the Explorer it is sorted into **folders** with readable names, and every single thing in them (one pumpkin, one bench, one tree, one parkour step) is its own **Model**, so clicking it in the viewport selects just that thing (see "Move just one thing" below):
    - `Plaza` (the ground), `Spawn`, `Npcs` (Voting Board, Leaderboard, Photo Spot),
-   - one Model per lobby area: `ReadyArea`, `Shop` (with the `PumpkinVendor` stall), `CrateStand`, `Parkour`, `CandyRush`, `WebScour`, `EasterEggs`,
+   - one folder per lobby area: `ReadyArea`, `Shop` (with the `PumpkinVendor` stall), `CrateStand`, `Parkour`, `CandyRush`, `WebScour`, `EasterEggs`,
    - `Plaza`: `Ground`, the `Promenade` ring, the `Dais` the cauldron stands on, `Walkways`, `Curb` and small `Details` (cracks, puddles, leaves),
    - `Decor`: everything that is only for looks (`ClockTower`, `Cauldron`, `Lamps`, `PathLamps`, `Bunting`, `JackOLanterns`, `Candles`, `Benches`, `Graveyard`, `Trees`, `Clutter`, `Signposts`, `Forest`, `HauntedMansion`, `KingStatue`, `PumpkinPatch`, `OldGraves`, `Fence`, `Paths`, `Ambience`). Delete or move any of it freely.
 5. Lock it: `require(game.ServerScriptService.Server.Tools.Bake).Lock()`
 6. Save the place (Ctrl+S). Your lobby lives in the place file, not in git, so keep a backup: right-click `Workspace.Hub` > **Save to File...**
+
+### Move just one thing
+1. Do steps 1 to 3 and 5 above once (bake and lock the lobby), so the game keeps your changes.
+2. Click the thing in the viewport, e.g. one pumpkin. Only that pumpkin is selected (blue box round it). To pick a single part of something (one plank of a bench), hold **Alt** while you click.
+3. Move it with the **Move** tool (Model tab > Move, or Ctrl+2) by dragging the arrows; **Rotate** (Ctrl+3) and **Scale** (Ctrl+4) work the same way. Every other pumpkin stays where it is.
+4. Copy it with **Ctrl+D**, delete it with **Delete**.
+5. Save the place (**Ctrl+S**).
+
+To give that one thing a different look, see [With a Toolbox code](#with-a-toolbox-code-one-line-no-dragging) (`Swap.Selected`).
+
+A lobby saved before version 9 had all of it grouped in Models, so a click selected the whole lobby: run `Bake.Hub(true)` once to get the new layout (your hand edits are replaced; the old lobby is kept in `ServerStorage > HubBackup`).
 
 More command bar helpers (each one starts with `require(game.ServerScriptService.Server.Tools.Bake)`):
 
