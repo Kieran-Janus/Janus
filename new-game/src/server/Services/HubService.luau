@@ -3,20 +3,25 @@
 	The lobby, "Spooky Town Square": a Model in Workspace named "Hub", built by
 	src/server/Hub/HubBuilder.luau. What happens on every server start:
 
-	  1. Lighting comes from Config.Hub.Lighting.
+	  1. Lighting comes from Config.Hub.Lighting (a mistake there only skips that setting).
 	  2. The hub saved in the place file is used as it is, unless it is older than the code:
 	     its attribute BuildVersion is missing or lower than Config.Hub.BuildVersion. Then it is
 	     rebuilt from code, UNLESS it has the attribute Locked = true (set that once you edit
 	     the hub by hand): a Locked hub is kept and the Output shows a warning.
 	     No hub at all: one is built. If building fails, a plain plaza with the spawn and the
 	     Ready pad is used instead, so the server always starts.
-	  3. EnsureRequired: the pieces the game needs are put back if they are missing, even on a
+	  3. There is only ever one hub: extra "Hub" models and loose copies of hub pieces in
+	     Workspace are removed, with a warning saying what to clean up in the saved place.
+	  4. Old NPCs that v2 removed (Witch Wanda, Boo Guide) are deleted, and lobby areas whose
+	     switch in Config.Features is off (Ready pad, Parkour, Candy Rush, Crates) are taken
+	     out of this server (HubBuilder.RemoveSwitchedOff; the saved place keeps them).
+	  5. EnsureRequired: the pieces the game needs are put back if they are missing, even on a
 	     Locked hub (with a warning): the spawn (tag HubSpawn), the Ready pad (tag ReadyPad,
 	     while Config.Features.ReadyPad is on) and the Pumpkin Shop keeper (tag ShopKeeper).
-	  4. Old NPCs that v2 removed (Witch Wanda, Boo Guide) are deleted, a custom shopkeeper
-	     model is applied, the music is set and palette colours changed in Config are repainted.
-	  5. There is only ever one hub: extra "Hub" models and loose copies of hub pieces in
-	     Workspace are removed, with a warning saying what to clean up in the saved place.
+	     Tagged pieces count wherever they are in Workspace, also when moved out of the hub.
+	  6. A custom shopkeeper model is applied, the music is set and palette colours changed in
+	     Config are repainted. A SpawnLocation directly in Workspace that is NOT tagged HubSpawn
+	     (the baseplate's default spawn) is switched off.
 
 	Edit the hub by hand: docs/CUSTOMIZE.md > "Editing the lobby and maps by hand", or build it
 	into the place from the command bar: require(game.ServerScriptService.Server.Tools.Bake).Hub()
@@ -119,15 +124,26 @@ function HubService.RemoveRetired(hub: Model): number
 	return removed
 end
 
--- Tagged instances inside `hub`.
-local function taggedIn(hub: Model, tag: string): { Instance }
+-- Tagged instances that are in the game: anywhere in Workspace (moved out of the hub too), but
+-- not a backup in ServerStorage.
+local function taggedInGame(tag: string): { Instance }
 	local list = {}
 	for _, instance in CollectionService:GetTagged(tag) do
-		if instance:IsDescendantOf(hub) then
+		if instance:IsDescendantOf(workspace) then
 			table.insert(list, instance)
 		end
 	end
 	return list
+end
+
+-- The part a prompt goes on: a tagged part itself, or the main part of a tagged Model.
+local function promptHolder(instance: Instance): BasePart?
+	if instance:IsA("BasePart") then
+		return instance
+	elseif instance:IsA("Model") then
+		return instance.PrimaryPart or instance:FindFirstChildWhichIsA("BasePart", true)
+	end
+	return nil
 end
 
 local function shopIds(): { [string]: boolean }
@@ -184,14 +200,29 @@ local function ensureShopKeeper(hub: Model, notes: { string })
 		return
 	end
 	local ids = shopIds()
-	-- A part tagged ShopKeeper without a prompt gets one, so tagging any part works.
+	local def = defs[1]
+	-- Anything tagged ShopKeeper anywhere in Workspace opens the shop: a tagged part or model
+	-- without a prompt gets one, so tagging any part works. Parts go first, so a keeper whose
+	-- tagged PromptAnchor already has its prompt never gets a second one. A built shop NPC
+	-- whose prompt was deleted is handled below (its prompt goes back in front of it).
+	local keepers = taggedInGame(Tags.ShopKeeper)
 	local working = false
-	for _, instance in taggedIn(hub, Tags.ShopKeeper) do
-		if shopPrompt(instance, ids) then
-			working = true
-		elseif instance:IsA("BasePart") then
-			Npcs.AddPrompt(defs[1], instance)
-			working = true
+	for _, partsFirst in { true, false } do
+		for _, instance in keepers do
+			if instance:IsA("BasePart") ~= partsFirst then
+				continue
+			end
+			if shopPrompt(instance, ids) then
+				working = true
+				continue
+			end
+			local holder = if instance:GetAttribute("NpcId") == nil
+				then promptHolder(instance)
+				else nil
+			if holder then
+				Npcs.AddPrompt(def, holder)
+				working = true
+			end
 		end
 	end
 	if working then
@@ -210,8 +241,16 @@ local function ensureShopKeeper(hub: Model, notes: { string })
 		end
 		return
 	end
-	local def = defs[1]
 	local stale = Npcs.Find(hub, def.Id)
+	if not stale then
+		-- The shop NPC dragged out of the hub into Workspace.
+		for _, instance in keepers do
+			if instance:IsA("Model") and instance:GetAttribute("NpcId") == def.Id then
+				stale = instance
+				break
+			end
+		end
+	end
 	if stale then
 		-- The shop is there but its prompt was deleted: give it a new one where it stands.
 		local spot = stale:FindFirstChild("KeeperSpot", true)
@@ -230,8 +269,9 @@ local function ensureReadyPad(hub: Model, notes: { string })
 	if not Config.Features.ReadyPad then
 		return
 	end
-	for _, instance in CollectionService:GetTagged(Tags.ReadyPad) do
-		if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
+	-- A tagged part or Model (ReadyService uses a Model's bounding box) anywhere in Workspace.
+	for _, instance in taggedInGame(Tags.ReadyPad) do
+		if instance:IsA("BasePart") or instance:IsA("Model") then
 			return
 		end
 	end
@@ -276,12 +316,33 @@ end
 -- runs on its own: one failing never stops the others or the server.
 local function prepare(hub: Model)
 	local steps: { () -> () } = {
+		-- First, so the checks below never count a loose copy that is about to be removed.
+		function()
+			local loose = HubBuilder.RemoveLoosePieces(hub)
+			if loose > 0 then
+				warn(
+					("[HubService] Removed %d loose hub piece(s) from Workspace (an ungrouped or pasted hub copy). Delete them in Studio and save the place."):format(
+						loose
+					)
+				)
+			end
+		end,
 		function()
 			local retired = HubService.RemoveRetired(hub)
 			if retired > 0 then
 				print(
 					("[HubService] Removed %d retired NPC(s) (Witch Wanda, Boo Guide) from the saved hub."):format(
 						retired
+					)
+				)
+			end
+		end,
+		function()
+			local off = HubBuilder.RemoveSwitchedOff(hub)
+			if #off > 0 then
+				print(
+					("[HubService] Switched off in Config.Features: %s. Their lobby pieces were taken out of this server (your saved place still has them). Signposts and paths to them stay until the hub is rebuilt (F8 > Rebuild hub, or Bake.Hub() in edit mode)."):format(
+						table.concat(off, ", ")
 					)
 				)
 			end
@@ -301,16 +362,6 @@ local function prepare(hub: Model)
 		function()
 			HubPalette.Sync(hub)
 		end,
-		function()
-			local loose = HubBuilder.RemoveLoosePieces(hub)
-			if loose > 0 then
-				warn(
-					("[HubService] Removed %d loose hub piece(s) from Workspace (an ungrouped or pasted hub copy). Delete them in Studio and save the place."):format(
-						loose
-					)
-				)
-			end
-		end,
 		HubBuilder.DisableDefaultSpawn,
 	}
 	for _, step in steps do
@@ -322,7 +373,11 @@ local function prepare(hub: Model)
 end
 
 function HubService.Start()
-	HubBuilder.ApplyLighting()
+	-- Lighting can't stop the lobby from loading (each bad setting is skipped with a warning).
+	local lit, problem = pcall(HubBuilder.ApplyLighting :: any) -- (cast: the old type checker misreads pcall of a function returning nothing)
+	if not lit then
+		warn("[HubService] Couldn't apply Config.Hub.Lighting: " .. tostring(problem))
+	end
 	local hub = keepOneHub()
 	if hub and HubService.IsOutdated(hub) then
 		if hub:GetAttribute("Locked") == true then

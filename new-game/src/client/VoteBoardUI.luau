@@ -1,6 +1,9 @@
 --!strict
 --[[
-	The hub Voting Board: a live SurfaceGui on Hub.Npcs.VotingBoard.Screen.
+	The hub Voting Board: a live SurfaceGui on the board's "Screen" part. The board is the NPC
+	in Config.Npcs.List with Kind "Board" (Id VotingBoard), found by its NpcId attribute
+	wherever it is in Workspace.Hub (in Npcs, in a lobby area when it has a Zone, or moved by
+	hand in Studio).
 	While a vote is open it shows the game (mode + map) and, when an offered mode uses it, the
 	difficulty choices with counts, and its buttons cast votes (the server validates them
 	like any other vote; players not on the Ready pad see a hint instead). Otherwise it shows
@@ -23,6 +26,34 @@ type VoteState = {
 }
 
 local VoteBoardUI = {}
+
+-- The Voting Board's NPC Id from Config.Npcs.List (the first NPC of Kind "Board").
+local function boardId(): string
+	for _, def in Config.Npcs.List do
+		if def.Kind == "Board" then
+			return def.Id
+		end
+	end
+	return "VotingBoard"
+end
+
+-- The board's Screen part: Hub.Npcs.<id> first (quick), else any Model in the hub whose NpcId
+-- attribute is `id`. nil while the hub or the board hasn't been built or streamed in yet.
+function VoteBoardUI.FindScreen(hub: Instance, id: string): BasePart?
+	local npcs = hub:FindFirstChild("Npcs")
+	local board: Instance? = npcs and npcs:FindFirstChild(id)
+	if not (board and board:IsA("Model") and board:FindFirstChild("Screen")) then
+		board = nil
+		for _, d in hub:GetDescendants() do
+			if d:IsA("Model") and d:GetAttribute("NpcId") == id and d:FindFirstChild("Screen") then
+				board = d
+				break
+			end
+		end
+	end
+	local screen = board and board:FindFirstChild("Screen")
+	return if screen and screen:IsA("BasePart") then screen else nil
+end
 
 function VoteBoardUI.Mount()
 	local player = Players.LocalPlayer
@@ -148,16 +179,19 @@ function VoteBoardUI.Mount()
 		end)
 	end
 
-	-- The hub may be built after this client starts; keep looking for the board.
+	-- The hub may be built (or stream in) after this client starts, and can be rebuilt: look
+	-- for the board again whenever the one shown is gone.
+	local id = boardId()
 	task.spawn(function()
 		while true do
-			local hub = workspace:FindFirstChild("Hub")
-			local npcs = hub and hub:FindFirstChild("Npcs")
-			local board = npcs and npcs:FindFirstChild("VotingBoard")
-			local screen = board and board:FindFirstChild("Screen")
-			if screen and screen:IsA("BasePart") and gui.Adornee ~= screen then
-				gui.Adornee = screen
-				render()
+			local shown = gui.Adornee
+			if not (shown and shown:IsDescendantOf(workspace)) then
+				local hub = workspace:FindFirstChild("Hub")
+				local screen = hub and VoteBoardUI.FindScreen(hub, id)
+				if screen then
+					gui.Adornee = screen
+					render()
+				end
 			end
 			task.wait(2)
 		end

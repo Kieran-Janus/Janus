@@ -43,7 +43,8 @@ Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See 
 | Daily streak rewards | `Config.Daily.Rewards` |
 | First-round tutorial tips and timings | `Config.Tutorial` |
 | Friend/group bonus, invite button, favourite prompt | `Config.Social` |
-| Map lighting and ambient sound | `Config.Maps.List[i].Lighting`, `.AmbientSound` |
+| Map lighting and ambient sound | `Lighting`, `AmbientSound` in the map's file, `src/shared/Config/Maps/<Id>.luau` |
+| Which maps and modes the vote offers | `Config.Modes.Playlists` (`src/shared/Config/Modes.luau`) |
 | Sound effects (clicks, pickups, King footsteps, minions, rewards) | `Config.Sounds` (SoundId "" = silent) |
 | Hub music, King roar | `Config.Hub.Music`, `Config.King.Heard.RoarSoundId` |
 | UI colours and font | `src/client/Theme.luau` |
@@ -156,7 +157,10 @@ Mystery crates give a random skin. Everything about them is in `src/shared/Confi
   files in `Config/Skins/` do this for you). The rarity crates (Common, Uncommon, Rare, CRAZY Crate)
   hold every crate skin of their rarity.
 - **New crate**: copy a line in `List`, give it a new Id and Name, then set `Crate = "<new Id>"` on
-  the skins it should give. It appears in Menu > Crates and on the crate stand automatically.
+  the skins it should give. It appears in Menu > Crates straight away, and on the crate stand once
+  the lobby is rebuilt (F8 > Rebuild hub, or `Bake.Hub()`). A lobby saved in your place keeps its
+  stand: copy one of its `<CrateId>Display` models and set the `CrateId` attribute of its
+  `CratePrompt` part to the new Id.
 - **Duplicates**: a skin you already own pays back `DuplicateRefund` coins (`Config/Rarity.luau`).
 - **The crate stand** next to the Pumpkin Shop (`src/server/Hub/Sections/CrateStand.luau`, in
   `Config.Lobby.Zones.Crates`): every crate on a plinth with an "Open" prompt. Each prompt sits on
@@ -187,7 +191,11 @@ Each map is built from code in `src/server/Maps/` until you give it a hand-made 
 
 Easiest start: let the game build its own map into `ServerStorage > Maps` for you and edit that (see [Editing the lobby and maps by hand](#editing-the-lobby-and-maps-by-hand)).
 
-Add a third map: add an entry to `Config.Maps.List` (Id, Name, SpawnFolder = "Spawns", Lighting, AmbientSound) and put its model in `ServerStorage > Maps`. Or ask Claude with `/add-map`.
+**Add a new map** (or ask Claude with `/add-map`):
+1. Copy one of the files in `src/shared/Config/Maps/` (e.g. `PumpkinPatch.luau`) and rename the copy after your map's Id (e.g. `GhostTown.luau`). In it, change `Id` (the same as the file name), `Name`, `Lighting` and `AmbientSound`, and set `Modes` to the game modes it is for (`"KingHunt"`, `"HideSeek"`, `"ScareMaze"`). Leave `Builder` pointing at the builder of a map like yours: it is only used when there is no model.
+2. Add it to `Config.Maps.List` in `src/shared/Config/init.luau`: one more line like `require(script.Maps.GhostTown) :: any,`.
+3. Add a playlist for it in `src/shared/Config/Modes.luau` > `Playlists`: `{ Id = "KingHuntGhostTown", Mode = "KingHunt", Map = "GhostTown", Name = "King Hunt: Ghost Town" },`. The vote only offers playlists, and the button shows the playlist's `Name`.
+4. Build the map as described above, name the Model after the Id and put it in `ServerStorage > Maps`. Besides `Floor` and `Spawns`, the other modes use tagged parts: a ScareMaze map needs at least one part tagged `MazeExit` (where Survivors escape) and can have `SurvivorSpawn`, `HauntSpawn` and `ScareTrigger`; a Hide & Seek map can have `SeekerSpawn`, `HiderSpawn`, `HidingDecoy` and `SeekerDoor`. Without the spawn tags everyone starts at `Spawns`. What each tag needs is at the top of `src/shared/Tags.luau`.
 
 ---
 
@@ -215,7 +223,9 @@ The lobby ("Spooky Town Square", `Workspace.Hub`) and the round maps are built b
 - When you press Play, the game uses the `Workspace.Hub` saved in your place, as it is.
 - **BuildVersion.** Every lobby built by the game has the attribute `BuildVersion` (select `Workspace.Hub`, then Properties > Attributes). When the lobby code changes, `Config.Hub.BuildVersion` goes up. A saved lobby with a lower number (or none) is rebuilt from code automatically, and your changes to it are lost...
 - **Locked.** ...unless you lock it. Add the attribute `Locked` (a boolean, ticked) to `Workspace.Hub`, or run `Bake.Lock()` (below). A Locked lobby is never rebuilt; if it is older than the code, the Output window says so and how to update it.
-- **The game always puts back what it needs**, even in a Locked lobby: the spawn, the Ready pad and the Pumpkin Shop keeper. If one is missing, it is added for that server and the Output window tells you; run `Bake.Repair()` to add it to your place for good.
+- **The game always puts back what it needs**, even in a Locked lobby: the spawn, the Ready pad and the Pumpkin Shop keeper. If one is missing, it is added for that server and the Output window tells you; run `Bake.Repair()` to add it to your place for good. Tagged pieces count wherever they are in Workspace, even if you dragged them out of `Workspace.Hub`. A lobby minigame that is switched on but missing (the parkour start pad, the Candy Rush stand, the Web Scour lantern) is also built for that server, with a message in the Output window.
+- **What a saved lobby keeps.** Config changes to what a lobby area is *made of* (the parkour `Course`, the crate stand and its crate list, the Candy Rush stand or Spider Grove look, where an Easter egg hides) only show once the lobby is rebuilt (F8 > Rebuild hub to try, `Bake.Hub()` to keep). Rewards, prices, timings and words from Config work straight away, also in a saved or Locked lobby.
+- **Switching a feature off** in `Config.Features` (Ready pad, Parkour, Candy Rush, Web Scour, Crates, Easter eggs) takes its pieces out of the running game; your saved place still has them, so switching it back on brings them back. Signposts and paths pointing there stay until the lobby is rebuilt.
 - The old Witch Wanda and Boo Guide are removed from saved lobbies automatically.
 
 ### Step by step: edit the lobby
@@ -225,7 +235,7 @@ The lobby ("Spooky Town Square", `Workspace.Hub`) and the round maps are built b
    `Workspace.Hub` is (re)built from code. Ctrl+Z undoes it.
 4. Edit it. In the Explorer it is grouped into Models with readable names:
    - `Plaza` (the ground), `Spawn`, `Npcs` (Voting Board, Leaderboard, Photo Spot),
-   - one Model per lobby area: `ReadyArea`, `Shop` (with the `PumpkinVendor` stall), `Parkour`, `CandyRush`, `WebScour`, `EasterEggs`,
+   - one Model per lobby area: `ReadyArea`, `Shop` (with the `PumpkinVendor` stall), `CrateStand`, `Parkour`, `CandyRush`, `WebScour`, `EasterEggs`,
    - `Plaza`: `Ground`, the `Promenade` ring, the `Dais` the cauldron stands on, `Walkways`, `Curb` and small `Details` (cracks, puddles, leaves),
    - `Decor`: everything that is only for looks (`ClockTower`, `Cauldron`, `Lamps`, `PathLamps`, `Bunting`, `JackOLanterns`, `Candles`, `Benches`, `Graveyard`, `Trees`, `Clutter`, `Signposts`, `Forest`, `HauntedMansion`, `KingStatue`, `PumpkinPatch`, `OldGraves`, `Fence`, `Paths`, `Ambience`). Delete or move any of it freely.
 5. Lock it: `require(game.ServerScriptService.Server.Tools.Bake).Lock()`
@@ -248,10 +258,10 @@ The game finds the parts that *do* something by their **tag**, not their name or
 
 | Tag | What it does | Tips |
 | --- | --- | --- |
-| `ReadyPad` | Players standing on it join the next round | The round stone in `ReadyArea` (square or round pads both work). Ctrl+D a copy to make a second pad. The glowing runes on top are just decoration. |
+| `ReadyPad` | Players standing on it join the next round | The round stone in `ReadyArea` (square or round pads both work, and a tagged Model counts as its whole box). Ctrl+D a copy to make a second pad. The glowing runes on top are just decoration. |
 | `ReadySign` | Shows "READY 2 / 4" and what the round is doing | An invisible part in `ReadyArea` holding the floating sign. Move it anywhere. |
-| `HubSpawn` | Where players appear in the lobby and come back after a round | The `Spawn` pad. |
-| `ShopKeeper` | Opens the Pumpkin Shop | On the `PumpkinVendor` stall. Tag **any** part `ShopKeeper` and it opens the shop too (a "Shop" prompt is added). |
+| `HubSpawn` | Where players appear in the lobby and come back after a round | The `Spawn` pad. Your own SpawnLocation (Model > Spawn) works too: tag it `HubSpawn`, otherwise the game switches it off so it doesn't compete with the lobby spawn. |
+| `ShopKeeper` | Opens the Pumpkin Shop | On the `PumpkinVendor` stall. Tag **any** part or model `ShopKeeper`, anywhere in Workspace, and it opens the shop too (a "Shop" prompt is added). |
 
 Other features add their own tags (parkour checkpoints, Candy Rush pads, Easter eggs...): the list, with what each one needs, is at the top of `src/shared/Tags.luau`.
 
@@ -285,7 +295,7 @@ The code for all of them is in `src/server/Build/Props.luau` (and `Hub/NpcLooks.
 - Removed your custom prop? Lobbies built while it existed still contain copies of it: run `Bake.Hub()` again (or F8 > Rebuild hub) to get the built ones back.
 
 ### Lobby areas (zones)
-`Config.Lobby.Zones` says where the Ready pad, the shop, Candy Rush, Web Scour and the parkour course go. Decorations are never placed inside a zone, so each area stays free. Move one by changing its `Offset`, then rebuild (`Bake.Hub()`, or raise `Config.Hub.BuildVersion`). The shop follows its zone.
+`Config.Lobby.Zones` says where the Ready pad, the shop, the crate stand (`Crates`), Candy Rush, Web Scour and the parkour course go. Decorations are never placed inside a zone, so each area stays free. Move one by changing its `Offset`, then rebuild (`Bake.Hub()`, or raise `Config.Hub.BuildVersion`). The shop follows its zone.
 
 ### Round maps
 1. In edit mode, run `require(game.ServerScriptService.Server.Tools.Bake).Map("PumpkinPatch")` (any Id from `Config.Maps.List`).
@@ -295,7 +305,7 @@ The code for all of them is in `src/server/Build/Props.luau` (and `Hub/NpcLooks.
 4. Drag it back into `ServerStorage > Maps` and save the place.
 5. Keep it in git: right-click it > **Save to File...** and save it as `new-game/maps/PumpkinPatch.rbxm` (the `maps/` folder is `ServerStorage > Maps`). Then, with Rojo connected, delete the copy in Studio so there is only one.
 - Running `Map(...)` again keeps your previous copy as `PumpkinPatch_Backup`.
-- Lighting, sounds and the name in the vote still come from `Config.Maps`.
+- Lighting and sounds still come from the map's file in `src/shared/Config/Maps/`; the name on the vote button comes from its playlist in `src/shared/Config/Modes.luau`.
 - Want the code-built map back? Delete it from `ServerStorage > Maps`.
 
 ---

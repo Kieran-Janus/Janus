@@ -15,7 +15,10 @@
 	  - coins: CoinsPerCritter, FinishCoins, TimeBonusPerSecond, MaxCoins, RewardCooldown
 	  - what it says on screen: Text            - sounds: Sounds (any rbxassetid, "" = silent)
 	In Studio the hiding spots are the invisible parts tagged WebScourSpot and the lantern is
-	the part tagged WebScourStart: move, copy or delete them and the game keeps working.
+	the part tagged WebScourStart: move, copy or delete them and the game keeps working (your
+	own lantern model works too: tag the Model WebScourStart). Delete the lantern and a new one
+	is put back at Config.Lobby.Zones.WebScour; the rest of the grove stays as you left it
+	(as long as it still has hiding spots).
 ]]
 
 -- What one sound line may contain (leave this as it is).

@@ -10,7 +10,8 @@
 	Some tags also need attributes on the same part (Properties > Attributes):
 	  ParkourCheckpoint  Index (number: 1, 2, 3... in course order)
 	  CandyRushPad       Lane (number)
-	  EasterEgg          EggId (string, matches Config.EasterEggs.List) and Coins (number)
+	  EasterEgg          EggId (string, matches Config.EasterEggs.List) and Coins (number; an
+	                     EggId in the list pays the list's Coins instead)
 	  ScareTrigger       Kind (string: which scare plays)
 	  CrateDisplay       CrateId (string, a crate Id from Config.Crates.List)
 	Colours: any part can have the attribute PaletteRole (an attribute, not a tag) to take its

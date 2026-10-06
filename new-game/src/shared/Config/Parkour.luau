@@ -11,6 +11,10 @@
 	Change the course: edit the Course list just below. Each line is one piece. To add a
 	jump, copy a line, paste it where it goes in the order and change its Offset. The Output
 	window warns about any jump that is too far or too high for a normal player.
+	Course changes show after the hub is rebuilt (F8 > Rebuild hub to try them, then
+	Bake.Hub() or raise Config.Hub.BuildVersion). A hub saved in the place, or Locked, keeps
+	the course it was built with: move its pieces in Studio instead. Rewards, times and words
+	work straight away, also on a saved hub.
 	In Studio you can also move, resize or copy the built pieces (Workspace.Hub.Parkour): the
 	game finds the working parts by their tags (ParkourStart, ParkourCheckpoint with the
 	attribute Index = 1, 2, 3..., ParkourFinish, ParkourHazard), not by name or position.

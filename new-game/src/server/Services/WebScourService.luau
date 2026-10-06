@@ -7,7 +7,8 @@
 
 	How a hunt works (several players can hunt at once, each with their own critters):
 	  1. A player uses the "Scour the Web!" button on a part tagged WebScourStart (any part
-	     with that tag gets the button, even one added in Studio).
+	     with that tag gets the button, even one added in Studio; a tagged Model gets it on
+	     its PrimaryPart, else its first part).
 	  2. The server picks Critters random parts tagged WebScourSpot and tells ONLY that
 	     player where they are (the client shows the critters, nobody else sees them).
 	  3. The player clicks or taps a critter: the client sends its number; the server checks
@@ -91,6 +92,32 @@ local function tagged(tag: string): { BasePart }
 	for _, instance in CollectionService:GetTagged(tag) do
 		if instance:IsA("BasePart") and instance:IsDescendantOf(workspace) then
 			table.insert(list, instance)
+		end
+	end
+	return list
+end
+
+-- The part that holds a lantern's button: a part tagged WebScourStart, or the main part
+-- (PrimaryPart, else its first part) of a Model with that tag, e.g. a Toolbox lantern.
+local function buttonPart(instance: Instance): BasePart?
+	if not instance:IsDescendantOf(workspace) then
+		return nil
+	end
+	if instance:IsA("BasePart") then
+		return instance
+	elseif instance:IsA("Model") then
+		return instance.PrimaryPart or instance:FindFirstChildWhichIsA("BasePart", true)
+	end
+	return nil
+end
+
+-- Every lantern in the game (its button part).
+local function starts(): { BasePart }
+	local list = {}
+	for _, instance in CollectionService:GetTagged(Tags.WebScourStart) do
+		local part = buttonPart(instance)
+		if part then
+			table.insert(list, part)
 		end
 	end
 	return list
@@ -212,7 +239,7 @@ function WebScourService.StartHunt(
 	local origin = startPart
 	if not origin then
 		local nearest = math.huge
-		for _, part in tagged(Tags.WebScourStart) do
+		for _, part in starts() do
 			local distance = (part.Position - root.Position).Magnitude
 			if distance < nearest then
 				nearest = distance
@@ -352,14 +379,14 @@ local function check()
 	end
 end
 
--- Gives a WebScourStart part its button (with the Config text) and listens to it.
+-- Gives a WebScourStart part or model its button (with the Config text) and listens to it.
 local function wire(instance: Instance)
-	if not (instance:IsA("BasePart") and instance:IsDescendantOf(workspace)) then
+	local part = buttonPart(instance)
+	if not part then
 		return
 	end
-	local part = instance
 	local prompt: ProximityPrompt? = nil
-	for _, d in part:GetDescendants() do
+	for _, d in instance:GetDescendants() do
 		if d:IsA("ProximityPrompt") and d.Name == "WebScourPrompt" then
 			prompt = d
 			break
@@ -397,9 +424,11 @@ local function wire(instance: Instance)
 	end)
 end
 
--- A saved hub from before the Spider Grove existed: build it for this server.
+-- A saved hub with no lantern (from before the Spider Grove existed, baked with Web Scour off,
+-- or the lantern was deleted): WebScour.Repair builds the grove for this server, or only a
+-- new lantern when the grove is still there (hand edits stay).
 local function ensureGrove()
-	if #tagged(Tags.WebScourStart) > 0 then
+	if #starts() > 0 then
 		return
 	end
 	local hub = workspace:FindFirstChild("Hub")
@@ -416,7 +445,7 @@ local function ensureGrove()
 	end)
 	if ok then
 		warn(
-			"[WebScour] Your saved hub had no Spider Grove (no part tagged WebScourStart), so it was built for this server. To keep it, F8 > Rebuild hub or bake the hub again (Bake.Hub())."
+			"[WebScour] Your saved hub had no Web Scour lantern (nothing tagged WebScourStart), so the Spider Grove (or just its lantern, if the grove was still there) was built for this server. To keep it, F8 > Rebuild hub or bake the hub again (Bake.Hub())."
 		)
 	else
 		warn("[WebScour] Couldn't build the Spider Grove: " .. tostring(err))
@@ -425,8 +454,11 @@ end
 
 -- Feature off: the grove isn't part of the running game (the saved place is not changed).
 local function removeGrove()
-	for _, part in tagged(Tags.WebScourStart) do
-		for _, d in part:GetDescendants() do
+	for _, instance in CollectionService:GetTagged(Tags.WebScourStart) do
+		if not instance:IsDescendantOf(workspace) then
+			continue
+		end
+		for _, d in instance:GetDescendants() do
 			if d:IsA("ProximityPrompt") then
 				d.Enabled = false
 			end
@@ -470,7 +502,7 @@ function WebScourService.Start()
 		end
 	end)
 	AdminService.Register("WebScourStart", "Web Scour: start", function(player, _data)
-		local lantern = tagged(Tags.WebScourStart)[1]
+		local lantern = starts()[1]
 		local character = player.Character
 		if lantern and character then
 			-- Stand on the ground just in front of the lantern (it hangs above head height),

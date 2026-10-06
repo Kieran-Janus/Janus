@@ -34,6 +34,9 @@
 	with the attributes EggId (an Id from the list) and Coins; move it, copy it or make any part
 	an egg by giving it that tag and those attributes. Eggs missing from the lobby are put back
 	from this list when the game starts (to remove one for good, delete its line here).
+	Coins changes work straight away, also on a hub saved in the place. A new Anchor or Offset
+	for an egg that is already in a saved hub shows after the hub is rebuilt (F8 > Rebuild hub,
+	or Bake.Hub()), or just move the egg in Studio.
 	Your own egg look: a model named EggGoldenPumpkin (or EggCandy, EggLollipop, EggSkull,
 	EggGhost) in ReplicatedStorage.Custom.Props replaces the built one.
 ]]

@@ -5,8 +5,10 @@
 	On/off: Config.Features.EasterEggs (off = no eggs: they are taken out of the running game).
 
 	An egg is any part tagged EasterEgg with the attributes EggId and Coins (the eggs built by
-	src/server/Hub/Sections/EasterEggs.luau, or any part you tag in Studio). On start, eggs in
-	Config.EasterEggs.List that the lobby doesn't have are placed (Sections/EasterEggs).
+	src/server/Hub/Sections/EasterEggs.luau, or any part you tag in Studio). An EggId from
+	Config.EasterEggs.List pays the Coins written there (its Coins attribute is only used for
+	eggs that aren't in the list). On start, eggs in Config.EasterEggs.List that the lobby
+	doesn't have are placed (Sections/EasterEggs).
 	Collecting: the egg's "Take" button or walking into it. The server checks the player's
 	save is loaded, they aren't in a round, they are within ReachDistance of the egg, aren't
 	grabbing too fast and haven't found that egg before; then it adds the coins and tells
@@ -169,7 +171,13 @@ function EasterEggService.Collect(player: Player, part: BasePart): boolean
 		return false
 	end
 	found[id] = true
-	local coins = EasterEggRules.Coins(part:GetAttribute("Coins"), cfg.MaxCoins)
+	-- An egg in Config.EasterEggs.List pays its Coins from there (so changing it works on a
+	-- saved hub too); an egg you made yourself in Studio pays its Coins attribute.
+	local def = EasterEggRules.Def(id)
+	local reward = if def and type(def.Coins) == "number"
+		then def.Coins
+		else part:GetAttribute("Coins")
+	local coins = EasterEggRules.Coins(reward, cfg.MaxCoins)
 	if coins > 0 then
 		DataService.Add(player, "Coins", coins)
 		pcall(ShopService.Push, player)
