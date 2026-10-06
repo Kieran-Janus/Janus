@@ -46,6 +46,7 @@ local Tags = {
 	SurvivorSpawn = "SurvivorSpawn", -- ScareMaze: where Survivors start
 	SeekerSpawn = "SeekerSpawn", -- Hide & Seek: where seekers start
 	HiderSpawn = "HiderSpawn", -- Hide & Seek: where hiders start
+	SeekerDoor = "SeekerDoor", -- Hide & Seek: the seeker hut's door, swings open when seekers are let out
 	-- Older tags (set by src/server/Build/Kit.luau)
 	HubFloat = "HubFloat", -- bobs up and down (client HubAmbience)
 	HubFlicker = "HubFlicker", -- light flickers (client HubAmbience)

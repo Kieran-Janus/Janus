@@ -18,7 +18,8 @@
 	  "KingHunt"), ModeName (e.g. "King Hunt"); modes add their own (King Hunt: Alive, KingCount).
 	Remote RoundResults(rows, info): rows = Modes/Types.luau ResultRow list (best first),
 	  info = { ScoreLabel, Winner?, MvpLine?, Mode, ModeName }.
-	Owner buttons (F8 panel): "Start round now", and in Studio "Force mode".
+	Owner buttons (F8 panel): "Start round now", and in Studio "Force mode" plus one
+	"<mode>: force next round" per mode (e.g. "Pumpkin Hide & Seek: force next round").
 ]]
 
 local Players = game:GetService("Players")
@@ -420,6 +421,42 @@ local function registerAdminCommands()
 			end
 			return "Next round: normal vote."
 		end)
+
+		-- One "<mode>: force next round" button per mode: the next round plays that mode
+		-- without a vote (each press moves on to its next map).
+		for _, modeId in Config.Modes.Order do
+			local def = Config.Modes.List[modeId]
+			if not def then
+				continue
+			end
+			AdminService.Register(
+				"Force" .. modeId,
+				("%s: force next round"):format(def.Name),
+				function(_player, _data)
+					local list = {}
+					for _, playlist in Playlists.Enabled() do
+						if playlist.Mode == modeId then
+							table.insert(list, playlist)
+						end
+					end
+					if #list == 0 then
+						return ("%s is switched off (Config.Features.%s)."):format(
+							def.Name,
+							def.Feature
+						)
+					end
+					local index = 0
+					for i, playlist in list do
+						if forcedPlaylist and playlist.Id == forcedPlaylist.Id then
+							index = i
+						end
+					end
+					local chosen = list[index % #list + 1]
+					forcedPlaylist = chosen
+					return ("Next round: %s (any player count)."):format(chosen.Name)
+				end
+			)
+		end
 	end
 end
 
