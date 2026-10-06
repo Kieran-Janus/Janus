@@ -15,7 +15,7 @@ return {
 	HideSeek = false, -- Pumpkin Hide & Seek: seekers with candy guns vs pumpkin hiders
 	ScareMaze = false, -- ScareMaze: Survivors run the maze, Haunters scare them
 	Parkour = true, -- the parkour course in the lobby
-	CandyRush = false, -- lobby minigame: click your candies, first to clear them all wins
+	CandyRush = true, -- lobby minigame: click your candies, first to clear them all wins
 	WebScour = false, -- lobby minigame: a quick scavenger hunt in the spider webs
 	EasterEggs = false, -- hidden pumpkins around the lobby that give coins once each
 	Crates = true, -- crates bought with coins that give a random skin
