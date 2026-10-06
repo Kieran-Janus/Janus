@@ -9,8 +9,11 @@ local Runtime = require("../harness/Runtime")
 
 local describe, it, expect = T.describe, T.it, T.expect
 
+-- One game for the tests that don't run the server (fewer games = a faster spec).
+local shared = Runtime.new()
+
 describe("Config.Parkour.Course", function()
-	local rt = Runtime.new()
+	local rt = shared
 	local Config = rt:require("ReplicatedStorage.Shared.Config")
 	local Logic = rt:require("ReplicatedStorage.Shared.ParkourLogic")
 	local Lobby = rt:require("ReplicatedStorage.Shared.Lobby")
@@ -124,7 +127,7 @@ describe("Config.Parkour.Course", function()
 end)
 
 describe("ParkourLogic", function()
-	local rt = Runtime.new()
+	local rt = shared
 	local Logic = rt:require("ReplicatedStorage.Shared.ParkourLogic")
 	local Vector3 = rt.env.Vector3
 	local CFrame = rt.env.CFrame
@@ -178,7 +181,7 @@ describe("ParkourLogic", function()
 end)
 
 describe("The parkour section", function()
-	local rt = Runtime.new()
+	local rt = shared
 	local Config = rt:require("ReplicatedStorage.Shared.Config")
 	local Tags = rt:require("ReplicatedStorage.Shared.Tags")
 	local Lobby = rt:require("ReplicatedStorage.Shared.Lobby")
@@ -551,5 +554,79 @@ describe("ParkourService on a saved hub without a course", function()
 		expect(#CollectionService:GetTagged(Tags.ParkourStart)).toBe(1)
 		expect(#CollectionService:GetTagged(Tags.ParkourCheckpoint)).toBe(3)
 		expect(#rt.workspace.Hub:GetChildren()).toBeGreaterThan(3)
+	end)
+end)
+
+describe("ParkourUI", function()
+	local server = Runtime.new()
+	server:require("ServerScriptService.Server.Services.ParkourService").Start()
+	local client = Runtime.new({ client = true })
+	client:replicateFrom(server)
+	local Config = client:require("ReplicatedStorage.Shared.Config")
+	local text = Config.Parkour.Text
+	local Client = client:find("StarterPlayer.StarterPlayerScripts.Client")
+	local player = client.game:GetService("Players").LocalPlayer
+	local gui = client:create("ScreenGui", { Name = "GameUI" }, player.PlayerGui)
+	client:require(Client.Layout).Mount(gui)
+	client:require(Client.PanelManager).Mount(gui)
+	local MenuUI = client:require(Client.MenuUI)
+	MenuUI.Mount(gui)
+	client:require(Client.MenuTiles).Mount(gui)
+	client:require(Client.ParkourUI).Mount(gui)
+	client:advance(0.5)
+
+	it("puts one Parkour tile in the Menu that opens the panel", function()
+		local tiles = {}
+		for _, child in gui.Menu.Tiles:GetChildren() do
+			if child:GetAttribute("MenuTile") == "Parkour" then
+				table.insert(tiles, child)
+			end
+		end
+		expect(#tiles).toBe(1)
+		client:fire(tiles[1], "Activated")
+		expect(gui.ParkourPanel.Visible).toBe(true)
+		expect(gui.ParkourPanel.Best.Text).toBe(text.NoBest)
+		player:SetAttribute("ParkourBest", 65.32)
+		client:advance(0.1)
+		expect(gui.ParkourPanel.Best.Text).toBe(text.Best:format("1:05.32"))
+		client:fire(gui.ParkourPanel.CloseButton, "Activated")
+		expect(gui.ParkourPanel.Visible).toBe(false)
+	end)
+
+	it("shows the timer while you climb", function()
+		expect(gui.ParkourTimer.Visible).toBe(false)
+		player:SetAttribute("ParkourRun", "Ready")
+		client:advance(0.1)
+		expect(gui.ParkourTimer.Visible).toBe(true)
+		expect(gui.ParkourTimer.Time.Text).toBe(text.Ready)
+		player:SetAttribute("ParkourStarted", client.workspace:GetServerTimeNow() - 42.5)
+		player:SetAttribute("ParkourRun", "Running")
+		client:advance(0.1)
+		expect(gui.ParkourTimer.Time.Text).toMatch("^0:42%.")
+		player:SetAttribute("ParkourRun", "")
+		client:advance(0.1)
+		expect(gui.ParkourTimer.Visible).toBe(false)
+	end)
+
+	it("pops up checkpoints and the finish", function()
+		local event = client:find("ReplicatedStorage.Remotes.ParkourEvent")
+		client:fire(event, "OnClientEvent", "Checkpoint", { Index = 2, Count = 3 })
+		expect(gui.ParkourPop.Visible).toBe(true)
+		expect(gui.ParkourPop.Text).toBe(text.Checkpoint:format(2, 3))
+		client:fire(event, "OnClientEvent", "Back", { Reason = "Hazard", Checkpoint = 0 })
+		expect(gui.ParkourPop.Text).toBe(text.SlimedStart)
+		client:fire(event, "OnClientEvent", "Finish", {
+			Time = 61.5,
+			Best = 61.5,
+			NewBest = true,
+			Coins = Config.Parkour.Reward.Coins,
+			Wait = 72000,
+		})
+		expect(gui.ParkourFinish.Visible).toBe(true)
+		expect(gui.ParkourFinish.Time.Text).toBe(text.FinishTime:format("1:01.50"))
+		expect(gui.ParkourFinish.Best.Text).toBe(text.NewBest)
+		client:fire(event, "OnClientEvent", "Nonsense", 42) -- ignored, no error
+		client:advance(Config.Parkour.Screen.FinishSeconds + 1)
+		expect(gui.ParkourFinish.Visible).toBe(false)
 	end)
 end)

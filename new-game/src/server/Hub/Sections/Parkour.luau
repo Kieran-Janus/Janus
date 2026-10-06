@@ -653,7 +653,7 @@ end
 -- A signpost on the edge of a pad, facing `facing` (a flat direction), with two lines.
 local function signpost(base: CFrame, facing: Vector3, title: string, text: string?, m: Model)
 	local cf = CFrame.lookAt(base.Position, base.Position + facing)
-	solid({
+	decor({ -- (no collision, so it never blocks a jump onto the pad)
 		Name = "SignPost",
 		Size = Vector3.new(0.5, 6, 0.5),
 		CFrame = cf * CFrame.new(0, 3, 0),

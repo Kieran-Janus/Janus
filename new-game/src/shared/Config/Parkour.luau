@@ -46,6 +46,7 @@ type Step = { -- (what one line may contain; leave this as it is)
 	Text: string?,
 }
 
+-- stylua: ignore
 local Course: { Step } = {
 	-- Stage 1: Pumpkin Hop (up the left side)
 	{ Kind = "Start", Offset = Vector3.new(-20, 1.5, -15) },
@@ -60,39 +61,19 @@ local Course: { Step } = {
 	{ Kind = "Broom", Offset = Vector3.new(0, 17, 16.5), Rotation = Vector3.new(6, -95, 0) },
 	{ Kind = "Broom", Offset = Vector3.new(12.25, 19.5, 16.5), Rotation = Vector3.new(6, -88, 0) },
 	{ Kind = "Checkpoint", Offset = Vector3.new(24.5, 22, 16.5), Label = "Graveyard Steps" },
-	-- Stage 3: Graveyard Steps (down the right side)
-	{
-		Kind = "Grave",
-		Offset = Vector3.new(16, 24, 9.5),
-		Rotation = Vector3.new(0, 8, 4),
-		Text = "RIP\nSlow Pokey",
-	},
-	{
-		Kind = "Grave",
-		Offset = Vector3.new(26, 26, 3.5),
-		Rotation = Vector3.new(0, -6, -4),
-		Text = "BOO!",
-	},
-	{ Kind = "Platform", Offset = Vector3.new(18.5, 27, -5.5), Size = Vector3.new(5, 1.5, 11) },
-	{ Kind = "Hazard", Offset = Vector3.new(18.5, 27, -5.5), Size = Vector3.new(5, 0.4, 3) },
-	{
-		Kind = "Grave",
-		Offset = Vector3.new(25.5, 29, -14),
-		Rotation = Vector3.new(0, 5, 3),
-		Text = "Here lies\nMr. Bones",
-	},
-	{ Kind = "Checkpoint", Offset = Vector3.new(15, 31.5, -16.5), Label = "Candy Sky" },
+	-- Stage 3: Graveyard Steps (down the right side), with a slimy crypt lid to jump across
+	{ Kind = "Grave", Offset = Vector3.new(16, 24, 9.5), Rotation = Vector3.new(0, 8, 4), Text = "RIP\nSlow Pokey" },
+	{ Kind = "Grave", Offset = Vector3.new(26, 26, 3.5), Rotation = Vector3.new(0, -6, -4), Text = "BOO!" },
+	{ Kind = "Platform", Offset = Vector3.new(16, 27, -5.5), Size = Vector3.new(5, 1.5, 11), Spicy = true },
+	{ Kind = "Hazard", Offset = Vector3.new(16, 27, -5.5), Size = Vector3.new(5, 0.4, 3) },
+	{ Kind = "Grave", Offset = Vector3.new(25.5, 29, -14), Rotation = Vector3.new(0, 5, 3), Text = "Here lies\nMr. Bones" },
+	{ Kind = "Checkpoint", Offset = Vector3.new(15, 31.5, -17), Label = "Candy Sky" },
 	-- Stage 4: Candy Sky (up to the trophy)
 	{ Kind = "Candy", Offset = Vector3.new(4.5, 33.5, -11.5) },
 	{ Kind = "Bat", Offset = Vector3.new(-8, 35.5, -15.5) },
 	{ Kind = "Candy", Offset = Vector3.new(-20, 37.5, -11) },
 	{ Kind = "Bat", Offset = Vector3.new(-21, 39.5, 1), Rotation = 90 },
-	{
-		Kind = "Candy",
-		Offset = Vector3.new(-11, 42.5, 8),
-		Size = Vector3.new(5.5, 1.4, 5.5),
-		Spicy = true,
-	},
+	{ Kind = "Candy", Offset = Vector3.new(-11, 42.5, 8), Size = Vector3.new(5.5, 1.4, 5.5), Spicy = true },
 	{ Kind = "Finish", Offset = Vector3.new(-22, 45.5, 14) },
 }
 
@@ -141,7 +122,7 @@ return {
 
 	-- What players see and hear (src/client/ParkourUI.luau).
 	Text = {
-		Ready = "Jump on to start the clock!",
+		Ready = "Ready... jump!", -- on the start pad (the clock starts when you leave it)
 		Timer = "%s", -- the time, e.g. 1:05.32
 		CheckpointCount = "Checkpoint %d/%d",
 		Checkpoint = "Checkpoint %d/%d!",
@@ -171,7 +152,7 @@ return {
 		RewardWait = "Next reward in %s (you can still climb for a best time)",
 		GoToStart = "Go to start",
 		Close = "Close",
-		Teleported = "Off you go: jump on to start the clock!",
+		Teleported = "Jump off the start pad to start the clock!",
 		InRound = "You're in a round right now!",
 		NotInLobby = "You can only do that from the lobby.",
 		NoCourse = "The parkour course isn't in this lobby.",

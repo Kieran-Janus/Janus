@@ -174,7 +174,10 @@ function ParkourUI.Mount(gui: ScreenGui)
 	popLabel.Font = Enum.Font.GothamBlack
 	popLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 	popLabel.Position = UDim2.fromScale(0.5, 0.34)
-	popLabel.Size = UDim2.fromOffset(520, 52)
+	popLabel.Size = UDim2.new(0.9, 0, 0, 52) -- the words shrink to fit narrow phones
+	local widest = Instance.new("UISizeConstraint")
+	widest.MaxSize = Vector2.new(560, 52)
+	widest.Parent = popLabel
 	popLabel.TextStrokeTransparency = 0.2
 	popLabel.Visible = false
 	popLabel.ZIndex = 6
@@ -363,9 +366,11 @@ function ParkourUI.Mount(gui: ScreenGui)
 		task.spawn(function()
 			local done, message = request("GoToStart")
 			busy = false
-			messageLine.Text = message
 			if done then
 				panel.Visible = false
+				pop(message, colors.Checkpoint)
+			else
+				messageLine.Text = message
 			end
 		end)
 	end)

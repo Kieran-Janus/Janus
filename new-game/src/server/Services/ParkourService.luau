@@ -462,8 +462,14 @@ local function checkPlayer(player: Player, course: CourseParts)
 		return
 	end
 
-	-- Teleport check: nobody walks or jumps this fast.
 	local clock = os.clock()
+	if clock < run.GraceUntil then
+		-- Just sent back: the player's computer may report the old spot for a moment.
+		run.LastPosition = nil
+		return
+	end
+
+	-- Teleport check: nobody walks or jumps this fast.
 	local last = run.LastPosition
 	if last then
 		local moved = Vector3.new(position.X - last.X, 0, position.Z - last.Z).Magnitude
@@ -503,21 +509,19 @@ local function checkPlayer(player: Player, course: CourseParts)
 		stop(player, "TimeUp")
 		return
 	end
-	if clock >= run.GraceUntil then
-		for _, hazard in course.Hazards do
-			if inside(position, hazard, 0.3, cfg.HazardHeight) then
-				sendBack(player, run, body, course, "Hazard")
-				return
-			end
-		end
-		if feet < course.FallY then
-			if run.Reached == 0 and elapsed < cfg.FallGraceSeconds then
-				stop(player, nil) -- walked off the start pad: not playing
-			else
-				sendBack(player, run, body, course, "Fall")
-			end
+	for _, hazard in course.Hazards do
+		if inside(position, hazard, 0.3, cfg.HazardHeight) then
+			sendBack(player, run, body, course, "Hazard")
 			return
 		end
+	end
+	if feet < course.FallY then
+		if run.Reached == 0 and elapsed < cfg.FallGraceSeconds then
+			stop(player, nil) -- walked off the start pad: not playing
+		else
+			sendBack(player, run, body, course, "Fall")
+		end
+		return
 	end
 	if nearestDistance(position, course) > cfg.LeaveDistance then
 		stop(player, "Left")
@@ -723,6 +727,10 @@ function ParkourService.Start()
 	end
 	CollectionService:GetInstanceAddedSignal(Tags.ParkourHazard):Connect(watchHazard)
 	CollectionService:GetInstanceRemovedSignal(Tags.ParkourHazard):Connect(unwatchHazard)
+	-- A board built later (F8 > Rebuild hub) shows the times straight away.
+	CollectionService:GetInstanceAddedSignal(Tags.ParkourBoard):Connect(function()
+		task.defer(updateBoards)
+	end)
 
 	Players.PlayerAdded:Connect(onPlayer)
 	Players.PlayerRemoving:Connect(onLeave)
@@ -745,7 +753,10 @@ function ParkourService.Start()
 	task.spawn(function()
 		while true do
 			task.wait(cfg.CheckSeconds)
-			ParkourService.Check()
+			local checked, problem = pcall(ParkourService.Check :: any)
+			if not checked then
+				warn("[ParkourService] " .. tostring(problem))
+			end
 		end
 	end)
 end
