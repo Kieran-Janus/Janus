@@ -1282,6 +1282,10 @@ local Config = {
 			},
 		},
 		ReceiptHistory = 50, -- receipt ids remembered per player, so a purchase is never granted twice
+		-- A purchase Roblox hands over as the player joins (e.g. one that couldn't finish last
+		-- time) waits up to this many seconds for their save to load, instead of waiting for
+		-- their next visit.
+		ReceiptLoadWaitSeconds = 30,
 		-- Crates sold for Robux are Developer Products too: paste each one's id into that crate's
 		-- Robux.ProductId in Config/Crates.luau (not in Products above).
 	},
@@ -1373,7 +1377,8 @@ local Config = {
 			Parkour = { Best = 0, LastReward = 0, Runs = 0 }, -- best time (s), os.time() of the last reward, finishes
 			-- Lobby minigames: Candy Rush wins, best solo time (s) and its coin limits (the UTC day
 			-- number, coins earned that day, os.time() of the last reward and of the last solo
-			-- race), and the best Web Scour time (s).
+			-- race), the best Web Scour time (s) and the os.time() of its last coins (for its
+			-- RewardCooldown, so a new server doesn't skip it).
 			Minigames = {
 				CandyRushWins = 0,
 				CandyRushBest = 0,
@@ -1382,6 +1387,7 @@ local Config = {
 				CandyRushLastReward = 0,
 				CandyRushLastSolo = 0,
 				WebScourBest = 0,
+				WebScourLastReward = 0,
 			},
 			Crates = { Opened = 0 }, -- crates opened, ever
 			Stats = { HideSeekTags = 0, HideSeekWins = 0, ScareMazeEscapes = 0 },

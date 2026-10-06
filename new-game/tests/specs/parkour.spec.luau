@@ -538,6 +538,19 @@ describe("ParkourService", function()
 		expect(DataService.Get(player).Parkour.Best).toBe(0)
 		expect(player:GetAttribute("ParkourBest")).toBe(0)
 		expect(first(Tags.ParkourBoard).Board.Row1.Text).toBe(cfg.Text.BoardEmpty)
+		-- F8 > "Reset my save" shows the fresh parkour numbers straight away too.
+		local saved = DataService.Get(player)
+		saved.Parkour.Best = 12.5
+		saved.Parkour.Runs = 3
+		player:SetAttribute("ParkourBest", 12.5) -- what the menu showed before the reset
+		player:SetAttribute("ParkourRuns", 3)
+		rt:advance(1)
+		ok = rt:invokeServer(remote, player, "ResetSave")
+		expect(ok).toBe(true)
+		expect(DataService.Get(player).Parkour.Best).toBe(0)
+		expect(player:GetAttribute("ParkourBest")).toBe(0)
+		expect(player:GetAttribute("ParkourRuns")).toBe(0)
+		expect(player:GetAttribute("ParkourRewardAt")).toBe(0)
 		travel(spotOn(first(Tags.ParkourStart)))
 		expect(Parkour.Run(player)).toBeTruthy()
 		rt:removePlayer(player)

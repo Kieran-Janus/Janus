@@ -298,6 +298,8 @@ function EasterEggService.Start()
 		publishFound(player)
 		return "Every Easter egg is hidden from you again: go and find them!"
 	end)
+	-- F8 > Reset my save emptied data.EasterEggs: show every egg again.
+	AdminService.OnSaveReset(publishFound)
 end
 
 return EasterEggService

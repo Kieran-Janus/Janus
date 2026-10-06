@@ -2,7 +2,8 @@
 --[[
 	Player data: load on join, autosave, save on leave / shutdown.
 	Swap the internals for ProfileStore later if you need session locking -
-	keep the same public API (Get / Add / Spend / Save) so nothing else changes.
+	keep the same public API (Get / IsLoaded / WaitForLoad / Add / Spend / Save) so nothing
+	else changes.
 	New saved fields go in Config.Data.Template; old saves get the missing fields (and
 	missing keys inside table fields such as Equipped) filled in from the template on load.
 ]]
@@ -100,6 +101,19 @@ end
 
 function DataService.IsLoaded(player: Player): boolean
 	return loaded[player] == true
+end
+
+--[[
+	For things that happen as a player joins (e.g. a Robux purchase Roblox hands over straight
+	away): waits up to `seconds` while their save is still loading. Returns IsLoaded(player):
+	false if it took too long, the load failed, or they left. May yield.
+]]
+function DataService.WaitForLoad(player: Player, seconds: number): boolean
+	local deadline = os.clock() + math.max(seconds, 0)
+	while cache[player] == nil and player.Parent == Players and os.clock() < deadline do
+		task.wait(0.2)
+	end
+	return loaded[player] == true and player.Parent == Players
 end
 
 function DataService.Add(player: Player, key: string, amount: number)

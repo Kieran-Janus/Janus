@@ -18,6 +18,11 @@
 	  end, danger?)                   -- danger = true: red button, needs a second click
 	The panel asks the server for the list each time it opens (GetAdminCommands, admins only).
 
+	"Reset my save" puts the save back to Config.Data.Template (purchase receipts are kept, so
+	a Robux purchase is never given twice). A service that shows saved things on screen (e.g.
+	Easter eggs found, parkour best) refreshes them with:
+	  AdminService.OnSaveReset(function(player) ... end)
+
 	Remotes: AdminCommand(name) -> (ok, message)
 	         GetAdminCommands() -> { { Name, Label, Danger } }  (empty for non-admins)
 ]]
@@ -76,6 +81,7 @@ type Command = { Info: CommandInfo, Run: CommandFn }
 
 local commands: { [string]: Command } = {}
 local order: { string } = {} -- names, in the order the buttons are shown
+local saveResetListeners: { (player: Player) -> () } = {}
 
 --[[
 	Adds a button to the admin panel. `name` must be unique (registering it again replaces
@@ -93,6 +99,12 @@ function AdminService.Register(name: string, label: string, fn: CommandFn, dange
 		Info = { Name = name, Label = tostring(label), Danger = danger == true },
 		Run = fn,
 	}
+end
+
+-- Runs `fn(player)` after "Reset my save", so a service can show the fresh save straight away.
+function AdminService.OnSaveReset(fn: (player: Player) -> ())
+	assert(type(fn) == "function", "AdminService.OnSaveReset: fn must be a function")
+	table.insert(saveResetListeners, fn)
 end
 
 AdminService.Register("AddCoins", "+ Coins", function(player, data)
@@ -127,15 +139,27 @@ AdminService.Register("RepaintHub", "Repaint hub", function(_player, _data)
 end)
 
 AdminService.Register("ResetSave", "Reset my save", function(player, data)
+	-- Purchases already granted stay remembered, so Roblox can never grant one twice.
+	local receipts = data.Receipts
 	for key in data do
 		data[key] = nil
 	end
 	for key, value in Config.Data.Template :: { [string]: any } do
 		data[key] = deepCopy(value)
 	end
+	if type(receipts) == "table" then
+		data.Receipts = receipts
+	end
 	DataService.Add(player, "Coins", 0) -- refresh leaderstats
 	ShopService.Dress(player)
 	ShopService.Push(player)
+	for _, fn in saveResetListeners do
+		-- (the cast: the old type checker misreads pcall of a function returning nothing)
+		local ok, err = pcall(fn :: any, player)
+		if not ok then
+			warn("[AdminService] After Reset my save: " .. tostring(err))
+		end
+	end
 	return "Your save is back to a brand new player (saved when you leave)."
 end, true)
 

@@ -104,6 +104,12 @@ return {
 		WaitSeconds = 15, -- a Robux crate bought while still asking waits this long for the answer
 	},
 
+	-- A Robux crate bought by a player who can't open crates (their region, or crates were
+	-- switched off before the purchase finished) gives coins instead of a random skin: the
+	-- crate's coin Price, or this many coins for a crate sold only for Robux (no Price).
+	-- Keep it above 0: with 0 the purchase is left unfinished (Roblox asks again later).
+	RobuxFallbackCoins = 500,
+
 	-- F8 admin panel buttons (Studio playtests).
 	Admin = {
 		FreeCrate = "PumpkinCrate", -- "Crates: open free ..." opens this one without paying
