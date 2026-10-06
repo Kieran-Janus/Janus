@@ -17,7 +17,7 @@ return {
 	Parkour = false, -- the parkour course in the lobby
 	CandyRush = false, -- lobby minigame: click your candies, first to clear them all wins
 	WebScour = true, -- lobby minigame: a quick scavenger hunt in the spider webs
-	EasterEggs = false, -- hidden pumpkins around the lobby that give coins once each
+	EasterEggs = true, -- hidden pumpkins around the lobby that give coins once each
 	Crates = false, -- crates bought with coins that give a random skin
 	RobuxCrates = false, -- crates can also be bought with Robux (needs Crates on too)
 	Tutorial = false, -- Boo Guide's first-round tips (removed in v2; true brings them back)
