@@ -1625,7 +1625,7 @@ function builders.MoonHead(m: Model, style: any): BasePart
 		Shape = BALL,
 		Size = size,
 		Color = moon,
-		Material = Enum.Material.Slate,
+		Material = Enum.Material.SmoothPlastic,
 	})
 	for _, c in
 		{ { -0.55, 0.45, 0.32 }, { 0.6, -0.35, 0.26 }, { 0.3, 0.65, 0.2 }, { -0.62, -0.42, 0.18 } }
@@ -2468,7 +2468,6 @@ function builders.MoonCrown(m: Model, style: any): BasePart
 			child:Destroy()
 		end
 	end
-	handle.Material = Enum.Material.SmoothPlastic
 	-- a ring of little lights behind the moon
 	for i = 1, 16 do
 		local a = i / 16 * math.pi * 2

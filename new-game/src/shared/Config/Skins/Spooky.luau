@@ -148,10 +148,10 @@ return {
 		Name = "Batty",
 		Rarity = "Uncommon",
 		Style = {
-			BodyColor = rgb(70, 50, 95),
-			Accent = { Color = rgb(50, 35, 70), Pattern = "Wings" },
+			BodyColor = rgb(90, 65, 125),
+			Accent = { Color = rgb(60, 42, 85), Pattern = "Wings" },
 			Head = "BatHead",
-			HeadColor = rgb(70, 50, 95),
+			HeadColor = rgb(90, 65, 125),
 			HeadColor2 = rgb(255, 150, 190),
 		},
 	},
@@ -161,7 +161,7 @@ return {
 		Rarity = "Uncommon",
 		Style = {
 			BodyColor = rgb(40, 35, 50),
-			Accent = { Color = rgb(55, 50, 70), Pattern = "Tail" },
+			Accent = { Color = rgb(110, 95, 140), Pattern = { "Tail", "Collar" } },
 			Head = "CatHead",
 			HeadColor = rgb(40, 35, 50),
 			HeadColor2 = rgb(255, 150, 190),

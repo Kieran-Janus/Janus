@@ -139,7 +139,7 @@ return {
 			Material = M.Fabric,
 			Accent = { Color = rgb(250, 238, 180), Pattern = "Buttons" },
 			Head = "MoonHead",
-			HeadColor = rgb(255, 235, 140),
+			HeadColor = rgb(255, 228, 120),
 			HeadColor2 = rgb(60, 70, 150),
 		},
 	},
