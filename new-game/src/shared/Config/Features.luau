@@ -13,7 +13,7 @@ return {
 	Menu = true, -- the top-left Menu button with tiles for every panel
 	KingHunt = true, -- the classic mode: grab pumpkins and hide from the Pumpkin King
 	HideSeek = true, -- Pumpkin Hide & Seek: seekers with candy guns vs pumpkin hiders
-	ScareMaze = false, -- ScareMaze: Survivors run the maze, Haunters scare them
+	ScareMaze = true, -- ScareMaze: Survivors run the maze, Haunters scare them
 	Parkour = true, -- the parkour course in the lobby
 	CandyRush = true, -- lobby minigame: click your candies, first to clear them all wins
 	WebScour = true, -- lobby minigame: a quick scavenger hunt in the spider webs
