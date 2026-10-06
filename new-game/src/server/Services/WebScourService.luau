@@ -17,6 +17,8 @@
 	  4. All caught, time up, Stop, walking away (LeaveDistance) or joining a round ends it.
 	     Coins (WebScourRules.Coins) are only paid once every RewardCooldown seconds; the best
 	     time (everything found) is saved in data.Minigames.WebScourBest.
+	     When coins were last paid is saved too (data.Minigames.WebScourLastReward, os.time()),
+	     so leaving and joining another server doesn't skip the cooldown.
 
 	Remotes (created in Start() even when the feature is off, so the client never waits):
 	  WebScourRun     server -> client   { Op = "Start" | "Found" | "Miss" | "End" | "Note", ... }
@@ -62,9 +64,6 @@ local hunts: { [Player]: Hunt } = {}
 local huntCount: { [Player]: number } = {}
 local lastEnded: { [Player]: number } = {}
 local actionWindow: { [Player]: { Start: number, Count: number } } = {}
--- When each player last won coins here, by UserId. Kept for the whole server (not cleared when
--- they leave) so leaving and rejoining doesn't skip the coin cooldown.
-local lastReward: { [number]: number } = {}
 local wiredPrompts: { [ProximityPrompt]: RBXScriptConnection } = {}
 local rng = Random.new()
 local runEvent: RemoteEvent? = nil
@@ -123,15 +122,6 @@ local function starts(): { BasePart }
 	return list
 end
 
--- Seconds until this player can win coins again (0 = now).
-local function rewardWait(player: Player, now: number): number
-	local last = lastReward[player.UserId]
-	if not last then
-		return 0
-	end
-	return math.max(cfg.RewardCooldown - (now - last), 0)
-end
-
 local function minigameData(player: Player): { [string]: any }?
 	local data = DataService.Get(player)
 	if not data then
@@ -143,6 +133,18 @@ local function minigameData(player: Player): { [string]: any }?
 		data.Minigames = minigames
 	end
 	return minigames
+end
+
+-- Seconds until this player can win coins again (0 = now). Uses the saved os.time() of their
+-- last coins (data.Minigames.WebScourLastReward), so it holds on every server. Never more than
+-- RewardCooldown, even if another server's clock was a little ahead.
+local function rewardWait(player: Player): number
+	local minigames = minigameData(player)
+	local last = minigames and minigames.WebScourLastReward
+	if type(last) ~= "number" or last ~= last or last <= 0 then
+		return 0
+	end
+	return math.clamp(cfg.RewardCooldown - (os.time() - last), 0, cfg.RewardCooldown)
 end
 
 local function bestOf(player: Player): number
@@ -163,16 +165,17 @@ local function finish(player: Player, reason: string)
 	local total = #hunt.Critters
 	local allFound = total > 0 and hunt.Found >= total
 	local elapsed = math.clamp(now - hunt.Started, 0, cfg.TimeLimit)
-	local wait = rewardWait(player, now)
+	local wait = rewardWait(player)
 	local paying = reason == "AllFound" or reason == "TimeUp"
 	local coins = 0
-	if paying and wait <= 0 and player.Parent == Players then
+	local minigames = minigameData(player)
+	if paying and wait <= 0 and minigames and player.Parent == Players then
 		local secondsLeft = if allFound then cfg.TimeLimit - elapsed else 0
 		coins = WebScourRules.Coins(cfg, hunt.Found, total, secondsLeft)
 		if coins > 0 then
 			DataService.Add(player, "Coins", coins)
 			pcall(ShopService.Push, player)
-			lastReward[player.UserId] = now
+			minigames.WebScourLastReward = os.time()
 		end
 	end
 	local best = bestOf(player)
@@ -180,7 +183,6 @@ local function finish(player: Player, reason: string)
 	if allFound and reason == "AllFound" then
 		local time = math.floor(elapsed * 100 + 0.5) / 100
 		if best <= 0 or time < best then
-			local minigames = minigameData(player)
 			if minigames then
 				minigames.WebScourBest = time
 				best = time
@@ -289,7 +291,7 @@ function WebScourService.StartHunt(
 		TimeLimit = cfg.TimeLimit,
 		Critters = list,
 		Best = bestOf(player),
-		CooldownLeft = rewardWait(player, now),
+		CooldownLeft = rewardWait(player),
 	})
 	task.delay(cfg.TimeLimit, function()
 		if hunts[player] == hunt then

@@ -340,6 +340,67 @@ describe("WebScourService", function()
 		end
 	)
 
+	it("saves the coin cooldown, so joining another server doesn't skip it", function()
+		-- Server 1: a paying hunt saves when the coins were paid.
+		local rt = server()
+		local player = hunter(rt, "Hopper")
+		local data = rt:require("ServerScriptService.Server.Services.DataService").Get(player)
+		press(rt, player)
+		local start = last(rt, player, "Start")
+		expect(start.CooldownLeft).toBe(0)
+		for id = 1, #start.Critters do
+			rt:advance(0.5)
+			player.Character:PivotTo(rt.env.CFrame.new(start.Critters[id].Position))
+			catch(rt, player, start.RunId, id)
+		end
+		expect(last(rt, player, "End").Coins).toBeGreaterThan(0)
+		local paidAt = data.Minigames.WebScourLastReward
+		expect(paidAt).toBeGreaterThan(0)
+		expect(paidAt).toBeLessThanOrEqual(rt.env.os.time())
+
+		-- Server 2 (a different server: nothing in its memory), same save, 30 s later.
+		local other = server()
+		local again = hunter(other, "Hopper")
+		local saved = other:require("ServerScriptService.Server.Services.DataService").Get(again)
+		saved.Minigames.WebScourLastReward = other.env.os.time() - 30
+		local coins = saved.Coins
+		press(other, again)
+		local second = last(other, again, "Start")
+		expect(second.CooldownLeft).toBeNear(cfg.RewardCooldown - 30, 1)
+		for id = 1, #second.Critters do
+			other:advance(0.5)
+			again.Character:PivotTo(other.env.CFrame.new(second.Critters[id].Position))
+			catch(other, again, second.RunId, id)
+		end
+		local ended = last(other, again, "End")
+		expect(ended.Reason).toBe("AllFound")
+		expect(ended.Coins).toBe(0)
+		expect(ended.CooldownLeft).toBeGreaterThan(0)
+		expect(saved.Coins).toBe(coins)
+
+		-- A save stamped by a server whose clock ran ahead never waits longer than the cooldown.
+		saved.Minigames.WebScourLastReward = other.env.os.time() + 100000
+		other:advance(cfg.StartCooldown + 1)
+		press(other, again)
+		local third = last(other, again, "Start")
+		expect(third.RunId).toBe(second.RunId + 1)
+		expect(third.CooldownLeft).toBeLessThanOrEqual(cfg.RewardCooldown)
+
+		-- Once the cooldown is over, hunts pay again.
+		other:fireServer(
+			other:find("ReplicatedStorage.Remotes.WebScourAction"),
+			again,
+			"Stop",
+			third.RunId
+		)
+		other:flush()
+		saved.Minigames.WebScourLastReward = other.env.os.time() - cfg.RewardCooldown - 1
+		other:advance(cfg.StartCooldown + 1)
+		press(other, again)
+		expect(last(other, again, "Start").CooldownLeft).toBe(0)
+		expect(#rt.errors + #other.errors).toBe(0)
+	end)
+
 	it(
 		"lets two players hunt at once, each with their own critters, and cleans up leavers",
 		function()

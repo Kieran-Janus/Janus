@@ -43,7 +43,9 @@ return {
 	TimeBonusPerSecond = 0.5, -- and this many coins for every second left on the clock
 	MaxCoins = 50, -- never more than this from one hunt
 	RewardCooldown = 180, -- seconds between hunts that pay coins (in between: just for fun,
-	-- your best time still counts). Best times are saved in data.Minigames.WebScourBest.
+	-- your best time still counts). Best times are saved in data.Minigames.WebScourBest, and
+	-- when you last got coins in data.Minigames.WebScourLastReward (so changing servers
+	-- doesn't skip the wait).
 
 	-- The lantern's button ----------------------------------------------------------------------
 	Prompt = {

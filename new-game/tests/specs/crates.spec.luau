@@ -76,6 +76,9 @@ describe("Config.Crates and CrateOdds", function()
 		end
 		expect(CrateOdds.Get("NoSuchCrate")).toBeNil()
 		expect(CrateOdds.Get(42)).toBeNil()
+		-- A Robux crate that can't be opened for the buyer always gives some coins back.
+		expect(Config.Crates.RobuxFallbackCoins).toBeGreaterThan(0)
+		expect(Config.Monetization.ReceiptLoadWaitSeconds).toBeGreaterThan(0)
 	end)
 
 	it("gives every crate at least one item, and chances that add up to 100", function()
@@ -503,6 +506,101 @@ describe("Robux crates (MonetizationService)", function()
 		expect(decision.Name).toBe("PurchaseGranted")
 		expect(data.Coins).toBe(before + pack.Coins)
 		local _ = DataService
+	end)
+
+	it("gives coins for a Robux-only crate it can't open, never 0", function()
+		local Config = w.Config
+		local price = crate.Price
+		crate.Price = nil -- sold only for Robux
+		Config.Features.RobuxCrates = false -- e.g. switched off before the purchase finished
+		local before = data.Coins
+		local opened = data.Crates.Opened
+		local fallback = Config.Crates.RobuxFallbackCoins
+		local decision = w.rt:purchase(player, 777)
+		expect(decision.Name).toBe("PurchaseGranted")
+		expect(data.Coins).toBe(before + fallback)
+		expect(data.Crates.Opened).toBe(opened)
+		local sent = w.results(player)
+		expect(sent[#sent].Ok).toBe(false)
+		expect(sent[#sent].Message).toMatch(tostring(fallback))
+
+		-- No fallback either: left unfinished for later instead of giving nothing.
+		Config.Crates.RobuxFallbackCoins = 0
+		local receipts = table.clone(data.Receipts)
+		decision = w.rt:purchase(player, 777)
+		Config.Crates.RobuxFallbackCoins = fallback
+		Config.Features.RobuxCrates = true
+		crate.Price = price
+		expect(decision.Name).toBe("NotProcessedYet")
+		expect(data.Coins).toBe(before + fallback)
+		expect(data.Receipts).toEqual(receipts)
+	end)
+
+	it("answers 'not yet' to a second ask about a purchase that is still saving", function()
+		local callback = Dom.callback(w.rt.game:GetService("MarketplaceService"), "ProcessReceipt")
+		local receipt = {
+			PlayerId = player.UserId,
+			ProductId = 777,
+			PurchaseId = "slow-save",
+			CurrencySpent = 0,
+		}
+		local owned = table.clone(data.Owned)
+		local opened = data.Crates.Opened
+		local first: any = nil
+		w.rt.dataStoreFailures = 100 -- the first answer's save keeps failing (and retrying)
+		w.rt.env.task.spawn(function()
+			first = callback(receipt)
+		end)
+		w.rt:advance(1)
+		expect(first).toBeNil() -- still trying to save
+		local second = w.rt:call(callback, receipt)
+		expect(second.Name).toBe("NotProcessedYet") -- not "granted": that save could still fail
+		w.rt:advance(40)
+		w.rt.dataStoreFailures = 0
+		expect(first.Name).toBe("NotProcessedYet")
+		expect(data.Owned).toEqual(owned)
+		expect(data.Crates.Opened).toBe(opened)
+		expect(table.find(data.Receipts, "slow-save")).toBeNil()
+
+		-- Roblox asks again later: granted, and only once.
+		expect(w.rt:call(callback, receipt).Name).toBe("PurchaseGranted")
+		expect(data.Crates.Opened).toBe(opened + 1)
+		expect(w.rt:call(callback, receipt).Name).toBe("PurchaseGranted")
+		expect(data.Crates.Opened).toBe(opened + 1)
+	end)
+
+	it("waits for the save of a buyer who is still joining", function()
+		local pack = w.Config.Monetization.Products[1]
+		pack.Id = 9002
+		w.rt.dataStoreFailures = 1 -- the first load attempt fails, the retry 2 s later works
+		local late = w.rt:addPlayer({ Name = "LateBuyer" })
+		expect(DataService.Get(late)).toBeNil()
+		local decision = w.rt:purchase(late, 9002)
+		expect(decision.Name).toBe("PurchaseGranted")
+		expect(DataService.IsLoaded(late)).toBe(true)
+		expect(DataService.Get(late).Coins).toBe(pack.Coins)
+
+		-- A buyer who leaves while their save loads: left for their next visit.
+		w.rt.dataStoreFailures = 1
+		local leaver = w.rt:addPlayer({ Name = "Leaver" })
+		local callback = Dom.callback(w.rt.game:GetService("MarketplaceService"), "ProcessReceipt")
+		local result: any = nil
+		w.rt.env.task.spawn(function()
+			result = callback({
+				PlayerId = leaver.UserId,
+				ProductId = 9002,
+				PurchaseId = "leaver-1",
+				CurrencySpent = 0,
+			})
+		end)
+		w.rt:advance(0.5)
+		expect(result).toBeNil()
+		w.rt:removePlayer(leaver)
+		w.rt:advance(1)
+		pack.Id = 0
+		expect(result.Name).toBe("NotProcessedYet")
+		w.rt:advance(5)
+		w.rt.dataStoreFailures = 0
 	end)
 end)
 

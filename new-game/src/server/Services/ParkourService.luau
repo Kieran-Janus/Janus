@@ -777,6 +777,11 @@ function ParkourService.Start()
 		updateBoards()
 		return "Parkour best time, finishes and coin cooldown reset."
 	end)
+	-- F8 > Reset my save cleared data.Parkour: show the fresh best time and cooldown.
+	AdminService.OnSaveReset(function(player)
+		publish(player)
+		updateBoards()
+	end)
 
 	task.spawn(function()
 		while true do

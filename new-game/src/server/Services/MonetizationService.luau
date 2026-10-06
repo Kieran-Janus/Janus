@@ -8,14 +8,18 @@
 	                chat tag (client) and the King tracker below.
 	Coin packs    - Developer Products granted in ProcessReceipt. Each receipt id is stored in
 	                the player's save and the save must succeed before Roblox is told it was
-	                granted, so a purchase is never lost or granted twice.
+	                granted, so a purchase is never lost or granted twice. While one receipt is
+	                being handled, Roblox asking about the same one again gets "not yet". A
+	                receipt that arrives as the player joins waits for their save to load
+	                (Config.Monetization.ReceiptLoadWaitSeconds).
 	Crates        - a Developer Product that is a crate's Robux.ProductId (Config.Crates) opens
 	                that crate the same way: the receipt is checked first, then CrateService
 	                rolls and gives the skin, and everything is undone if the save fails (Roblox
 	                retries later with a new roll). The player's screen then plays the opening
 	                (CrateResult). If crates aren't allowed for the player (their region, or
 	                Config.Features.Crates / RobuxCrates switched off) they get the crate's coin
-	                Price instead of a random skin.
+	                Price instead of a random skin (Config.Crates.RobuxFallbackCoins for a crate
+	                with no Price).
 	King tracker  - TrackKing() -> (direction, distance) of the nearest King, VIP only, for a
 	                living player in the round, with a cooldown (attribute TrackerReadyAt).
 	IDs of 0 mean "not created yet": nothing is checked or granted for them.
@@ -87,24 +91,21 @@ local function forgetReceipt(data: { [string]: any }, receiptId: string)
 	end
 end
 
+-- Receipt ids being handled right now. Roblox may ask about the same purchase again while the
+-- first answer is still saving; that second ask is told "not yet", so a purchase is never
+-- reported as granted before its save has finished (the save could still fail and be undone).
+local pending: { [string]: boolean } = {}
+
 -- A crate bought with Robux (Config.Crates, Robux.ProductId).
 local function processCrateReceipt(
-	receipt: any,
+	player: Player,
+	data: { [string]: any },
+	receiptId: string,
 	crate: CrateOdds.Crate
 ): Enum.ProductPurchaseDecision
-	local player = Players:GetPlayerByUserId(receipt.PlayerId)
-	local data = player and DataService.Get(player)
-	if not player or not data or not DataService.IsLoaded(player) then
-		return Enum.ProductPurchaseDecision.NotProcessedYet
-	end
-	local receiptId = tostring(receipt.PurchaseId)
-	if table.find(data.Receipts, receiptId) then
-		return Enum.ProductPurchaseDecision.PurchaseGranted -- already granted earlier
-	end
 	-- May wait a little for the region check that starts when the player joins.
 	local allowed = CrateService.CanOpenWithRobux(player, Config.Crates.Policy.WaitSeconds)
-	data = DataService.Get(player)
-	if player.Parent ~= Players or not data then
+	if player.Parent ~= Players or DataService.Get(player) ~= data then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	if table.find(data.Receipts, receiptId) then
@@ -118,8 +119,17 @@ local function processCrateReceipt(
 	end
 	local coins = 0
 	if not result then
-		-- No random skin for this player: the crate's coin price instead.
-		coins = CrateOdds.CoinPrice(crate) or 0
+		-- No random skin for this player: the crate's coin price instead (or the fallback for
+		-- a crate sold only for Robux). Never "grant" nothing for real Robux.
+		coins = CrateOdds.CoinPrice(crate) or math.floor(Config.Crates.RobuxFallbackCoins)
+		if not (coins > 0) then
+			warn(
+				"[MonetizationService] "
+					.. crate.Id
+					.. " has no coin Price and Config.Crates.RobuxFallbackCoins is 0, so a Robux purchase of it can't be given as coins; it stays unfinished until crates can be opened."
+			)
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
 		DataService.Add(player, "Coins", coins)
 		result = {
 			Ok = false,
@@ -145,42 +155,66 @@ local function processCrateReceipt(
 	return Enum.ProductPurchaseDecision.PurchaseGranted
 end
 
-local function processReceipt(receipt: any): Enum.ProductPurchaseDecision
-	local crate = CrateOdds.ByProductId(receipt.ProductId)
-	if crate then
-		return processCrateReceipt(receipt, crate)
-	end
-	local product = productById(receipt.ProductId)
-	local player = Players:GetPlayerByUserId(receipt.PlayerId)
-	if not product or not player then
-		-- Unknown product, or the buyer left: Roblox retries next time they join.
-		return Enum.ProductPurchaseDecision.NotProcessedYet
-	end
-	local data = DataService.Get(player)
-	if not data or not DataService.IsLoaded(player) then
-		return Enum.ProductPurchaseDecision.NotProcessedYet
-	end
-	local receiptId = tostring(receipt.PurchaseId)
-	if table.find(data.Receipts, receiptId) then
-		return Enum.ProductPurchaseDecision.PurchaseGranted -- already granted earlier
-	end
-
+-- A coin pack (Config.Monetization.Products).
+local function processCoinPack(
+	player: Player,
+	data: { [string]: any },
+	receiptId: string,
+	product: any
+): Enum.ProductPurchaseDecision
 	DataService.Add(player, "Coins", product.Coins)
-	table.insert(data.Receipts, receiptId)
-	while #data.Receipts > Config.Monetization.ReceiptHistory do
-		table.remove(data.Receipts, 1)
-	end
+	rememberReceipt(data, receiptId)
 	if not DataService.Save(player) then
 		-- Undo, so the retry Roblox will make doesn't double up.
 		DataService.Add(player, "Coins", -product.Coins)
-		local index = table.find(data.Receipts, receiptId)
-		if index then
-			table.remove(data.Receipts, index)
-		end
+		forgetReceipt(data, receiptId)
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
 	ShopService.Push(player)
 	return Enum.ProductPurchaseDecision.PurchaseGranted
+end
+
+local function handleReceipt(receipt: any, receiptId: string): Enum.ProductPurchaseDecision
+	local crate = CrateOdds.ByProductId(receipt.ProductId)
+	local product = if crate then nil else productById(receipt.ProductId)
+	local player = Players:GetPlayerByUserId(receipt.PlayerId)
+	if not (crate or product) or not player then
+		-- Unknown product, or the buyer left: Roblox retries next time they join.
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	-- Roblox often hands over an unfinished purchase as the player joins: let the save load.
+	if not DataService.WaitForLoad(player, Config.Monetization.ReceiptLoadWaitSeconds) then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	local data = DataService.Get(player)
+	if not data then
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	if type(data.Receipts) ~= "table" then
+		data.Receipts = {}
+	end
+	if table.find(data.Receipts, receiptId) then
+		return Enum.ProductPurchaseDecision.PurchaseGranted -- already granted (and saved) earlier
+	end
+	if crate then
+		return processCrateReceipt(player, data, receiptId, crate)
+	end
+	return processCoinPack(player, data, receiptId, product)
+end
+
+local function processReceipt(receipt: any): Enum.ProductPurchaseDecision
+	local receiptId = tostring(receipt.PurchaseId)
+	if pending[receiptId] then
+		return Enum.ProductPurchaseDecision.NotProcessedYet -- still being handled (see pending)
+	end
+	pending[receiptId] = true
+	local ok, decision = pcall(handleReceipt, receipt, receiptId)
+	pending[receiptId] = nil
+	if not ok then
+		warn("[MonetizationService] Receipt " .. receiptId .. " failed: " .. tostring(decision))
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
+	return decision
 end
 
 local function onTrackKing(player: Player): (Vector3?, number?)
