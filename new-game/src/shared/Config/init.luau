@@ -1281,8 +1281,9 @@ local Config = {
 
 	-- Custom art: drop your own models into ReplicatedStorage.Custom (docs/CUSTOMIZE.md,
 	-- src/shared/CustomAssets.luau). They're scaled to these sizes unless they have the
-	-- attribute KeepSize = true. Lobby props (Custom > Props: JackOLantern, Lamppost, DeadTree,
-	-- ...) are scaled to the size of the decoration they replace.
+	-- attribute KeepSize = true. Lobby props (Custom > Props: Pumpkin, JackOLantern, Lamppost,
+	-- SpookyTree, DeadTree, Bench, Gravestone... the full list is at the top of
+	-- src/server/Build/Props.luau) are scaled to the size of the decoration they replace.
 	Custom = {
 		StripScripts = true, -- remove scripts from custom models (free models can hide bad ones)
 		Heights = { -- studs, feet to top
