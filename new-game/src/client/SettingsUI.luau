@@ -72,7 +72,7 @@ function SettingsUI.Mount(gui: ScreenGui)
 
 	for i, t in TOGGLES do
 		local b = button("", panel)
-		b.Position = UDim2.new(0, 20, 0, 44 + (i - 1) * 50)
+		b.Position = UDim2.fromOffset(20, 44 + (i - 1) * 50)
 		b.Size = UDim2.new(1, -40, 0, 42)
 		b.Activated:Connect(function()
 			local on = not isOn(t.Key)

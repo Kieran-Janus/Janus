@@ -257,6 +257,8 @@ local function buildButton(gui: ScreenGui)
 	topGui.Name = "MenuButtonGui"
 	topGui.ResetOnSpawn = false
 	topGui.ScreenInsets = Enum.ScreenInsets.None
+	-- Sibling, like GameUI: with Global, the button's ZIndex drew it over its own icon and label.
+	topGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	topGui.DisplayOrder = gui.DisplayOrder + 1
 	topGui.Parent = gui.Parent
 

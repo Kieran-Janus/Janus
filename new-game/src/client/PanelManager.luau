@@ -33,6 +33,9 @@ local registered: { [GuiObject]: boolean } = {}
 local openOrder: { GuiObject } = {} -- the open managed panels, last opened at the end
 local bound = false
 local lastEscape = 0
+-- An invisible Modal button, shown while a panel is open: it frees the mouse when the camera
+-- is zoomed into first person (where Roblox locks it to the middle of the screen).
+local cursor: TextButton? = nil
 
 local function forget(panel: GuiObject)
 	local index = table.find(openOrder, panel)
@@ -44,6 +47,9 @@ end
 -- Gamepad B closes the open panel, only while one is open (B does other things otherwise).
 local function updateBinding()
 	local want = #openOrder > 0
+	if cursor then
+		cursor.Visible = want
+	end
 	if want and not bound then
 		ContextActionService:BindActionAtPriority(CLOSE_ACTION, function(_, state)
 			if state == Enum.UserInputState.Begin then
@@ -126,6 +132,16 @@ local function escape()
 end
 
 function PanelManager.Mount(gui: ScreenGui)
+	local free = Instance.new("TextButton")
+	free.Name = "PanelCursor"
+	free.Modal = true
+	free.Text = ""
+	free.BackgroundTransparency = 1
+	free.Size = UDim2.fromOffset(0, 0)
+	free.Visible = #openOrder > 0
+	free.Parent = gui
+	cursor = free
+
 	local function consider(child: Instance)
 		if child:IsA("GuiObject") and table.find(AUTO_NAMES, child.Name) then
 			PanelManager.Register(child)

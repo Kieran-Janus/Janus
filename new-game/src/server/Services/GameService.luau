@@ -49,6 +49,7 @@ local roundResults: RemoteEvent
 -- Owner test buttons (AdminService): start the next round now / pick its playlist.
 local startNow = false
 local forcedPlaylist: Playlists.Playlist? = nil
+local lastForced: { [string]: string } = {} -- mode id -> the playlist its button picked last
 
 -- What the current round has running, so it can be cleaned up if it breaks.
 local activeMode: Types.Mode? = nil
@@ -453,14 +454,16 @@ local function registerAdminCommands()
 							def.Feature
 						)
 					end
+					-- Move on from the last pick, even once a round has used it up.
 					local index = 0
 					for i, playlist in list do
-						if forcedPlaylist and playlist.Id == forcedPlaylist.Id then
+						if playlist.Id == lastForced[modeId] then
 							index = i
 						end
 					end
 					local chosen = list[index % #list + 1]
 					forcedPlaylist = chosen
+					lastForced[modeId] = chosen.Id
 					return ("Next round: %s (any player count)."):format(chosen.Name)
 				end
 			)

@@ -334,7 +334,7 @@ function CandyRushUI.Mount(gui: ScreenGui)
 	bannerTitle.Font = Enum.Font.FredokaOne
 	bannerTitle.TextScaled = true
 	bannerTitle.TextColor3 = GOLD
-	bannerTitle.Position = UDim2.new(0, 12, 0, 8)
+	bannerTitle.Position = UDim2.fromOffset(12, 8)
 	bannerTitle.Size = UDim2.new(1, -24, 0.55, -8)
 	local bannerLine = Theme.label("", 16, banner)
 	bannerLine.Name = "Details"

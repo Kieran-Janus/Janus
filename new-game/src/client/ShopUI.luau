@@ -159,7 +159,7 @@ function ShopUI.Mount(gui: ScreenGui)
 	local pageSize =
 		math.max(1, if compact then skinSettings.PhonePageSize else skinSettings.PageSize)
 	local panelHeight = if compact then 0.97 else 0.8 -- of the screen
-	panel.Size = UDim2.new(0.92, 0, panelHeight, 0) -- capped below
+	panel.Size = UDim2.fromScale(0.92, panelHeight) -- capped below
 	panel.Visible = false
 	Layout.Fit(panel)
 	local sizeLimit = Instance.new("UISizeConstraint")
@@ -242,7 +242,7 @@ function ShopUI.Mount(gui: ScreenGui)
 	local nextButton = button(">", pager)
 	nextButton.Name = "Next"
 	nextButton.AnchorPoint = Vector2.new(1, 0)
-	nextButton.Position = UDim2.new(1, 0, 0, 0)
+	nextButton.Position = UDim2.fromScale(1, 0)
 	nextButton.Size = UDim2.fromOffset(40, 28)
 	local pageLabel = Theme.label("", 14, pager)
 	pageLabel.TextColor3 = Theme.Muted
