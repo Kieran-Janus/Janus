@@ -679,7 +679,8 @@ local function signpost(base: CFrame, facing: Vector3, title: string, text: stri
 	glow(lantern, colors.Face, 14, 1)
 end
 
--- Course-space positions of the pieces next to step i (for facing signs).
+-- The flat direction (world) from step i to the piece you jump on next (dir = 1) or before
+-- it (dir = -1); nil when there is none. Used to turn signs towards arriving players.
 local function neighbourDirection(zone: Zone, i: number, dir: number): Vector3?
 	local course = cfg.Course :: { Step }
 	local j = i + dir
@@ -738,10 +739,12 @@ local function buildStart(top: CFrame, size: Vector3, m: Model): BasePart
 	-- A glowing orange border and START written on top.
 	for i = 0, 3 do
 		local edge = top * CFrame.Angles(0, math.rad(i * 90), 0)
+		local along = if i % 2 == 0 then size.X else size.Z -- (works for long pads too)
+		local across = if i % 2 == 0 then size.Z else size.X
 		decor({
 			Name = "GlowEdge",
-			Size = Vector3.new(size.X - 0.6, 0.08, 0.5),
-			CFrame = edge * CFrame.new(0, 0.03, -size.Z / 2 + 0.6),
+			Size = Vector3.new(along - 0.6, 0.08, 0.5),
+			CFrame = edge * CFrame.new(0, 0.03, -across / 2 + 0.6),
 			Color = colors.Start,
 			Material = Enum.Material.Neon,
 		}, m)

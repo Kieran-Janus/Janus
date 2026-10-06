@@ -8,7 +8,7 @@
 	when you leave the start pad. Fall to the ground (or touch green slime) and you go back
 	to your last checkpoint. Finishing gives coins once every Reward.CooldownHours.
 
-	Change the course: edit the Course list near the bottom. Each line is one piece. To add a
+	Change the course: edit the Course list just below. Each line is one piece. To add a
 	jump, copy a line, paste it where it goes in the order and change its Offset. The Output
 	window warns about any jump that is too far or too high for a normal player.
 	In Studio you can also move, resize or copy the built pieces (Workspace.Hub.Parkour): the
@@ -56,7 +56,8 @@ local Course: { Step } = {
 	{ Kind = "Pumpkin", Offset = Vector3.new(-25, 8.5, 6.5), Size = Vector3.new(7, 4.5, 7) },
 	{ Kind = "Pumpkin", Offset = Vector3.new(-14, 10.5, 10.5), Size = Vector3.new(9, 5.5, 9) },
 	{ Kind = "Checkpoint", Offset = Vector3.new(-24.5, 12.5, 16.5), Label = "Broomstick Bridge" },
-	-- Stage 2: Broomstick Bridge (across the back)
+	-- Stage 2: Broomstick Bridge (across the back; turned about -90 so the handles point right,
+	-- tipped up 6 degrees so each broom climbs a little)
 	{ Kind = "Broom", Offset = Vector3.new(-12.25, 14.5, 16.5), Rotation = Vector3.new(6, -86, 0) },
 	{ Kind = "Broom", Offset = Vector3.new(0, 17, 16.5), Rotation = Vector3.new(6, -95, 0) },
 	{ Kind = "Broom", Offset = Vector3.new(12.25, 19.5, 16.5), Rotation = Vector3.new(6, -88, 0) },
@@ -96,7 +97,7 @@ return {
 	TouchHeight = 6, -- studs above a pad's top that still count (landing from a jump is fine)
 	StartHeight = 11, -- the same for the start pad, so jumping on it doesn't start the clock
 	HazardHeight = 3.5, -- studs above slime that still count as touching it
-	TeleportGraceSeconds = 0.6, -- after being sent back, ignore falls and slime this long
+	TeleportGraceSeconds = 0.6, -- after being sent back, don't check that climber for this long
 	LeaveDistance = 90, -- a climber further than this from every course pad has left: run stops
 	SpeedTolerance = 1.5, -- moving faster than sprint speed x this between checks = cheating
 	SpeedSlack = 8, -- extra studs allowed per check (bumps, lag)
