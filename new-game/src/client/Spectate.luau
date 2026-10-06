@@ -30,6 +30,10 @@ local Spectate = {}
 local ACTION_NEXT = "SpectateNext"
 local ACTION_PREVIOUS = "SpectatePrevious"
 local STREAM_EVERY = 3 -- seconds between "stream the map to me" reminders while watching
+-- The bar on phones: narrow enough to fit between the thumbstick and the jump button at full
+-- size (a wider bar would shrink and its text with it).
+local PHONE_WIDTH = 300
+local PHONE_HEIGHT = 88
 
 local active = false
 local mounted = false
@@ -39,6 +43,7 @@ local messageToken = 0 -- counts messages, so an old one's timer can't hide a ne
 
 -- Set in Mount.
 local bar: Frame? = nil
+local twoRows = false -- phones: the name on its own line above the buttons
 local watchButton: TextButton? = nil
 local nameLabel: TextLabel? = nil
 local controls: { GuiObject } = {}
@@ -80,6 +85,10 @@ local function refreshVisibility()
 	local cfg = Config.Lobby.Spectate
 	if bar then
 		bar.Visible = active or showingMessage
+		if twoRows then
+			-- Just the name line while it only shows a message.
+			bar.Size = UDim2.fromOffset(PHONE_WIDTH, if active then PHONE_HEIGHT else 44)
+		end
 	end
 	for _, control in controls do
 		control.Visible = active
@@ -202,12 +211,17 @@ function Spectate.Mount(gui: ScreenGui)
 	local cfg = Config.Lobby.Spectate
 	local player = Players.LocalPlayer
 
-	-- The bar: [< Back] Watching Name [Next >] [Stop]
+	-- The bar: [< Back] Watching Name [Next >] [Stop]. On phones the name goes on its own
+	-- line above the three buttons.
+	twoRows = Layout.IsPhone()
+	local buttonsTop = if twoRows then 44 else 8
 	local panel = Theme.panel(gui)
 	panel.Name = "SpectateBar"
 	panel.AnchorPoint = Vector2.new(0.5, 1)
 	panel.Position = UDim2.new(0.5, 0, 1, -24)
-	panel.Size = UDim2.fromOffset(520, 52)
+	panel.Size = if twoRows
+		then UDim2.fromOffset(PHONE_WIDTH, PHONE_HEIGHT)
+		else UDim2.fromOffset(520, 52)
 	panel.Visible = false
 	Layout.Fit(panel, true)
 	bar = panel
@@ -223,13 +237,18 @@ function Spectate.Mount(gui: ScreenGui)
 		panel
 	)
 	previous.Name = "Previous"
-	previous.Position = UDim2.fromOffset(8, 8)
+	previous.Position = UDim2.fromOffset(8, buttonsTop)
 	previous.Size = UDim2.fromOffset(92, 36)
 
 	local label = Theme.label("", 16, panel)
 	label.Name = "Watching"
-	label.Position = UDim2.fromOffset(106, 8)
-	label.Size = UDim2.new(1, -106 - 198, 0, 36)
+	if twoRows then
+		label.Position = UDim2.fromOffset(8, 6)
+		label.Size = UDim2.new(1, -16, 0, 32)
+	else
+		label.Position = UDim2.fromOffset(106, 8)
+		label.Size = UDim2.new(1, -106 - 198, 0, 36)
+	end
 	label.TextTruncate = Enum.TextTruncate.AtEnd
 	nameLabel = label
 
@@ -241,13 +260,13 @@ function Spectate.Mount(gui: ScreenGui)
 	)
 	nextButton.Name = "Next"
 	nextButton.AnchorPoint = Vector2.new(1, 0)
-	nextButton.Position = UDim2.new(1, -100, 0, 8)
+	nextButton.Position = UDim2.new(1, -100, 0, buttonsTop)
 	nextButton.Size = UDim2.fromOffset(92, 36)
 
 	local stop = button(cfg.Text.Stop, panel)
 	stop.Name = "Stop"
 	stop.AnchorPoint = Vector2.new(1, 0)
-	stop.Position = UDim2.new(1, -8, 0, 8)
+	stop.Position = UDim2.new(1, -8, 0, buttonsTop)
 	stop.Size = UDim2.fromOffset(84, 36)
 	stop.BackgroundColor3 = Theme.Selected
 

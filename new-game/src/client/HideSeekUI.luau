@@ -88,6 +88,8 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	tip.Visible = false
 	tip.ZIndex = 12
 	Layout.Fit(tip)
+	-- On short phone screens the banner and tip move down together, clear of the top bar.
+	Layout.KeepBelowHud({ banner, tip })
 
 	local bannerToken = 0
 	local foundAt = -math.huge

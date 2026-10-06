@@ -135,6 +135,7 @@ function EasterEggUI.Mount(gui: ScreenGui)
 	toast.Visible = false
 	toast.ZIndex = 7
 	Layout.Fit(toast)
+	Layout.KeepBelowHud({ toast }) -- (on short phone screens 0.15 is on the bar at the top)
 	local pop = Instance.new("UIScale")
 	pop.Name = "Pop"
 	pop.Parent = toast
@@ -283,8 +284,21 @@ function EasterEggUI.Mount(gui: ScreenGui)
 			end
 		end
 	end
+	-- Config.EasterEggs.Panel's size, but never bigger than the screen: on a short phone the
+	-- list scrolls instead of the whole panel (and its text) shrinking.
+	local function sizePanel()
+		local screen = Layout.Screen()
+		local margin = 2 * Config.UI.EdgeMargin
+		local width, height = size.Width, size.Height
+		if screen.X > margin and screen.Y > margin then -- (zero before the screen is laid out)
+			width = math.min(width, math.max(screen.X - margin, 280))
+			height = math.min(height, math.max(screen.Y - margin, 200))
+		end
+		panel.Size = UDim2.fromOffset(width, height)
+	end
 	openPanel = function()
 		refreshPanel()
+		sizePanel()
 		panel.Visible = true
 	end
 

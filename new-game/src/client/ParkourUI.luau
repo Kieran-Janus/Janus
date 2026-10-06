@@ -182,6 +182,9 @@ function ParkourUI.Mount(gui: ScreenGui)
 	popLabel.Visible = false
 	popLabel.ZIndex = 6
 	textSize(popLabel, 34)
+	-- On short phone screens 0.34 of the height is where the timer is: the messages go just
+	-- below the timer instead, so the clock stays readable.
+	Layout.KeepBelowHud({ popLabel }, timer)
 	local popId = 0
 	local function pop(message: string, color: Color3)
 		popId += 1
@@ -374,10 +377,15 @@ function ParkourUI.Mount(gui: ScreenGui)
 			end
 		end)
 	end)
+	local ticking = false -- the 1-second refresh below is running (only ever one)
 	local function openPanel()
 		messageLine.Text = ""
 		refreshPanel()
 		panel.Visible = true
+		if ticking then
+			return -- closed and opened again within a second: the running loop carries on
+		end
+		ticking = true
 		-- Keep the reward countdown ticking while it is open.
 		task.spawn(function()
 			while panel.Visible do
@@ -386,6 +394,7 @@ function ParkourUI.Mount(gui: ScreenGui)
 					refreshPanel()
 				end
 			end
+			ticking = false
 		end)
 	end
 

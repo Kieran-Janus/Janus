@@ -119,23 +119,28 @@ function ResultsUI.Mount(gui: ScreenGui)
 		end
 	end
 
-	local function mvpSpotlight(result: ResultRow, order: number, mvpLine: string)
+	-- `slim` (phones): a smaller headshot with the words beside it, Config.Results.PhoneMvpHeight
+	-- tall, so the whole panel fits a short screen without shrinking.
+	local function mvpSpotlight(result: ResultRow, order: number, mvpLine: string, slim: boolean)
+		local height = if slim then math.max(cfg.PhoneMvpHeight, 44) else 112
+		local headSize = if slim then height - 8 else 100
 		local box = Instance.new("Frame")
 		box.Name = "Mvp"
 		box.BackgroundTransparency = 1
 		box.LayoutOrder = order
-		box.Size = UDim2.new(1, -24, 0, 112)
+		box.Size = UDim2.new(1, -24, 0, height)
 		box.Parent = panel
 
 		-- A slowly turning glow behind the headshot.
 		local glow = Instance.new("Frame")
 		glow.Name = "Glow"
 		glow.AnchorPoint = Vector2.new(0.5, 0.5)
-		glow.Position = UDim2.new(0, 60, 0.5, 0)
-		glow.Size = UDim2.fromOffset(118, 118)
+		glow.Position = UDim2.new(0, headSize / 2 + 10, 0.5, 0)
+		local glowSize = headSize + (if slim then 8 else 18)
+		glow.Size = UDim2.fromOffset(glowSize, glowSize)
 		glow.BackgroundColor3 = cfg.Colors.Mvp
 		glow.Parent = box
-		corner(glow, 59)
+		corner(glow, glowSize / 2)
 		local gradient = Instance.new("UIGradient")
 		gradient.Transparency = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 0.1),
@@ -152,11 +157,11 @@ function ResultsUI.Mount(gui: ScreenGui)
 		head.Name = "Headshot"
 		head.AnchorPoint = Vector2.new(0.5, 0.5)
 		head.Position = glow.Position
-		head.Size = UDim2.fromOffset(100, 100)
+		head.Size = UDim2.fromOffset(headSize, headSize)
 		head.BackgroundColor3 = Theme.Button
 		head.Image = ""
 		head.Parent = box
-		corner(head, 50)
+		corner(head, headSize / 2)
 		task.spawn(function()
 			local ok, image = pcall(function()
 				return Players:GetUserThumbnailAsync(
@@ -170,20 +175,22 @@ function ResultsUI.Mount(gui: ScreenGui)
 			end
 		end)
 
-		local title = Theme.label(text.Mvp, 28, box)
+		local left = headSize + 30
+		local title = Theme.label(text.Mvp, if slim then 20 else 28, box)
 		title.Font = Enum.Font.GothamBlack
 		title.TextColor3 = cfg.Colors.Mvp
 		title.TextXAlignment = Enum.TextXAlignment.Left
-		title.Position = UDim2.fromOffset(130, 18)
-		title.Size = UDim2.new(1, -140, 0, 34)
+		title.Position = UDim2.fromOffset(left, if slim then 2 else 18)
+		title.Size = UDim2.new(1, -(left + 10), 0, if slim then 22 else 34)
 		-- A mode's own MvpLine might not have exactly "%s ... %d"; never let that break the screen.
 		local ok, formatted =
 			pcall(string.format, mvpLine, result.Name, math.floor(scoreOf(result)))
-		local line = Theme.label(if ok then formatted else result.Name, 18, box)
+		local line =
+			Theme.label(if ok then formatted else result.Name, if slim then 16 else 18, box)
 		line.TextXAlignment = Enum.TextXAlignment.Left
 		line.TextWrapped = true
-		line.Position = UDim2.fromOffset(130, 54)
-		line.Size = UDim2.new(1, -140, 0, 44)
+		line.Position = UDim2.fromOffset(left, if slim then 24 else 54)
+		line.Size = UDim2.new(1, -(left + 10), 0, if slim then height - 26 else 44)
 	end
 
 	local function row(parent: Instance, order: number): Frame
@@ -292,7 +299,7 @@ function ResultsUI.Mount(gui: ScreenGui)
 				then details.MvpLine
 				elseif typeof(details.ScoreLabel) == "string" then text.MvpLineDefault
 				else text.MvpLine
-			mvpSpotlight(top, 1, mvpLine)
+			mvpSpotlight(top, 1, mvpLine, Layout.IsPhone())
 		end
 
 		local header = row(panel, 2)
@@ -344,7 +351,6 @@ function ResultsUI.Mount(gui: ScreenGui)
 			cell(nobody, 1, text.Nobody, Theme.Text, 17).Size = UDim2.fromScale(0.96, 1)
 		end
 		local rowsHeight = math.max(#rowFrames, 1) * (ROW_HEIGHT + 4)
-		list.Size = UDim2.new(1, -24, 0, math.min(rowsHeight, cfg.MaxListHeight))
 
 		local footer = Theme.label("", 16, panel)
 		footer.Name = "NextRound"
@@ -363,13 +369,26 @@ function ResultsUI.Mount(gui: ScreenGui)
 		countdown = ReplicatedStorage:GetAttributeChangedSignal("TimeLeft"):Connect(updateFooter)
 		updateFooter()
 
-		-- Size the panel to its contents, then pop it in.
+		-- Size the panel to its contents, then pop it in. On a short screen the rows get only
+		-- the room that is left (at least one row) and scroll, so the panel fits without
+		-- shrinking its text.
 		local contentHeight = 22
 		for _, child in panel:GetChildren() do
-			if child:IsA("GuiObject") then
+			if child:IsA("GuiObject") and child ~= list then
 				contentHeight += child.Size.Y.Offset + stack.Padding.Offset
 			end
 		end
+		local listHeight = math.min(rowsHeight, cfg.MaxListHeight)
+		local screenHeight = Layout.Screen().Y
+		if screenHeight > 0 then -- (zero before the screen is laid out)
+			local room = screenHeight
+				- 2 * Config.UI.EdgeMargin
+				- contentHeight
+				- stack.Padding.Offset
+			listHeight = math.clamp(room, math.min(ROW_HEIGHT + 4, listHeight), listHeight)
+		end
+		list.Size = UDim2.new(1, -24, 0, listHeight)
+		contentHeight += listHeight + stack.Padding.Offset
 		panel.Size = UDim2.fromOffset(WIDTH, contentHeight)
 		panel.Position = UDim2.fromScale(0.5, 0.62)
 		panel.Visible = true

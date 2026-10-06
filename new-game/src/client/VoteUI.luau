@@ -2,7 +2,11 @@
 -- Vote panel: one row of game buttons (a mode on a map) and, when an offered mode uses it, a
 -- row of difficulty buttons, with live counts. Shown while the server's vote is open; sends
 -- intent only (the server validates). When only Ready players can vote and you aren't on the
--- Ready pad, the buttons are greyed out with a hint (Config.Lobby.Ready.Text.VoteHint).
+-- Ready pad, the buttons are greyed out with a hint (Config.Lobby.Ready.Text.VoteHint); on
+-- phones you only see the hint then, so the greyed buttons don't cover the middle of a small
+-- screen (and the Candy Rush lanes) for the whole vote.
+-- On touch screens the panel is only as wide as the gap between the thumbstick and the jump
+-- button, with taller game buttons, so it never has to shrink (text stays readable).
 -- VoteUI.Open() -> boolean   shows the panel again if a vote is open (Menu > Vote); false
 --                            when no vote is open right now.
 local Players = game:GetService("Players")
@@ -23,9 +27,16 @@ type VoteState = {
 
 local VoteUI = {}
 
-local SECTION_HEIGHT = 24 + 52 + 12 -- heading + row + the gaps between them
+local HEADING_HEIGHT = 24
+local ROW_HEIGHT = 52
+local TALL_ROW_HEIGHT = 64 -- game buttons on a narrow panel (long names wrap onto more lines)
+local SECTION_GAPS = 12 -- the gaps around a heading and its row
 local HINT_HEIGHT = 22
 local PADDING = 8
+local WIDTH = 560
+local MIN_WIDTH = 340
+local NARROW = 500 -- narrower than this uses TALL_ROW_HEIGHT
+local BUTTON_TEXT = 17
 
 local votePanel: Frame? = nil
 local voteOpen = false
@@ -49,7 +60,7 @@ function VoteUI.Mount(gui: ScreenGui)
 	panel.Name = "Vote"
 	panel.AnchorPoint = Vector2.new(0.5, 1)
 	panel.Position = UDim2.new(0.5, 0, 1, -24)
-	panel.Size = UDim2.fromOffset(560, 200)
+	panel.Size = UDim2.fromOffset(WIDTH, 200)
 	panel.Visible = false
 	Layout.Fit(panel, true)
 	votePanel = panel
@@ -73,12 +84,12 @@ function VoteUI.Mount(gui: ScreenGui)
 	local function section(title: string, order: number): (TextLabel, Frame)
 		local heading = Theme.label(title, 18, panel)
 		heading.LayoutOrder = order
-		heading.Size = UDim2.new(1, 0, 0, 24)
+		heading.Size = UDim2.new(1, 0, 0, HEADING_HEIGHT)
 
 		local row = Instance.new("Frame")
 		row.BackgroundTransparency = 1
 		row.LayoutOrder = order + 1
-		row.Size = UDim2.new(1, -24, 0, 52)
+		row.Size = UDim2.new(1, -24, 0, ROW_HEIGHT)
 		row.Parent = panel
 		local rowLayout = Instance.new("UIListLayout")
 		rowLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -88,8 +99,21 @@ function VoteUI.Mount(gui: ScreenGui)
 		return heading, row
 	end
 
-	local _, mapRow = section("Vote for the next game", 1)
+	local mapHeading, mapRow = section("Vote for the next game", 1)
 	local difficultyHeading, difficultyRow = section("Vote for the difficulty", 3)
+
+	-- As wide as the screen allows (on touch screens: between the thumbstick and the jump
+	-- button), up to WIDTH.
+	local function panelWidth(): number
+		local screen = Layout.Screen()
+		if screen.X <= 0 then
+			return WIDTH -- (not laid out yet)
+		end
+		local clear = if Layout.IsTouch()
+			then Config.UI.TouchBottomSideClear
+			else Config.UI.EdgeMargin
+		return math.clamp(screen.X - 2 * clear, MIN_WIDTH, WIDTH)
+	end
 
 	-- Only Ready players can vote (when the server says so).
 	local function canVote(): boolean
@@ -114,8 +138,14 @@ function VoteUI.Mount(gui: ScreenGui)
 			button.AutoButtonColor = enabled
 			button.Active = enabled
 			button.Font = Theme.Font
-			button.TextSize = 17 -- stays >= 14 px when the panel shrinks to fit a phone
+			button.TextSize = BUTTON_TEXT
 			button.TextWrapped = true
+			-- Long names shrink a little on narrow panels, never below Config.UI.MinTextSize.
+			button.TextScaled = true
+			local limit = Instance.new("UITextSizeConstraint")
+			limit.MaxTextSize = BUTTON_TEXT
+			limit.MinTextSize = Config.UI.MinTextSize
+			limit.Parent = button
 			button.Text = ("%s\n%d vote%s"):format(
 				option.Name,
 				option.Votes,
@@ -147,17 +177,31 @@ function VoteUI.Mount(gui: ScreenGui)
 			return
 		end
 		local enabled = canVote()
-		local hasDifficulty = #state.Difficulties > 0
+		-- Phones: someone who can't vote yet only sees the hint.
+		local hintOnly = not enabled and Layout.IsPhone()
+		local hasDifficulty = #state.Difficulties > 0 and not hintOnly
+		local width = panelWidth()
+		local mapHeight = if width < NARROW then TALL_ROW_HEIGHT else ROW_HEIGHT
 		hint.Visible = not enabled
+		mapHeading.Visible = not hintOnly
+		mapRow.Visible = not hintOnly
+		mapRow.Size = UDim2.new(1, -24, 0, mapHeight)
 		difficultyHeading.Visible = hasDifficulty
 		difficultyRow.Visible = hasDifficulty
 		fill(mapRow, "Map", state.Maps, enabled)
 		fill(difficultyRow, "Difficulty", state.Difficulties, enabled)
-		-- Height from what's showing: one or two sections, plus the hint.
+		-- Height from what's showing: the game row, the difficulty row, the hint.
 		local height = PADDING * 2
-			+ SECTION_HEIGHT * (if hasDifficulty then 2 else 1)
-			+ (if hint.Visible then HINT_HEIGHT + 6 else 0)
-		panel.Size = UDim2.fromOffset(560, height)
+		if not hintOnly then
+			height += HEADING_HEIGHT + mapHeight + SECTION_GAPS
+		end
+		if hasDifficulty then
+			height += HEADING_HEIGHT + ROW_HEIGHT + SECTION_GAPS
+		end
+		if hint.Visible then
+			height += HINT_HEIGHT + (if hintOnly then 0 else 6)
+		end
+		panel.Size = UDim2.fromOffset(width, height)
 		panel.Visible = true
 	end
 

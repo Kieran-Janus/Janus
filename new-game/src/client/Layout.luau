@@ -17,6 +17,17 @@
 	Layout.Fit(panel, bottom?) shrinks a panel (UIScale) only when it doesn't fit the screen.
 	                           bottom = true for panels along the bottom edge: on touch screens
 	                           they also keep clear of the thumbstick (left) and jump button (right).
+	Layout.KeepBelowHud(items, under?) -> place
+	                           for banners placed part-way down the screen (e.g. at 0.26 of its
+	                           height), which would cover the Hud on short phone screens: moves
+	                           `items` (shown together, same parent) down just enough to keep
+	                           Config.UI.BelowHudGap under the Hud, and under `under` (another
+	                           bar, e.g. a timer) while that is showing. Their Position when this
+	                           is called is their usual spot; on tall screens they stay there.
+	                           Runs when an item is shown and when the screen changes size; call
+	                           the returned function to run it yourself.
+	Layout.HudBottom(parent?)  how far down the Hud reaches, in UI units from the top of `parent`
+	                           (default: the screen); nil while no Hud is showing
 	Layout.Screen()            usable screen size in UI units
 	Layout.IsTouch()           touch screen (phone or tablet)
 	Layout.IsPhone()           touch screen shorter than Config.UI.PhoneMaxHeight (smaller buttons)
@@ -249,6 +260,90 @@ function Layout.Fit(panel: GuiObject, bottom: boolean?)
 	panel:GetPropertyChangedSignal("Size"):Connect(fit)
 	panel:GetPropertyChangedSignal("Visible"):Connect(fit)
 	fit()
+end
+
+-- The bottom edge of `guard` in UI units from the top of `parent` (nil while it isn't showing
+-- or hasn't been laid out yet).
+local function bottomIn(guard: GuiObject, parent: GuiBase2d): number?
+	if not guard.Visible or guard.AbsoluteSize.Y <= 0 then
+		return nil
+	end
+	local bottom = guard.AbsolutePosition.Y + guard.AbsoluteSize.Y - parent.AbsolutePosition.Y
+	return bottom / math.max(scaleValue(), 0.01)
+end
+
+function Layout.HudBottom(parent: GuiBase2d?): number?
+	local gui = root
+	if not gui then
+		return nil
+	end
+	local hud = gui:FindFirstChild("Hud")
+	if not (hud and hud:IsA("GuiObject")) then
+		return nil
+	end
+	return bottomIn(hud, parent or gui)
+end
+
+function Layout.KeepBelowHud(items: { GuiObject }, under: GuiObject?): () -> ()
+	local homes: { UDim2 } = {}
+	for i, item in items do
+		homes[i] = item.Position
+	end
+	local function place()
+		local first = items[1]
+		local parent = first and first.Parent
+		local shift = 0
+		if parent and parent:IsA("GuiBase2d") then
+			local guard = Layout.HudBottom(parent)
+			local other = if under then bottomIn(under, parent) else nil
+			if other and (guard == nil or other > guard) then
+				guard = other
+			end
+			if guard then
+				local height = parent.AbsoluteSize.Y / math.max(scaleValue(), 0.01)
+				-- The highest top edge of the items at their usual spot (a Layout.Fit scale
+				-- shrinks an item around its AnchorPoint).
+				local top = math.huge
+				for i, item in items do
+					local fit = item:FindFirstChild("FitScale")
+					local s = if fit and fit:IsA("UIScale") then fit.Scale else 1
+					local size = (item.Size.Y.Scale * height + item.Size.Y.Offset) * s
+					local y = homes[i].Y.Scale * height + homes[i].Y.Offset
+					top = math.min(top, y - item.AnchorPoint.Y * size)
+				end
+				-- (rounded up: UDim offsets are whole numbers)
+				shift = math.max(0, math.ceil(guard + Config.UI.BelowHudGap - top))
+			end
+		end
+		for i, item in items do
+			local home = homes[i]
+			local want = UDim2.new(home.X.Scale, home.X.Offset, home.Y.Scale, home.Y.Offset + shift)
+			if item.Position ~= want then
+				item.Position = want
+			end
+		end
+	end
+	for _, item in items do
+		item:GetPropertyChangedSignal("Visible"):Connect(function()
+			if item.Visible then
+				place()
+			end
+		end)
+	end
+	if under then
+		under:GetPropertyChangedSignal("Visible"):Connect(place)
+	end
+	table.insert(fitters, place)
+	if items[1] then
+		items[1].Destroying:Once(function()
+			local index = table.find(fitters, place)
+			if index then
+				table.remove(fitters, index)
+			end
+		end)
+	end
+	place()
+	return place
 end
 
 return Layout
