@@ -519,10 +519,12 @@ end
 
 function NpcLooks.PhotoSpot(cf: CFrame, m: Model): BasePart
 	local cfg = hubCfg.PhotoSpot
-	local stage = paint.rounded({
+	-- A real cylinder (round to bump into), not a rounded mesh (that would bump like a box).
+	local stage = part({
 		Name = "Stage",
-		Size = Vector3.new(14, 1, 14),
-		CFrame = cf * CFrame.new(0, 1.5, 0),
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(1, 14, 14),
+		CFrame = upright(cf * CFrame.new(0, 1.5, 0)),
 		PaletteRole = "Path",
 		PaletteShade = 0.1,
 		Material = Enum.Material.Slate,

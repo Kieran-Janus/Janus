@@ -234,18 +234,20 @@ local function buildStatue(parent: Instance)
 	end
 	Kit.prop("KingStatue", base, parent, 18 * k, function()
 		local folder = Kit.model("KingStatue", parent)
-		paint.rounded({
+		part({
 			Name = "Pedestal",
-			Size = Vector3.new(9.5 * k, 2 * k, 9.5 * k),
-			CFrame = base * CFrame.new(0, 1 * k, 0),
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(2 * k, 9.5 * k, 9.5 * k),
+			CFrame = Kit.upright(base * CFrame.new(0, 1 * k, 0)),
 			PaletteRole = "Stone",
 			PaletteShade = 0.2,
 			Material = Enum.Material.Slate,
 		}, folder)
-		paint.rounded({
+		part({
 			Name = "Pedestal",
-			Size = Vector3.new(7.5 * k, 1.4 * k, 7.5 * k),
-			CFrame = base * CFrame.new(0, 2.6 * k, 0),
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(1.4 * k, 7.5 * k, 7.5 * k),
+			CFrame = Kit.upright(base * CFrame.new(0, 2.6 * k, 0)),
 			PaletteRole = "Stone",
 			PaletteShade = 0.1,
 			Material = Enum.Material.Slate,

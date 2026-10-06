@@ -685,12 +685,21 @@ local function buildCauldron(parent: Instance)
 		-- The pot: a fat rounded drum with a round belly.
 		local potBottom = 1.4
 		local potHeight = r * 1.25
-		local pot = paint.rounded({
+		local pot = paint.roundedDecor({
 			Name = "Pot",
 			Size = Vector3.new(r * 1.9, potHeight, r * 1.9),
 			CFrame = base * CFrame.new(0, potBottom + potHeight / 2, 0),
 			PaletteRole = "Iron",
 			Material = Enum.Material.Metal,
+		}, m)
+		-- What players bump into: an invisible round body (a rounded mesh bumps like a box).
+		part({
+			Name = "PotCollider",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(potHeight + 1.4, r * 2, r * 2),
+			CFrame = upright(base * CFrame.new(0, (potHeight + 1.4) / 2, 0)),
+			Transparency = 1,
+			CastShadow = false,
 		}, m)
 		decor({
 			Name = "Belly",
