@@ -73,6 +73,18 @@ describe("WebScourRules", function()
 		x, y = WebScourRules.ClockPoint(3, 2)
 		expect(x).toBeNear(2)
 		expect(y).toBeNear(0)
+		-- Knots: 4 spokes (12, 3, 6, 9 o'clock), rings at 0.3 and 0.6 of the way out.
+		local used = {}
+		local spoke, ring = WebScourRules.WebKnot(3, 0.62, 4, 0, { 0.3, 0.6 }, used)
+		expect(spoke).toBe(2)
+		expect(ring).toBe(2)
+		used["2:2"] = true
+		spoke, ring = WebScourRules.WebKnot(3, 0.62, 4, 0, { 0.3, 0.6 }, used)
+		expect(spoke).toBe(2) -- taken: the next knot along the same spoke
+		expect(ring).toBe(1)
+		used["2:1"] = true
+		expect((WebScourRules.WebKnot(3, 0.62, 1, 0, { 0.5 }, used))).toBe(1)
+		expect((WebScourRules.WebKnot(3, 0.62, 1, 0, { 0.5 }, { ["1:1"] = true }))).toBeNil()
 		expect(WebScourRules.FormatTime(23.44)).toBe("23.4s")
 		expect(WebScourRules.FormatTime(65.25)).toBe("1:05.2")
 		expect(WebScourRules.FormatWait(42)).toBe("42s")
@@ -86,9 +98,13 @@ describe("Config.Minigames.WebScour", function()
 		expect(cfg.TimeLimit).toBeGreaterThan(5)
 		expect(cfg.MaxReach).toBeGreaterThan(cfg.CatchPromptDistance)
 		expect(cfg.RewardCooldown).toBeGreaterThanOrEqual(0)
-		for _, kind in cfg.CritterKinds do
-			expect(cfg.CritterColors[kind]).toBeTruthy()
+		expect(#cfg.CritterColors).toBe(0) -- a map of colour names, not a list
+		local colours = 0
+		for _, colour in cfg.CritterColors do
+			expect(colour.R + colour.G + colour.B).toBeGreaterThan(1) -- bright
+			colours += 1
 		end
+		expect(colours).toBeGreaterThanOrEqual(4) -- several bright spider colours
 		for _, key in { "Start", "Catch", "Miss", "Tick", "AllFound", "TimeUp" } do
 			expect((cfg.Sounds :: any)[key].SoundId).toBeA("string")
 		end
@@ -126,6 +142,24 @@ describe("Spider Grove (Sections/WebScour)", function()
 			expect(Lobby.InZone(spot.Position, "WebScour", 1)).toBe(true)
 			expect(spot.Position.Y).toBeGreaterThan(Lobby.GroundY())
 			expect(spot.Position.Y).toBeLessThan(Lobby.GroundY() + 20)
+		end
+		-- Every spot sits on a web strand (a spoke or a ring thread), so no spider is ever on
+		-- the floor or a tree.
+		local strands = {}
+		for _, d in area:FindFirstChild("Webs"):GetDescendants() do
+			if d:IsA("BasePart") and (d.Name == "Spoke" or d.Name == "Thread") then
+				table.insert(strands, d)
+			end
+		end
+		for _, spot in spots do
+			local nearest = math.huge
+			for _, s in strands do
+				local p = s.CFrame:PointToObjectSpace(spot.Position)
+				local z = math.clamp(p.Z, -s.Size.Z / 2, s.Size.Z / 2)
+				nearest = math.min(nearest, math.sqrt(p.X * p.X + p.Y * p.Y + (p.Z - z) ^ 2))
+			end
+			expect(nearest).toBeLessThan(0.5)
+			expect(spot.Position.Y).toBeGreaterThan(Lobby.GroundY() + 2)
 		end
 		local parts = rt:parts(area)
 		for _, part in parts do
@@ -463,7 +497,7 @@ describe("WebScourUI", function()
 		local root = player.Character:GetPivot().Position
 		local list = {}
 		for i = 1, 3 do
-			local kind = cfg.CritterKinds[(i - 1) % #cfg.CritterKinds + 1]
+			local kind = ({ "Pink", "Lime", "Sky" })[i]
 			table.insert(list, { Id = i, Position = root + V3.new(i * 3, 2, 0), Kind = kind })
 		end
 		client:fire(run, "OnClientEvent", {

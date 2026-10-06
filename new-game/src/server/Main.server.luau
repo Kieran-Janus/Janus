@@ -23,6 +23,7 @@ local ORDER = {
 	"NoiseService",
 	"SprintService",
 	"ShoutService",
+	"DanceService", -- Photo Spot dances
 	"PumpkinService",
 	"KingService",
 	"MinionService",

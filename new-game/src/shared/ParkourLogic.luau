@@ -345,17 +345,45 @@ function ParkourLogic.Check(course: { Step }, zoneSize: Vector3?): { string }
 		end
 	end
 
-	-- Head room: no piece right above another one (players would bump their heads).
-	for x = 1, #jumps do
-		for y = x + 2, #jumps do
-			local ia, ib = jumps[x], jumps[y]
-			local gap = ParkourLogic.Jump(course[ia], cframes[ia], course[ib], cframes[ib])
-			local height = math.abs(cframes[ib].Position.Y - cframes[ia].Position.Y)
-			if gap < rules.HeadroomMargin and height < rules.Headroom then
+	-- Head room: nothing may hang over a jump (or over where you stand before and after it)
+	-- lower than Headroom studs above it, or players bump their heads mid-jump and fall. A
+	-- piece hangs SizeOf(piece).Y studs below its top (a gravestone is tall).
+	local function flat(v: Vector3): Vector3
+		return Vector3.new(v.X, 0, v.Z)
+	end
+	local function radius(step: Step): number
+		local size = ParkourLogic.SizeOf(step)
+		return math.max(size.X, size.Z) / 2
+	end
+	local function toSegment(p: Vector3, a: Vector3, b: Vector3): number
+		local ab = b - a
+		local t = if ab.Magnitude > 1e-6 then math.clamp((p - a):Dot(ab) / ab:Dot(ab), 0, 1) else 0
+		return (p - (a + ab * t)).Magnitude
+	end
+	for k = 2, #jumps do
+		local ia, ib = jumps[k - 1], jumps[k]
+		local pa, pb = cframes[ia].Position, cframes[ib].Position
+		local floor = math.max(pa.Y, pb.Y)
+		for _, ic in jumps do
+			if ic == ia or ic == ib then
+				continue
+			end
+			local c = course[ic]
+			local pc = cframes[ic].Position
+			if pc.Y <= floor then
+				continue -- below the jump: nothing to bump into
+			end
+			local rc = radius(c)
+			local over = toSegment(flat(pc), flat(pa), flat(pb)) < rc + rules.HeadroomMargin
+				or (flat(pc) - flat(pa)).Magnitude < rc + radius(course[ia])
+				or (flat(pc) - flat(pb)).Magnitude < rc + radius(course[ib])
+			local bottom = pc.Y - ParkourLogic.SizeOf(c).Y
+			if over and bottom - floor < rules.Headroom - 1e-6 then
 				add(
-					("%s is too close above or below %s (keep %d studs of head room)."):format(
-						stepName(course, ib),
+					("%s hangs too low over the jump from %s to %s (keep %.1f studs of head room)."):format(
+						stepName(course, ic),
 						stepName(course, ia),
+						stepName(course, ib),
 						rules.Headroom
 					)
 				)

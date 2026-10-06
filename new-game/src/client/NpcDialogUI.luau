@@ -4,7 +4,7 @@
 	opens a dialog with that NPC's Config.Npcs lines (Next / Close). Special cases:
 	  VotingBoard - adds whether voting is open right now
 	  Leaderboard - adds the current top list from the gravestone
-	  PhotoSpot   - opens the emote bar instead (hides when you walk away)
+	  PhotoSpot   - opens the dance bar instead (Config.Dances; hides when you walk away)
 	  OpensShop   - NPCs with this set (the Pumpkin Shop) open the shop on that tab
 ]]
 local Players = game:GetService("Players")
@@ -16,6 +16,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local ShopUI = require(script.Parent.ShopUI)
 local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
+local Dances = require(script.Parent.Dances)
 
 local NpcDialogUI = {}
 
@@ -89,51 +90,51 @@ function NpcDialogUI.Mount(gui: ScreenGui)
 		dialog.Visible = false
 	end)
 
-	-- Photo spot emote bar ------------------------------------------------------------------
+	-- Photo spot dance bar (Config.Dances) ---------------------------------------------------
+	local dances = Config.Dances
+	local columns = math.max(dances.Columns, 1)
+	local cellW, cellH, gap = 132, 40, 6
+	local buttonCount = #dances.List + 2 -- the dances, Stop and X
+	local rows = math.ceil(buttonCount / columns)
 	local emoteBar = Theme.panel(gui)
 	emoteBar.Name = "EmoteBar"
 	emoteBar.AnchorPoint = Vector2.new(0.5, 1)
 	emoteBar.Position = UDim2.new(0.5, 0, 1, -24)
-	emoteBar.Size = UDim2.fromOffset(560, 60)
+	emoteBar.Size = UDim2.fromOffset(columns * (cellW + gap) + 14, rows * (cellH + gap) + 14)
 	emoteBar.Visible = false
 	Layout.Fit(emoteBar, true)
-	local layout = Instance.new("UIListLayout")
-	layout.FillDirection = Enum.FillDirection.Horizontal
-	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	layout.VerticalAlignment = Enum.VerticalAlignment.Center
-	layout.Padding = UDim.new(0, 6)
-	layout.Parent = emoteBar
-	local emotes = Config.Hub.PhotoSpot.Emotes
-	for _, emote in emotes do
-		local b = button(emote.Label, emoteBar)
-		b.Size = UDim2.new(1 / (#emotes + 1), -6, 0, 40)
-		b.Activated:Connect(function()
-			local character = player.Character
-			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-			if not character or not humanoid then
-				return
-			end
-			-- Built-in emotes (the "/e wave" ones) are played by the default Animate script's
-			-- PlayEmote function; Humanoid:PlayEmote only knows the avatar's equipped emotes.
-			local animate = character:FindFirstChild("Animate")
-			local playEmote = animate and animate:FindFirstChild("PlayEmote")
-			local played = false
-			if playEmote and playEmote:IsA("BindableFunction") then
-				local ok, result = pcall(function()
-					return playEmote:Invoke(emote.Emote)
-				end)
-				played = ok and result == true
-			end
-			if not played then
-				pcall(function()
-					humanoid:PlayEmote(emote.Emote)
-				end)
-			end
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.fromOffset(cellW, cellH)
+	grid.CellPadding = UDim2.fromOffset(gap, gap)
+	grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	grid.VerticalAlignment = Enum.VerticalAlignment.Center
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = emoteBar
+	local function danceButton(text: string, order: number, onClick: () -> ()): TextButton
+		local b = button(text, emoteBar)
+		b.LayoutOrder = order
+		b.TextScaled = true
+		local limit = Instance.new("UITextSizeConstraint")
+		limit.MaxTextSize = 16
+		limit.MinTextSize = Config.UI.MinTextSize
+		limit.Parent = b
+		local pad = Instance.new("UIPadding")
+		pad.PaddingLeft = UDim.new(0, 4)
+		pad.PaddingRight = UDim.new(0, 4)
+		pad.Parent = b
+		b.Activated:Connect(onClick)
+		return b
+	end
+	for i, dance in dances.List do
+		danceButton(dance.Label, i, function()
+			Dances.Request(dance.Id)
 		end)
 	end
-	local closeEmotes = button("X", emoteBar)
-	closeEmotes.Size = UDim2.fromOffset(40, 40)
-	closeEmotes.Activated:Connect(function()
+	local stopButton = danceButton(dances.StopLabel, #dances.List + 1, function()
+		Dances.Request("")
+	end)
+	stopButton.BackgroundColor3 = Theme.Selected
+	danceButton("X", #dances.List + 2, function()
 		emoteBar.Visible = false
 	end)
 
@@ -177,7 +178,7 @@ function NpcDialogUI.Mount(gui: ScreenGui)
 			return
 		end
 
-		if def.Kind == "PhotoSpot" then
+		if def.Kind == "PhotoSpot" and Config.Features.Dances then
 			dialog.Visible = false
 			photoAnchor = prompt.Parent :: BasePart
 			emoteBar.Visible = true

@@ -387,6 +387,21 @@ local function arm(player: Player, character: Model)
 	setRunAttributes(player, run)
 end
 
+-- True when `feet` are more than FallBelowCheckpoint studs under the last checkpoint reached: on
+-- a course that spirals up, a fall usually lands on a lower loop, not on the ground.
+local function belowCheckpoint(run: Run, course: CourseParts, feet: number): boolean
+	if run.Reached == 0 then
+		return false
+	end
+	local index = course.Order[run.Reached]
+	for _, pad in course.Checkpoints do
+		if pad.Index == index then
+			return feet < ParkourLogic.TopY(pad.CFrame, pad.Size) - cfg.FallBelowCheckpoint
+		end
+	end
+	return false
+end
+
 -- Fell or touched slime: back to the last checkpoint reached (or the start pad).
 local function sendBack(player: Player, run: Run, body: Body, course: CourseParts, reason: string)
 	local target: Pad? = nil
@@ -527,7 +542,13 @@ local function checkPlayer(player: Player, course: CourseParts)
 
 	-- Running.
 	if onStart then
-		arm(player, body.Character) -- back on the start pad: ready to start again
+		if run.Reached > 0 then
+			-- Fell from higher up onto the start pad (it sits under the course): back to the
+			-- last checkpoint, never a fresh start. (Menu > Parkour > Go to start restarts.)
+			sendBack(player, run, body, course, "Fall")
+		else
+			arm(player, body.Character) -- back on the start pad: ready to start again
+		end
 		return
 	end
 	local elapsed = serverNow() - run.Started
@@ -541,7 +562,7 @@ local function checkPlayer(player: Player, course: CourseParts)
 			return
 		end
 	end
-	if feet < course.FallY then
+	if feet < course.FallY or belowCheckpoint(run, course, feet) then
 		if run.Reached == 0 and elapsed < cfg.FallGraceSeconds then
 			stop(player, nil) -- walked off the start pad: not playing
 		else

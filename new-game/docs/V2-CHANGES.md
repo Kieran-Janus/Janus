@@ -91,6 +91,9 @@ Fair-play rules that were added after review:
 - A town square layout: the spawn in the south, the Ready circle in front of it, the cauldron in the middle, the crooked clock tower in the north.
 - Curving stone paths and signposts lead to every area that is switched on.
 - Every area has its own space (a **zone**), so decorations never block it.
+- A glowing sign lies on the ground in front of each area (READY? STEP IN!, PUMPKIN SHOP, MYSTERY CRATES, CANDY RUSH, WEB SCOUR, PARKOUR), readable from far away.
+- The lobby is solid: trees, lampposts, benches, gravestones, crates, stalls, statues and big pumpkins can't be walked through, and nothing you stand on lets you fall through. Paths, area entrances and the Ready pad stay clear.
+- The Photo Spot has 10 spooky dances (Zombie Shuffle, Skeleton Rattle, Ghost Float, Pumpkin Head Spin, Monster Mash, Bat Flap, Scaredy Cat Shiver, Witchy Cackle, Mummy Wobble, Spooky Floss) that everyone can see. Walk or jump to stop.
 - Dusk lighting with a big moon, stars, clouds and soft haze.
 - Every lobby area is its own Model with readable names, so it is easy to edit by hand (see [Make it look like yours](#make-it-look-like-yours)).
 
@@ -99,10 +102,10 @@ More views: [from the top](screenshots/lobby-top.png).
 ### Parkour: "Spooky Sky Climb"
 ![The parkour course behind the clock tower](screenshots/lobby-parkour.png)
 
-- Behind the clock tower. 21 jumps in 4 stages: Pumpkin Hop, Broomstick Bridge, Graveyard Steps and Candy Sky.
+- Behind the clock tower. About 60 jumps in 8 stages, spiralling up: Pumpkin Hop, Broomstick Bridge, Graveyard Steps, Candy Sky, Bat Wings, Crypt Lids, Lantern Leap and Moonlight Summit. Super easy at the start, only a little trickier at the top, with wide broomsticks.
 - Start on the START pad. The timer starts when you jump off it.
-- Touch the 3 checkpoints in order. Fall (or touch green slime) and you go back to your last checkpoint.
-- Reach the golden trophy pumpkin at the top: **100 coins**, at most once every 20 hours. Your best time is saved and shown on a board.
+- Touch the 7 checkpoints in order (one at the start of every stage). Fall (or touch green slime) and you go back to your last checkpoint, never all the way down.
+- Reach the golden trophy pumpkin at the top: **300 coins**, at most once every 20 hours. Your best time is saved and shown on a board.
 - **Menu > Parkour** shows your best time, when coins can be won again, and a "Go to start" button.
 
 ### Candy Rush
@@ -117,7 +120,7 @@ More views: [from the top](screenshots/lobby-top.png).
 ![The Spider Grove](screenshots/lobby-webscour.png)
 
 - The **Spider Grove**: twisted trees full of cobwebs. Walk to the glowing lantern and press **Scour the Web!**
-- 6 little glowing critters (spiders, bats, candy, ghosts) hide in the webs. Only you can see yours. Click or tap them all within 45 seconds.
+- 6 cute cartoon spiders in bright colours hide on the web strands (never on the floor or a tree). Only you can see yours. Click or tap them all within 45 seconds.
 - Coins: 2 per critter, 20 more for finding them all, plus a bonus for time left (never more than 50). Coins at most once every 3 minutes. That wait is saved, so changing servers doesn't skip it.
 
 ### Secret pumpkins (Easter eggs)
@@ -235,11 +238,12 @@ Something broken, or you just don't want it? Open `src/shared/Config/Features.lu
 | Parkour course | line 19: `Parkour = true,` |
 | Candy Rush | line 20: `CandyRush = true,` |
 | Web Scour | line 21: `WebScour = true,` |
-| Secret pumpkins (Easter eggs) | line 22: `EasterEggs = true,` |
-| Crates (all of them) | line 23: `Crates = true,` |
-| Robux crates only (coin crates stay) | line 24: `RobuxCrates = true,` |
-| CRAZY skins' animations (rainbow, orbiting pieces, pulsing glow) | line 25: `SkinEffects = true,` |
-| The old first-round tutorial (already off) | line 26: `Tutorial = false,` |
+| Photo Spot dances | line 22: `Dances = true,` |
+| Secret pumpkins (Easter eggs) | line 23: `EasterEggs = true,` |
+| Crates (all of them) | line 24: `Crates = true,` |
+| Robux crates only (coin crates stay) | line 25: `RobuxCrates = true,` |
+| CRAZY skins' animations (rainbow, orbiting pieces, pulsing glow) | line 26: `SkinEffects = true,` |
+| The old first-round tutorial (already off) | line 27: `Tutorial = false,` |
 
 Good to know:
 - A switched-off lobby area (parkour, Candy Rush, crates, Ready pad) is taken out of the running game. Your saved place still has it, so switching it back on brings it back.
@@ -462,7 +466,7 @@ Shortcuts for testing by hand: press **F8** in a playtest (or the Admin button o
 ## Known limits
 
 Things that are not done, or need your eyes in Studio:
-- **Tested in Studio on 6 October** (`/verify-v2`): solo, 2 players (Clients and Servers), an iPhone-sized screen and an iPad (Test > Device). What was fixed is listed in `docs/PROGRESS.md`. Still worth doing yourself: a 3-player ScareMaze (an OUT Survivor turning into a Haunter), one real parkour climb (the brooms are narrow), and a live test with friends after publishing.
+- **Tested in Studio on 6 October** (`/verify-v2`): solo, 2 players (Clients and Servers), an iPhone-sized screen and an iPad (Test > Device). What was fixed is listed in `docs/PROGRESS.md`. The longer parkour was climbed start to finish in a Studio playtest (all 7 checkpoints, coins paid). Still worth doing yourself: a 3-player ScareMaze (an OUT Survivor turning into a Haunter), a parkour climb with your own hands, and a live test with friends after publishing.
 - **Lighting Technology** must be set to Future by hand once (see above).
 - **Sounds**: new features reuse sound ids that were already in the game (the hider giggle is a pitched-up bat squeak). Swap any you don't like in each feature's `Sounds` block.
 - **Art is still built from Parts**: the Pumpkin King, the round maps and the scare characters. Real models can replace them (see [Make it look like yours](#make-it-look-like-yours)).
@@ -470,8 +474,8 @@ Things that are not done, or need your eyes in Studio:
 - **Signposts** still point at a switched-off area until the lobby is rebuilt.
 - **ScareMaze with 2 players has no Haunters** (Haunters need 3+). The scares move on the server, so they may look a little choppy on slow connections.
 - **Hide & Seek**: hiders' invisible bodies can still bump into decoy pumpkins.
-- **Anti-cheat**: a very slow fly upwards on the parkour still passes the speed check (the 15-second minimum time stops instant wins). A Candy Rush auto-clicker could be about twice as fast as a person; coins are still capped. General speed hacks are possible in every Roblox game; pickups and rewards check speed.
+- **Anti-cheat**: a very slow fly upwards on the parkour still passes the speed check (the 45-second minimum time stops instant wins). A Candy Rush auto-clicker could be about twice as fast as a person; coins are still capped. General speed hacks are possible in every Roblox game; pickups and rewards check speed.
 - **Crates**: the region check and real Robux purchases can only be tested on the published game. There is no "X unboxed a CRAZY skin!" announcement yet.
 - **Skins**: the 6 classic skins don't have the new rarity effects. The Menu's Skins tile opens all skins (not "owned only").
-- **Phones**: the full lobby is about 3,900 parts and 83 lights. That is inside the phone budget the tests check, but check the frame rate on a real phone.
+- **Phones**: the full lobby is about 4,160 parts and 84 lights. That is inside the phone budget the tests check, but check the frame rate on a real phone.
 - **Saves are not session-locked yet** (planned before any trading, see `docs/ROADMAP.md`).

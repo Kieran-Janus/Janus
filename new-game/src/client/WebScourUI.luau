@@ -121,120 +121,67 @@ local function eyes(parent: Instance, s: number, y: number, z: number, spread: n
 	end
 end
 
--- Builds the look of one critter (s = its size in studs), front = -Z.
-local function buildLook(m: Model, kind: string, s: number, glow: Color3)
-	if kind == "Bat" then
-		ovalPiece(
-			m,
-			"Body",
-			Vector3.new(0.7, 0.75, 0.65) * s,
-			CFrame.new(),
-			Color3.fromRGB(45, 30, 60)
-		)
-		for _, side in { -1, 1 } do
-			local wing = piece(
-				m,
-				"Wing",
-				Enum.PartType.Block,
-				Vector3.new(0.75, 0.42, 0.06) * s,
-				CFrame.new(side * 0.62 * s, 0.08 * s, 0) * CFrame.Angles(0, 0, math.rad(side * 15)),
-				glow,
-				true
-			)
-			wing:SetAttribute("Wing", side)
-			piece(
-				m,
-				"Ear",
-				Enum.PartType.Block,
-				Vector3.new(0.14, 0.24, 0.1) * s,
-				CFrame.new(side * 0.18 * s, 0.42 * s, 0),
-				Color3.fromRGB(45, 30, 60)
-			)
-		end
-		eyes(m, s, 0.1, -0.3, 0.14)
-	elseif kind == "Candy" then
-		ovalPiece(m, "Candy", Vector3.new(0.85, 0.55, 0.55) * s, CFrame.new(), glow, true)
-		ovalPiece(m, "Stripe", Vector3.new(0.25, 0.58, 0.58) * s, CFrame.new(), Color3.new(1, 1, 1))
-		for _, side in { -1, 1 } do
-			piece(
-				m,
-				"Wrapper",
-				Enum.PartType.Block,
-				Vector3.new(0.32, 0.5, 0.08) * s,
-				CFrame.new(side * 0.55 * s, 0, 0) * CFrame.Angles(math.rad(side * 20), 0, 0),
-				Color3.new(1, 1, 1)
-			)
-		end
-	elseif kind == "Ghost" then
-		ovalPiece(
-			m,
-			"Sheet",
-			Vector3.new(0.75, 0.95, 0.7) * s,
-			CFrame.new(0, 0.05 * s, 0),
-			Color3.fromRGB(235, 250, 255),
-			true
-		)
-		ovalPiece(
-			m,
-			"Tail",
-			Vector3.new(0.5, 0.35, 0.45) * s,
-			CFrame.new(0.1 * s, -0.45 * s, 0.08 * s),
-			Color3.fromRGB(235, 250, 255),
-			true
-		)
-		for _, side in { -1, 1 } do
-			piece(
-				m,
-				"Eye",
-				Enum.PartType.Ball,
-				Vector3.one * (0.16 * s),
-				CFrame.new(side * 0.14 * s, 0.15 * s, -0.33 * s),
-				Color3.fromRGB(20, 14, 26)
-			)
-		end
+-- Builds a cute cartoon spider (s = its size in studs, colour = its bright body), front = -Z.
+local function buildLook(m: Model, s: number, colour: Color3)
+	local dark = colour:Lerp(Color3.new(0, 0, 0), 0.45)
+	ovalPiece(m, "Body", Vector3.new(0.8, 0.7, 0.85) * s, CFrame.new(0, 0.05 * s, 0.18 * s), colour)
+	ovalPiece(
+		m,
+		"Stripe",
+		Vector3.new(0.5, 0.2, 0.6) * s,
+		CFrame.new(0, 0.33 * s, 0.2 * s),
+		colour:Lerp(Color3.new(1, 1, 1), 0.55)
+	)
+	ovalPiece(
+		m,
+		"Head",
+		Vector3.new(0.62, 0.56, 0.5) * s,
+		CFrame.new(0, 0.02 * s, -0.3 * s),
+		colour
+	)
+	eyes(m, s, 0.12, -0.5, 0.13)
+	piece(
+		m,
+		"Smile",
+		Enum.PartType.Block,
+		Vector3.new(0.2, 0.04, 0.04) * s,
+		CFrame.new(0, -0.12 * s, -0.54 * s),
+		Color3.fromRGB(20, 14, 26)
+	)
+	for _, side in { -1, 1 } do
 		piece(
 			m,
-			"Mouth",
-			Enum.PartType.Ball,
-			Vector3.one * (0.12 * s),
-			CFrame.new(0, -0.05 * s, -0.34 * s),
-			Color3.fromRGB(20, 14, 26)
+			"Fang",
+			Enum.PartType.Block,
+			Vector3.new(0.05, 0.09, 0.04) * s,
+			CFrame.new(side * 0.06 * s, -0.17 * s, -0.53 * s),
+			Color3.new(1, 1, 1)
 		)
-	else -- Spider
-		ovalPiece(
-			m,
-			"Body",
-			Vector3.new(0.75, 0.6, 0.8) * s,
-			CFrame.new(0, 0, 0.12 * s),
-			Color3.fromRGB(40, 24, 56)
-		)
-		ovalPiece(
-			m,
-			"Head",
-			Vector3.new(0.5, 0.45, 0.45) * s,
-			CFrame.new(0, -0.02 * s, -0.32 * s),
-			Color3.fromRGB(55, 34, 76)
-		)
-		eyes(m, s, 0.06, -0.48, 0.11)
-		for _, side in { -1, 1 } do
-			for i = 1, 3 do
-				local z = (i - 2) * 0.22
-				piece(
-					m,
-					"Leg",
-					Enum.PartType.Block,
-					Vector3.new(0.6, 0.07, 0.07) * s,
-					CFrame.new(side * 0.5 * s, -0.08 * s, z * s)
-						* CFrame.Angles(0, math.rad(z * 60 * side), math.rad(side * -25)),
-					glow,
-					true
-				)
-			end
+		-- Four bendy legs a side: up and out at the knee, then down to the web.
+		for i = 1, 4 do
+			local z = (i - 2.5) * 0.2 * s
+			piece(
+				m,
+				"Leg",
+				Enum.PartType.Block,
+				Vector3.new(0.4, 0.08, 0.08) * s,
+				CFrame.new(side * 0.42 * s, 0.1 * s, z) * CFrame.Angles(0, 0, math.rad(side * 30)),
+				dark
+			)
+			piece(
+				m,
+				"Leg",
+				Enum.PartType.Block,
+				Vector3.new(0.45, 0.08, 0.08) * s,
+				CFrame.new(side * 0.71 * s, 0.005 * s, z)
+					* CFrame.Angles(0, 0, math.rad(side * -60)),
+				dark
+			)
 		end
 	end
-	-- A soft glowing bubble around every critter so it can be spotted in the webs.
+	-- A soft glowing bubble around every spider so it can be spotted in the webs.
 	local aura =
-		piece(m, "Aura", Enum.PartType.Ball, Vector3.one * (1.25 * s), CFrame.new(), glow, true)
+		piece(m, "Aura", Enum.PartType.Ball, Vector3.one * (1.25 * s), CFrame.new(), colour, true)
 	aura.Transparency = 0.82
 end
 
@@ -496,7 +443,7 @@ function WebScourUI.Mount(gui: ScreenGui)
 		hitbox.CanQuery = true -- the click ray looks for these
 		hitbox:SetAttribute("Offset", CFrame.new())
 		hitbox.Parent = m
-		buildLook(m, kind, size, glowColor)
+		buildLook(m, size, glowColor)
 		local parts: { BasePart } = {}
 		for _, d in m:GetDescendants() do
 			if d:IsA("BasePart") and d ~= hitbox then
@@ -566,7 +513,7 @@ function WebScourUI.Mount(gui: ScreenGui)
 			local t = now * 2 + critter.Phase
 			local bob = math.sin(t) * 0.25
 			local turn: CFrame
-			if (critter.Kind == "Ghost" or critter.Kind == "Bat") and camera then
+			if camera then -- face the player, with a little wiggle
 				local to = camera.CFrame.Position - critter.Base.Position
 				local yaw = math.atan2(-to.X, -to.Z) + math.pi
 				turn = CFrame.Angles(0, yaw + math.sin(t * 0.7) * 0.3, 0)

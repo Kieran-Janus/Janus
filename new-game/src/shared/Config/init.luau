@@ -74,6 +74,7 @@ local Config = {
 	Crates = require(script.Crates),
 	Skins = require(script.Skins.Settings),
 	Menu = require(script.Menu),
+	Dances = require(script.Dances),
 
 	Game = {
 		Name = "Pumpkin Panic", -- working title, see docs/DESIGN.md
@@ -576,9 +577,9 @@ local Config = {
 	]]
 	Hub = {
 		Name = "Spooky Town Square",
-		-- Bump this number (5 -> 6) whenever the hub code or these settings change in a way the
+		-- Bump this number (6 -> 7) whenever the hub code or these settings change in a way the
 		-- saved hub should pick up: a saved hub with a lower number is rebuilt on the next start.
-		BuildVersion = 5,
+		BuildVersion = 6,
 		Center = Vector3.new(0, 0, 0), -- top of the baseplate
 		Seed = 31, -- random variation in decorations (change it for a different scatter)
 		Radius = 105, -- cobblestone plaza (room for 32 players)
@@ -875,16 +876,8 @@ local Config = {
 		},
 		PhotoSpot = {
 			Sign = "Spooky Town Square",
-			-- Built-in Roblox emotes (the "/e wave" set: wave, point, dance, dance2, dance3, laugh, cheer).
-			Emotes = {
-				{ Label = "Wave", Emote = "wave" },
-				{ Label = "Cheer", Emote = "cheer" },
-				{ Label = "Dance", Emote = "dance" },
-				{ Label = "Dance 2", Emote = "dance2" },
-				{ Label = "Laugh", Emote = "laugh" },
-				{ Label = "Point", Emote = "point" },
-			},
-			CloseDistance = 18, -- the emote bar hides when you walk this far away
+			-- Its dance buttons are in Config.Dances (src/shared/Config/Dances.luau).
+			CloseDistance = 18, -- the dance bar hides (and dancing is refused) this far away
 		},
 	},
 

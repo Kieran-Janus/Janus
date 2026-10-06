@@ -14,6 +14,9 @@
 	        "TooFast" or "TooFar"
 	WebScourRules.ClockPoint(hour, radius) -> (right, up)
 	        where a clock hour (12 = top, 3 = right) is on a circle of that radius
+	WebScourRules.WebKnot(hour, distance, spokes, turn, rings, used) -> (spoke?, ring?)
+	        the free knot (a spoke crossing a ring) nearest that clock hour, `distance` out
+	        (0 = middle, 1 = edge); `used` holds the "spoke:ring" keys already taken
 	WebScourRules.FormatTime(seconds) -> string      "23.4s", "1:05.2"
 	WebScourRules.FormatWait(seconds) -> string      "45s", "2m 05s"
 ]]
@@ -98,6 +101,34 @@ end
 function WebScourRules.ClockPoint(hour: number, radius: number): (number, number)
 	local angle = (hour % 12) / 12 * math.pi * 2
 	return math.sin(angle) * radius, math.cos(angle) * radius
+end
+
+function WebScourRules.WebKnot(
+	hour: number,
+	distance: number,
+	spokes: number,
+	turn: number,
+	rings: { number },
+	used: { [string]: boolean }
+): (number?, number?)
+	local wantX, wantY = WebScourRules.ClockPoint(hour, distance)
+	local best, bestSpoke, bestRing = math.huge, nil, nil
+	for s = 1, spokes do
+		-- Spoke s points `angle` round from 12 o'clock, clockwise (like ClockPoint).
+		local angle = turn + (s - 1) / spokes * math.pi * 2
+		for r, fraction in rings do
+			if used[s .. ":" .. r] then
+				continue
+			end
+			local dx = math.sin(angle) * fraction - wantX
+			local dy = math.cos(angle) * fraction - wantY
+			local gap = dx * dx + dy * dy
+			if gap < best then
+				best, bestSpoke, bestRing = gap, s, r
+			end
+		end
+	end
+	return bestSpoke, bestRing
 end
 
 function WebScourRules.FormatTime(seconds: number): string

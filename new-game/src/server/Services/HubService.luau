@@ -44,6 +44,7 @@ local Kit = require(script.Parent.Parent.Build.Kit)
 local Hub = script.Parent.Parent.Hub
 local HubBuilder = require(Hub.HubBuilder)
 local HubPalette = require(Hub.HubPalette)
+local HubSolid = require(Hub.HubSolid)
 local Npcs = require(Hub.Npcs)
 
 local HubService = {}
@@ -352,6 +353,10 @@ local function prepare(hub: Model)
 		end,
 		function()
 			Kit.applyCustomProps(hub)
+		end,
+		function()
+			-- After the custom props, so your own models are made solid too.
+			HubSolid.Apply(hub)
 		end,
 		function()
 			HubBuilder.ApplyCustomNpcs(hub)

@@ -16,7 +16,7 @@ Want every pumpkin (or lantern, tree, gravestone...) to be **your** model, every
 
 Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See [Editing the lobby and maps by hand](#editing-the-lobby-and-maps-by-hand).
 
-Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Tags](#parts-that-do-something-tags)
+Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Tags](#parts-that-do-something-tags)
 
 ---
 
@@ -60,6 +60,9 @@ Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Mod
 | Parkour course, coins, times | `Config.Parkour` (`src/shared/Config/Parkour.luau`) |
 | Candy Rush | `src/shared/Config/CandyRush.luau` |
 | Web Scour | `src/shared/Config/WebScour.luau` |
+| Photo Spot dances | `Config.Dances` (`src/shared/Config/Dances.luau`, see "Photo Spot dances" below) |
+| Glowing floor signs in front of each lobby area | `Config.Lobby.FloorSigns` (`src/shared/Config/Lobby.luau`) |
+| What in the lobby is solid | `Config.Lobby.Solid` (`src/shared/Config/Lobby.luau`, see "A solid lobby" below) |
 | Secret pumpkins (Easter eggs) | `src/shared/Config/EasterEggs.luau` |
 | Sound effects (clicks, pickups, King footsteps, minions, rewards) | `Config.Sounds` (SoundId "" = silent) |
 | Hub music, King roar | `Config.Hub.Music`, `Config.King.Heard.RoarSoundId` |
@@ -373,9 +376,10 @@ Players stand on the Ready pad (the glowing rune circle in front of the spawn) t
 
 ## Parkour jumps
 The "Spooky Sky Climb" behind the clock tower. Settings: `src/shared/Config/Parkour.luau`.
-- **Coins and times:** `Reward.Coins` (100), `Reward.CooldownHours` (20), `MinSeconds` (15: a faster finish doesn't count). These work straight away, also in a saved lobby.
+- **The climb:** about 60 jumps in 8 themed stages (Pumpkin Hop, Broomstick Bridge, Graveyard Steps, Candy Sky, Bat Wings, Crypt Lids, Lantern Leap, Moonlight Summit), spiralling up round the parkour zone. It starts super easy and the top is only a little trickier (slightly smaller pieces, slightly longer gaps). Each stage starts at a checkpoint (7 in all), so a fall only costs you that stage: falling to the ground, onto a lower lap (`FallBelowCheckpoint` studs under your checkpoint), onto the START pad or into slime sends you back to your last checkpoint. "Go to start" in Menu > Parkour starts again from the bottom.
+- **Coins and times:** `Reward.Coins` (300), `Reward.CooldownHours` (20), `MinSeconds` (45: a faster finish doesn't count). These work straight away, also in a saved lobby.
 - **The course** is the `Course` list near the top: one line per piece, in climbing order. `Kind` is `Start`, `Pumpkin`, `Grave`, `Broom`, `Candy`, `Bat`, `Platform`, `Checkpoint`, `Finish` or `Hazard` (green slime). `Offset = Vector3.new(right, up, back)` is where the top of the piece is, in studs from the middle of the parkour zone, seen from the plaza. Optional: `Size`, `Rotation`, `Spicy = true` (a harder jump is allowed), `Label` (a checkpoint's stage name) and `Text` (words on a gravestone).
-- **Add a jump:** copy a line, paste it where it goes in the order and change its `Offset`. Keep `Start` first and `Finish` last. The Output window warns about any jump that is too far or too high for a normal player (limits in `Jumps`: 9 studs across and 5 up; 10 and 5.5 for a Spicy one).
+- **Add a jump:** copy a line, paste it where it goes in the order and change its `Offset`. Keep `Start` first and `Finish` last. The Output window warns about any jump that is too far or too high for a normal player (limits in `Jumps`: 9 studs across and 5 up; 10 and 5.5 for a Spicy one), and about any piece hanging too low over a jump (`Jumps.Headroom`, 12.5 studs: a jump goes about 7 studs up and a character is 5 tall, so on a spiral each lap must climb high enough). `lune run tests/run -- parkour` checks every jump too.
 - **See it:** F8 > Rebuild hub tries it in a playtest. To keep it, run `Bake.Hub()` in edit mode (or `Bake.Hub(true)` for a Locked lobby) or raise `Config.Hub.BuildVersion`.
 - **Or move pieces by hand** in a baked lobby (`Workspace.Hub.Parkour`): the game finds the working parts by tag, not by name or place. `ParkourStart` (start pad), `ParkourCheckpoint` with the attribute `Index` = 1, 2, 3 in climbing order, `ParkourFinish` (the trophy), `ParkourHazard` (slime), `ParkourBoard` (best times). The jumps in between are just parts: move, copy or delete them freely.
 - Or ask Claude Code: `/add-parkour-jump a spooky ghost platform after the second checkpoint`.
@@ -398,9 +402,36 @@ The candy stand on the west side of the lobby. Settings: `src/shared/Config/Cand
 The Spider Grove scavenger hunt. Settings: `src/shared/Config/WebScour.luau`.
 - **The game:** `Critters` (6 to find), `TimeLimit` (45 s), `MaxReach` (how close you must be to click one).
 - **Coins:** `CoinsPerCritter` (2), `FinishCoins` (20), `TimeBonusPerSecond` (0.5), `MaxCoins` (50), `RewardCooldown` (180 s between paid hunts, saved per player).
+- **The critters** are cute cartoon spiders, each a random bright colour from `CritterColors` (add, remove or change colours; the names are only labels).
+- **Where they hide:** every web lists its hiding spots as clock hours (`Grove.Webs[...].Spots`, 12 = top, 3 = right; halves like 1.5 work). Each spot snaps to the nearest knot where a ring thread crosses a spoke (`SpotDistance` = how far out), so every spider sits on a strand, never on the floor or a tree. 16 spots in all.
 - **Looks and words:** `Grove` (trees, webs, lantern, spider, colours), `Text`, `Sounds`.
-- **In Studio:** the lantern is the part tagged `WebScourStart` (your own lantern model works too: tag the Model). The hiding spots are invisible parts tagged `WebScourSpot`: move, copy or delete them. Delete the lantern and a new one is put back; the rest of the grove stays as you left it.
+- **In Studio:** the lantern is the part tagged `WebScourStart` (your own lantern model works too: tag the Model). The hiding spots are invisible parts tagged `WebScourSpot`: move, copy or delete them (keep them on a web). Delete the lantern and a new one is put back; the rest of the grove stays as you left it.
 - Test: F8 > "Web Scour: start".
+
+---
+
+## Photo Spot dances
+At the Photo Spot ("Strike a pose") a bar of spooky, silly dances opens: Zombie Shuffle, Skeleton Rattle, Ghost Float, Pumpkin Head Spin, Monster Mash, Bat Flap, Scaredy Cat Shiver, Witchy Cackle, Mummy Wobble and Spooky Floss. Everyone sees you dance; walking or jumping stops it. Settings: `src/shared/Config/Dances.luau` (on/off: `Config.Features.Dances`).
+- **Why not Roblox emotes or animations?** Roblox only plays animations owned by the game's creator, so these dances are made in code (`src/shared/DanceMoves.luau`): the server checks you're at the Photo Spot and sets the `Dance` attribute on your character, and every player's screen moves that character's joints. They work on R15 and R6 avatars.
+- **Change the buttons:** `List` (one line per dance; the order is the button order), `Label` = the words on the button, `StopLabel`, `Columns` (buttons per row).
+- **Use your own animation:** upload it to Roblox under the game's owner, then put its id in that dance's `AnimationId` (`"rbxassetid://123..."`). It plays instead of the code dance. `""` = the code dance.
+- **Tweak:** `Speed` (all code dances), `Cooldown` (seconds between changes), `MaxDrift` (studs you can drift before the dance stops). The Photo Spot itself is tagged `PhotoSpot`; dancing only starts within `Config.Hub.PhotoSpot.CloseDistance` of it.
+
+---
+
+## Floor signs
+A flat pad on the ground in front of each lobby area with big glowing words: READY? STEP IN!, PUMPKIN SHOP, MYSTERY CRATES, CANDY RUSH, WEB SCOUR, PARKOUR. Settings: `Config.Lobby.FloorSigns` (`src/shared/Config/Lobby.luau`).
+- **Words and colours:** each area's line in `Signs` (`Text`, `Color`). Size, glow, font and the pad colour are at the top of the block.
+- **Where:** by default a sign lies in front of its area (`Side = "Front"`, `Gap` studs out). Give it its own spot with `Offset` (studs from the middle of the lobby) and `LookAt` (where its words face), and its own `Width`.
+- **In Studio:** each pad is its own part named `<Area>FloorSign` (for example `ShopFloorSign`), tagged `FloorSign` with the attribute `Zone`. Move, turn or resize it freely in a baked lobby. A switched-off area's sign is taken out of the running game.
+
+---
+
+## A solid lobby
+When the game starts, every decoration you would expect to bump into or stand on is made solid: trees, lampposts, benches, gravestones, crates, barrels, hay, fences, statues, the cauldron, stalls, stands, rocks, big pumpkins, scarecrows, and your own models from `ReplicatedStorage.Custom.Props`. Settings: `Config.Lobby.Solid` (`src/shared/Config/Lobby.luau`; the code is `src/server/Hub/HubSolid.luau`).
+- **What stays walk-through:** tiny ground clutter (pieces under `MinSize` studs, or no higher than `StepHeight` above the ground: leaves, path stones, small candles), see-through pieces (`MaxTransparency`), the glowing floor signs, the working parts (pads, prompts, hitboxes), anything named in `KeepWalkThrough` and everything inside a Model named in `KeepAreas` (the Web Scour webs, the parkour course, mist, fireflies...).
+- **Your own models:** their parts become solid the same way. Roblox doesn't let scripts change `CollisionFidelity`, so for a MeshPart set it yourself in Studio (select the MeshPart > Properties > CollisionFidelity: `Hull` for round things, `Box` for boxy ones, `PreciseConvexDecomposition` if players must walk inside it).
+- **Something blocks a path?** Add its name to `KeepWalkThrough`, or switch the whole thing off with `On = false`.
 
 ---
 
@@ -434,7 +465,7 @@ The orange **Menu** button at the top left (key **M**) opens a grid of tiles. Se
 ---
 
 ## The hub
-`Config.Hub` controls the plaza size, colours, lighting, decorations, music and photo spot emotes. After changing it, try it with F8 > **Rebuild hub** (that playtest only). To make it stick, raise `Config.Hub.BuildVersion` by one: the next time the game starts, a saved hub with a lower number is rebuilt (unless it is Locked, see below).
+`Config.Hub` controls the plaza size, colours, lighting, decorations and music (the Photo Spot's dances are in `Config.Dances`). After changing it, try it with F8 > **Rebuild hub** (that playtest only). To make it stick, raise `Config.Hub.BuildVersion` by one: the next time the game starts, a saved hub with a lower number is rebuilt (unless it is Locked, see below).
 
 What's where (positions are studs from the middle: x = east/west, z = south/north):
 - `Spawn`: the round stone players appear on (south), and the spot they look at (`LookAt`).
@@ -510,7 +541,9 @@ The v2 features add their own tags:
 | `CandyRushPad` | A Candy Rush join pad | attribute `Lane` (1, 2, 3...) |
 | `CandyRushBoard` | The board candies pop up on | |
 | `WebScourStart` | The Web Scour lantern | |
-| `WebScourSpot` | A place a critter can hide | |
+| `WebScourSpot` | A place a spider can hide (keep it on a web strand) | |
+| `FloorSign` | A glowing sign on the ground in front of a lobby area (walk-through) | attribute `Zone` |
+| `PhotoSpot` | The Photo Spot: dances only start near it | |
 | `EasterEgg` | A secret pumpkin | attributes `EggId`, `Coins` |
 | `SeekerSpawn`, `HiderSpawn` | Hide & Seek start spots (maps) | |
 | `HidingDecoy` | A decoy pumpkin; hiders copy its look | |
@@ -541,7 +574,7 @@ Moved to its own section: [Swap every copy of something at once](#swap-every-cop
 | `Crates` | The Mystery Crates stand, next to the shop | (46, 6): east |
 | `CandyRush` | The Candy Rush stand | (-60, 0): west |
 | `WebScour` | The Spider Grove | (-38, -32): north-west |
-| `Parkour` | The Spooky Sky Climb (60 tall) | (0, -80): north, behind the clock tower |
+| `Parkour` | The Spooky Sky Climb (76 wide, 120 tall) | (0, -82): north, behind the clock tower |
 
 - `Offset = Vector3.new(x, 0, z)`: x = east (+) / west (-), z = south (+) / north (-). `Size` = width and depth.
 - Each zone faces the middle of the lobby, so its front points at the plaza.

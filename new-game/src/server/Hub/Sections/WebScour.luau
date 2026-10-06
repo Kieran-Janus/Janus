@@ -246,6 +246,10 @@ type Web = {
 	Frame: CFrame, -- at the web's middle; LookVector points away from the front
 	Radius: number,
 	Spots: { number },
+	Knots: { { Vector3 } }, -- Knots[ring][spoke]: where a ring thread crosses a spoke
+	Spokes: number,
+	Turn: number, -- how far spoke 1 is turned from 12 o'clock (radians, clockwise)
+	Rings: { number },
 }
 
 -- A giant web between two trees, facing `viewer` (a point in front of it).
@@ -321,7 +325,15 @@ local function buildWeb(
 			strand("GuyLine", tip, anchor, 0.11, m)
 		end
 	end
-	return { Frame = frame, Radius = radius, Spots = def.Spots }
+	return {
+		Frame = frame,
+		Radius = radius,
+		Spots = def.Spots,
+		Knots = ringPoints,
+		Spokes = spokes,
+		Turn = turn,
+		Rings = rings,
+	}
 end
 
 -- The thick branch the big web hangs from (between the web's two trees, above the web).
@@ -715,24 +727,27 @@ function WebScour.Build(hub: Model, zone: Zone): Model
 	buildLantern(frame, area)
 	buildFloor(frame, zone, trees, rng, area)
 
-	-- Hiding spots: on the webs at their clock hours, then on the ground.
+	-- Hiding spots: on each web's knots (where a ring thread crosses a spoke) nearest its clock
+	-- hours, so every critter sits on a strand, never on the ground or a tree.
 	local spots = Kit.model("HidingSpots", area)
 	local count = 0
 	for _, web in webs do
+		local used: { [string]: boolean } = {}
 		for _, hour in web.Spots do
-			local right, up = WebScourRules.ClockPoint(hour, web.Radius * grove.SpotDistance)
-			local f = web.Frame
-			local position = f.Position
-				+ f.RightVector * right
-				+ f.UpVector * up
-				- f.LookVector * 0.35
-			count += 1
-			spotPart(count, position, spots)
+			local spoke, ring = WebScourRules.WebKnot(
+				hour,
+				grove.SpotDistance,
+				web.Spokes,
+				web.Turn,
+				web.Rings,
+				used
+			)
+			if spoke and ring then
+				used[spoke .. ":" .. ring] = true
+				count += 1
+				spotPart(count, web.Knots[ring][spoke] - web.Frame.LookVector * 0.35, spots)
+			end
 		end
-	end
-	for _, offset in grove.GroundSpots do
-		count += 1
-		spotPart(count, frame.Point(offset), spots)
 	end
 
 	local mist = Kit.holder(

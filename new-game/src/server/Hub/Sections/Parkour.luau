@@ -107,6 +107,14 @@ local function glow(target: BasePart, color: Color3, range: number, brightness: 
 	end
 end
 
+-- The light of an ordinary piece (a jack-o-lantern, a grave candle, a candy, a sign lantern):
+-- only with Config.Parkour.Look.PieceLights (a long course would use too many for phones).
+local function pieceGlow(target: BasePart, color: Color3, range: number, brightness: number)
+	if look.PieceLights then
+		glow(target, color, range, brightness)
+	end
+end
+
 local function sparkles(target: BasePart, color: Color3, rate: number)
 	Kit.particles(target, {
 		Rate = rate,
@@ -222,7 +230,9 @@ builders.Pumpkin = function(top, size, _step, m, index)
 		true
 	)
 	local lit = index % 2 == 0 -- every other pumpkin is a glowing jack-o-lantern
-	local light: Kit.PropLight? = if lit and look.Lights
+	local light: Kit.PropLight? = if lit
+			and look.Lights
+			and look.PieceLights
 		then { Color = colors.Face, Range = 12, Brightness = 1.2, Flicker = false, Height = 0.5 }
 		else nil
 	Kit.look("ParkourPumpkin", lid, top * CFrame.new(0, -size.Y, 0), size.Y, function()
@@ -257,8 +267,10 @@ builders.Pumpkin = function(top, size, _step, m, index)
 		-- A jack-o-lantern faces the plaza.
 		if lit then
 			carveFace(center, size.X / 2 * 0.98, size.Y / 2, size.Z / 2 * 0.98, body)
-			local inside = Kit.holder("Glow", center, Vector3.one, body)
-			glow(inside, colors.Face, 12, 1.2)
+			if look.PieceLights then
+				local inside = Kit.holder("Glow", center, Vector3.one, body)
+				pieceGlow(inside, colors.Face, 12, 1.2)
+			end
 		end
 		body.PrimaryPart = core
 		return body
@@ -330,8 +342,8 @@ builders.Grave = function(top, size, step, m, index)
 		m,
 		Enum.Material.Grass
 	)
-	for r = 0, 2 do
-		local angle = math.rad(r * 120 + index * 17)
+	for r = 0, 1 do -- (few parts per piece: the course is long and phones count parts)
+		local angle = math.rad(r * 180 + index * 17)
 		decor({
 			Name = "Root",
 			Size = Vector3.new(0.3, 2.4, 0.3),
@@ -350,7 +362,7 @@ builders.Grave = function(top, size, step, m, index)
 			Color = colors.Slime,
 			Material = Enum.Material.Neon,
 		}, m)
-		glow(flame, colors.Slime, 10, 1)
+		pieceGlow(flame, colors.Slime, 10, 1)
 	end
 	return cap
 end
@@ -385,8 +397,8 @@ builders.Broom = function(top, size, _step, m, index)
 	bundleMesh.MeshType = Enum.MeshType.Sphere
 	bundleMesh.Parent = bristles
 	-- Loose straws fanning out of the end.
-	for i = 0, 5 do
-		local angle = (i / 6) * math.pi * 2 + index
+	for i = 0, 2 do
+		local angle = (i / 3) * math.pi * 2 + index
 		local spread = Vector3.new(math.cos(angle), math.sin(angle), 0)
 		local from = tail
 			* CFrame.new(spread.X * size.X * 0.45, spread.Y * size.Y * 0.4, bundle.Z * 0.35)
@@ -426,12 +438,12 @@ builders.Candy = function(top, size, _step, m, _index)
 	local candy =
 		disc("Disc", top * CFrame.new(0, -size.Y / 2, 0), diameter, size.Y, colors.Candy, m, true)
 	-- Peppermint swirl on top and a red stripe round the edge.
-	for i = 0, 5 do
+	for i = 0, 3 do
 		decor({
 			Name = "Swirl",
 			Size = Vector3.new(diameter * 0.16, 0.06, diameter * 0.44),
 			CFrame = top
-				* CFrame.Angles(0, math.rad(i * 60), 0)
+				* CFrame.Angles(0, math.rad(i * 90), 0)
 				* CFrame.new(0, 0.02, -diameter * 0.24)
 				* CFrame.Angles(0, math.rad(18), 0),
 			Color = colors.CandyStripe,
@@ -466,8 +478,10 @@ builders.Candy = function(top, size, _step, m, _index)
 			}, m)
 		end
 	end
-	local under = Kit.holder("Glow", top * CFrame.new(0, -size.Y - 1, 0), Vector3.one, m)
-	glow(under, colors.Wrapper, 10, 0.8)
+	if look.PieceLights then
+		local under = Kit.holder("Glow", top * CFrame.new(0, -size.Y - 1, 0), Vector3.one, m)
+		pieceGlow(under, colors.Wrapper, 10, 0.8)
+	end
 	return candy
 end
 
@@ -498,9 +512,9 @@ builders.Bat = function(top, size, _step, m, _index)
 		}, m)
 		-- Wing bones fanning out from the shoulders (flat on top, only for looks).
 		local shoulder = Vector3.new(side * 1.3, 0.04, size.Z / 2 - 1)
-		for b = 0, 2 do
+		for b = 0, 1 do
 			local tip =
-				Vector3.new(side * (size.X / 2 - 0.3) * (0.45 + b * 0.27), 0.04, -size.Z / 2 + 0.3)
+				Vector3.new(side * (size.X / 2 - 0.3) * (0.5 + b * 0.4), 0.04, -size.Z / 2 + 0.3)
 			local a = (top * CFrame.new(shoulder)).Position
 			local c = (top * CFrame.new(tip)).Position
 			decor({
@@ -511,7 +525,7 @@ builders.Bat = function(top, size, _step, m, _index)
 			}, m)
 		end
 		-- Scalloped back edge.
-		for s = 0, 1 do
+		for s = 0, 0 do
 			decor({
 				Name = "Scallop",
 				Shape = Enum.PartType.Cylinder,
@@ -696,7 +710,7 @@ local function signpost(base: CFrame, facing: Vector3, title: string, text: stri
 		Color = colors.Face,
 		Material = Enum.Material.Neon,
 	}, m)
-	glow(lantern, colors.Face, 14, 1)
+	pieceGlow(lantern, colors.Face, 14, 1)
 end
 
 -- The flat direction (world) from step i to the piece you jump on next (dir = 1) or before

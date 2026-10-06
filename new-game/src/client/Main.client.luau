@@ -26,6 +26,7 @@ local ORDER = {
 	"ResultsUI",
 	"GhostUI",
 	"NpcDialogUI",
+	"Dances", -- Photo Spot dances on every character
 	"MinionFeedback",
 	"ShopUI",
 	"VipUI",

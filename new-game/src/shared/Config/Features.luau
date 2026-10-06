@@ -19,6 +19,7 @@ return {
 	Parkour = true, -- the parkour course in the lobby
 	CandyRush = true, -- lobby minigame: click your candies, first to clear them all wins
 	WebScour = true, -- lobby minigame: a quick scavenger hunt in the spider webs
+	Dances = true, -- spooky code-made dances at the lobby Photo Spot (off = the bar shows nothing)
 	EasterEggs = true, -- hidden pumpkins around the lobby that give coins once each
 	Crates = true, -- crates bought with coins that give a random skin
 	RobuxCrates = true, -- crates can also be bought with Robux (needs Crates on too)

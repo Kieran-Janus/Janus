@@ -222,10 +222,10 @@ describe("Lobby", function()
 		expect(Lobby.InZone(Vector3.new(12, 1, 48), "ReadyArea", 2)).toBe(true) -- margin
 		expect(Lobby.InZone(Vector3.new(0, 1, 58), "ReadyArea")).toBe(false)
 		expect(Lobby.InZone(Vector3.new(0, 200, 48), "ReadyArea")).toBe(true) -- no Height
-		-- Parkour has a Height of 60.
+		-- Parkour has a Height of 120.
 		expect(Lobby.InZone(Vector3.new(0, 30, -80), "Parkour")).toBe(true)
-		expect(Lobby.InZone(Vector3.new(0, 70, -80), "Parkour")).toBe(false)
-		expect(Lobby.ZoneSize("Parkour")).toBeNear(Vector3.new(60, 60, 44))
+		expect(Lobby.InZone(Vector3.new(0, 130, -80), "Parkour")).toBe(false)
+		expect(Lobby.ZoneSize("Parkour")).toBeNear(Vector3.new(76, 120, 48))
 		expect(Lobby.ZoneSize("Shop")).toBeNear(Vector3.new(22, 0, 18))
 		expect(function()
 			Lobby.ZoneCFrame("NoSuchZone")

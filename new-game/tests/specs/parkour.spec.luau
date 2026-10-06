@@ -39,12 +39,25 @@ describe("Config.Parkour.Course", function()
 		end
 	end)
 
-	it("starts at the Start, ends at the Finish, with checkpoints 1, 2, 3 in between", function()
+	it("starts at the Start, ends at the Finish, with a checkpoint every 6-8 jumps", function()
 		local jumps = {}
 		local checkpoints = 0
+		local since = 0 -- jumps since the start or the last checkpoint
 		for _, step in course do
-			if step.Kind ~= "Hazard" then
-				table.insert(jumps, step)
+			if step.Kind == "Hazard" then
+				continue
+			end
+			table.insert(jumps, step)
+			if #jumps > 1 then
+				since += 1
+			end
+			if step.Kind == "Checkpoint" or step.Kind == "Finish" then
+				if since < 6 or since > 8 then
+					error(
+						("%d jumps before checkpoint %d (want 6-8)"):format(since, checkpoints + 1)
+					)
+				end
+				since = 0
 			end
 			if step.Kind == "Checkpoint" then
 				checkpoints += 1
@@ -52,13 +65,13 @@ describe("Config.Parkour.Course", function()
 		end
 		expect(jumps[1].Kind).toBe("Start")
 		expect(jumps[#jumps].Kind).toBe("Finish")
-		expect(checkpoints).toBe(3)
+		expect(checkpoints).toBe(7) -- 8 stages: each one after the first starts at a checkpoint
 	end)
 
-	it("has 20-28 jumps, each one doable (a few spicy ones)", function()
+	it("has about 60 jumps, each one doable and easy (no spicy ones)", function()
 		local rules = Config.Parkour.Jumps
 		local previous: number? = nil
-		local jumps, spicy = 0, 0
+		local jumps, spicy, hardest = 0, 0, 0
 		for i, step in course do
 			if step.Kind == "Hazard" then
 				continue
@@ -93,13 +106,21 @@ describe("Config.Parkour.Course", function()
 					)
 				end
 				expect(gap).toBeGreaterThanOrEqual(rules.MinGap)
+				hardest = math.max(hardest, gap / Logic.Reach(rise))
 			end
 			previous = i
 		end
-		T.note(("%d jumps, %d spicy"):format(jumps, spicy))
-		expect(jumps).toBeGreaterThanOrEqual(20)
-		expect(jumps).toBeLessThanOrEqual(28)
-		expect(spicy).toBeLessThanOrEqual(3)
+		T.note(
+			("%d jumps, %d spicy, the hardest needs %d%% of a jump"):format(
+				jumps,
+				spicy,
+				hardest * 100
+			)
+		)
+		expect(jumps).toBeGreaterThanOrEqual(55)
+		expect(jumps).toBeLessThanOrEqual(65)
+		expect(spicy).toBe(0)
+		expect(hardest).toBeLessThanOrEqual(0.7) -- still easy at the top
 	end)
 
 	it("passes every check and fits in the parkour zone", function()
@@ -123,6 +144,19 @@ describe("Config.Parkour.Course", function()
 		local unknown = table.clone(course)
 		unknown[3] = { Kind = "Trampoline", Offset = Vector3.zero }
 		expect(table.concat(Logic.Check(unknown), " ")).toMatch("unknown Kind")
+		-- A gravestone hanging just over a jump: players would bump their heads mid-jump.
+		local low = { Kind = "Start", Offset = Vector3.new(0, 1, 0) }
+		local lowCourse = {
+			low,
+			{ Kind = "Platform", Offset = Vector3.new(0, 2, 9) },
+			{ Kind = "Grave", Offset = Vector3.new(0, 14, 5), Size = Vector3.new(4, 7.5, 3) },
+			{ Kind = "Checkpoint", Offset = Vector3.new(0, 3, 20) },
+			{ Kind = "Finish", Offset = Vector3.new(0, 4, 30) },
+		}
+		expect(table.concat(Logic.Check(lowCourse), " ")).toMatch("hangs too low")
+		lowCourse[3] = table.clone(lowCourse[3])
+		lowCourse[3].Offset = Vector3.new(0, 2 + 7.5 + Config.Parkour.Jumps.Headroom + 0.5, 5)
+		expect(table.concat(Logic.Check(lowCourse), " ")).never.toMatch("hangs too low")
 	end)
 end)
 
@@ -265,9 +299,9 @@ describe("The parkour section", function()
 		expect(#tagged(Tags.ParkourFinish, area)).toBe(1)
 		expect(#tagged(Tags.ParkourBoard, area)).toBe(1)
 		expect(#tagged(Tags.ParkourHazard, area)).toBeGreaterThanOrEqual(1)
-		-- Checkpoints numbered 1, 2, 3 in course order (and at the course positions).
+		-- Checkpoints numbered 1, 2, 3... in course order (and at the course positions).
 		local checkpoints = tagged(Tags.ParkourCheckpoint, area)
-		expect(#checkpoints).toBe(3)
+		expect(#checkpoints).toBe(7)
 		local n = 0
 		for i, step in course do
 			if step.Kind == "Checkpoint" then
@@ -326,6 +360,13 @@ describe("ParkourService", function()
 	local AdminService = rt:require(services .. "AdminService")
 	local Parkour = rt:require(services .. "ParkourService")
 	local cfg = Config.Parkour
+	-- How many checkpoints the course has (7: one at the start of each stage after the first).
+	local CHECKPOINTS = 0
+	for _, step in cfg.Course do
+		if step.Kind == "Checkpoint" then
+			CHECKPOINTS += 1
+		end
+	end
 	local player: any = nil
 
 	local function first(tag: string): any
@@ -347,10 +388,13 @@ describe("ParkourService", function()
 	local function root(): any
 		return player.Character.HumanoidRootPart
 	end
-	-- Moves the character to `target` a few studs per check, like walking and jumping.
+	-- Moves the character to `target` a few studs per check, like walking and jumping (and never
+	-- climbing faster than a person can: the course is 90 studs tall).
 	local function travel(target: any)
 		local from = root().Position
-		local steps = math.max(1, math.ceil((target - from).Magnitude / 2.5))
+		local d = target - from
+		local flat = Vector3.new(d.X, 0, d.Z).Magnitude
+		local steps = math.max(1, math.ceil(flat / 2.5), math.ceil(math.abs(d.Y) / 1.2))
 		for s = 1, steps do
 			player.Character:PivotTo(CFrame.new(from:Lerp(target, s / steps)))
 			rt:advance(cfg.CheckSeconds)
@@ -389,7 +433,7 @@ describe("ParkourService", function()
 		rt:advance(1)
 		expect(player:GetAttribute("DataReady")).toBe(true)
 		expect(player:GetAttribute("ParkourBest")).toBe(0)
-		expect(ReplicatedStorage:GetAttribute("ParkourCheckpoints")).toBe(3)
+		expect(ReplicatedStorage:GetAttribute("ParkourCheckpoints")).toBe(CHECKPOINTS)
 	end)
 
 	it("tells you to use the start pad when you climb on without it", function()
@@ -430,7 +474,7 @@ describe("ParkourService", function()
 		local cp = events("Checkpoint")
 		expect(#cp).toBe(1)
 		expect(cp[1].Index).toBe(1)
-		expect(cp[1].Count).toBe(3)
+		expect(cp[1].Count).toBe(CHECKPOINTS)
 	end)
 
 	it("sends you back to your checkpoint when you fall or touch slime", function()
@@ -457,13 +501,36 @@ describe("ParkourService", function()
 		expect(back[2].Reason).toBe("Hazard")
 		expect((root().Position - spotOn(pad)).Magnitude).toBeLessThan(1)
 		expect(player:GetAttribute("ParkourReached")).toBe(1)
+		-- Landing on a lower loop of the spiral (well under your checkpoint, still high above
+		-- the ground) is a fall too.
+		rt:advance(cfg.TeleportGraceSeconds)
+		local lower = spotOn(pad) - Vector3.new(0, cfg.FallBelowCheckpoint + 2, 0)
+		player.Character:PivotTo(CFrame.new(lower))
+		rt:advance(0.3)
+		back = events("Back")
+		expect(#back).toBe(3)
+		expect(back[3].Reason).toBe("Fall")
+		expect((root().Position - spotOn(pad)).Magnitude).toBeLessThan(1)
+		-- Falling onto the start pad (it sits under the course) is a fall too, not a restart.
+		rt:advance(cfg.TeleportGraceSeconds)
+		local start = spotOn(first(Tags.ParkourStart))
+		travel(Vector3.new(start.X, spotOn(pad).Y, start.Z)) -- over the start pad...
+		player.Character:PivotTo(CFrame.new(start)) -- ...and a quick drop onto it
+		rt:advance(0.3)
+		back = events("Back")
+		expect(#back).toBe(4)
+		expect(back[4].Reason).toBe("Fall")
+		expect((root().Position - spotOn(pad)).Magnitude).toBeLessThan(1)
+		expect(player:GetAttribute("ParkourRun")).toBe("Running")
+		expect(player:GetAttribute("ParkourReached")).toBe(1)
 	end)
 
 	it("doesn't count a finish that is too fast", function()
 		rt:advance(cfg.TeleportGraceSeconds)
-		travel(spotOn(checkpoint(2)))
-		travel(spotOn(checkpoint(3)))
-		expect(player:GetAttribute("ParkourReached")).toBe(3)
+		for index = 2, CHECKPOINTS do
+			travel(spotOn(checkpoint(index)))
+		end
+		expect(player:GetAttribute("ParkourReached")).toBe(CHECKPOINTS)
 		local coins = DataService.Get(player).Coins
 		local minSeconds = cfg.MinSeconds
 		cfg.MinSeconds = 1000 -- (so this run surely counts as too fast)
@@ -491,7 +558,7 @@ describe("ParkourService", function()
 		travel(spotOn(first(Tags.ParkourStart)))
 		travel(spotOn(rt.workspace.Hub.Parkour.Course.Step02_Pumpkin.PrimaryPart))
 		rt:advance(cfg.MinSeconds)
-		for index = 1, 3 do
+		for index = 1, CHECKPOINTS do
 			travel(spotOn(checkpoint(index)))
 		end
 		travel(spotOn(first(Tags.ParkourFinish)))
@@ -514,7 +581,7 @@ describe("ParkourService", function()
 		travel(spotOn(first(Tags.ParkourStart)))
 		travel(spotOn(rt.workspace.Hub.Parkour.Course.Step02_Pumpkin.PrimaryPart))
 		rt:advance(cfg.MinSeconds + 5)
-		for index = 1, 3 do
+		for index = 1, CHECKPOINTS do
 			travel(spotOn(checkpoint(index)))
 		end
 		travel(spotOn(first(Tags.ParkourFinish)))
@@ -651,7 +718,7 @@ describe("ParkourService on a saved hub without a course", function()
 			error(err)
 		end
 		expect(#CollectionService:GetTagged(Tags.ParkourStart)).toBe(1)
-		expect(#CollectionService:GetTagged(Tags.ParkourCheckpoint)).toBe(3)
+		expect(#CollectionService:GetTagged(Tags.ParkourCheckpoint)).toBe(7)
 		expect(#rt.workspace.Hub:GetChildren()).toBeGreaterThan(3)
 	end)
 end)

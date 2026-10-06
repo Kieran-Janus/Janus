@@ -3,8 +3,13 @@
 	PARKOUR COURSE: "Spooky Sky Climb" (Config.Parkour)
 
 	The climb behind the clock tower (on/off: Config.Features.Parkour; its area is
-	Config.Lobby.Zones.Parkour). Stand on the START pad, jump up the pieces, touch the 3
-	checkpoints in order and reach the glowing trophy pumpkin at the top. The timer starts
+	Config.Lobby.Zones.Parkour). Stand on the START pad and climb about 60 jumps in 8 stages,
+	spiralling up round the area: Pumpkin Hop, Broomstick Bridge, Graveyard Steps, Candy Sky, Bat
+	Wings, Crypt Lids, Lantern Leap and Moonlight Summit. Each stage starts at a checkpoint (one every
+	6-8 jumps), so a fall only costs you that stage. Touch the checkpoints in order and reach the
+	glowing trophy pumpkin at the top. It starts super easy and gets only a little trickier near the
+	top (slightly smaller pieces, slightly longer gaps): the hardest jump needs about 60% of a
+	normal jump. The timer starts
 	when you leave the start pad. Fall to the ground (or touch green slime) and you go back
 	to your last checkpoint. Finishing gives coins once every Reward.CooldownHours.
 
@@ -37,8 +42,11 @@
 	  Spicy     (optional) true = a harder jump is allowed here (Jumps.SpicyMaxGap)
 	  Label     (optional, Checkpoint) the name of the stage that starts here, on its sign
 	  Text      (optional, Grave) what is written on the gravestone
-	Checkpoints are numbered 1, 2, 3 in the order they appear. Keep the Start first and the
-	Finish last. The zone is 60 wide (right -30 to 30), 44 deep (back -22 to 22), 60 high.
+	Checkpoints are numbered 1, 2, 3... in the order they appear. Keep the Start first and the
+	Finish last. The zone is 76 wide (right -38 to 38), 48 deep (back -24 to 24), 120 high.
+	The course below was laid out on an oval (28 studs to each side, 17 forward and back) by a
+	one-off script, then checked with ParkourLogic.Check (tests/specs/parkour.spec.luau): every
+	jump is easy, and each lap climbs high enough that nothing hangs over your head (Headroom).
 ]]
 type Step = { -- (what one line may contain; leave this as it is)
 	Kind: string,
@@ -52,34 +60,77 @@ type Step = { -- (what one line may contain; leave this as it is)
 
 -- stylua: ignore
 local Course: { Step } = {
-	-- Stage 1: Pumpkin Hop (up the left side)
-	{ Kind = "Start", Offset = Vector3.new(-20, 1.5, -15) },
-	{ Kind = "Pumpkin", Offset = Vector3.new(-15, 3.5, -5.5) },
-	{ Kind = "Pumpkin", Offset = Vector3.new(-25, 5.5, -2), Size = Vector3.new(7, 4.5, 7) },
-	{ Kind = "Pumpkin", Offset = Vector3.new(-15.5, 7, 2.5) },
-	{ Kind = "Pumpkin", Offset = Vector3.new(-25, 8.5, 6.5), Size = Vector3.new(7, 4.5, 7) },
-	{ Kind = "Pumpkin", Offset = Vector3.new(-14, 10.5, 10.5), Size = Vector3.new(9, 5.5, 9) },
-	{ Kind = "Checkpoint", Offset = Vector3.new(-24.5, 12.5, 16.5), Label = "Broomstick Bridge" },
-	-- Stage 2: Broomstick Bridge (across the back; turned about -90 so the handles point right,
-	-- tipped up 6 degrees so each broom climbs a little)
-	{ Kind = "Broom", Offset = Vector3.new(-12.25, 14.5, 16.5), Rotation = Vector3.new(6, -86, 0) },
-	{ Kind = "Broom", Offset = Vector3.new(0, 17, 16.5), Rotation = Vector3.new(6, -95, 0) },
-	{ Kind = "Broom", Offset = Vector3.new(12.25, 19.5, 16.5), Rotation = Vector3.new(6, -88, 0) },
-	{ Kind = "Checkpoint", Offset = Vector3.new(24.5, 22, 16.5), Label = "Graveyard Steps" },
-	-- Stage 3: Graveyard Steps (down the right side), with a slimy crypt lid to jump across
-	{ Kind = "Grave", Offset = Vector3.new(16, 24, 9.5), Rotation = Vector3.new(0, 8, 4), Text = "RIP\nSlow Pokey" },
-	{ Kind = "Grave", Offset = Vector3.new(26, 26, 3.5), Rotation = Vector3.new(0, -6, -4), Text = "BOO!" },
-	{ Kind = "Platform", Offset = Vector3.new(16, 27, -5.5), Size = Vector3.new(5, 1.5, 11), Spicy = true },
-	{ Kind = "Hazard", Offset = Vector3.new(16, 27, -5.5), Size = Vector3.new(5, 0.4, 3) },
-	{ Kind = "Grave", Offset = Vector3.new(25.5, 29, -14), Rotation = Vector3.new(0, 5, 3), Text = "Here lies\nMr. Bones" },
-	{ Kind = "Checkpoint", Offset = Vector3.new(15, 31.5, -17), Label = "Candy Sky" },
-	-- Stage 4: Candy Sky (up to the trophy)
-	{ Kind = "Candy", Offset = Vector3.new(4.5, 33.5, -11.5) },
-	{ Kind = "Bat", Offset = Vector3.new(-8, 35.5, -15.5) },
-	{ Kind = "Candy", Offset = Vector3.new(-20, 37.5, -11) },
-	{ Kind = "Bat", Offset = Vector3.new(-21, 39.5, 1), Rotation = 90 },
-	{ Kind = "Candy", Offset = Vector3.new(-11, 42.5, 8), Size = Vector3.new(5.5, 1.4, 5.5), Spicy = true },
-	{ Kind = "Finish", Offset = Vector3.new(-22, 45.5, 14) },
+	-- Stage 1: Pumpkin Hop
+	{ Kind = "Start", Offset = Vector3.new(-9.6, 1.5, -16) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(1.2, 3.2, -17), Size = Vector3.new(8.6, 5, 8.6) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(10, 5.1, -15.9), Size = Vector3.new(8.6, 5, 8.6) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(18.5, 7, -12.7), Size = Vector3.new(8.5, 5, 8.5) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(25.5, 8.4, -7.1), Size = Vector3.new(8.5, 5, 8.5) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(27.9, 10.1, 1.7), Size = Vector3.new(8.5, 5, 8.5) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(23.1, 12.1, 9.6), Size = Vector3.new(8.5, 5, 8.5) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(15.2, 13.7, 14.3), Size = Vector3.new(8.4, 5, 8.4) },
+	-- Stage 2: Broomstick Bridge
+	{ Kind = "Checkpoint", Offset = Vector3.new(5.4, 14.9, 16.7), Label = "Broomstick Bridge" },
+	{ Kind = "Broom", Offset = Vector3.new(-7.3, 16.7, 16.4), Size = Vector3.new(5, 3, 11), Rotation = 99 },
+	{ Kind = "Broom", Offset = Vector3.new(-20.7, 18.7, 11.4), Size = Vector3.new(5, 3, 11), Rotation = 124 },
+	{ Kind = "Broom", Offset = Vector3.new(-28, 20.5, -0.1), Size = Vector3.new(5, 3, 11), Rotation = -179 },
+	{ Kind = "Broom", Offset = Vector3.new(-20.5, 21.9, -11.6), Size = Vector3.new(5, 3, 11), Rotation = -123 },
+	{ Kind = "Broom", Offset = Vector3.new(-7.1, 23.8, -16.4), Size = Vector3.new(5, 3, 11), Rotation = -99 },
+	{ Kind = "Broom", Offset = Vector3.new(7.4, 25.7, -16.4), Size = Vector3.new(5, 3, 11), Rotation = -81 },
+	-- Stage 3: Graveyard Steps
+	{ Kind = "Checkpoint", Offset = Vector3.new(19.3, 26.9, -12.3), Label = "Graveyard Steps" },
+	{ Kind = "Grave", Offset = Vector3.new(27.1, 30.1, -4.2), Size = Vector3.new(6.7, 5.5, 4.8), Rotation = 67, Text = "RIP\nSlow Pokey" },
+	{ Kind = "Grave", Offset = Vector3.new(25.6, 31.9, 6.9), Size = Vector3.new(6.7, 5.5, 4.8), Rotation = 126, Text = "BOO!" },
+	{ Kind = "Grave", Offset = Vector3.new(17.6, 33.9, 13.2), Size = Vector3.new(6.7, 5.5, 4.8), Rotation = 154, Text = "Here lies\nMr. Bones" },
+	{ Kind = "Platform", Offset = Vector3.new(5.3, 35.3, 16.7), Size = Vector3.new(12, 1.5, 5), Rotation = 173 },
+	{ Kind = "Hazard", Offset = Vector3.new(5.3, 35.3, 16.7), Size = Vector3.new(3, 0.4, 5), Rotation = 173 },
+	{ Kind = "Grave", Offset = Vector3.new(-7.7, 37.3, 16.3), Size = Vector3.new(6.7, 5.5, 4.8), Rotation = -170, Text = "Gone\nbatty" },
+	{ Kind = "Grave", Offset = Vector3.new(-17.7, 39.3, 13.2), Size = Vector3.new(6.7, 5.5, 4.8), Rotation = -154, Text = "Back\nsoon" },
+	-- Stage 4: Candy Sky
+	{ Kind = "Checkpoint", Offset = Vector3.new(-25.8, 40.5, 6.6), Label = "Candy Sky" },
+	{ Kind = "Candy", Offset = Vector3.new(-26.7, 42.4, -5.2), Size = Vector3.new(7, 1.4, 7) },
+	{ Kind = "Candy", Offset = Vector3.new(-19, 44.4, -12.5), Size = Vector3.new(7, 1.4, 7) },
+	{ Kind = "Candy", Offset = Vector3.new(-9, 46.3, -16.1), Size = Vector3.new(6.9, 1.4, 6.9) },
+	{ Kind = "Candy", Offset = Vector3.new(1.6, 47.7, -17), Size = Vector3.new(6.9, 1.4, 6.9) },
+	{ Kind = "Candy", Offset = Vector3.new(12.3, 49.5, -15.3), Size = Vector3.new(6.9, 1.4, 6.9) },
+	{ Kind = "Candy", Offset = Vector3.new(21.8, 51.4, -10.7), Size = Vector3.new(6.9, 1.4, 6.9) },
+	{ Kind = "Candy", Offset = Vector3.new(27.8, 53.3, -1.9), Size = Vector3.new(6.8, 1.4, 6.8) },
+	-- Stage 5: Bat Wings
+	{ Kind = "Checkpoint", Offset = Vector3.new(24.7, 54.5, 8), Label = "Bat Wings" },
+	{ Kind = "Bat", Offset = Vector3.new(13.6, 56.5, 14.8), Size = Vector3.new(9.2, 1.2, 4.7), Rotation = 161 },
+	{ Kind = "Bat", Offset = Vector3.new(0.4, 58.5, 17), Size = Vector3.new(9.2, 1.2, 4.7), Rotation = 180 },
+	{ Kind = "Bat", Offset = Vector3.new(-12.9, 60.4, 15.1), Size = Vector3.new(9.2, 1.2, 4.7), Rotation = -163 },
+	{ Kind = "Bat", Offset = Vector3.new(-24.7, 61.8, 8), Size = Vector3.new(9.2, 1.2, 4.7), Rotation = -131 },
+	{ Kind = "Bat", Offset = Vector3.new(-26.9, 63.8, -4.8), Size = Vector3.new(9.1, 1.2, 4.7), Rotation = -64 },
+	{ Kind = "Bat", Offset = Vector3.new(-16.4, 65.8, -13.8), Size = Vector3.new(9.1, 1.2, 4.6), Rotation = -24 },
+	-- Stage 6: Crypt Lids
+	{ Kind = "Checkpoint", Offset = Vector3.new(-5.2, 67, -16.7), Label = "Crypt Lids" },
+	{ Kind = "Platform", Offset = Vector3.new(7.6, 69.1, -16.4), Size = Vector3.new(8.4, 1.5, 4.7), Rotation = 10 },
+	{ Kind = "Platform", Offset = Vector3.new(20, 71, -11.9), Size = Vector3.new(8.4, 1.5, 4.7), Rotation = 32 },
+	{ Kind = "Platform", Offset = Vector3.new(28, 73, -1), Size = Vector3.new(12, 1.5, 5), Rotation = 85 },
+	{ Kind = "Hazard", Offset = Vector3.new(28, 73, -1), Size = Vector3.new(3, 0.4, 5), Rotation = 85 },
+	{ Kind = "Platform", Offset = Vector3.new(21.6, 74.4, 10.8), Size = Vector3.new(8.3, 1.5, 4.7), Rotation = 144 },
+	{ Kind = "Platform", Offset = Vector3.new(9.7, 76.5, 16), Size = Vector3.new(8.3, 1.5, 4.7), Rotation = 167 },
+	{ Kind = "Platform", Offset = Vector3.new(-3.3, 78.6, 16.9), Size = Vector3.new(8.3, 1.5, 4.6), Rotation = -176 },
+	-- Stage 7: Lantern Leap
+	{ Kind = "Checkpoint", Offset = Vector3.new(-14.2, 79.8, 14.7), Label = "Lantern Leap" },
+	{ Kind = "Pumpkin", Offset = Vector3.new(-24.4, 81.7, 8.3), Size = Vector3.new(7.4, 5, 7.4) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(-27.9, 83.8, -1.2), Size = Vector3.new(7.4, 5, 7.4) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(-22.4, 85.9, -10.2), Size = Vector3.new(7.4, 5, 7.4) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(-13.4, 87.3, -14.9), Size = Vector3.new(7.3, 5, 7.3) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(-3.4, 89.3, -16.9), Size = Vector3.new(7.3, 5, 7.3) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(7, 91.3, -16.5), Size = Vector3.new(7.3, 5, 7.3) },
+	{ Kind = "Pumpkin", Offset = Vector3.new(16.9, 93.4, -13.6), Size = Vector3.new(7.2, 5, 7.2) },
+	-- Stage 8: Moonlight Summit
+	{ Kind = "Checkpoint", Offset = Vector3.new(24.7, 94.6, -8), Label = "Moonlight Summit" },
+	{ Kind = "Candy", Offset = Vector3.new(27.1, 96.6, 4.3), Size = Vector3.new(6.2, 1.4, 6.2) },
+	{ Kind = "Bat", Offset = Vector3.new(17.9, 98.8, 13.1), Size = Vector3.new(8.7, 1.2, 4.5), Rotation = 153 },
+	{ Kind = "Candy", Offset = Vector3.new(5.9, 100.8, 16.6), Size = Vector3.new(6.1, 1.4, 6.1) },
+	{ Kind = "Platform", Offset = Vector3.new(-8.3, 102.2, 16.2), Size = Vector3.new(12, 1.5, 5), Rotation = -169 },
+	{ Kind = "Hazard", Offset = Vector3.new(-8.3, 102.2, 16.2), Size = Vector3.new(3, 0.4, 5), Rotation = -169 },
+	{ Kind = "Bat", Offset = Vector3.new(-22.9, 104.4, 9.7), Size = Vector3.new(8.6, 1.2, 4.4), Rotation = -139 },
+	{ Kind = "Candy", Offset = Vector3.new(-27.7, 106.4, -2.3), Size = Vector3.new(6.1, 1.4, 6.1) },
+	{ Kind = "Finish", Offset = Vector3.new(-19.3, 107.4, -12.3) },
 }
 
 return {
@@ -87,15 +138,18 @@ return {
 
 	-- Coins for reaching the top.
 	Reward = {
-		Coins = 100, -- coins for reaching the finish...
+		Coins = 300, -- coins for reaching the finish (a long climb: about 60 jumps)...
 		CooldownHours = 20, -- ...at most once per this many hours (saved per player)
 	},
 
 	-- Rules the server checks (it never trusts the player's computer about these).
-	MinSeconds = 15, -- a finish faster than this doesn't count (stops cheaters who teleport)
-	MaxRunSeconds = 900, -- a run still going after this long stops by itself (15 minutes)
+	MinSeconds = 45, -- a finish faster than this doesn't count (stops cheaters who teleport)
+	MaxRunSeconds = 1800, -- a run still going after this long stops by itself (30 minutes)
 	CheckSeconds = 0.1, -- how often the server looks where every climber is
 	FallMargin = 1, -- studs below the lowest pad (start, checkpoints) that count as "fell"
+	-- studs below your last checkpoint that count as "fell" too (the course spirals up, so a
+	-- fall usually lands on a lower loop instead of the ground: you go back to the checkpoint)
+	FallBelowCheckpoint = 6,
 	FallGraceSeconds = 1.5, -- stepping off the start pad onto the ground this soon just stops the run
 	TouchMargin = 1, -- studs past a pad's edge that still count as standing on it
 	TouchHeight = 6, -- studs above a pad's top that still count (landing from a jump is fine)
@@ -124,8 +178,10 @@ return {
 		Safety = 0.85, -- normal jumps use at most this share of the longest possible jump
 		SpicySafety = 0.97, -- ...and spicy ones this share
 		MinGap = -0.5, -- pieces may touch, but not overlap more than this
-		Headroom = 10, -- studs kept between a piece and one hanging right above it
-		HeadroomMargin = 1, -- extra studs around pieces for the head-room check
+		-- Free space above every jump, from the higher of its two tops to the bottom of anything
+		-- hanging over it: a jump goes 7.2 studs up and a character is 5 tall.
+		Headroom = 12.5,
+		HeadroomMargin = 2, -- studs either side of a jump's line kept clear (your body is ~2 wide)
 		-- A normal Roblox character (no sprinting): used to work out the longest jump.
 		Character = { WalkSpeed = 16, JumpHeight = 7.2, Gravity = 196.2, Body = 1 },
 	},
@@ -211,7 +267,10 @@ return {
 	-- How the pieces look (src/server/Hub/Sections/Parkour.luau).
 	Look = {
 		PumpkinTop = 0.75, -- share of a pumpkin's width that is flat on top to stand on
-		Lights = true, -- glowing faces, lanterns and lights along the course
+		Lights = true, -- lights at the start, the checkpoints, the slime and the finish
+		-- false = the pumpkins, candies and graves glow (neon) without a light of their own: a
+		-- 60-piece course would use too many lights for phones (Config.Hub.Budget).
+		PieceLights = false,
 		Colors = {
 			Pumpkin = Color3.fromRGB(255, 125, 25),
 			PumpkinStem = Color3.fromRGB(90, 140, 60),
@@ -244,7 +303,7 @@ return {
 		Start = Vector3.new(10, 1.5, 10),
 		Pumpkin = Vector3.new(8, 5, 8),
 		Grave = Vector3.new(6.5, 7.5, 4.5), -- a headstone with a rounded top
-		Broom = Vector3.new(3, 3, 10), -- long side = depth (the handle points "forward")
+		Broom = Vector3.new(5, 3, 11), -- long side = depth (the handle points "forward"); 5 wide: easy to land on
 		Candy = Vector3.new(7, 1.4, 7),
 		Bat = Vector3.new(10, 1.2, 4.5),
 		Platform = Vector3.new(10, 1.5, 5),

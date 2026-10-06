@@ -29,6 +29,9 @@ local Tags = {
 	-- prompt gets one, so tagging any part ShopKeeper makes it open the shop)
 	CrateDisplay = "CrateDisplay", -- a crate on the crate stand: its prompt opens that crate's
 	-- panel (attribute CrateId). A tagged part or model with no prompt gets one.
+	PhotoSpot = "PhotoSpot", -- the Photo Spot's prompt part: dances only start near it
+	FloorSign = "FloorSign", -- a glowing sign lying on the ground in front of a lobby area
+	-- (attribute Zone). Move, turn or resize it in Studio; its words and colour are in Config.
 	-- Parkour
 	ParkourStart = "ParkourStart",
 	ParkourCheckpoint = "ParkourCheckpoint", -- attribute Index

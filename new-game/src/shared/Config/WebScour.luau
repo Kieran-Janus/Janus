@@ -56,14 +56,17 @@ return {
 	},
 
 	-- The critters (only the player hunting sees them) ------------------------------------------
-	-- Kinds: Spider, Bat, Candy, Ghost. Leave one out of the list and it never shows up.
-	CritterKinds = { "Spider", "Bat", "Candy", "Ghost" },
+	-- Every critter is a cute cartoon spider sitting on a web strand. Each one gets a random
+	-- colour from this list: add, remove or change colours (the name is only a label).
 	CritterSize = 1.7, -- studs across
-	CritterColors = { -- the glowing colour of each kind
-		Spider = Color3.fromRGB(190, 110, 255),
-		Bat = Color3.fromRGB(255, 150, 60),
-		Candy = Color3.fromRGB(255, 110, 190),
-		Ghost = Color3.fromRGB(140, 255, 230),
+	CritterColors = {
+		Pink = Color3.fromRGB(255, 95, 200),
+		Lime = Color3.fromRGB(120, 255, 70),
+		Orange = Color3.fromRGB(255, 150, 40),
+		Sky = Color3.fromRGB(70, 200, 255),
+		Purple = Color3.fromRGB(180, 100, 255),
+		Yellow = Color3.fromRGB(255, 230, 60),
+		Red = Color3.fromRGB(255, 70, 80),
 	} :: { [string]: Color3 },
 	CritterLight = 7, -- studs of glow around each critter (0 = no light)
 	HintLastSeconds = 10, -- in the last seconds the critters glow brighter, to help
@@ -140,21 +143,21 @@ return {
 			{ Offset = Vector3.new(14, 0, -6), Height = 15 }, -- 4: front right
 		},
 		-- Giant webs, each strung between two trees (their numbers above). Height = the web's
-		-- middle above the ground, Radius = its size. Spots = where critters can hide on it,
-		-- as clock hours seen from the front (12 = top, 3 = right, 6 = bottom, 9 = left).
+		-- middle above the ground, Radius = its size. Spots = where spiders can hide on it,
+		-- as clock hours seen from the front (12 = top, 3 = right, 6 = bottom, 9 = left;
+		-- halves like 2.5 work). Each spot snaps to the nearest knot where a ring thread
+		-- crosses a spoke, so every spider sits on a strand.
 		Webs = {
-			{ Between = { 1, 2 }, Height = 10, Radius = 8.5, Spots = { 1, 3, 5, 7, 9, 11 } },
-			{ Between = { 3, 1 }, Height = 7, Radius = 5.2, Spots = { 2, 6, 10 } },
-			{ Between = { 2, 4 }, Height = 7, Radius = 5.2, Spots = { 2, 6, 10 } },
+			{
+				Between = { 1, 2 },
+				Height = 10,
+				Radius = 8.5,
+				Spots = { 12, 1.5, 3, 4.5, 6, 7.5, 9, 10.5 },
+			},
+			{ Between = { 3, 1 }, Height = 7, Radius = 5.2, Spots = { 12, 3, 6, 9 } },
+			{ Between = { 2, 4 }, Height = 7, Radius = 5.2, Spots = { 12, 3, 6, 9 } },
 		},
 		SpotDistance = 0.62, -- how far out on the web a spot is (0 = middle, 1 = the edge)
-		-- More hiding spots on the ground, among the roots and mushrooms.
-		GroundSpots = {
-			Vector3.new(-9, 0.9, 11),
-			Vector3.new(9, 0.9, 11),
-			Vector3.new(-15.5, 0.9, -9.5),
-			Vector3.new(15.5, 0.9, -9.5),
-		},
 		Lantern = Vector3.new(-6.5, 0, -10), -- the start lantern's post (where you press the button)
 		SpiderSize = 8, -- the big friendly spider sitting on top of the back web
 		Mushrooms = 7, -- glowing mushrooms scattered on the grove floor

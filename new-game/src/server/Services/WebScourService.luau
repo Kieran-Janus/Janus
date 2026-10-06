@@ -263,7 +263,12 @@ function WebScourService.StartHunt(
 		)
 		return false, text.NoSpots
 	end
-	local kinds = cfg.CritterKinds
+	-- Every critter is a spider; its Kind is the name of its colour in CritterColors.
+	local kinds: { string } = {}
+	for name in cfg.CritterColors do
+		table.insert(kinds, name)
+	end
+	table.sort(kinds)
 	local critters: { Critter } = {}
 	for i, index in WebScourRules.PickSpots(#spots, cfg.Critters, rng) do
 		local kind = if #kinds > 0 then kinds[rng:NextInteger(1, #kinds)] else "Spider"

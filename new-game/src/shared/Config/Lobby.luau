@@ -18,7 +18,9 @@ return {
 		Shop = { Offset = Vector3.new(40, 0, -18), Size = Vector3.new(22, 0, 18) },
 		CandyRush = { Offset = Vector3.new(-60, 0, 0), Size = Vector3.new(30, 0, 26) },
 		WebScour = { Offset = Vector3.new(-38, 0, -32), Size = Vector3.new(32, 0, 26) },
-		Parkour = { Offset = Vector3.new(0, 0, -80), Size = Vector3.new(60, 0, 44), Height = 60 },
+		-- (the course spirals up to about 90 studs; deeper at the back, so its front still clears
+		-- the clock tower)
+		Parkour = { Offset = Vector3.new(0, 0, -82), Size = Vector3.new(76, 0, 48), Height = 120 },
 		Crates = { Offset = Vector3.new(46, 0, 6), Size = Vector3.new(20, 0, 12) }, -- crate stand by the shop
 	} :: { [string]: { Offset: Vector3, Size: Vector3, Height: number? } },
 
@@ -47,6 +49,109 @@ return {
 			ReadyNextRound = "You're ready for the next round",
 			VoteHint = "Stand on the Ready pad to vote",
 		},
+	},
+
+	-- Glowing floor signs (src/server/Hub/FloorSigns.luau): a flat pad on the ground in front of
+	-- each lobby area with big glowing words, readable from far away. Each pad is its own part,
+	-- named "<Zone>FloorSign" and tagged FloorSign, so you can move, turn or resize it in Studio.
+	-- (Changing words, colours or sizes here shows after the hub is rebuilt: F8 > Rebuild hub
+	-- or Bake.Hub(); a sign only shows while its Feature is on.)
+	FloorSigns = {
+		On = true, -- false = no floor signs
+		Size = Vector3.new(24, 0.2, 7), -- width, thickness, depth of each pad (studs)
+		Gap = 2, -- studs between the area's edge and its sign
+		PadColor = Color3.fromRGB(24, 16, 34), -- the dark pad under the words
+		Font = Enum.Font.FredokaOne,
+		Glow = 3, -- how brightly the words glow (1 = like paint, higher = glowing)
+		LightRange = 14, -- a soft light of the sign's colour over each pad (0 = none)
+		-- One per area. Side = "Front" (the side facing the middle of the lobby) or "Back"
+		-- (the far side: the Ready pad is reached from the spawn, behind it). Or give it its own
+		-- spot: Offset = studs from Config.Hub.Center, LookAt = the spot its words face (the
+		-- parkour's front is behind the clock tower, so its sign sits beside the tower). Width =
+		-- its own width in studs (instead of Size.X).
+		Signs = {
+			{
+				Zone = "ReadyArea",
+				Text = "READY? STEP IN!",
+				Color = Color3.fromRGB(70, 255, 225),
+				Feature = "ReadyPad",
+				-- between the pumpkin arch and the spawn stone, facing the pad, narrow enough
+				-- to fit between the arch's pillars
+				Offset = Vector3.new(0, 0, 59.2),
+				LookAt = Vector3.new(0, 0, 46),
+				Width = 10,
+			},
+			{
+				Zone = "Shop",
+				Text = "PUMPKIN SHOP",
+				Color = Color3.fromRGB(255, 150, 40),
+				Feature = "",
+			},
+			{
+				Zone = "Crates",
+				Text = "MYSTERY CRATES",
+				Color = Color3.fromRGB(255, 80, 220),
+				Feature = "Crates",
+			},
+			{
+				Zone = "CandyRush",
+				Text = "CANDY RUSH",
+				Color = Color3.fromRGB(255, 110, 160),
+				Feature = "CandyRush",
+			},
+			{
+				Zone = "WebScour",
+				Text = "WEB SCOUR",
+				Color = Color3.fromRGB(150, 255, 90),
+				Feature = "WebScour",
+			},
+			{
+				Zone = "Parkour",
+				Text = "PARKOUR",
+				Color = Color3.fromRGB(255, 220, 60),
+				Feature = "Parkour",
+				Offset = Vector3.new(-23, 0, -55),
+				LookAt = Vector3.new(-23, 0, -80),
+			},
+		} :: {
+			{
+				Zone: string,
+				Text: string,
+				Color: Color3,
+				Feature: string,
+				Side: string?,
+				Offset: Vector3?,
+				LookAt: Vector3?,
+				Width: number?,
+			}
+		},
+	},
+
+	-- A solid lobby (src/server/Hub/HubSolid.luau): when the game starts, every decoration you
+	-- would expect to bump into or stand on is made solid (trees, lampposts, benches, gravestones,
+	-- crates, hay, fences, statues, the cauldron, stalls, stands, the mansion, big pumpkins...).
+	-- This also works on a lobby saved in your place and on your own models from
+	-- ReplicatedStorage.Custom.Props. What stays walk-through:
+	Solid = {
+		On = true, -- false = leave every decoration as it was built
+		MinSize = 2.5, -- studs: pieces smaller than this (their longest side) stay walk-through
+		StepHeight = 1.25, -- studs: low things you'd just step over (curbs, path stones, rugs)
+		MaxTransparency = 0.6, -- more see-through than this (mist, glow, light beams) stays walk-through
+		-- Decorations (their PropName attribute) that always stay walk-through: they hang in the
+		-- air or are webs you need to reach through.
+		KeepWalkThrough = {
+			"Cobweb",
+			"Candle",
+			"Bat",
+			"ParkourBat",
+			"Lantern",
+			"Mushroom",
+			"GroveSpider",
+		},
+		-- Lobby parts in a Model with one of these names stay walk-through (the Web Scour webs,
+		-- the glowing rune circle, mist and fireflies, and the parkour course's decorations:
+		-- its steps are solid already and the jumps are measured without the decorations).
+		KeepAreas = { "Webs", "Runes", "Mist", "Fireflies", "FloatingCandles", "Course" },
 	},
 
 	-- Watching the round from the lobby (Config.Features.LobbySpectate): Menu > Spectate, or the

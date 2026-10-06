@@ -49,6 +49,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Kit = require(script.Parent.Parent.Build.Kit)
 local Props = require(script.Parent.Parent.Build.Props)
+local FloorSigns = require(script.Parent.FloorSigns)
 local HubExtras = require(script.Parent.HubExtras)
 local HubLayout = require(script.Parent.HubLayout)
 local HubPalette = require(script.Parent.HubPalette)
@@ -1136,21 +1137,7 @@ local function buildSignposts(parent: Instance)
 			Props.Signpost(paint, facingCenter(pos), arms, folder)
 		end
 	end
-	-- A little sign at the front of each area, beside its path.
-	local width = hubCfg.Plaza.PathWidth
-	for _, entry in enabled do
-		if entry.Zone == "ReadyArea" then
-			continue
-		end
-		local zone = HubLayout.Zone(entry.Zone)
-		local front = zone.CFrame * CFrame.new(width / 2 + 2, 0, -zone.Size.Z / 2 - 2.5)
-		if blocked(front.Position, 0.5) then
-			continue
-		end
-		Props.Signpost(paint, front, {
-			{ Text = entry.Text, Direction = -zone.CFrame.LookVector, Role = "Purple" },
-		}, folder)
-	end
+	-- Each area's own sign is a glowing floor sign in front of it (FloorSigns, built below).
 end
 
 local function buildAmbience(parent: Instance)
@@ -1616,6 +1603,18 @@ function HubBuilder.RemoveSwitchedOff(hub: Model): { string }
 			end
 		end
 		count += removeEggsAnchoredTo(area.Tags)
+		-- Its glowing floor sign goes too.
+		for _, sign in CollectionService:GetTagged(Tags.FloorSign) do
+			local zone = sign:GetAttribute("Zone")
+			if
+				sign:IsDescendantOf(workspace)
+				and typeof(zone) == "string"
+				and FloorSigns.FeatureOf(zone) == area.Feature
+			then
+				sign:Destroy()
+				count += 1
+			end
+		end
 		if count > 0 then
 			table.insert(removed, area.Feature)
 		end
@@ -1664,6 +1663,7 @@ function HubBuilder.Build(): Model
 	buildTrees(decorModel)
 	buildClutter(decorModel)
 	buildSignposts(decorModel)
+	FloorSigns.Build(hub) -- a glowing sign on the ground in front of each area
 	buildAmbience(decorModel)
 	HubExtras.Build(hub, decorModel) -- terrain, forest, mansion, statue, fence, paths (Config.Hub.Polish)
 	-- (A custom shopkeeper model is swapped in by HubService when the game runs, so a hub baked

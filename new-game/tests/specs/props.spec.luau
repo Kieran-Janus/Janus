@@ -28,6 +28,16 @@ local function world(): any
 		HubBuilder = rt:require("ServerScriptService.Server.Hub.HubBuilder"),
 		MapService = rt:require("ServerScriptService.Server.Services.MapService"),
 	}
+	-- How many Pumpkin steps and checkpoints the parkour course has (Config.Parkour.Course).
+	w.parkourPumpkins = 0
+	w.parkourCheckpoints = 0
+	for _, step in w.Config.Parkour.Course do
+		if step.Kind == "Pumpkin" then
+			w.parkourPumpkins += 1
+		elseif step.Kind == "Checkpoint" then
+			w.parkourCheckpoints += 1
+		end
+	end
 	-- A plain custom model: one block, 3 studs tall, standing on the origin (any shape works).
 	function w.model(name: string): any
 		local m = rt:create("Model", { Name = name })
@@ -399,11 +409,11 @@ describe("One custom model per prop name", function()
 				expect(high.Y).toBeNear(top.Position.Y + top.Size.X / 2, 0.05)
 			end
 		end
-		expect(pumpkins).toBe(5)
+		expect(pumpkins).toBe(w.parkourPumpkins)
 		for _, tag in { "ParkourStart", "ParkourFinish", "ParkourBoard" } do
 			expect(#w.tagged(tag, hub)).toBe(1)
 		end
-		expect(#w.tagged("ParkourCheckpoint", hub)).toBe(3)
+		expect(#w.tagged("ParkourCheckpoint", hub)).toBe(w.parkourCheckpoints)
 	end)
 
 	it("keeps the haystacks hiding you from the King, and lanterns glowing", function()
@@ -650,10 +660,10 @@ describe("Swap tool (src/server/Tools/Swap.luau)", function()
 		w.custom("HidingPumpkin")
 		w.custom("ParkourPumpkin")
 		local changed = Swap.Props()
-		expect(changed).toBeGreaterThanOrEqual(lanterns + decoys + 5)
+		expect(changed).toBeGreaterThanOrEqual(lanterns + decoys + w.parkourPumpkins)
 		expect(count(hub, "JackOLantern", false)).toBe(0)
 		expect(count(hub, "JackOLantern", true)).toBeGreaterThan(0)
-		expect(count(hub, "ParkourPumpkin", true)).toBe(5)
+		expect(count(hub, "ParkourPumpkin", true)).toBe(w.parkourPumpkins)
 		-- The baked decoys are your model now, still decoys with their sizes, and a hitbox.
 		local swappedDecoys = w.tagged("HidingDecoy", baked)
 		expect(#swappedDecoys).toBe(decoys)
@@ -671,10 +681,10 @@ describe("Swap tool (src/server/Tools/Swap.luau)", function()
 				hidden += 1
 			end
 		end
-		expect(hidden).toBe(5)
+		expect(hidden).toBe(w.parkourPumpkins)
 		-- The built ones are kept as backups (never counted as working pieces).
 		local backups = w.ServerStorage:FindFirstChild("PropBackups")
-		expect(#backups:GetChildren()).toBeGreaterThanOrEqual(lanterns + decoys + 5)
+		expect(#backups:GetChildren()).toBeGreaterThanOrEqual(lanterns + decoys + w.parkourPumpkins)
 		for _, d in backups:GetChildren() do
 			expect(#w.CollectionService:GetTags(d)).toBe(0)
 		end
@@ -688,7 +698,7 @@ describe("Swap tool (src/server/Tools/Swap.luau)", function()
 		lanternModel.Look.Size = w.Vector3.new(2, 6, 2)
 		local again = Swap.Props()
 		expect(again).toBe(changed)
-		expect(#backups:GetChildren()).toBeGreaterThanOrEqual(lanterns + decoys + 5)
+		expect(#backups:GetChildren()).toBeGreaterThanOrEqual(lanterns + decoys + w.parkourPumpkins)
 
 		-- Take the jack-o'-lantern out of Custom.Props and revert: the built ones come back.
 		lanternModel:Destroy()

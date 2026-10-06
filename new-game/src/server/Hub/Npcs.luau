@@ -219,6 +219,9 @@ function Npcs.AttachPrompt(def: NpcDef, m: Model, cf: CFrame): BasePart
 	local p = Config.Npcs.Prompt
 	local anchor = holder("PromptAnchor", cf * CFrame.new(0, p.Height, -p.Forward), Vector3.one, m)
 	Npcs.AddPrompt(def, anchor)
+	if def.Kind == "PhotoSpot" then
+		CollectionService:AddTag(anchor, Tags.PhotoSpot) -- dances only start near it
+	end
 	if def.OpensShop then
 		CollectionService:AddTag(m, Tags.ShopKeeper)
 		CollectionService:AddTag(anchor, Tags.ShopKeeper)
