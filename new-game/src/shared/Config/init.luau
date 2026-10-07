@@ -1106,6 +1106,11 @@ local Config = {
 		BuyText = "Buy %s %s", -- the buy button: price (with commas), currency name
 		PreviewDistance = 1.15, -- how far the camera is from an item in its card (smaller = bigger)
 		PhonePreviewDistance = 0.95, -- the same on phones (closer: bigger pictures on small cards)
+		-- The rarity tag in the top-left corner of each card: text size, height, distance from
+		-- the card's corner and the space either side of the word. Phones get a smaller one
+		-- tucked into the corner so it covers less of the picture (text never below UI.MinTextSize).
+		RarityTag = { TextSize = 14, Height = 20, Inset = 12, Padding = 6 },
+		PhoneRarityTag = { TextSize = 14, Height = 16, Inset = 5, Padding = 4 },
 		-- The shop's little animations (src/client/ShopJuice.luau, used by the shop, Packs & VIP,
 		-- Settings and the VIP tracker). Times are in seconds. Animate = false turns them all off:
 		-- things just change straight away. Phones get fewer (no turning previews, fewer sparkles).

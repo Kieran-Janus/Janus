@@ -16,7 +16,9 @@ Want every pumpkin (or lantern, tree, gravestone...) to be **your** model, every
 
 Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See [Editing the lobby and maps by hand](#editing-the-lobby-and-maps-by-hand).
 
-Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Toolbox codes](#with-a-toolbox-code-one-line-no-dragging) · [Move one thing](#move-just-one-thing) · [Tags](#parts-that-do-something-tags)
+Too much movement, or a phone feels slow? Every animation switch is in one list: [Turn animations off or down](#turn-animations-off-or-down).
+
+Jump to: [Animations](#turn-animations-off-or-down) · [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Toolbox codes](#with-a-toolbox-code-one-line-no-dragging) · [Move one thing](#move-just-one-thing) · [Tags](#parts-that-do-something-tags)
 
 ---
 
@@ -38,7 +40,12 @@ Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Mod
 | Ghost mode rules (fly speed, haunt) | `Config.Ghost` |
 | Voice range and echo | `Config.Voice` |
 | Turn any v2 feature on or off | `src/shared/Config/Features.luau` (one `true`/`false` line each) |
-| How hard the lobby and map animations work on phones (how far candles animate, flicker rate, how often they look for something nearby) | `Config.Performance` (the `Phone...` lines are for small touch screens; `tests/specs/perf.spec.luau` checks idle work stays near zero) |
+| How hard the lobby and map animations work on phones (how far candles animate, flicker rate, how often they look for something nearby) | `Config.Performance` (the `Phone...` lines are for small touch screens; `tests/specs/perf.spec.luau` checks idle work stays near zero). See [Turn animations off or down](#turn-animations-off-or-down) |
+| UI animation: panels popping in and out, buttons squashing, the Menu's tiles, the Menu button's wobble, coins rolling | `Config.UI.Motion` (`On = false` = everything instant) |
+| Animations on the Hide & Seek, ScareMaze (BOO cooldown ring), jumpscare, ghost, spectate, daily reward, NPC dialogue, announcement and Voting Board screens | `Config.ScreenMotion` (`src/shared/Config/ScreenMotion.luau`; `On = false` = instant) |
+| Shop animations: hover lift, turning previews, rare shine, purchase pop and sparkles, "Need N more Coins", "Wearing it!" | `Config.Shop.Juice` (`Animate = false` = none) |
+| How big the skin pictures are in the Shop | `Config.Shop.PreviewDistance`, `Config.Shop.PhonePreviewDistance` (phones; smaller = bigger) |
+| The floating READY sign hiding while you stand right under it | `Config.Hub.ReadyArea.Sign.HideNear` (studs; `0` = always shown) |
 | Hub layout, lighting, music, decorations | `Config.Hub` (then F8 > Rebuild hub to try it, and raise `Config.Hub.BuildVersion` so saved hubs update) |
 | Hub colours | `Config.Hub.Palette` (the `hubPalette` list at the top of `Config/init.luau`) |
 | Where the Ready pad, shop, crate stand, minigames and parkour go | `Config.Lobby.Zones` (`src/shared/Config/Lobby.luau`) |
@@ -82,6 +89,29 @@ Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Mod
 
 Colours in Config are `Color3.fromRGB(red, green, blue)`, each 0-255. Pick them in any colour picker.
 Sounds are `"rbxassetid://NUMBER"` from the Creator Store (Toolbox > Audio). Empty `""` means no sound.
+
+---
+
+## Turn animations off or down
+Every animation in the game is only a look on each player's own screen. Buttons, votes, coins and prizes happen straight away whether the animation plays or not, so switching one off never breaks anything. Change `true` to `false` on the line, save, press Play.
+
+| What moves | Switch it off | Turn it down instead |
+| --- | --- | --- |
+| Panels popping in and out, buttons squashing, the Menu's tiles and its button's wobble, coins rolling | `Config.UI.Motion.On = false` (`src/shared/Config/init.luau` > `UI` > `Motion`). This also stops everything in the next row. | the `...Seconds` and `...Scale` numbers in the same block |
+| Hide & Seek and ScareMaze banners, the BOO cooldown ring, the jumpscare zoom, the ghost panel and spectate bar, daily reward and code toasts, NPC text typing out, stacked announcements, the Voting Board | `Config.ScreenMotion.On = false` (`src/shared/Config/ScreenMotion.luau`) | `PhoneShare` (less sparkle and confetti on phones), each screen's own block |
+| The vote panel (cards pop in, your pick bounces, counts tick up, the winner pops) | `Config.Voting.Animate = false` | `Config.Voting.Motion` |
+| Round moments (3-2-1, GO!, RUN!, banners punching in, "+1" pop-ups) | `Config.Juice.Animate = false` (the same messages show, just still) | `Config.Juice.Motion`, `Config.Juice.Countdown` |
+| The results screen (rows growing in, shine, coins counting, "You got X coins!") | `Config.Results.Animate = false` | `RowInSeconds`, `ShineSeconds`, `CountUpSeconds` in `Config.Results` |
+| The Shop (hover lift, turning previews, rare shine, purchase sparkles, coin roll) | `Config.Shop.Juice.Animate = false` | `SpinSpeed = 0` (still previews), `PhoneSparkles` |
+| Minigame celebrations (Candy Rush, Web Scour, secret pumpkins, both parkour courses) | `Config.Minigames.Effects.On = false` for all of them (`src/shared/Config/Minigames.luau`), or one game's own `Effects.On` | `PhoneShare` |
+| The lobby comes alive (shopkeeper, Ready ring, floor signs, cauldron, bats) | `Config.Lobby.Life.On = false` (`src/shared/Config/Lobby.luau`), or one part: `Keeper.On`, `ReadyPad.On`, `FloorSigns.On`, `Cauldron.On`, `Bats.On` | `Range`, `PhoneRange` |
+| Round maps come alive (bobbing pumpkins, fireflies, wobbling Hide & Seek pumpkins) | `Config.Features.MapLife = false` (`src/shared/Config/Features.luau`), or one part in `src/shared/Config/MapLife.luau`: `Pickups.On`, `Ambient.On`, `Wobble.On` | `Range`, `PhoneRange`, `Ambient.PhoneCount` |
+| The crate stand (crates bob, sway, peek their lids, wake up when you walk close) | `Config.Crates.Idle.On = false` (`src/shared/Config/Crates.luau`; the crates then just float gently by `Stand.Bob`, `0` = still) | `Idle.Range`, `Idle.PhoneRange`, `Idle.PhoneSparkleShare`, `LookDefaults.PeekEvery = 0` (no lid peeks) |
+| Crate openings (chest drop, shake, light beam, pedestal) | Players can tick **Quick open** on the crate page (`QuickOpen.Default = true` starts it ticked), or `Opening.Style = "Reel"` for the old spinning strip | `Opening.ShakeSeconds`, `Opening.Beam` (`PhoneShafts`, `FlashSeconds = 0` = no flash), `PhoneConfetti`, `PhoneCoinPour`; crate cards: `Cards.SpinSpeed = 0`, `Cards.Halo = false` |
+| CRAZY skins' rainbow, orbiting pieces and glow | `Config.Features.SkinEffects = false` | `Effects.MaxAnimated` in `src/shared/Config/Skins/Settings.luau` |
+| Floating candles and flickering lights, and how often the lobby, map and crate animations look for something nearby | (no off switch) | `Config.Performance`: `AmbienceDistance`, `FlickerHz`, `IdleScanHz` and their `Phone...` versions |
+
+Phones already get less: shorter ranges, fewer sparkles, no turning Shop previews. While nothing near the camera is moving, these animations do almost no work (`Config.Performance.IdleScanHz`), and a panel's animation only runs while it is open.
 
 ---
 
@@ -322,8 +352,6 @@ A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
 
 ---
 
-- **All the UI animation** (panels popping in and out, button squash, the Menu's tiles, the coins rolling): `Config.UI.Motion` in `src/shared/Config/init.luau`; `On = false` makes everything instant. Rounds: `Config.Voting.Animate`, `Config.Juice.Animate`, `Config.Results.Animate`; the Shop: `Config.Shop.Juice.Animate`; minigames: `Config.Minigames.Effects.On`; the lobby's keeper, Ready ring, floor signs, cauldron and bats: `Config.Lobby.Life`. Hide & Seek and ScareMaze banners, the BOO cooldown ring, the jumpscare's zoom, the ghost panel and spectate bar, daily reward toasts, NPC typing, announcements (stacking: `Config.Announce`) and the Voting Board: `Config.ScreenMotion` (`src/shared/Config/ScreenMotion.luau`; `On = false` makes them instant).
-
 ## Crates
 Mystery crates give a random skin. Everything about them is in `src/shared/Config/Crates.luau`
 (switch them off with `Config.Features.Crates = false`, or only the Robux ones with
@@ -359,7 +387,11 @@ Mystery crates give a random skin. Everything about them is in `src/shared/Confi
   the strips: every result on one page, rarity colours, duplicates with their coins back, the best
   one highlighted.
 - **Tabs and pages**: Menu > Crates has a tab per `Categories` entry (each crate's `Category`), and
-  `PageSize` (`PhonePageSize` on phones) crates per page.
+  `PageSize` (`PhonePageSize` on phones) crates per page. Each card's chest turns slowly on a
+  soft halo and bounces when tapped: `Cards` (`SpinSpeed`, `Halo`, `PopSeconds`).
+- **On phones** the crate panel drops its hint line and moves up, the cards fit the list's height
+  (name and price never cut off) and the opening chest is bigger: `Opening.PhoneCameraDistance`
+  (smaller = bigger chest).
 - **The crate stand** next to the Pumpkin Shop (`src/server/Hub/Sections/CrateStand.luau`, in
   `Config.Lobby.Zones.Crates`): the rarity crates and the themed crates in `Stand.Themed` (there
   isn't room for all 30) on plinths with an "Open" prompt. Each prompt sits on
@@ -554,6 +586,7 @@ The orange **Menu** button at the top left (key **M**) opens a grid of tiles. Se
 - `Feature = "Crates"` means the tile only shows while that feature is on.
 - The button itself: `ButtonText`, `Key`, and `Button` (size, colour; `InTopBar = true` puts it in Roblox's own top bar).
 - Switch the whole Menu off (`Menu = false` in `Features.luau`) and the old column of Shop / Codes / Invite / Settings buttons comes back.
+- Only one panel is open at a time; Escape closes it, and every open panel (Shop, Crates...) closes by itself when a round pulls you in, so nothing covers the start of the round.
 - A tile that opens something new needs a little code (`MenuUI.AddTile`): ask Claude Code.
 
 ---
@@ -563,7 +596,7 @@ The orange **Menu** button at the top left (key **M**) opens a grid of tiles. Se
 
 What's where (positions are studs from the middle: x = east/west, z = south/north):
 - `Spawn`: the round stone players appear on (south), and the spot they look at (`LookAt`).
-- `ReadyArea`: the glowing rune circle, its standing stones, the pumpkin arch and the "PLAY!" banner. Move the circle with `Config.Lobby.Zones.ReadyArea`.
+- `ReadyArea`: the glowing rune circle, its standing stones, the pumpkin arch, the "PLAY!" banner and the floating READY sign (`Sign`; it hides while your camera is within `Sign.HideNear` studs of it, so it never hangs cut off over the top of the screen). Move the circle with `Config.Lobby.Zones.ReadyArea`.
 - `ShopStall`: the big "PUMPKIN SHOP" sign, the chalkboard, how many goodies sit on the shelves.
 - `Plaza`: the promenade ring round the cauldron, path width, cracks, puddles, fallen leaves.
 - `Signposts`: which areas get paths and signs, and what the signs say (only while that area's switch in `Config.Features` is on).
@@ -593,9 +626,8 @@ The lobby ("Spooky Town Square", `Workspace.Hub`) and the round maps are built b
 3. Paste this and press Enter: `require(game.ServerScriptService.Server.Tools.Bake).Hub()`
    `Workspace.Hub` is (re)built from code. Ctrl+Z undoes it.
 4. Edit it. In the Explorer it is sorted into **folders** with readable names, and every single thing in them (one pumpkin, one bench, one tree, one parkour step) is its own **Model**, so clicking it in the viewport selects just that thing (see "Move just one thing" below):
-   - `Plaza` (the ground), `Spawn`, `Npcs` (Voting Board, Leaderboard, Photo Spot),
-   - one folder per lobby area: `ReadyArea`, `Shop` (with the `PumpkinVendor` stall), `CrateStand`, `Parkour`, `CandyRush`, `WebScour`, `EasterEggs`,
-   - `Plaza`: `Ground`, the `Promenade` ring, the `Dais` the cauldron stands on, `Walkways`, `Curb` and small `Details` (cracks, puddles, leaves),
+   - `Plaza` (the ground: `Ground`, the `Promenade` ring, the `Dais` the cauldron stands on, `Walkways`, `Curb` and small `Details` such as cracks, puddles and leaves), `Spawn`, `Npcs` (Voting Board, Leaderboard, Photo Spot),
+   - one folder per lobby area: `ReadyArea`, `Shop` (with the `PumpkinVendor` stall), `CrateStand`, `Parkour`, `TowerParkour`, `CandyRush`, `WebScour`, `EasterEggs`,
    - `Decor`: everything that is only for looks (`ClockTower`, `Cauldron`, `Lamps`, `PathLamps`, `Bunting`, `JackOLanterns`, `Candles`, `Benches`, `Graveyard`, `Trees`, `Clutter`, `Signposts`, `Forest`, `HauntedMansion`, `KingStatue`, `PumpkinPatch`, `OldGraves`, `Fence`, `Paths`, `Ambience`). Delete or move any of it freely.
 5. Lock it: `require(game.ServerScriptService.Server.Tools.Bake).Lock()`
 6. Save the place (Ctrl+S). Your lobby lives in the place file, not in git, so keep a backup: right-click `Workspace.Hub` > **Save to File...**
@@ -688,7 +720,7 @@ Moved to its own section: [Swap every copy of something at once](#swap-every-cop
 - `Offset = Vector3.new(x, 0, z)`: x = east (+) / west (-), z = south (+) / north (-). `Size` = width and depth.
 - Each zone faces the middle of the lobby, so its front points at the plaza.
 - **Move an area:** change its `Offset`, then rebuild (F8 > Rebuild hub to try it; `Bake.Hub()` in edit mode, or raise `Config.Hub.BuildVersion`, to keep it). The paths and signposts follow.
-- In a baked lobby you can also just drag the area's Model (`Workspace.Hub.CandyRush` and so on): the working parts are found by tag.
+- In a baked lobby you can also move a whole area by hand. Each area is a **folder** (`Workspace.Hub.CandyRush` and so on), and a folder can't be dragged itself: in the Explorer open it, click its first child, Shift+click its last child, then drag them in the viewport. The working parts are found by tag, so they keep working.
 - Or ask Claude Code: `/edit-lobby move Candy Rush closer to the spawn`.
 
 ### Round maps

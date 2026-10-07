@@ -595,19 +595,21 @@ function ShopUI.Mount(gui: ScreenGui)
 	-- Small coloured rarity label in the top-left corner of a card's preview.
 	local function rarityTag(item: any, parent: Frame): TextLabel
 		local info = Items.RarityInfo(item)
-		local tag = Theme.label(info.Name, 14, parent)
+		-- Phones: smaller and tucked into the corner, so it covers less of the picture.
+		local look = if compact then Config.Shop.PhoneRarityTag else Config.Shop.RarityTag
+		local tag = Theme.label(info.Name, math.max(look.TextSize, Config.UI.MinTextSize), parent)
 		tag.Name = "RarityTag"
 		tag.ZIndex = 2 -- above the preview
 		tag.AutomaticSize = Enum.AutomaticSize.X
-		tag.Position = UDim2.fromOffset(12, 12)
-		tag.Size = UDim2.fromOffset(0, 20)
+		tag.Position = UDim2.fromOffset(look.Inset, look.Inset)
+		tag.Size = UDim2.fromOffset(0, look.Height)
 		tag.BackgroundTransparency = 0.1
 		tag.BackgroundColor3 = info.Color
 		tag.TextStrokeTransparency = 0.6
-		Theme.round(tag, 6)
+		Theme.round(tag, if compact then 4 else 6)
 		local padding = Instance.new("UIPadding")
-		padding.PaddingLeft = UDim.new(0, 6)
-		padding.PaddingRight = UDim.new(0, 6)
+		padding.PaddingLeft = UDim.new(0, look.Padding)
+		padding.PaddingRight = UDim.new(0, look.Padding)
 		padding.Parent = tag
 		return tag
 	end

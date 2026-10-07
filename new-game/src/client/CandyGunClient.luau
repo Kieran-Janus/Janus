@@ -6,6 +6,9 @@
 	    crosshair in the middle of the screen (right trigger). Only says WHERE you aimed: the
 	    server decides what the candy hits (src/server/Modes/HideSeek.luau).
 	  - every candy flying, splatting and the "TAGGED!" burst where it lands, for everyone nearby
+	  - the looks (Config.ScreenMotion.CandyGun, off with the motion switches): the crosshair
+	    kicks when you fire (the shot is sent first), and where the server says the candy landed
+	    a candy splat burst (decoy), big sparkles and a popping TAGGED! (hider) or a puff (miss)
 	  - hiders' giggles (3D sound) and sparkle puffs
 	Not a screen of its own (not in Main.client.luau's ORDER): HideSeekUI mounts it once the
 	first Hide & Seek round starts and passes it the server's events.
@@ -24,6 +27,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local ScreenFx = require(script.Parent.ScreenFx)
 local Sounds = require(script.Parent.Sounds)
 
 local CandyGunClient = {}
@@ -43,6 +47,7 @@ local splats: { Instance } = {}
 
 -- Crosshair (set in Mount)
 local crosshair: Frame? = nil
+local crossScale: UIScale? = nil -- the crosshair's kick when you fire
 local reload: Frame? = nil
 local reloadFill: Frame? = nil
 local tapHint: TextLabel? = nil
@@ -212,11 +217,22 @@ local function taggedBurst(position: Vector3)
 	emitter.RotSpeed = NumberRange.new(-200, 200)
 	emitter.LightEmission = 0.4
 	emitter.Parent = holder
-	emitter:Emit(40)
+	emitter:Emit(ScreenFx.Count(40)) -- fewer on phones
 
 	local board = Instance.new("BillboardGui")
 	board.Name = "TaggedPop"
 	board.Size = UDim2.fromOffset(220, 60)
+	if ScreenFx.On() then
+		-- Punches in big and snaps to its size.
+		local motion = Config.ScreenMotion.CandyGun
+		local scale = motion.TaggedPopScale
+		board.Size = UDim2.fromOffset(220 * scale, 60 * scale)
+		TweenService:Create(
+			board,
+			TweenInfo.new(motion.TaggedPopSeconds, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+			{ Size = UDim2.fromOffset(220, 60) }
+		):Play()
+	end
 	board.StudsOffsetWorldSpace = Vector3.new(0, 3, 0)
 	board.AlwaysOnTop = true
 	board.LightInfluence = 0
@@ -239,6 +255,74 @@ local function taggedBurst(position: Vector3)
 		TweenService
 			:Create(label, TweenInfo.new(0.6), { TextTransparency = 1, TextStrokeTransparency = 1 })
 			:Play()
+	end)
+end
+
+-- What the candy hit, where the server says it landed (Config.ScreenMotion.CandyGun): a candy
+-- splat burst (Decoy), big sparkles (Hider, with the TAGGED! pop above), a small puff (Miss).
+-- A BillboardGui on a little invisible part that nothing can touch or hit; gone after it plays.
+local HIT_KINDS = { Decoy = true, Hider = true, Miss = true }
+
+local function hitBurst(kind: string, position: Vector3, normal: unknown, color: Color3)
+	if not HIT_KINDS[kind] or not ScreenFx.On() then
+		return
+	end
+	local motion = Config.ScreenMotion.CandyGun
+	local spec = (motion :: any)[kind]
+	local count = ScreenFx.Count(spec.Bits)
+	local colors: { Color3 }
+	if kind == "Hider" then
+		colors = Config.ScreenMotion.HideSeek.TaggedColors
+	elseif kind == "Decoy" then
+		colors = table.clone(Config.HideSeek.Gun.CandyColors)
+		table.insert(colors, 1, color) -- mostly the candy's own colour
+		table.insert(colors, 1, color)
+	else
+		colors = { spec.Color }
+	end
+	-- Just off the surface it hit, so it isn't hidden inside it.
+	local lift = if typeof(normal) == "Vector3" then normal * 0.4 else Vector3.zero
+	local holder = anchor(position + lift, spec.Seconds + 1)
+	holder.Name = "CandyHitFx"
+	holder:SetAttribute("Result", kind)
+	local box = (spec.Distance + spec.Size * math.max(spec.Grow, 1)) * 2
+	local board = Instance.new("BillboardGui")
+	board.Name = "Burst"
+	board.Size = UDim2.fromOffset(box, box)
+	board.LightInfluence = 0
+	board.AlwaysOnTop = kind == "Hider"
+	board.MaxDistance = SHOW_DISTANCE
+	board.Parent = holder
+	local info = TweenInfo.new(spec.Seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	for i = 1, count do
+		local size = spec.Size * (0.7 + math.random() * 0.6)
+		local bit = Instance.new("Frame")
+		bit.Name = "Bit"
+		bit.AnchorPoint = Vector2.new(0.5, 0.5)
+		bit.Position = UDim2.fromScale(0.5, 0.5)
+		bit.Size = UDim2.fromOffset(size, size)
+		bit.BackgroundColor3 = colors[(i - 1) % #colors + 1]
+		bit.BorderSizePixel = 0
+		if kind == "Hider" then
+			bit.Rotation = 45 -- sparkles are little diamonds
+		else
+			local round = Instance.new("UICorner")
+			round.CornerRadius = UDim.new(1, 0)
+			round.Parent = bit
+		end
+		bit.Parent = board
+		local angle = (i + math.random() * 0.6) / count * math.pi * 2
+		local reach = spec.Distance * (0.55 + math.random() * 0.45)
+		local grown = size * spec.Grow
+		TweenService:Create(bit, info, {
+			Position = UDim2.new(0.5, math.cos(angle) * reach, 0.5, math.sin(angle) * reach),
+			Size = UDim2.fromOffset(grown, grown),
+			BackgroundTransparency = 1,
+			Rotation = bit.Rotation + (if kind == "Hider" then 90 else 0),
+		}):Play()
+	end
+	task.delay(spec.Seconds + 0.1, function()
+		holder:Destroy()
 	end)
 end
 
@@ -317,6 +401,9 @@ local function onShot(data: { [string]: any })
 		elseif typeof(normal) == "Vector3" then
 			splat(to, normal, color)
 		end
+		if typeof(data.Result) == "string" then
+			hitBurst(data.Result, to, normal, color)
+		end
 		play3D(cfg.Sounds.Splat, anchor(to, 4))
 	end)
 end
@@ -381,6 +468,20 @@ local function aimAt(point: Vector2): Vector3?
 	return if result then result.Position else ray.Origin + ray.Direction * AIM_DISTANCE
 end
 
+-- The crosshair jumps and tilts a little, then settles (Config.ScreenMotion.CandyGun).
+local function kick()
+	local cross, scale = crosshair, crossScale
+	if not cross or not scale or not ScreenFx.On() then
+		return
+	end
+	local motion = Config.ScreenMotion.CandyGun
+	scale.Scale = motion.KickScale
+	cross.Rotation = motion.KickDegrees
+	local info = TweenInfo.new(motion.KickSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	TweenService:Create(scale, info, { Scale = 1 }):Play()
+	TweenService:Create(cross, info, { Rotation = 0 }):Play()
+end
+
 -- `point` is in viewport pixels (what the mouse location and the camera use).
 local function shoot(point: Vector2)
 	local remote = shootRemote
@@ -397,7 +498,8 @@ local function shoot(point: Vector2)
 	end
 	lastSentAt = now
 	readyAt = now + Config.HideSeek.Gun.FireCooldown + SEND_MARGIN
-	remote:FireServer(target)
+	remote:FireServer(target) -- sent at once; the kick is only a look
+	kick()
 end
 
 local function viewportCenter(): Vector2
@@ -460,6 +562,9 @@ local function buildCrosshair()
 	round.CornerRadius = UDim.new(1, 0)
 	round.Parent = dot
 	dot.Parent = cross
+	local scale = Instance.new("UIScale")
+	scale.Parent = cross
+	crossScale = scale
 	crosshair = cross
 
 	-- Reload bar under the crosshair (under the tap hint on touch screens).

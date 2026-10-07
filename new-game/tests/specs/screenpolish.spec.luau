@@ -683,3 +683,245 @@ describe("Voting Board", function()
 		expect(fxScale(king)).toBe(1)
 	end)
 end)
+
+-- The candy gun (CandyGunClient, Config.ScreenMotion.CandyGun): the shot is sent at once and
+-- the crosshair kicks; where the SERVER says the candy landed, a burst shows what it hit.
+describe("Candy gun feedback", function()
+	-- A client holding the candy gun, with the gun's screen mounted.
+	local function gun(options: { phone: boolean?, motion: boolean? }?)
+		local c = client(options)
+		local env = c.rt.env
+		local character = c.player.Character
+		local tool = c.rt:create("Tool", { Name = "Candy Gun" }, character)
+		tool:SetAttribute("CandyGun", true)
+		local camera = c.rt.workspace.CurrentCamera
+		camera.CFrame = env.CFrame.new(0, 10, 0)
+		local CandyGun = c.rt:require(c.Client.CandyGunClient)
+		CandyGun.Mount(c.remotes.HideSeekShoot)
+		c.rt:advance(0.1)
+		c.CandyGun = CandyGun
+		c.cross = c.player.PlayerGui.CandyGunAim.Crosshair
+		return c
+	end
+
+	local function shot(c, result: string, to: any)
+		local env = c.rt.env
+		c.CandyGun.OnEvent("Shot", {
+			Shooter = c.player,
+			From = env.Vector3.new(0, 10, 0),
+			To = to,
+			Normal = env.Vector3.new(0, 1, 0),
+			Result = result,
+			Candy = 2,
+			Cooldown = 0.6,
+		})
+	end
+
+	local function hits(c): { any }
+		local list = {}
+		local folder = c.rt.workspace:FindFirstChild("CandyEffects")
+		if folder then
+			for _, d in folder:GetChildren() do
+				if d.Name == "CandyHitFx" then
+					table.insert(list, d)
+				end
+			end
+		end
+		return list
+	end
+
+	it("sends the shot at once and kicks the crosshair back to normal", function()
+		local c = gun()
+		local m = c.motion.CandyGun
+		c.rt:fire(
+			c.rt.game:GetService("UserInputService").TouchTapInWorld,
+			c.rt.env.Vector2.new(400, 300),
+			false
+		)
+		expect(#fired(c, "HideSeekShoot")).toBe(1)
+		expect(typeof(fired(c, "HideSeekShoot")[1][1])).toBe("Vector3")
+		local scale = c.cross:FindFirstChildOfClass("UIScale")
+		expect(scale.Scale).toBe(m.KickScale)
+		expect(c.cross.Rotation).toBe(m.KickDegrees)
+		c.rt:advance(0.5)
+		expect(scale.Scale).toBe(1)
+		expect(c.cross.Rotation).toBe(0)
+	end)
+
+	it("shows each result's burst at the server's hit point, then cleans up", function()
+		local c = gun()
+		local env = c.rt.env
+		for i, result in { "Decoy", "Hider", "Miss" } do
+			local to = env.Vector3.new(i * 6, 2, -20)
+			shot(c, result, to)
+			expect(#hits(c)).toBe(0) -- nothing until the candy gets there
+			c.rt:advance(0.25)
+			local list = hits(c)
+			expect(#list).toBe(1)
+			local fx = list[1]
+			expect(fx:GetAttribute("Result")).toBe(result)
+			expect((fx.Position - to).Magnitude).toBeLessThan(1)
+			expect(fx.CanCollide).toBe(false)
+			expect(fx.CanQuery).toBe(false)
+			expect(fx.CanTouch).toBe(false)
+			local bits = #fx.Burst:GetChildren()
+			expect(bits).toBe(c.motion.CandyGun[result].Bits)
+			T.note(("%s: %d pieces"):format(result, bits))
+			if result == "Hider" then
+				local pop = nil
+				for _, d in c.rt.workspace.CandyEffects:GetDescendants() do
+					if d.Name == "TaggedPop" then
+						pop = d
+					end
+				end
+				expect(pop.Size.X.Offset).toBeGreaterThan(220)
+				c.rt:advance(0.5)
+				expect(pop.Size.X.Offset).toBe(220)
+			end
+			c.rt:advance(1.5)
+			expect(#hits(c)).toBe(0)
+		end
+		c.rt:advance(10)
+		expect(#c.rt.workspace.CandyEffects:GetChildren()).toBe(0)
+	end)
+
+	it("gives phones fewer pieces", function()
+		local c = gun({ phone = true })
+		shot(c, "Hider", c.rt.env.Vector3.new(0, 2, -20))
+		c.rt:advance(0.25)
+		local bits = #hits(c)[1].Burst:GetChildren()
+		expect(bits).toBeLessThan(c.motion.CandyGun.Hider.Bits)
+		expect(bits).toBeGreaterThan(0)
+	end)
+
+	it("still sends at once but shows no extra effects with the motion off", function()
+		for _, which in { "ScreenMotion", "UI" } do
+			local c = gun()
+			if which == "ScreenMotion" then
+				c.Config.ScreenMotion.On = false
+			else
+				c.Config.UI.Motion.On = false
+			end
+			c.rt:fire(
+				c.rt.game:GetService("UserInputService").TouchTapInWorld,
+				c.rt.env.Vector2.new(400, 300),
+				false
+			)
+			expect(#fired(c, "HideSeekShoot")).toBe(1)
+			expect(c.cross:FindFirstChildOfClass("UIScale").Scale).toBe(1)
+			expect(c.cross.Rotation).toBe(0)
+			shot(c, "Decoy", c.rt.env.Vector3.new(0, 2, -20))
+			c.rt:advance(0.25)
+			expect(#hits(c)).toBe(0)
+		end
+	end)
+end)
+
+-- The spectating camera (SpectateTargets, Config.ScreenMotion.SpectateCamera): a new target
+-- glides over, then the normal camera (Custom) follows the new subject.
+describe("Spectate camera glide", function()
+	local function setup(options: { motion: boolean? }?)
+		local c = client(options)
+		local env = c.rt.env
+		local camera = c.rt.workspace.CurrentCamera
+		local others = {}
+		for i = 1, 3 do
+			local p = c.rt:addPlayer({ Name = "Runner" .. i, character = false })
+			c.rt:spawnCharacter(p, env.CFrame.new(i * 40, 5, 0))
+			table.insert(others, p)
+		end
+		c.rt:spawnCharacter(c.player, env.CFrame.new(0, 5, 0))
+		local mine = c.player.Character:FindFirstChildOfClass("Humanoid")
+		camera.CameraType = env.Enum.CameraType.Custom
+		camera.CameraSubject = mine
+		camera.CFrame = env.CFrame.lookAt(env.Vector3.new(0, 12, 14), env.Vector3.new(0, 6.5, 0))
+		c.camera = camera
+		c.mine = mine
+		c.others = others
+		c.Spectate = c.rt:require(c.Client.SpectateTargets)
+		return c
+	end
+
+	local function humanoidOf(p): any
+		return p.Character:FindFirstChildOfClass("Humanoid")
+	end
+
+	it("glides to a new target and ends on the Custom camera following it", function()
+		local c = setup()
+		local Custom = c.rt.env.Enum.CameraType.Custom
+		local start = c.camera.CFrame.Position
+		c.Spectate.Follow(c.others[1])
+		expect(c.Spectate.Gliding()).toBe(true)
+		c.rt:advance(0.15)
+		local mid = c.camera.CFrame.Position
+		expect((mid - start).Magnitude).toBeGreaterThan(1) -- on its way...
+		local goal = c.others[1].Character.HumanoidRootPart.Position
+		expect((mid - goal).Magnitude).toBeGreaterThan(5) -- ...not there yet
+		c.rt:advance(0.4)
+		expect(c.Spectate.Gliding()).toBe(false)
+		expect(c.camera.CameraType).toBe(Custom)
+		expect(c.camera.CameraSubject).toBe(humanoidOf(c.others[1]))
+		-- Same angle and distance as before, behind the new subject.
+		local offset = c.camera.CFrame.Position - (goal + c.rt.env.Vector3.new(0, 1.5, 0))
+		expect(offset).toBeNear(start - c.rt.env.Vector3.new(0, 6.5, 0), 0.01)
+		-- Restoring glides back and ends on your own humanoid, Custom.
+		c.Spectate.RestoreCamera()
+		c.rt:advance(0.6)
+		expect(c.Spectate.Gliding()).toBe(false)
+		expect(c.camera.CameraType).toBe(Custom)
+		expect(c.camera.CameraSubject).toBe(c.mine)
+	end)
+
+	it("ends on the last of three quick switches with nothing left running", function()
+		local c = setup()
+		for i = 1, 3 do
+			c.Spectate.Follow(c.others[i])
+			c.rt:advance(0.2 / 3)
+		end
+		c.rt:advance(0.5)
+		expect(c.Spectate.Gliding()).toBe(false)
+		expect(c.camera.CameraType).toBe(c.rt.env.Enum.CameraType.Custom)
+		expect(c.camera.CameraSubject).toBe(humanoidOf(c.others[3]))
+		-- Nothing moves the camera any more.
+		local still = c.camera.CFrame
+		c.rt:advance(0.5)
+		expect(c.camera.CFrame).toEqual(still)
+		-- Stopping spectating half-way through a glide still ends on your own humanoid.
+		c.Spectate.Follow(c.others[1])
+		c.rt:advance(0.1)
+		c.Spectate.RestoreCamera()
+		c.rt:advance(0.6)
+		expect(c.camera.CameraType).toBe(c.rt.env.Enum.CameraType.Custom)
+		expect(c.camera.CameraSubject).toBe(c.mine)
+	end)
+
+	it("switches at once with smoothing off", function()
+		for _, how in { "SpectateCamera", "ScreenMotion" } do
+			local c = setup()
+			if how == "SpectateCamera" then
+				c.Config.ScreenMotion.SpectateCamera.On = false
+			else
+				c.Config.ScreenMotion.On = false
+			end
+			c.Spectate.Follow(c.others[2])
+			expect(c.Spectate.Gliding()).toBe(false)
+			expect(c.camera.CameraType).toBe(c.rt.env.Enum.CameraType.Custom)
+			expect(c.camera.CameraSubject).toBe(humanoidOf(c.others[2]))
+			c.Spectate.RestoreCamera()
+			expect(c.camera.CameraSubject).toBe(c.mine)
+		end
+	end)
+
+	it("lets the ghost's haunt cam take the camera from a glide", function()
+		local c = setup()
+		c.Spectate.Follow(c.others[1])
+		c.rt:advance(0.1)
+		c.Spectate.StopGlide()
+		c.camera.CameraType = c.rt.env.Enum.CameraType.Scriptable
+		local held = c.rt.env.CFrame.new(5, 50, 5)
+		c.camera.CFrame = held
+		c.rt:advance(0.5)
+		expect(c.camera.CFrame).toEqual(held) -- the glide no longer writes the camera
+		expect(c.camera.CameraType).toBe(c.rt.env.Enum.CameraType.Scriptable)
+	end)
+end)

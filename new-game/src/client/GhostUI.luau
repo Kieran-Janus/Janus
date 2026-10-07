@@ -198,6 +198,7 @@ function GhostUI.Mount(gui: ScreenGui)
 			end
 		end
 		hauntCamUntil = os.clock() + cfg.Seconds
+		SpectateTargets.StopGlide() -- the haunt cam has the camera now
 		camera.CameraType = Enum.CameraType.Scriptable
 		local started = os.clock()
 		local offset = camera.CFrame.Position - catchSpot

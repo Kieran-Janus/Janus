@@ -1,8 +1,8 @@
 # Pumpkin Panic v2: what changed and how to use it
 
-Written 6 October 2026 for Kieran. Plain English, step by step.
+Written 6 October 2026 for Kieran, updated 7 October. Plain English, step by step.
 
-**Read this first.** Everything in v2 was built and tested **offline** (more than 1,100 automatic tests, plus picture renders of the lobby and maps). Nobody has pressed Play on it in Roblox Studio yet. So the first job is to update, open Studio, press Play and run `/verify-v2` in Claude Code (see [Test in Studio](#test-in-studio)).
+**Read this first.** v2 was built and tested **offline** (well over 1,100 automatic tests, plus picture renders of the lobby and maps), then checked in Roblox Studio on 6 October with `/verify-v2` (solo, 2 players, an iPhone-sized screen and an iPad; the fixes are listed in `docs/PROGRESS.md`). The 7 October additions (cartoon crates, animations everywhere, one-click lobby editing, Toolbox swaps, bigger phone screens, server fixes) are covered by the offline tests. After updating, press Play and run `/verify-v2` again to see them in Studio (see [Test in Studio](#test-in-studio)).
 
 The pictures below are renders made from the game's own code, not Studio screenshots. Studio will look a little different (better lighting, cobwebs and rope lines show).
 
@@ -55,6 +55,7 @@ Words used on this page:
 - You appear on a round stone that says **BOO!**, facing a glowing rune circle under a pumpkin arch. That circle is the **Ready pad**.
 - Stand on it to say "I want to play". The floating sign shows **READY 1 / 2** and so on.
 - When enough players are ready, the vote opens. Only ready players can vote.
+- The sign hides while you stand right under it (from there you would only see its cut-off bottom at the top of the screen).
 - Everyone else stays in the lobby: shop, crates, parkour, minigames. They can watch the round with **Menu > Spectate** (or the "Watch the round" button).
 - After a round, everyone comes back to the lobby spawn. To play again, step on the pad again.
 
@@ -95,7 +96,8 @@ Fair-play rules that were added after review:
 - The lobby is solid: trees, lampposts, benches, gravestones, crates, stalls, statues and big pumpkins can't be walked through, and nothing you stand on lets you fall through. Paths, area entrances and the Ready pad stay clear.
 - The Photo Spot has 10 spooky dances (Zombie Shuffle, Skeleton Rattle, Ghost Float, Pumpkin Head Spin, Monster Mash, Bat Flap, Scaredy Cat Shiver, Witchy Cackle, Mummy Wobble, Spooky Floss) that everyone can see. Walk or jump to stop.
 - Dusk lighting with a big moon, stars, clouds and soft haze.
-- Every lobby area is its own Model with readable names, so it is easy to edit by hand (see [Make it look like yours](#make-it-look-like-yours)).
+- The lobby is sorted into **folders** with readable names (one per area, plus `Plaza`, `Decor`...), and every single thing in them (one pumpkin, one bench, one parkour step) is its own Model. In Studio a click selects just that one thing, so you can move it without dragging the whole lobby along (see [Make it look like yours](#make-it-look-like-yours)).
+- The lobby comes alive: the shopkeeper breathes, turns to you and waves; the Ready ring pulses (faster when someone is ready) and its sign hops when the count changes; the floor signs shimmer; the cauldron bubbles; bats flap across the sky.
 
 More views: [from the top](screenshots/lobby-top.png).
 
@@ -166,9 +168,33 @@ No picture: they are hidden on purpose.
 ### Top-left Menu
 No picture yet: you'll see it the moment you press Play.
 - One orange **Menu** button in Roblox's own top bar, next to the Roblox and chat buttons (so the chat window can't cover it). On a keyboard, press **M**.
-- It opens a grid of tiles: **Skins, Shop, Crates, Vote, Spectate, Invite, Codes, Settings, VIP & Packs, Parkour, Secret Pumpkins**. A tile only shows while its feature is on.
+- It opens a grid of tiles: **Skins, Shop, Crates, Vote, Spectate, Invite, Codes, Settings, VIP & Packs, Parkour, Tormented Tower, Secret Pumpkins**. A tile only shows while its feature is on.
 - The old column of Shop / Codes / Invite / Settings buttons moved into the Menu, so the screen is clear. **B** still opens the shop.
-- Only one panel is open at a time. Escape closes it.
+- Only one panel is open at a time. Escape closes it. Any open panel (Shop, Crates...) closes by itself when a round pulls you in, so it never covers the start of the round.
+
+### Everything is animated
+- **Panels and buttons**: panels pop in and shrink away, buttons squash when pressed, the Menu's tiles pop in one by one, the Menu button wobbles once to say hello, your coins roll to their new number with a "+50".
+- **Rounds**: vote cards pop in and the winner pops; a big 3-2-1 and GO!; banners punch in; results rows grow in with a shine and a "You got X coins!" pill. Hide & Seek, ScareMaze (with a BOO cooldown ring), the jumpscare, the ghost and spectate bars, reward toasts (the daily reward counts up), NPC text typing out, stacked announcements and the in-world Voting Board all move too.
+- **Round maps come alive**: King Hunt pumpkins bob, spin, glow and pop with sparkles when collected; fireflies drift in each map's colour; Hide & Seek decoys and hiders' pumpkins wobble now and then, exactly alike, so a hider never stands out. Only copies on each screen move: the real pickups stay where the server put them.
+- **Shop**: cards lift under the mouse, previews turn, rare cards shine, a purchase pops with sparkles, a refusal says "Need N more Coins", putting something on says "Wearing it!". The Settings switches slide.
+- **Minigames**: Candy Rush, Web Scour, the secret pumpkins and both parkour courses get sparkles, "+1"s, count-ups, confetti, fireworks and a NEW BEST! moment, only on the server's real results.
+- Too much? Every animation has a switch, all in one list: [`docs/CUSTOMIZE.md` > Turn animations off or down](CUSTOMIZE.md#turn-animations-off-or-down).
+
+### Phones
+- The Shop on phones has tighter title, tab and filter rows, one-line names and a closer camera, so the skin pictures are clearly visible (`Config.Shop.PhonePreviewDistance`).
+- The crate panel drops its hint line on phones, the crate cards fit (name and price never cut off) and the opening chest is bigger (`Config.Crates.Opening.PhoneCameraDistance`).
+- Smoother: the lobby, crate stand, map and skin animations only look for something nearby a few times a second (fewer on phones) and do nothing while nothing near you moves; a panel's animations only run while it is open. Settings: `Config.Performance`.
+
+### Toolbox looks in one line
+- Every free Toolbox model has a code (the number in its link). One command-bar line gives **every copy** of a prop that look (`Swap.Toolbox`), only the thing(s) you clicked (`Swap.Selected`), or one secret pumpkin (`Swap.Egg`). A pack (a folder of several trees) is spread over the copies.
+- Scripts are removed, a Tool (a torch, a sword) becomes a plain model nobody can pick up, and lights inside Toolbox models stay off where the built thing had none, so the lobby stays inside its phone light budget.
+- A custom crate model is sized by its longest side, so a long coffin stays on its plinth.
+- Steps: [Make it look like yours](#make-it-look-like-yours) below.
+
+### Safer servers
+- VIP can't be faked any more: the server asks Roblox whether you own the pass, instead of trusting a message from your computer.
+- The leaderboard can no longer overwrite a player's lifetime total with 0 (after a failed save load, or when they leave), and it stops retrying for players who have left.
+- The friend bonus check no longer errors when a player leaves in the middle of it.
 
 ---
 
@@ -199,12 +225,13 @@ Do these once, in this order.
 2. In Studio: **Plugins > Rojo > Connect**. Accept the changes it shows.
 3. Restart Claude Code (Ctrl+C twice, then `claude`), so it sees the new slash commands like `/verify-v2`.
 
-### 3. The lobby rebuilds itself once
-Every lobby the game builds carries a version number: the attribute **BuildVersion** on `Workspace.Hub`. The code's number is `Config.Hub.BuildVersion` (now 5). When the lobby saved in your place has a lower number (or none, like your old one), the game builds the new lobby automatically when you press Play.
+### 3. The lobby rebuilds itself when the code changes
+Every lobby the game builds carries a version number: the attribute **BuildVersion** on `Workspace.Hub`. The code's number is `Config.Hub.BuildVersion` (now **10**; it goes up every time the lobby code changes, e.g. 9 for the one-click folders, 10 for the cartoon crate stand). When the lobby saved in your place has a lower number (or none), the game builds the new lobby automatically when you press Play, **unless it is Locked** (the attribute `Locked` on `Workspace.Hub`, or `Bake.Lock()`). A Locked lobby is never rebuilt; the Output window says it is older than the code and how to update it.
 
 What that means for you:
-- **If you never changed the old lobby by hand:** nothing to do. You get the new lobby.
-- **If you moved or changed things in the old lobby:** those changes are replaced by the new lobby. They are gone in the game. Re-do them on the new lobby (it's a different layout, so most old edits wouldn't fit anyway), then **Lock** it so it is never rebuilt again. Steps are in [Make it look like yours](#make-it-look-like-yours).
+- **If you never changed the lobby by hand (not Locked):** nothing to do. You get the new lobby.
+- **If you moved or changed things and did NOT lock it:** those changes are replaced by the new lobby. Re-do them on the new lobby, then **Lock** it so it is never rebuilt again. Steps are in [Make it look like yours](#make-it-look-like-yours).
+- **If your lobby is Locked:** it stays exactly as you left it, so you won't see lobby changes like the new crate stand. To get them, run `require(game.ServerScriptService.Server.Tools.Bake).Hub(true)` in edit mode (your hand edits are replaced; the old lobby is kept in `ServerStorage > HubBackup`), re-do your edits, then `Bake.Lock()` again.
 
 To make the new lobby part of your place (so you also see it while editing, not only while playing):
 1. Stop the game (edit mode).
@@ -262,6 +289,7 @@ Good to know:
 - Signposts and paths pointing at a switched-off area stay until the lobby is rebuilt (F8 > Rebuild hub, or `Bake.Hub()`).
 - With every mode switched off, King Hunt still plays, so a round can always start.
 - The little celebrations in the lobby minigames (sparkles, "+1", confetti, fireworks, NEW BEST!) have their own switch: `Effects = { On = true, ...` in `src/shared/Config/Minigames.luau` turns them all off, and each game's `Effects.On` (`CandyRush.luau`, `WebScour.luau`, `EasterEggs.luau`, `Parkour.luau`) turns off just that one. The games themselves work the same either way.
+- Animations have their own switches in the other Config files (UI, rounds, Shop, lobby, crates). All of them are listed in one place: [`docs/CUSTOMIZE.md` > Turn animations off or down](CUSTOMIZE.md#turn-animations-off-or-down).
 - These have no switch: the lobby redesign, rarity prices and the crate skins. Change their numbers in Config (see [Change it](#change-it)) or undo them (next section).
 
 ---
@@ -340,17 +368,22 @@ Each feature has its own short settings file in `src/shared/Config/`. Every file
 | Hide & Seek | `Config/HideSeek.luau` | `HeadStart` (15 s), `Duration` (165 s), `SeekerRatio` (0.25), `GiggleInterval` (20 s), `GlowLastSeconds` (30), `Rewards` |
 | ScareMaze | `Config/ScareMaze.luau` | `Duration` (240 s), `StopSeconds` (3), `HaunterRatio` (0.2), `MinPlayersForHaunters` (3), `Boo.Cooldown` (8 s), `Rewards` |
 | A map's lighting, size, decorations | `Config/Maps/<MapId>.luau` | `Lighting`, `AmbientSound`, `Layout` |
-| Parkour | `Config/Parkour.luau` | `Reward.Coins` (100), `Reward.CooldownHours` (20), `MinSeconds` (15), the `Course` list |
+| Parkour | `Config/Parkour.luau` | `Reward.Coins` (300), `Reward.CooldownHours` (20), `MinSeconds` (45), the `Course` list |
+| Tormented Tower | `Config/TowerParkour.luau` | the `Course` list, `Jumps`, `MinSeconds`, `Reward.BadgeId` |
 | Candy Rush | `Config/CandyRush.luau` | `Candies` (10), `MinPlayers` (2), `Rewards.WinCoins` (25), `Rewards.DailyCap` (300), `Solo.AfterSeconds` (6) |
 | Web Scour | `Config/WebScour.luau` | `Critters` (6), `TimeLimit` (45 s), `CoinsPerCritter` (2), `FinishCoins` (20), `MaxCoins` (50), `RewardCooldown` (180 s) |
 | Secret pumpkins | `Config/EasterEggs.luau` | each egg's `Coins` and `Hint` in `List`, `TouchToCollect` |
 | Rarity prices | `Config/Rarity.luau` | each rarity's `Price` (125 / 500 / 1,000 / 100,000) and `DuplicateRefund` |
-| Crates | `Config/Crates.luau` | `Odds` (70 / 24.9 / 5 / 0.1), each crate's `Price`, `Robux.ProductId`, `RobuxFallbackCoins` |
+| Crates | `Config/Crates.luau` | `Odds` (73.48 / 24 / 2.5 / 0.02), each crate's `Price`, `Robux.ProductId`, `RobuxFallbackCoins`, `LookDefaults` and each crate's `Look`, `Idle` (the stand), `Opening` |
 | Skins | `Config/Skins/<Theme>.luau` | each skin's `Name`, `Rarity` and `Style` (never change an `Id`) |
 | CRAZY effects, themes, Skins tab | `Config/Skins/Settings.luau` | `Effects.MaxAnimated`, `Themes`, `Shop.PageSize` |
 | Menu | `Config/Menu.luau` | the `Tiles` list (order, words, icons, colours), `Key` (M) |
 | Lobby areas | `Config/Lobby.luau` > `Zones` | each zone's `Offset` (where) and `Size` |
 | Lobby look, lighting, music | `Config/init.luau` > `Hub` | `Palette`, `Lighting`, `Music`, `Signposts`, `BuildVersion` |
+| Lobby life (keeper, Ready ring, floor signs, cauldron, bats) | `Config/Lobby.luau` > `Life` | `On`, each part's `On`, `Range` |
+| Round maps coming alive | `Config/MapLife.luau` | `Pickups`, `Ambient`, `Wobble` (each with `On`), `Range` |
+| Screen animations | `Config/ScreenMotion.luau`, `Config/init.luau` > `UI.Motion`, `Voting`, `Juice`, `Results`, `Shop.Juice` | `On` / `Animate` (full list: [CUSTOMIZE](CUSTOMIZE.md#turn-animations-off-or-down)) |
+| Phone smoothness | `Config/init.luau` > `Performance` | `IdleScanHz`, `AmbienceDistance`, `FlickerHz` and their `Phone...` versions |
 
 Words in quotes (signs, messages, buttons) are in each file's `Text` block. Sounds are `"rbxassetid://NUMBER"`; `""` means silent.
 
@@ -453,7 +486,7 @@ Words:
 2. Copy each **Product ID** into the matching `Id = 0` in `Config.Monetization.Products` (same file).
 
 ### Robux crates
-1. Monetization > **Developer Products** > Create one per crate you want to sell for Robux (e.g. "Pumpkin Crate", suggested 49 Robux).
+1. Monetization > **Developer Products** > Create one per crate you want to sell for Robux. All 34 crates have a Robux slot; the 6 classic crates on the stand (Pumpkin, Candy, Spooky, Graveyard, Monster, Moonlight) are a good start. Suggested prices are in `Crates.luau`: 79 Robux for a themed crate (e.g. "Pumpkin Crate"); the rarity crates 19, 69, 129 and 1,999.
 2. Paste each Product ID into that crate's `Robux = { ProductId = 0, ... }` in `src/shared/Config/Crates.luau`.
 3. `SuggestedRobux` is only a note for you: the real price is the one in Creator Hub.
 4. The region rule still applies: players in regions that block paid random items can't open crates. If one somehow buys a Robux crate, they get the crate's coin price instead.
@@ -479,15 +512,15 @@ Shortcuts for testing by hand: press **F8** in a playtest (or the Admin button o
 - **Start round now**, **Force mode**, and one "force next round" button per mode (Studio only)
 - **Parkour: teleport to start**, **Parkour: reset my best/cooldown**
 - **Tower: teleport to start**, **Tower: teleport to checkpoint 1/2/3**, **Tower: reset my progress**
-- **Candy Rush: start solo test**, **Web Scour: start**, **Easter eggs: reset mine**
-- **Crates: open free Pumpkin Crate**, **Crates: +100k coins**
+- **Candy Rush: start solo test**, **Web Scour: start**, **Easter eggs: reset mine**, **Find every egg**
+- **Crates: open free Pumpkin Crate**, **Crates: open free CRAZY Crate** (Studio only: see the CRAZY celebration), **Crates: +100k coins**
 
 ---
 
 ## Known limits
 
 Things that are not done, or need your eyes in Studio:
-- **Tested in Studio on 6 October** (`/verify-v2`): solo, 2 players (Clients and Servers), an iPhone-sized screen and an iPad (Test > Device). What was fixed is listed in `docs/PROGRESS.md`. The longer parkour was climbed start to finish in a Studio playtest (all 7 checkpoints, coins paid). The Tormented Tower was checked in Studio piece by piece (spinning bars, cogs and vanishing platforms moving, the last stage climbed, the skin and the announcement given); a full climb by hand is worth doing, it is meant to be very hard. Still worth doing yourself: a 3-player ScareMaze (an OUT Survivor turning into a Haunter), a parkour climb with your own hands, and a live test with friends after publishing.
+- **Tested in Studio on 6 October** (`/verify-v2`): solo, 2 players (Clients and Servers), an iPhone-sized screen and an iPad (Test > Device). What was fixed is listed in `docs/PROGRESS.md`. The longer parkour was climbed start to finish in a Studio playtest (all 7 checkpoints, coins paid). The Tormented Tower was checked in Studio piece by piece (spinning bars, cogs and vanishing platforms moving, the last stage climbed, the skin and the announcement given); a full climb by hand is worth doing, it is meant to be very hard. Still worth doing yourself: a 3-player ScareMaze (real Haunters, an OUT Survivor turning into a Haunter, and the new BOO cooldown ring: none of these was seen in Studio with 3 players), a parkour climb with your own hands, and a live test with friends after publishing. The 7 October additions (animations, cartoon crates, phone Shop and crate panel, server fixes) are covered by offline tests; run `/verify-v2` once to see them in Studio.
 - **Lighting Technology** must be set to Future by hand once (see above).
 - **Sounds**: new features reuse sound ids that were already in the game (the hider giggle is a pitched-up bat squeak). Swap any you don't like in each feature's `Sounds` block.
 - **Art is still built from Parts**: the Pumpkin King, the round maps and the scare characters. Real models can replace them (see [Make it look like yours](#make-it-look-like-yours)).
@@ -496,7 +529,8 @@ Things that are not done, or need your eyes in Studio:
 - **ScareMaze with 2 players has no Haunters** (Haunters need 3+). The scares move on the server, so they may look a little choppy on slow connections.
 - **Hide & Seek**: hiders' invisible bodies can still bump into decoy pumpkins.
 - **Anti-cheat**: a very slow fly upwards on the parkour still passes the speed check (the 45-second minimum time stops instant wins). A Candy Rush auto-clicker could be about twice as fast as a person; coins are still capped. General speed hacks are possible in every Roblox game; pickups and rewards check speed.
-- **Crates**: the region check and real Robux purchases can only be tested on the published game. 
+- **Robux**: no products exist yet. The VIP pass, the 3 coin packs and the crate products all have id `0` in Config, so their buttons say "Coming soon" (see [Robux setup](#robux-setup)).
+- **Crates**: the region check and real Robux purchases can only be tested on the published game.
 - **Skins**: the 6 classic skins don't have the new rarity effects. The Menu's Skins tile opens all skins (not "owned only").
 - **Phones**: the full lobby is about 4,230 parts and 88 lights (the phone budget is 4,300 parts and 90 lights). That is inside the phone budget the tests check, but check the frame rate on a real phone.
 - **Saves are not session-locked yet** (planned before any trading, see `docs/ROADMAP.md`).

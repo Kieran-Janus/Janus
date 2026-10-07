@@ -369,6 +369,47 @@ describe("Buy buttons in view on a short phone screen", function()
 		p.rt:advance(0.1)
 	end)
 
+	it("tucks a smaller rarity tag into the card's corner on phones", function()
+		local function firstTag(width: number, height: number, touch: boolean)
+			local p = screen(width, height, touch)
+			local ShopUI = p.rt:require(p.Client.ShopUI)
+			ShopUI.Mount(p.gui)
+			p.rt:advance(0.5)
+			p.rt:fire(p.remotes.ShopState, "OnClientEvent", {
+				Ready = true,
+				Coins = 500,
+				Owned = {},
+				Equipped = { Skin = "", Hat = "", Trail = "", Pet = "" },
+				Vip = false,
+			})
+			ShopUI.Open("Skin")
+			p.rt:advance(0.5)
+			local tag = p.gui.Shop:FindFirstChild("RarityTag", true)
+			expect(tag).toBeTruthy()
+			return tag, p.Config
+		end
+		local phone, Config = firstTag(640, 302, true)
+		local pc = firstTag(1280, 760, false)
+		T.note(
+			("phone tag %d tall, text %d, at %d; PC %d tall, text %d, at %d"):format(
+				phone.Size.Y.Offset,
+				phone.TextSize,
+				phone.Position.X.Offset,
+				pc.Size.Y.Offset,
+				pc.TextSize,
+				pc.Position.X.Offset
+			)
+		)
+		expect(phone.TextSize).toBeGreaterThanOrEqual(Config.UI.MinTextSize)
+		expect(phone.TextSize).toBeLessThanOrEqual(pc.TextSize)
+		expect(phone.Size.Y.Offset).toBeLessThan(pc.Size.Y.Offset)
+		expect(phone.Position.X.Offset).toBeLessThan(pc.Position.X.Offset)
+		expect(phone.Position.Y.Offset).toBeLessThan(pc.Position.Y.Offset)
+		local phonePad = phone:FindFirstChildOfClass("UIPadding").PaddingLeft.Offset
+		local pcPad = pc:FindFirstChildOfClass("UIPadding").PaddingLeft.Offset
+		expect(phonePad).toBeLessThan(pcPad)
+	end)
+
 	it("pins the crate's Open buttons under the scrolling column", function()
 		local p = screen(640, 302, true)
 		p.Config.Features.Crates = true

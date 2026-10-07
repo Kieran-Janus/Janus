@@ -55,6 +55,40 @@ return {
 		GlowPulseFade = 0.45,
 	},
 
+	-- The Hide & Seek candy gun (src/client/CandyGunClient.luau). Firing is sent at once; the
+	-- crosshair just kicks. When the server says where the candy landed (never where you
+	-- clicked), a burst shows what it hit there: a candy splat (a decoy), big sparkles and a
+	-- popping "TAGGED!" (a hidden pumpkin), a small puff (a miss). Bits = how many pieces fly
+	-- out (phones get PhoneShare of them), Size = each piece's size, Distance = how far they
+	-- fly, Seconds = how long the burst lasts, Grow = each piece ends this many times its size.
+	CandyGun = {
+		KickScale = 1.35, -- the crosshair jumps this big when you fire...
+		KickDegrees = 12, -- ...tilted this much...
+		KickSeconds = 0.18, -- ...and settles back in this long
+		Decoy = { Bits = 14, Size = 16, Distance = 70, Seconds = 0.55, Grow = 0.5 },
+		Hider = { Bits = 22, Size = 22, Distance = 120, Seconds = 0.8, Grow = 0 },
+		Miss = {
+			Bits = 5,
+			Size = 14,
+			Distance = 28,
+			Seconds = 0.45,
+			Grow = 1.8,
+			Color = Color3.fromRGB(235, 230, 240), -- the puff's colour
+		},
+		TaggedPopScale = 1.8, -- "TAGGED!" over the pumpkin starts this big...
+		TaggedPopSeconds = 0.3, -- ...and snaps to its size in this long
+	},
+
+	-- The spectating camera (src/client/SpectateTargets.luau, used by the ghost screen and
+	-- lobby spectating). Switching who you watch glides the camera over in GlideSeconds, then
+	-- hands it back to the normal camera following the new player (you can turn it again).
+	-- On = false (or the motion switches above off): it jumps straight there, like before.
+	SpectateCamera = {
+		On = true,
+		GlideSeconds = 0.35,
+		FallbackDistance = 12, -- studs behind the new player if the camera was right on top of the old one
+	},
+
 	-- ScareMaze (src/client/ScareMazeUI.luau)
 	ScareMaze = {
 		TeamPopScale = 1.6, -- "You're a SURVIVOR!" starts this big...
