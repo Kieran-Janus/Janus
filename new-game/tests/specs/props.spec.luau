@@ -1020,6 +1020,31 @@ describe("Swap tool (src/server/Tools/Swap.luau)", function()
 		expect(downloads).toBe(downloaded)
 	end)
 
+	it("sizes a custom crate by its longest side, on the stand and in the crate panel", function()
+		local w = world()
+		local rt = w.rt
+		local CrateArt = rt:require("ReplicatedStorage.Shared.CrateArt")
+		local coffin = w.custom("PumpkinCrate")
+		coffin.Look.Size = w.Vector3.new(2, 2, 10) -- a long Toolbox coffin
+		coffin.Look.CFrame = w.CFrame.new(0, 1, 0)
+		local target = CrateArt.Height()
+		local hub = w.HubBuilder.Build()
+		local function longest(m: any): number
+			local _, size = m:GetBoundingBox()
+			return math.max(size.X, size.Y, size.Z)
+		end
+		local crate = hub.CrateStand.PumpkinCrateDisplay.PumpkinCrate
+		expect(crate:GetAttribute("CustomProp")).toBe(true)
+		local standSize = crate:GetAttribute("PropSize")
+		expect(longest(crate)).toBeNear(standSize, 0.05)
+		-- Swapped again (Swap.Props), even with the attribute lost in an older saved hub.
+		crate:SetAttribute("PropFitLargest", nil)
+		local again = w.Kit.swapProp(crate)
+		crate:Destroy()
+		expect(longest(again)).toBeNear(standSize, 0.05)
+		expect(longest(CrateArt.Preview({ Id = "PumpkinCrate" }))).toBeNear(target, 0.05)
+	end)
+
 	it("turns a Toolbox tool (a torch) into a plain model nobody can pick up", function()
 		local w = world()
 		local rt = w.rt

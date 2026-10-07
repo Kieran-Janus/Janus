@@ -266,6 +266,8 @@ export type PropOptions = {
 	-- cframe (named "Hitbox", its PrimaryPart), that collides and gets hit instead of it
 	Model: string?, -- use the model with this name in Custom.Props instead of `name` (one thing
 	-- with a look of its own: Swap.Selected). It is remembered in the attribute CustomModel.
+	FitLargest: boolean?, -- a custom model is sized by its longest side, not its height (a crate:
+	-- a long Toolbox coffin stays on its plinth instead of growing as long as a bus)
 }
 
 -- Attributes Kit itself puts on props (not copied from an old prop to its replacement).
@@ -279,6 +281,7 @@ local PROP_ATTRIBUTES = {
 	CustomProp = true,
 	CustomModel = true,
 	PropLit = true,
+	PropFitLargest = true,
 }
 
 -- Tags that only change how something looks (everything else in Tags does something).
@@ -384,7 +387,7 @@ local function dressCustom(
 	options: PropOptions,
 	center: boolean
 )
-	CustomAssets.Fit(custom, size)
+	CustomAssets.Fit(custom, size, options.FitLargest == true)
 	local visual = options.Visual == true or options.Hitbox ~= nil
 	-- A light inside the model only shines where the built thing had one (or with ModelLights):
 	-- a Toolbox jack-o'-lantern with a light in it would otherwise push the lobby over its
@@ -471,6 +474,7 @@ function Kit.prop(
 	m:SetAttribute("PropAnchor", anchor)
 	m:SetAttribute("PropHitbox", o.Hitbox)
 	m:SetAttribute("PropVisual", if o.Visual == true then true else nil)
+	m:SetAttribute("PropFitLargest", if o.FitLargest == true then true else nil)
 	-- Built or custom, the pivot is the spot it was placed on (other code relies on this, e.g.
 	-- the shopkeeper stands relative to the stall's pivot).
 	setPivot(m, cframe)
@@ -649,6 +653,9 @@ function Kit.swapProp(old: Model, model: string?): Model?
 		Visual = visual,
 		Hitbox = if typeof(rawHitbox) == "Vector3" then rawHitbox else fallbackHitbox(old),
 		Light = if old:GetAttribute("PropLit") == false then nil else lightOf(old, name, size),
+		-- (a crate on the stand saved before PropFitLargest existed: its display has a CratePrompt)
+		FitLargest = old:GetAttribute("PropFitLargest") == true
+			or parent:FindFirstChild("CratePrompt") ~= nil,
 		Model = if source ~= name then source else nil,
 	})
 	if custom == old then

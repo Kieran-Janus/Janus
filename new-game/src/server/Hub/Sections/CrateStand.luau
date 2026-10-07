@@ -100,7 +100,7 @@ local function display(
 		local built = CrateArt.Build(crate, size)
 		built:PivotTo(stand)
 		return built
-	end, { Visual = true })
+	end, { Visual = true, FitLargest = true })
 	crateModel.Name = crate.Id
 	local bob = Config.Crates.Stand.Bob
 	if bob > 0 and crateModel.PrimaryPart then

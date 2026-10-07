@@ -210,7 +210,7 @@ Sizes are studs tall (each copy is scaled to its own size, so this is just a gui
 | `CandyCane`, `GiantLollipop`, `CandyBucket`, `Gumdrop`, `SignCandyCorn` | the Candy Rush stand's decorations | lobby | 1.2-24 |
 | `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn` | the candies you click in Candy Rush | lobby, during a race | 2.4 (`Config.CandyRush`) |
 | `GroveSpider` | the friendly spider in the Spider Grove | lobby | 8 |
-| a crate's Id, e.g. `PumpkinCrate` | that crate on the crate stand | lobby | 3-3.6 |
+| a crate's Id, e.g. `PumpkinCrate` | that crate on the crate stand and in the crate panel | lobby, Menu > Crates | 3-3.6 (its longest side) |
 | `ScareScarecrow`, `ScareZombie`, `ScareBat`, `ScareGhost` | the ScareMaze scares | ScareMaze | 9, 6, 1.4, 6 |
 
 Can't be swapped this way: things that come in every length (the long hedge and corn walls, fence rails, bunting, paths), and anything with words drawn on it by the game (the boards). Characters (the King, minions, the shopkeeper) go in `Custom > Characters` and hats, pets and skins in `Custom > Cosmetics` ([Builder mode](#builder-mode-give-a-character-your-own-look)).
@@ -358,7 +358,7 @@ Mystery crates give a random skin. Everything about them is in `src/shared/Confi
   isn't room for all 30) on plinths with an "Open" prompt. Each prompt sits on
   an invisible part tagged `CrateDisplay` with the attribute `CrateId`: move or copy them in
   Studio, or tag any part of your own. Your own crate look: a model named after the crate's Id
-  (e.g. `PumpkinCrate`) in `ReplicatedStorage > Custom > Props`.
+  (e.g. `PumpkinCrate`) in `ReplicatedStorage > Custom > Props`. It shows on the stand and in the crate panel, sized by its longest side (a long coffin stays on its plinth; a model you stood upright stays upright). With a Toolbox code: `require(game.ServerScriptService.Server.Tools.Swap).Toolbox("PumpkinCrate", 5420577601)`. Its front is its pivot's front (turn the pivot if it shows its side).
 - **Test it**: F8 > "Crates: open free Pumpkin Crate" and "Crates: +100k coins". Which crate the free button opens: `Admin.FreeCrate`. To see what players in a blocked region see, set `Policy.TestAsRestricted = true` (Studio only).
 - Or ask Claude Code: `/add-crate a Witchy crate with 20 new skins`.
 

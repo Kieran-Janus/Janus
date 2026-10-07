@@ -244,7 +244,8 @@ end
 function CrateArt.Preview(crate: any, size: number?): Model
 	local custom = CustomAssets.Clone("Props", crate.Id)
 	if custom then
-		CustomAssets.Fit(custom, CrateArt.Height(size))
+		-- (by its longest side: a long coffin or a tall sarcophagus still fits the preview)
+		CustomAssets.Fit(custom, CrateArt.Height(size), true)
 		CustomAssets.MakeDecor(custom)
 		CustomAssets.PlaceFeet(custom, CFrame.identity)
 		custom:SetAttribute("CrateId", crate.Id)
