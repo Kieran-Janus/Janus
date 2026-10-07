@@ -49,6 +49,7 @@ local ORDER = {
 	"Controls",
 	"VoiceMeter",
 	"HubAmbience",
+	"CrateIdle", -- the crates on the lobby stand bob, peek and wake up when you walk over
 	"ReadySign", -- the "READY x / y" sign over the Ready pad
 	"VoteBoardUI",
 	"ZoneLighting",

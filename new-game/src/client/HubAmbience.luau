@@ -1,7 +1,9 @@
 --!strict
 --[[
 	Local-only hub (and map) animation, so the server never has to move decorations:
-	  "HubFloat" Models bob up and down (attributes BobHeight, Phase)
+	  "HubFloat" Models bob up and down (attributes BobHeight, Phase). The crates on the
+	             crate stand are left alone while Config.Crates.Idle is on: CrateIdle.luau
+	             animates them (a lobby saved before that still has the HubFloat tag on them).
 	  "HubFlicker" PointLights flicker like candles
 	Anything tagged later (the hub may be built after this client starts) is picked up too.
 	Cheap on phones (Config.Performance): only things near the camera animate, and the
@@ -12,16 +14,41 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Tags = require(ReplicatedStorage.Shared.Tags)
 
 type Float = { Base: CFrame?, Bob: number, Phase: number }
 type Flicker = { Brightness: number, Seed: number }
 
 local HubAmbience = {}
 
+-- A crate on the crate stand: its Display model also holds the CratePrompt part (tagged
+-- CrateDisplay).
+function HubAmbience.IsStandCrate(m: Model): boolean
+	local display = m.Parent
+	if not display or display == workspace then
+		return false
+	end
+	if display:FindFirstChild("CratePrompt") then
+		return true
+	end
+	for _, sibling in display:GetChildren() do
+		if sibling ~= m and CollectionService:HasTag(sibling, Tags.CrateDisplay) then
+			return true
+		end
+	end
+	return false
+end
+
+-- CrateIdle animates the stand's crates (it does nothing with crates or Idle switched off).
+local function crateIdleOn(): boolean
+	return Config.Features.Crates == true and Config.Crates.Idle.On == true
+end
+
 function HubAmbience.Mount()
 	local perf = Config.Performance
 	local floats: { [Model]: Float } = {}
 	local flickers: { [PointLight]: Flicker } = {}
+	local skipCrates = crateIdleOn()
 
 	local function addFloat(instance: Instance)
 		if not instance:IsA("Model") then
@@ -63,6 +90,14 @@ function HubAmbience.Mount()
 		local eye = workspace.CurrentCamera.CFrame.Position
 		for m, f in floats do
 			if not m.Parent then
+				floats[m] = nil
+				continue
+			end
+			-- (checked every frame: with streaming the crate's CratePrompt may arrive later)
+			if skipCrates and HubAmbience.IsStandCrate(m) then
+				if f.Base then
+					m:PivotTo(f.Base) -- back where it was, for CrateIdle to take over
+				end
 				floats[m] = nil
 				continue
 			end

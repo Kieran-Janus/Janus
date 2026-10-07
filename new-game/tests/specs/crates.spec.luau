@@ -285,6 +285,58 @@ describe("Config.Crates and CrateOdds", function()
 		end
 	end)
 
+	it("never teases a near miss: the cards next to the win are never rarer than it", function()
+		local guard = Config.Crates.Opening.TeaseGuard
+		expect(guard).toBeGreaterThan(0)
+		local crate = CrateOdds.Get("PumpkinCrate")
+		local function rank(id: string): number
+			return CrateOdds.RarityIndex(Items.Rarity(Items.Get(id)))
+		end
+		local byRarity = {}
+		for _, c in CrateOdds.Chances(crate) do
+			byRarity[c.Rarity] = byRarity[c.Rarity] or c.Item.Id
+		end
+		local cards, win = Config.Crates.Reel.Cards, Config.Crates.Reel.WinIndex
+		for _, rarity in Config.Rarity.Order do
+			local winner = byRarity[rarity]
+			local level = CrateOdds.RarityIndex(rarity)
+			local rarerOutside = 0 -- cards further away may still be rarer (honest draws)
+			local nearIds = {}
+			for seed = 1, 400 do
+				local reel = CrateOdds.Reel(crate, winner, rt.env.Random.new(seed), cards, win)
+				expect(#reel).toBe(cards)
+				expect(reel[win]).toBe(winner)
+				for i, id in reel do
+					expect(Items.Get(id).Crate).toBe("PumpkinCrate")
+					if i ~= win and math.abs(i - win) <= guard then
+						if rank(id) > level then
+							error(
+								("seed %d: card %d (%s) is rarer than the %s win"):format(
+									seed,
+									i,
+									id,
+									rarity
+								)
+							)
+						end
+						nearIds[id] = true
+					elseif i ~= win and rank(id) > level then
+						rarerOutside += 1
+					end
+				end
+			end
+			local kinds = 0
+			for _ in nearIds do
+				kinds += 1
+			end
+			expect(kinds).toBeGreaterThan(1) -- still random draws, not one fixed card
+			if rarity ~= "Crazy" then
+				expect(rarerOutside).toBeGreaterThan(0)
+			end
+			T.note(("%s win: %d rarer cards outside the guard"):format(rarity, rarerOutside))
+		end
+	end)
+
 	it("finds crates by their Robux product", function()
 		expect(CrateOdds.ByProductId(0)).toBeNil()
 		local crate = CrateOdds.Get("SpookyCrate")
@@ -760,6 +812,31 @@ describe("Admin crate commands", function()
 		expect(ok).toBe(true)
 		expect(data.Coins).toBe(coins + 100000)
 	end)
+
+	it("opens a free CRAZY Crate in Studio, to test the CRAZY opening", function()
+		local list =
+			w.rt:invokeServer(w.rt:find("ReplicatedStorage.Remotes.GetAdminCommands"), player)
+		local labels = {}
+		for _, info in list do
+			labels[info.Name] = info.Label
+		end
+		expect(labels.CrateFreeCrazy).toBe("Crates: open free CRAZY Crate")
+		local coins = data.Coins
+		local before = #w.results(player)
+		w.rt:advance(1)
+		local ok, message = w.rt:invokeServer(
+			w.rt:find("ReplicatedStorage.Remotes.AdminCommand"),
+			player,
+			"CrateFreeCrazy"
+		)
+		expect(ok).toBe(true)
+		expect(message).toMatch("Free CRAZY Crate")
+		expect(data.Coins).toBeGreaterThanOrEqual(coins) -- free (a duplicate even pays back)
+		local sent = w.results(player)
+		expect(#sent).toBe(before + 1)
+		expect(sent[#sent].Rarity).toBe("Crazy")
+		expect(sent[#sent].Paid).toBe("Free")
+	end)
 end)
 
 describe("Crate stand (lobby)", function()
@@ -898,6 +975,14 @@ describe("CrateUI (client)", function()
 		expect(preview.Side.Buy.OpenCoins.Text).toMatch("600")
 		expect(preview.Side.Buy.OpenCoins5.Text).toMatch("3,000")
 		expect(preview.Side.Buy.OpenCoins10.Text).toMatch("6,000")
+		-- Prices always name their currency: never a bare number.
+		local currency = CConfig.Economy.CurrencyName
+		expect(preview.Side.Buy.OpenCoins.Text).toBe("Open 600 " .. currency)
+		for _, b in preview.Side.Buy:GetChildren() do
+			if b:IsA("TextButton") then
+				expect(b.Text).toMatch(currency)
+			end
+		end
 		expect(preview.Side.Extras.OpenRobux.Text).toBe(CConfig.Crates.Text.ComingSoon)
 		expect(preview.Side.Extras.QuickOpen.Text).toMatch(CConfig.Crates.Text.QuickOpen)
 		-- A one-in-a-million skin shows its exact chance.
@@ -917,7 +1002,8 @@ describe("CrateUI (client)", function()
 		expect(panel.Body.Preview.Side.Buy.Visible).toBe(true)
 	end)
 
-	it("spins to the server's result and reveals it", function()
+	it("spins to the server's result and reveals it (Opening.Style Reel)", function()
+		CConfig.Crates.Opening.Style = "Reel"
 		local reel = {}
 		for i = 1, 32 do
 			reel[i] = "Pumpkin_PumpkinSpice"
@@ -951,6 +1037,8 @@ describe("CrateUI (client)", function()
 		)
 		expect(card.Buttons.Equip).toBeInstanceOf("TextButton")
 		expect(card.Buttons.OpenAnother.Visible).toBe(true)
+		expect(opening.Chest.Visible).toBe(false)
+		CConfig.Crates.Opening.Style = "Chest"
 	end)
 
 	it("ignores a malformed result", function()
@@ -1061,8 +1149,326 @@ describe("CrateUI (client)", function()
 		expect(results.Footer.CoinsBack.Text).toBe(
 			CConfig.Crates.Text.CoinsBack:format(5 * 60, CConfig.Economy.CurrencyName)
 		)
+		-- No chest sequence for a quick open.
+		expect(panel.Body.Opening.Chest:FindFirstChild("ChestView")).toBeNil()
+		expect(gui:FindFirstChild("CrazyBurst")).toBeNil()
 		client:fire(results.Footer.Back, "Activated")
 		expect(panel.Body.Preview.Visible).toBe(true)
+		client:fire(panel.Body.Preview.Side.Extras.QuickOpen, "Activated") -- (switch it off again)
+		panel.Visible = false
+		client:advance(0.1)
+	end)
+
+	-- The chest opening (Config.Crates.Opening.Style "Chest", the default) ---------------------
+	local CrateOdds = client:require("ReplicatedStorage.Shared.CrateOdds")
+	local CrateLook = client:require("ReplicatedStorage.Shared.CrateLook")
+	local Opening = CConfig.Crates.Opening
+	local tBurst = Opening.DropSeconds + Opening.ShakeSeconds
+	local tFly = tBurst + Opening.BurstSeconds
+	local tEnd = tFly + Opening.FlySeconds + Opening.PedestalSeconds
+
+	-- A Pumpkin Crate skin of `rarity`.
+	local function skinOf(rarity: string): any
+		for _, c in CrateOdds.Chances(CrateOdds.Get("PumpkinCrate")) do
+			if c.Rarity == rarity then
+				return c.Item
+			end
+		end
+		error("no " .. rarity)
+	end
+	-- What the server would send for that skin.
+	local function resultFor(item: any, extra: { [string]: any }?): any
+		local reel = {}
+		for k = 1, 32 do
+			reel[k] = skinOf("Common").Id
+		end
+		reel[28] = item.Id
+		local result = {
+			Ok = true,
+			Message = "",
+			CrateId = "PumpkinCrate",
+			ItemId = item.Id,
+			ItemName = item.Name,
+			Rarity = item.Rarity or "Common",
+			Duplicate = false,
+			Refund = 0,
+			Reel = reel,
+			WinIndex = 28,
+			Paid = "Coins",
+		}
+		for k, v in extra or {} do
+			result[k] = v
+		end
+		return result
+	end
+	-- Plays `result` from a closed panel (as a Robux purchase or F8 would).
+	local function play(result: any)
+		panel.Visible = false
+		client:advance(0.1)
+		client:fire(client:find("ReplicatedStorage.Remotes.CrateResult"), "OnClientEvent", result)
+		client:advance(0.05)
+	end
+	local function soundsPlayed(spec: any): number
+		local n = 0
+		for _, call in client:calls("Sound", "Play") do
+			if call.instance.SoundId == spec.SoundId then
+				n += 1
+			end
+		end
+		return n
+	end
+
+	it(
+		"drops, shakes, bursts open with the won rarity's beam, flies the skin out, reveals",
+		function()
+			me:SetAttribute("CratesRestricted", false)
+			local item = skinOf("Uncommon")
+			local shakes = soundsPlayed(Opening.Sounds.Shake)
+			play(resultFor(item, { Rarity = "Uncommon" }))
+			local start = client:now() - 0.05 -- (when the result arrived)
+			local function advanceTo(t: number)
+				client:advance(start + t - client:now())
+			end
+			local opening = panel.Body.Opening
+			local stage = opening.Chest
+			expect(opening.Visible).toBe(true)
+			expect(stage.Visible).toBe(true)
+			expect(opening.Reel.Visible).toBe(false)
+			local view = stage.ChestView
+			local chest = view:FindFirstChild("PumpkinCrate")
+			expect(chest).toBeInstanceOf("Model")
+			expect(chest:GetPivot().Position.Y).toBeGreaterThan(0.5) -- still dropping in
+			expect(stage.Beam.Visible).toBe(false)
+			advanceTo(Opening.DropSeconds + 0.02)
+			expect(chest:GetPivot().Position.Y).toBeNear(0, 0.05) -- landed
+			advanceTo(Opening.DropSeconds + Opening.ShakeSeconds * 0.85)
+			local maxRoll = 0
+			for _ = 1, 8 do
+				client:advance(0.02)
+				local _, _, rz = chest:GetPivot():ToEulerAnglesXYZ()
+				maxRoll = math.max(maxRoll, math.abs(math.deg(rz)))
+			end
+			expect(maxRoll).toBeGreaterThan(1) -- shaking hard by now
+			expect(soundsPlayed(Opening.Sounds.Shake) - shakes).toBeGreaterThan(4) -- faster and faster
+			expect(opening.Reveal.Visible).toBe(false)
+			-- The lid bursts open, the beam in the colour of the rarity the server gave.
+			advanceTo(tBurst + Opening.BurstSeconds * 0.9)
+			local beam = stage.Beam
+			expect(beam.Visible).toBe(true)
+			local color, rainbow = CrateLook.BeamColor("Uncommon")
+			expect(beam.BackgroundColor3).toBeNear(color)
+			expect(rainbow).toBe(false)
+			expect(beam:GetAttribute("Rarity")).toBe("Uncommon")
+			expect(stage:GetAttribute("HasLid")).toBe(true)
+			local lid = chest:FindFirstChild("Lid", true)
+			expect(math.abs(lid.CFrame.UpVector.Y)).toBeLessThan(0.9) -- swung open
+			expect(gui:FindFirstChild("CrazyBurst")).toBeNil()
+			expect(stage:FindFirstChild("CoinsBack")).toBeNil() -- not a duplicate
+			-- The skin flies out onto the pedestal.
+			advanceTo(tFly + Opening.FlySeconds + 0.05)
+			expect(view:FindFirstChild("Skin")).toBeInstanceOf("Model")
+			expect(view:FindFirstChild("Pedestal")).toBeInstanceOf("Model")
+			expect(opening.Reveal.Visible).toBe(false)
+			advanceTo(tEnd + 0.1)
+			expect(opening.Reveal.Visible).toBe(true)
+			expect(opening.Reveal.Card.ItemName.Text).toBe(item.Name)
+			expect(opening.Reveal.Card.News.Text).toBe(CConfig.Crates.Text.New)
+			expect(view.Parent).toBeNil() -- the stage is cleared under the reveal
+		end
+	)
+
+	it("colours the beam by the rarity actually won, every rarity (rainbow for CRAZY)", function()
+		for _, rarity in CConfig.Rarity.Order do
+			play(resultFor(skinOf(rarity), { Rarity = rarity }))
+			client:advance(tBurst + 0.05)
+			local beam = panel.Body.Opening.Chest.Beam
+			local color, rainbow = CrateLook.BeamColor(rarity)
+			expect(beam.Visible).toBe(true)
+			expect(beam.BackgroundColor3).toBeNear(color)
+			expect(beam:GetAttribute("Rainbow")).toBe(rainbow)
+			expect(rainbow).toBe(rarity == "Crazy")
+		end
+	end)
+
+	it("skips straight to the reveal with a tap or Space", function()
+		local item = skinOf("Rare")
+		play(resultFor(item, { Rarity = "Rare" }))
+		local opening = panel.Body.Opening
+		client:advance(0.3)
+		expect(opening.Reveal.Visible).toBe(false)
+		client:fire(opening.Chest, "Activated")
+		client:advance(0.05)
+		expect(opening.Reveal.Visible).toBe(true)
+		expect(opening.Reveal.Card.ItemName.Text).toBe(item.Name)
+		-- Space (Config.Crates.Open.SkipKey) does the same.
+		play(resultFor(skinOf("Common")))
+		client:advance(Opening.DropSeconds + 0.2)
+		expect(opening.Reveal.Visible).toBe(false)
+		client:triggerAction("CrateSkip")
+		client:advance(0.05)
+		expect(opening.Reveal.Visible).toBe(true)
+		expect(opening.Reveal.Card.ItemName.Text).toBe(skinOf("Common").Name)
+	end)
+
+	it("pours coins out for a duplicate, with the server's refund", function()
+		local coinSounds = soundsPlayed(Opening.Sounds.Coins)
+		play(resultFor(skinOf("Common"), { Duplicate = true, Refund = 63 }))
+		client:advance(tBurst + 0.1)
+		local stage = panel.Body.Opening.Chest
+		expect(stage.CoinsBack.Text).toBe(Opening.CoinsBack:format(63))
+		expect(stage.CoinsBack.Text).toBe("+63 coins back")
+		local coins = 0
+		for _, child in stage:GetChildren() do
+			if child.Name == "Coin" then
+				coins += 1
+			end
+		end
+		expect(coins).toBeGreaterThan(0)
+		expect(coins).toBeLessThanOrEqual(math.max(Opening.CoinPour, Opening.PhoneCoinPour))
+		expect(soundsPlayed(Opening.Sounds.Coins)).toBe(coinSounds + 1)
+		client:advance(tEnd)
+		expect(panel.Body.Opening.Reveal.Card.News.Text).toBe(
+			CConfig.Crates.Text.Duplicate:format(63, CConfig.Economy.CurrencyName)
+		)
+	end)
+
+	it("celebrates a CRAZY with a full-screen rainbow and confetti", function()
+		local item = skinOf("Crazy")
+		local bursts = soundsPlayed(Opening.Sounds.CrazyBurst)
+		play(resultFor(item, { Rarity = "Crazy" }))
+		client:advance(tBurst + 0.1)
+		local holder = gui:FindFirstChild("CrazyBurst")
+		expect(holder).toBeInstanceOf("Frame")
+		local confetti = 0
+		for _, child in holder:GetChildren() do
+			if child.Name == "Confetti" then
+				confetti += 1
+			end
+		end
+		expect(confetti == Opening.Confetti or confetti == Opening.PhoneConfetti).toBe(true)
+		expect(soundsPlayed(Opening.Sounds.CrazyBurst)).toBe(bursts + 1)
+		expect(panel.Body.Opening.Chest.Beam:GetAttribute("Rainbow")).toBe(true)
+		client:advance(Opening.CrazySeconds + 0.2)
+		expect(gui:FindFirstChild("CrazyBurst")).toBeNil() -- gone again
+		expect(panel.Body.Opening.Reveal.Visible).toBe(true)
+		-- Skipped before the lid opened: still celebrated.
+		play(resultFor(item, { Rarity = "Crazy" }))
+		client:advance(0.2)
+		client:fire(panel.Body.Opening.Chest, "Activated")
+		client:advance(0.05)
+		expect(gui:FindFirstChild("CrazyBurst")).toBeTruthy()
+		panel.Visible = false
+		client:advance(0.1)
+		expect(gui:FindFirstChild("CrazyBurst")).toBeNil() -- closing the panel clears it
+	end)
+
+	it("opens a custom crate model with no part named Lid (it pops instead)", function()
+		local props = client:find("ReplicatedStorage.Custom.Props")
+		local custom = client:create("Model", { Name = "PumpkinCrate" }, props)
+		local body = client:create("Part", {
+			Name = "Body",
+			Size = client.env.Vector3.new(3, 2, 2),
+			Anchored = true,
+		}, custom)
+		custom.PrimaryPart = body
+		local errors = #client.errors
+		play(resultFor(skinOf("Uncommon"), { Rarity = "Uncommon" }))
+		local stage = panel.Body.Opening.Chest
+		expect(stage:GetAttribute("HasLid")).toBe(false)
+		local chest = stage.ChestView:FindFirstChild("PumpkinCrate")
+		local scale = chest:GetScale()
+		client:advance(tBurst + Opening.BurstSeconds / 2)
+		expect(chest:GetScale()).toBeGreaterThan(scale * 1.1) -- the pop
+		client:advance(tEnd)
+		expect(panel.Body.Opening.Reveal.Visible).toBe(true)
+		expect(#client.errors).toBe(errors)
+		custom:Destroy()
+		panel.Visible = false
+		client:advance(0.1)
+	end)
+
+	it("x5 / x10 still go one by one with the chest, Next in between", function()
+		asked = {}
+		CrateUI.Open("PumpkinCrate")
+		client:advance(CConfig.Crates.RequestCooldown)
+		client:fire(panel.Body.Preview.Side.Buy.OpenCoins10, "Activated")
+		client:advance(0.2)
+		local opening = panel.Body.Opening
+		expect(opening.Chest.Visible).toBe(true)
+		client:advance(tEnd + 0.1)
+		expect(opening.Reveal.Visible).toBe(true)
+		expect(opening.Reveal.Card.Buttons.Next.Text).toBe(CConfig.Crates.Text.Next:format(9))
+		client:triggerAction("CrateSkip") -- Space on a reveal: the next crate
+		client:advance(0.1)
+		expect(opening.Reveal.Visible).toBe(false)
+		expect(opening.Chest.ChestView).toBeTruthy()
+		panel.Visible = false
+		client:advance(0.1)
+	end)
+
+	it(
+		"crate cards: a turning chest on a Glow halo, NEW only on New crates, one-tap Odds, a bounce",
+		function()
+			CrateUI.Open("PumpkinCrate") -- (Open() alone would play the rest of the x10)
+			client:fire(panel.Body.Preview.Side.Nav.Back, "Activated")
+			client:advance(0.1)
+			local seenNew, seenOld = 0, 0
+			for _, name in CConfig.Crates.Categories do
+				for _, tab in panel.Body.List.Categories:GetChildren() do
+					if tab:IsA("TextButton") and tab:GetAttribute("Category") == name then
+						client:fire(tab, "Activated")
+					end
+				end
+				for _, card in panel.Body.List.Crates:GetChildren() do
+					if card:IsA("TextButton") then
+						local crate = CrateOdds.Get(card.Name)
+						local ribbon = card:FindFirstChild("NewRibbon")
+						if crate.New then
+							expect(ribbon).toBeTruthy()
+							expect(ribbon.Text).toBe(CConfig.Crates.Text.NewRibbon)
+							seenNew += 1
+						else
+							expect(ribbon).toBeNil()
+							seenOld += 1
+						end
+						expect(card.Odds.Text).toBe(CConfig.Crates.Text.OddsButton)
+						expect(card.Halo.BackgroundColor3).toBeNear(crate.Glow)
+					end
+				end
+			end
+			expect(seenNew).toBeGreaterThan(0)
+			expect(seenOld).toBeGreaterThan(0)
+			-- Odds: one tap to every skin and its exact chance.
+			client:fire(panel.Body.List.Categories.Tab1, "Activated")
+			client:fire(panel.Body.List.Crates.PumpkinCrate.Odds, "Activated")
+			expect(panel.Body.Preview.Visible).toBe(true)
+			expect(panel.Body.Preview.Side.CrateName.Text).toBe("Pumpkin Crate")
+			local chance = CrateOdds.Chances(CrateOdds.Get("PumpkinCrate"))[1]
+			expect(panel.Body.Preview.Items[chance.Item.Id].Chance.Text).toBe(
+				CrateOdds.Format(chance.Chance)
+			)
+			-- A card tap: a little bounce, then the page.
+			client:fire(panel.Body.Preview.Side.Nav.Back, "Activated")
+			local card = panel.Body.List.Crates.CandyCrate
+			client:fire(card, "Activated")
+			expect(card:FindFirstChildOfClass("UIScale").Scale).toBeLessThan(1)
+			expect(panel.Body.List.Visible).toBe(true)
+			client:advance(CConfig.Crates.Cards.PopSeconds + 0.05)
+			expect(panel.Body.Preview.Visible).toBe(true)
+			expect(panel.Body.Preview.Side.CrateName.Text).toBe("Candy Crate")
+			panel.Visible = false
+			client:advance(0.1)
+		end
+	)
+
+	it("labels a Robux price with R$ when the crate has a product", function()
+		local crate = CrateOdds.Get("PumpkinCrate")
+		crate.Robux.ProductId = 4321
+		CrateUI.Open("PumpkinCrate")
+		client:advance(0.1)
+		local robux = panel.Body.Preview.Side.Extras.OpenRobux
+		expect(robux.Text).toMatch("R%$")
+		crate.Robux.ProductId = 0
 		panel.Visible = false
 		client:advance(0.1)
 	end)

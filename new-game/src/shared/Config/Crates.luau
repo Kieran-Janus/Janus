@@ -52,6 +52,8 @@
 	  Rarity     (rarity crates only) the rarity it gives, 100% of the time
 	  Odds       (optional) this crate's own odds instead of the ones below
 	  Category   (optional) its tab in Menu > Crates (Categories below)
+	  Look       its shape, emblem, extra colour and how it moves (LookDefaults below)
+	  New        (optional) true = a NEW ribbon on its card in Menu > Crates
 	Prices (themed crates): 600 coins, double the old 300, since there are now 30 crates and the
 	best skins are much rarer: a crate is a gamble for the rare and the one-in-a-million skins,
 	not the cheap way to get Commons (buy those in the shop for 125). One open is worth about
@@ -81,6 +83,8 @@ export type Crate = {
 	Rarity: string?,
 	Odds: { [string]: number }?,
 	Category: string?, -- which tab of Menu > Crates it is on (Categories below)
+	Look: { [string]: any }?, -- its look and movement (LookDefaults below has every field)
+	New: boolean?, -- shows a NEW ribbon in Menu > Crates
 }
 
 local rgb = Color3.fromRGB
@@ -140,6 +144,142 @@ return {
 		PreviewSpeed = 4,
 	},
 
+	-- HOW A CRATE LOOKS AND MOVES. Every crate in List has its own Look (Style, Emblem, Accent);
+	-- anything it leaves out comes from LookDefaults. Colours come from the crate's Color
+	-- (body), Trim (bands, lid edge) and Glow (glowing bits); Accent is one extra colour (the
+	-- pumpkin's leaves, the candy box's bow, the ghost, the moss, the monster's teeth, the
+	-- stars). Change a number here and every crate follows; give one crate its own (e.g.
+	-- Look = { Style = "Monster", Shake = 1.6 }) to change only that one.
+	--   Style    the shape of the built chest: "Pumpkin" (carved pumpkin, leafy lid), "Candy"
+	--            (wrapped candy box with a bow), "Coffin" (coffin crate, a ghost peeking out),
+	--            "Tomb" (mossy tombstone chest), "Monster" (furry, googly eyes, teeth), "Moon"
+	--            (starry chest, crescent moon) or "Chest" (a chunky chest with its Emblem)
+	--   Emblem   on the front of a "Chest": a head piece name (src/shared/HeadPieces.luau,
+	--            e.g. "WolfHead", "ClownHead") or "Gem"; "" = none
+	-- Every built chest has a part named "Lid" that opens. Your own crate model (a Model named
+	-- after the crate's Id in ReplicatedStorage.Custom.Props) bobs and shakes the same way;
+	-- its lid only opens if it has a part named "Lid".
+	LookDefaults = {
+		Style = "Chest",
+		Emblem = "",
+		Bob = 0.18, -- studs up and down while it waits on the stand
+		Sway = 3, -- degrees it rocks from side to side while it waits
+		PeekEvery = 7, -- seconds between lid peeks (0 = never)
+		PeekAngle = 28, -- degrees the lid lifts when it peeks
+		Shake = 1, -- how hard it shakes before it opens (1 = normal, 2 = twice as hard)
+		Sparkles = 10, -- sparkles in a peek puff (phones get Idle.PhoneSparkleShare of them)
+		-- Sounds for this crate on the stand ({ SoundId = "rbxassetid://...", Volume = 0.4 };
+		-- SoundId = "" = silent).
+		Sounds = {
+			Peek = { SoundId = "", Volume = 0.3 },
+			Wake = { SoundId = "", Volume = 0.4 },
+		},
+	},
+
+	-- The crates on the lobby stand come alive (client side, only for crates near the camera).
+	Idle = {
+		On = true,
+		Range = 70, -- studs from the camera: crates further away sit still
+		PhoneRange = 40,
+		PhoneSparkleShare = 0.35, -- phones show this share of the sparkles
+		WakeDistance = 11, -- studs: when you walk this close a crate wakes up
+		WiggleSeconds = 0.6, -- its happy wiggle when it wakes up
+		WakeLabel = true, -- name, price and an "Odds" button float above an awake crate
+		GlowRing = true, -- a soft glowing ring under each crate, in its Glow colour
+		GlowRingTransparency = 0.8,
+		EyeRange = 30, -- the Monster crate's eyes follow the nearest player this close
+		-- (src/client/CrateIdle.luau does all of this.) Finer settings:
+		BobSpeed = 1.6, -- how fast it bobs (bigger = faster)
+		SwaySpeed = 1.1, -- how fast it rocks from side to side
+		PeekSeconds = 1.2, -- how long one lid peek takes (open and shut again)
+		PeekLightBrightness = 2.5, -- the puff of coloured light when the lid peeks
+		PeekLightRange = 9, -- studs the puff of light reaches
+		SparkleSpeed = 6, -- how fast the peek sparkles fly up
+		SparkleSize = 0.3, -- studs, one sparkle
+		SparkleLifetime = 0.9, -- seconds a sparkle lasts
+		WakeHysteresis = 2, -- studs: an awake crate falls asleep at WakeDistance + this
+		WiggleHops = 2, -- little hops in the happy wiggle
+		WiggleHeight = 0.5, -- studs, how high it hops
+		WiggleTwist = 14, -- degrees it twists while it hops
+		GlowRingScale = 1.25, -- the ring's width compared with the crate's
+		GlowRingThickness = 0.05, -- studs
+		GlowRingDrop = 0.2, -- studs below the crate's bottom
+		EyeSpeed = 8, -- how quickly the Monster crate's pupils catch up (bigger = snappier)
+		-- The floating label over an awake crate (UI units; text never smaller than
+		-- Config.UI.MinTextSize). Its price is the real one: coins from Price, Robux from Roblox
+		-- (only when the crate has a Robux.ProductId).
+		LabelWidth = 220,
+		LabelHeight = 104,
+		PhoneLabelWidth = 180,
+		PhoneLabelHeight = 92,
+		LabelAbove = 2.2, -- studs above the top of the crate
+		LabelTextSize = 18,
+		LabelCoins = "%s %s", -- price, currency name: "600 Coins"
+		LabelRobux = "R$ %d",
+		LabelBoth = "%s  or  %s", -- coins, Robux
+		LabelOdds = "Odds", -- the button that opens the crate panel (every skin and its chance)
+	},
+
+	-- Opening a crate (Style "Chest"): the chest drops in and bounces, shakes faster and
+	-- faster, then the lid bursts open with a beam in the colour of the rarity you really
+	-- won, and the skin flies out onto a spinning pedestal before the reveal card. Space or a
+	-- tap skips; Quick open shows every result at once. Style "Reel" = the old spinning strip.
+	Opening = {
+		Style = "Chest",
+		DropSeconds = 0.5,
+		ShakeSeconds = 1.5, -- about how long it shakes (faster and faster)
+		BurstSeconds = 0.6, -- the lid flying open and the beam
+		FlySeconds = 0.7, -- the skin flying out onto the pedestal
+		PedestalSeconds = 1.2, -- the skin spinning on its pedestal before the reveal card
+		CameraDistance = 3.8, -- how far the camera is from the chest, in chest widths (smaller = bigger chest)
+		-- The beam's colour for each rarity (CRAZY is a rainbow).
+		BeamColors = {
+			Common = rgb(160, 200, 150),
+			Uncommon = rgb(80, 150, 255),
+			Rare = rgb(185, 95, 255),
+		} :: { [string]: Color3 },
+		RainbowRarities = { Crazy = true } :: { [string]: boolean },
+		Confetti = 70, -- confetti pieces for a CRAZY (phones: PhoneConfetti)
+		PhoneConfetti = 25,
+		CoinPour = 14, -- coins pouring out for a duplicate (phones: PhoneCoinPour)
+		PhoneCoinPour = 6,
+		CoinsBack = "+%d coins back", -- %d = the coins a duplicate pays back
+		-- The cards either side of yours on the strip (Style "Reel") never show a rarer skin
+		-- than the one you won: no teasing "near misses".
+		TeaseGuard = 2,
+		ShakeDegrees = 7, -- how far it rocks at the end of the shake (x the crate's Look.Shake)
+		ShakeStuds = 0.12, -- how far it jiggles sideways at the end of the shake (x Look.Shake)
+		ShakeTickStart = 0.3, -- seconds between shake sounds at the start...
+		ShakeTickEnd = 0.07, -- ...and at the end (faster and faster)
+		LidAngle = 115, -- degrees the lid flies open (a crate without a lid pops instead)
+		PedestalSpin = 90, -- degrees a second the skin turns on its pedestal
+		CrazySeconds = 3.5, -- how long the full-screen rainbow and confetti last for a CRAZY
+		Sounds = {
+			Drop = { SoundId = "", Volume = 0.5 },
+			Shake = {
+				SoundId = "rbxassetid://87437544236708",
+				Volume = 0.2,
+				PitchMin = 0.9,
+				PitchMax = 1.4,
+			},
+			Burst = { SoundId = "rbxassetid://120891770644830", Volume = 0.6 },
+			Coins = { SoundId = "rbxassetid://4612374807", Volume = 0.5 },
+			CrazyBurst = { SoundId = "rbxassetid://1841209502", Volume = 0.9 },
+		} :: {
+			[string]: { SoundId: string, Volume: number?, PitchMin: number?, PitchMax: number? },
+		},
+	},
+
+	-- The crate cards in Menu > Crates: each chest turns slowly in its picture (only cards on
+	-- screen, only while the panel is open) with a soft halo in the crate's Glow colour, and
+	-- the card bounces when tapped.
+	Cards = {
+		SpinSpeed = 30, -- degrees a second (0 = the chests stand still)
+		Halo = true,
+		HaloTransparency = 0.55, -- 0 = solid, 1 = invisible
+		PopSeconds = 0.14, -- the bounce when a card is tapped, before its page opens
+	},
+
 	-- Roblox's paid random items rule (PolicyService): players in a region where paid random
 	-- items aren't allowed can't open any crate (coins can be bought with Robux, so coin crates
 	-- count too). They can still buy every skin straight from the Shop. If Roblox can't tell
@@ -197,7 +337,11 @@ return {
 		},
 		CrateSize = 2.6, -- studs, the crate box
 		PromptDistance = 9, -- how close you must be to see "Open <crate>"
-		Bob = 0.35, -- how far the crates float up and down (0 = they sit still)
+		-- How far the crates float up and down (0 = they sit still). Only while Idle.On is false:
+		-- with it on, each crate's Look.Bob is used instead.
+		Bob = 0.35,
+		-- The light under each crate (in its colour). Brighter washes the painted chests out.
+		LightBrightness = 0.6,
 	},
 
 	-- Words players see (the crate panel, Menu > Crates, and the stand).
@@ -206,8 +350,8 @@ return {
 		Hint = "Tap a crate to see every skin inside and its chance.",
 		Restricted = "Crates aren't available in your region; you can still buy any skin directly in the Shop.",
 		Checking = "Checking...",
-		OpenCoins = "Open  %s", -- %s = the price in coins
-		OpenRobux = "R$ %d",
+		OpenCoins = "Open %s %s", -- price, currency name ("Open 600 Coins")
+		OpenRobux = "R$ %d", -- always says R$, so a Robux price is never mistaken for coins
 		ComingSoon = "Coming soon",
 		RobuxOnly = "Robux only",
 		WaitingRobux = "Finish the purchase in the Roblox window...",
@@ -216,7 +360,9 @@ return {
 		New = "NEW!",
 		Duplicate = "Duplicate! +%d %s back", -- coins, currency name
 		DuplicateShort = "Duplicate! +%d", -- on a small result card
-		OpenMany = "x%d  %s", -- the open buttons: count, price
+		OpenMany = "x%d  %s %s", -- the open buttons: count, price, currency name
+		NewRibbon = "NEW", -- the ribbon on a crate card with New = true
+		OddsButton = "Odds", -- the small button on each crate card (every skin and its chance)
 		QuickOpen = "Quick open",
 		SkipHint = "Space = skip",
 		Next = "Next (%d left)", -- after a reveal, when several were opened
@@ -256,6 +402,7 @@ return {
 			Trim = rgb(92, 52, 24),
 			Glow = rgb(255, 220, 110),
 			Topper = "Pumpkins",
+			Look = { Style = "Pumpkin", Accent = rgb(90, 170, 60) },
 			Category = "Classic",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -268,6 +415,7 @@ return {
 			Trim = rgb(255, 245, 250),
 			Glow = rgb(140, 240, 255),
 			Topper = "Candies",
+			Look = { Style = "Candy", Accent = rgb(120, 220, 255) },
 			Category = "Classic",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -280,6 +428,7 @@ return {
 			Trim = rgb(40, 28, 60),
 			Glow = rgb(170, 255, 140),
 			Topper = "Ghosts",
+			Look = { Style = "Coffin", Accent = rgb(240, 245, 255) },
 			Category = "Classic",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -292,6 +441,7 @@ return {
 			Trim = rgb(60, 58, 66),
 			Glow = rgb(130, 255, 200),
 			Topper = "Bones",
+			Look = { Style = "Tomb", Accent = rgb(95, 150, 75) },
 			Category = "Classic",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -304,6 +454,7 @@ return {
 			Trim = rgb(70, 40, 110),
 			Glow = rgb(255, 240, 90),
 			Topper = "Eyes",
+			Look = { Style = "Monster", Accent = rgb(255, 250, 235), Shake = 1.4 },
 			Category = "Classic",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -316,6 +467,7 @@ return {
 			Trim = rgb(225, 230, 255),
 			Glow = rgb(190, 220, 255),
 			Topper = "Stars",
+			Look = { Style = "Moon", Accent = rgb(255, 240, 150) },
 			Category = "Classic",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -331,6 +483,8 @@ return {
 			Trim = rgb(30, 15, 30),
 			Glow = rgb(255, 80, 100),
 			Topper = "Bats",
+			Look = { Emblem = "VampireHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -343,6 +497,8 @@ return {
 			Trim = rgb(80, 60, 50),
 			Glow = rgb(220, 255, 120),
 			Topper = "Eyes",
+			Look = { Emblem = "ZombieHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -355,6 +511,8 @@ return {
 			Trim = rgb(40, 70, 45),
 			Glow = rgb(230, 230, 255),
 			Topper = "Stars",
+			Look = { Emblem = "WolfHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -367,6 +525,8 @@ return {
 			Trim = rgb(40, 70, 170),
 			Glow = rgb(255, 215, 90),
 			Topper = "Gem",
+			Look = { Emblem = "MummyHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -379,6 +539,8 @@ return {
 			Trim = rgb(40, 50, 100),
 			Glow = rgb(255, 220, 120),
 			Topper = "Bones",
+			Look = { Emblem = "SkinSkull" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -391,6 +553,8 @@ return {
 			Trim = rgb(90, 80, 50),
 			Glow = rgb(160, 255, 120),
 			Topper = "Eyes",
+			Look = { Emblem = "FrogHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -403,6 +567,8 @@ return {
 			Trim = rgb(120, 80, 50),
 			Glow = rgb(255, 210, 80),
 			Topper = "Gem",
+			Look = { Emblem = "GoblinHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -415,6 +581,8 @@ return {
 			Trim = rgb(255, 210, 50),
 			Glow = rgb(120, 255, 240),
 			Topper = "Candies",
+			Look = { Emblem = "ClownHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -427,6 +595,8 @@ return {
 			Trim = rgb(220, 180, 80),
 			Glow = rgb(255, 240, 180),
 			Topper = "Ghosts",
+			Look = { Emblem = "BellhopHat" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -439,6 +609,8 @@ return {
 			Trim = rgb(190, 160, 110),
 			Glow = rgb(140, 255, 240),
 			Topper = "Ghosts",
+			Look = { Emblem = "CaptainHat" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -451,6 +623,8 @@ return {
 			Trim = rgb(225, 185, 80),
 			Glow = rgb(255, 245, 200),
 			Topper = "Stars",
+			Look = { Emblem = "PhantomMask" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -463,6 +637,8 @@ return {
 			Trim = rgb(70, 70, 80),
 			Glow = rgb(255, 230, 90),
 			Topper = "Bones",
+			Look = { Emblem = "PartyHat" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -475,6 +651,8 @@ return {
 			Trim = rgb(60, 170, 255),
 			Glow = rgb(140, 255, 90),
 			Topper = "Gem",
+			Look = { Emblem = "FrankenHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -487,6 +665,8 @@ return {
 			Trim = rgb(150, 140, 130),
 			Glow = rgb(200, 150, 255),
 			Topper = "Bats",
+			Look = { Emblem = "BatHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Creepy Critters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -499,6 +679,8 @@ return {
 			Trim = rgb(230, 230, 240),
 			Glow = rgb(150, 255, 80),
 			Topper = "Eyes",
+			Look = { Emblem = "SpiderCrown" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Creepy Critters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -511,6 +693,8 @@ return {
 			Trim = rgb(150, 70, 55),
 			Glow = rgb(160, 255, 90),
 			Topper = "Eyes",
+			Look = { Emblem = "CatHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Creepy Critters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -523,6 +707,8 @@ return {
 			Trim = rgb(180, 50, 40),
 			Glow = rgb(255, 180, 70),
 			Topper = "Pumpkins",
+			Look = { Emblem = "ScarecrowHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Creepy Critters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -535,6 +721,8 @@ return {
 			Trim = rgb(200, 205, 215),
 			Glow = rgb(90, 240, 255),
 			Topper = "Stars",
+			Look = { Emblem = "AlienHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Creepy Critters",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -547,6 +735,8 @@ return {
 			Trim = rgb(80, 150, 240),
 			Glow = rgb(255, 230, 120),
 			Topper = "Stars",
+			Look = { Emblem = "TeddyHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -559,6 +749,8 @@ return {
 			Trim = rgb(255, 210, 60),
 			Glow = rgb(255, 120, 230),
 			Topper = "Stars",
+			Look = { Emblem = "DiscoAfro" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -571,6 +763,8 @@ return {
 			Trim = rgb(140, 240, 200),
 			Glow = rgb(255, 245, 140),
 			Topper = "Candies",
+			Look = { Emblem = "GumballHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -583,6 +777,8 @@ return {
 			Trim = rgb(30, 25, 35),
 			Glow = rgb(130, 255, 100),
 			Topper = "Stars",
+			Look = { Emblem = "CauldronHat" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -595,6 +791,8 @@ return {
 			Trim = rgb(240, 245, 255),
 			Glow = rgb(200, 250, 255),
 			Topper = "Stars",
+			Look = { Emblem = "SnowmanHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -607,6 +805,8 @@ return {
 			Trim = rgb(110, 75, 45),
 			Glow = rgb(255, 210, 90),
 			Topper = "Pumpkins",
+			Look = { Emblem = "AcornHead" },
+			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
 			Robux = { ProductId = 0, SuggestedRobux = 79 },
@@ -622,6 +822,7 @@ return {
 			Trim = rgb(70, 80, 66),
 			Glow = rgb(235, 255, 225),
 			Topper = "Gem",
+			Look = { Emblem = "Gem" },
 			Category = "By Rarity",
 			Price = 100,
 			Robux = { ProductId = 0, SuggestedRobux = 19 },
@@ -635,6 +836,7 @@ return {
 			Trim = rgb(30, 50, 110),
 			Glow = rgb(190, 230, 255),
 			Topper = "Gem",
+			Look = { Emblem = "Gem" },
 			Category = "By Rarity",
 			Price = 400,
 			Robux = { ProductId = 0, SuggestedRobux = 69 },
@@ -648,6 +850,7 @@ return {
 			Trim = rgb(60, 25, 100),
 			Glow = rgb(255, 210, 255),
 			Topper = "Gem",
+			Look = { Emblem = "Gem" },
 			Category = "By Rarity",
 			Price = 800,
 			Robux = { ProductId = 0, SuggestedRobux = 129 },
@@ -661,6 +864,7 @@ return {
 			Trim = rgb(255, 215, 70),
 			Glow = rgb(255, 255, 255),
 			Topper = "Gem",
+			Look = { Emblem = "Gem", Shake = 1.6 },
 			Category = "By Rarity",
 			Price = 80000,
 			-- Optional: leave ProductId at 0 to keep this one coins-only.

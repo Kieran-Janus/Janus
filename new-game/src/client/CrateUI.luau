@@ -5,15 +5,23 @@
 
 	Opens from Menu > Crates, the crate stand in the lobby (prompts with a CrateId attribute)
 	and the Shop's Skins tab. Three views in one panel (named "Crates"):
-	  list      a card per crate: its look, name and price
+	  list      a card per crate: its chest turning slowly (only cards on screen) on a halo in
+	            its Glow colour, name, price, a NEW ribbon (crate New = true) and an "Odds"
+	            button straight to its page (Config.Crates.Cards)
 	  preview   one crate: EVERY skin inside with its rarity colour and % chance (Roblox
-	            requires the odds to be shown before buying), and the Open / Robux buttons
-	  opening   a strip of skin cards spins and slows down on the server's result, then the
-	            reveal card (rarity glow; CRAZY gets a rainbow burst), "Equip now",
-	            "Open another", and "Duplicate! +X coins" when you already had it
+	            requires the odds to be shown before buying), and the Open buttons, labelled
+	            "Open 600 Coins" / "R$ 79" so coins and Robux are never confused
+	  opening   Config.Crates.Opening.Style "Chest": the chest drops in, shakes faster and
+	            faster, the lid bursts open with a beam in the colour of the rarity really won
+	            (rainbow + full-screen confetti for CRAZY), the skin flies onto a spinning
+	            pedestal (a duplicate pours coins: "+X coins back"); Style "Reel": a strip of
+	            skin cards spins and slows down on the result. Then the reveal card (rarity
+	            glow), "Equip now", "Open another", and "Duplicate! +X coins" when you already
+	            had it. Space or a tap skips to the reveal; Quick open shows them all at once.
 	Nothing is decided here: the server (CrateService) takes the coins, rolls and gives the skin
-	before the strip starts spinning. Players whose region doesn't allow paid random items
-	(player attribute CratesRestricted) see the odds but no buy buttons.
+	before the chest even drops; the beam, the strip and the reveal only show that result.
+	Players whose region doesn't allow paid random items (player attribute CratesRestricted)
+	see the odds but no buy buttons.
 
 	CrateUI.Mount(gui)
 	CrateUI.Open(crateId?)        opens the panel, on that crate's preview if given. Safe to call
@@ -34,6 +42,7 @@ local TweenService = game:GetService("TweenService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local CrateArt = require(ReplicatedStorage.Shared.CrateArt)
+local CrateLook = require(ReplicatedStorage.Shared.CrateLook)
 local CrateOdds = require(ReplicatedStorage.Shared.CrateOdds)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Layout = require(script.Parent.Layout)
@@ -75,6 +84,10 @@ type LazyView = {
 	Build: () -> Model,
 	Stop: () -> (),
 	Built: boolean,
+	Spin: boolean?, -- turns slowly while on screen (the crate cards)
+	Clear: boolean?, -- no background (a halo shows through)
+	Model: Model?,
+	Base: CFrame?, -- the model's pivot when built
 }
 
 local openPanel: ((string?) -> ())? = nil
@@ -361,12 +374,14 @@ function CrateUI.Mount(gui: ScreenGui)
 	end
 
 	-- Lazy 3D previews -------------------------------------------------------------------------
-	local function lazy(holder: Frame, build: () -> Model)
+	local function lazy(holder: Frame, build: () -> Model, spin: boolean?)
 		table.insert(lazyViews, {
 			Holder = holder,
 			Build = build,
 			Stop = function() end,
 			Built = false,
+			Spin = spin,
+			Clear = spin,
 		})
 	end
 
@@ -379,7 +394,12 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 		local viewport = newViewport(entry.Holder)
 		viewport.Size = UDim2.fromScale(1, 1)
+		if entry.Clear then
+			viewport.BackgroundTransparency = 1
+		end
 		showModel(viewport, model, zoom or 1)
+		entry.Model = model
+		entry.Base = model:GetPivot()
 		entry.Stop = SkinFx.AnimatePreview(model)
 	end
 
@@ -410,6 +430,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		entry.Stop()
 		entry.Stop = function() end
 		entry.Built = false
+		entry.Model = nil
 		local viewport = entry.Holder:FindFirstChild("Preview")
 		if viewport then
 			viewport:Destroy()
@@ -445,6 +466,26 @@ function CrateUI.Mount(gui: ScreenGui)
 				if inView(entry.Holder, clip, 60) then
 					buildView(entry)
 					made += 1
+				end
+			end
+		end
+	end)
+
+	-- The crate cards' chests turn slowly: only built ones (near the screen) that are really on
+	-- screen, only while the list is showing (nothing runs once the panel closes).
+	local cardsCfg = cfg.Cards
+	RunService.Heartbeat:Connect(function()
+		local speed = cardsCfg.SpinSpeed
+		if speed == 0 or not panel.Visible or not listView.Visible then
+			return
+		end
+		local yaw = math.rad((os.clock() * speed) % 360)
+		for _, entry in lazyViews do
+			local model, base = entry.Model, entry.Base
+			if entry.Spin and model and base and model.Parent then
+				local scroller = entry.Holder:FindFirstAncestorWhichIsA("ScrollingFrame")
+				if scroller and inView(entry.Holder, scroller, 0) then
+					model:PivotTo(base * CFrame.Angles(0, yaw, 0))
 				end
 			end
 		end
@@ -516,6 +557,28 @@ function CrateUI.Mount(gui: ScreenGui)
 			gradient.Parent = stroke
 		end
 
+		-- A soft halo in the crate's Glow colour behind its turning chest.
+		if cardsCfg.Halo then
+			local halo = Instance.new("Frame")
+			halo.Name = "Halo"
+			halo.BorderSizePixel = 0
+			halo.BackgroundColor3 = crate.Glow
+			halo.BackgroundTransparency = cardsCfg.HaloTransparency
+			halo.AnchorPoint = Vector2.new(0.5, 0.5)
+			halo.Position = UDim2.new(0.5, 0, 0.5, -26) -- (centred on the picture)
+			halo.Size = UDim2.fromScale(0.72, 0.5)
+			halo.Parent = card
+			local round = Instance.new("UICorner")
+			round.CornerRadius = UDim.new(0.5, 0)
+			round.Parent = halo
+			local soft = Instance.new("UIGradient")
+			soft.Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.9),
+				NumberSequenceKeypoint.new(0.5, 0),
+				NumberSequenceKeypoint.new(1, 0.9),
+			})
+			soft.Parent = halo
+		end
 		local art = Instance.new("Frame")
 		art.Name = "Art"
 		art.BackgroundTransparency = 1
@@ -524,6 +587,36 @@ function CrateUI.Mount(gui: ScreenGui)
 		art.Parent = card
 		lazy(art, function()
 			return CrateArt.Preview(crate)
+		end, true)
+		if CrateLook.IsNew(crate) then
+			local ribbon = label(text.NewRibbon, 14, card)
+			ribbon.Name = "NewRibbon"
+			ribbon.ZIndex = 3
+			ribbon.TextWrapped = false
+			ribbon.AutomaticSize = Enum.AutomaticSize.X
+			ribbon.BackgroundTransparency = 0
+			ribbon.BackgroundColor3 = Color3.fromRGB(230, 40, 70)
+			ribbon.TextStrokeTransparency = 0.6
+			ribbon.Position = UDim2.fromOffset(6, 6)
+			ribbon.Size = UDim2.fromOffset(0, 20)
+			Theme.round(ribbon, 6)
+			local ribbonPad = Instance.new("UIPadding")
+			ribbonPad.PaddingLeft = UDim.new(0, 6)
+			ribbonPad.PaddingRight = UDim.new(0, 6)
+			ribbonPad.Parent = ribbon
+		end
+		-- One tap to every skin inside and its exact chance.
+		local oddsButton = button(text.OddsButton, card)
+		oddsButton.Name = "Odds"
+		oddsButton.ZIndex = 3
+		oddsButton.TextSize = 14
+		oddsButton.TextWrapped = false
+		oddsButton.AnchorPoint = Vector2.new(1, 0)
+		oddsButton.Position = UDim2.new(1, -6, 0, 6)
+		oddsButton.Size = UDim2.fromOffset(48, 22)
+		oddsButton.BackgroundTransparency = 0.15
+		oddsButton.Activated:Connect(function()
+			showPreview(crate)
 		end)
 
 		local name = label(crate.Name, 15, card)
@@ -560,8 +653,29 @@ function CrateUI.Mount(gui: ScreenGui)
 			pad.PaddingRight = UDim.new(0, 6)
 			pad.Parent = tag
 		end
+		-- A quick bounce, then the crate's page.
+		local pop = Instance.new("UIScale")
+		pop.Parent = card
+		local popping = false
 		card.Activated:Connect(function()
-			showPreview(crate)
+			if popping then
+				return
+			end
+			popping = true
+			local seconds = math.max(0, cardsCfg.PopSeconds)
+			pop.Scale = 0.9
+			TweenService:Create(
+				pop,
+				TweenInfo.new(seconds, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+				{ Scale = 1 }
+			):Play()
+			task.delay(seconds, function()
+				popping = false
+				-- (unless the list was left meanwhile)
+				if card.Parent and listView.Visible and panel.Visible then
+					showPreview(crate)
+				end
+			end)
 		end)
 	end
 
@@ -881,9 +995,10 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 		if price then
 			for order, count in counts do
+				-- Always with the currency word ("Open 600 Coins"), never a bare number.
 				local words = if count == 1
-					then text.OpenCoins:format(commas(price))
-					else text.OpenMany:format(count, commas(price * count))
+					then text.OpenCoins:format(commas(price), currency)
+					else text.OpenMany:format(count, commas(price * count), currency)
 				local openButton = button(words, buyRow, Theme.Selected)
 				openButton.Name = if count == 1 then "OpenCoins" else "OpenCoins" .. count
 				openButton.LayoutOrder = order
@@ -1056,6 +1171,21 @@ function CrateUI.Mount(gui: ScreenGui)
 	reveal.Parent = openView
 	Theme.round(reveal, 10)
 
+	-- The chest opening's stage (Config.Crates.Opening.Style "Chest"). A tap anywhere on it
+	-- skips to the reveal.
+	local openingCfg = cfg.Opening
+	local stage = Instance.new("TextButton")
+	stage.Name = "Chest"
+	stage.Text = ""
+	stage.AutoButtonColor = false
+	stage.BackgroundColor3 = Color3.fromRGB(14, 12, 22)
+	stage.BackgroundTransparency = 0.1
+	stage.ClipsDescendants = true
+	stage.Size = UDim2.new(1, 0, 1, -44)
+	stage.Visible = false
+	stage.Parent = openView
+	Theme.round(stage, 10)
+
 	local stripCards: { Frame } = {}
 	local reelIds: { string } = {}
 
@@ -1146,6 +1276,101 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 	end
 
+	-- The chest stage's pieces (3D chest, skin, beam, coins) are thrown away after each opening.
+	local stageStop: () -> () = function() end
+	local function clearStage()
+		stageStop()
+		stageStop = function() end
+		for _, child in stage:GetChildren() do
+			if not child:IsA("UICorner") then
+				child:Destroy()
+			end
+		end
+	end
+
+	-- The full-screen rainbow and confetti of a CRAZY (or one-in-a-million) unbox. It sits over
+	-- the whole screen (not just the panel), lets clicks through and goes after
+	-- Opening.CrazySeconds or when the panel closes.
+	local crazyHolder: Frame? = nil
+	local crazyConnection: RBXScriptConnection? = nil
+	local function stopCrazy()
+		if crazyConnection then
+			crazyConnection:Disconnect()
+			crazyConnection = nil
+		end
+		if crazyHolder then
+			crazyHolder:Destroy()
+			crazyHolder = nil
+		end
+	end
+	local function crazyBurst()
+		stopCrazy()
+		Sounds.PlaySpec(openingCfg.Sounds.CrazyBurst)
+		local holder = Instance.new("Frame")
+		holder.Name = "CrazyBurst"
+		holder.Active = false
+		holder.BackgroundTransparency = 1
+		holder.Size = UDim2.fromScale(1, 1)
+		holder.ZIndex = 50
+		holder.Parent = gui
+		crazyHolder = holder
+		local flash = Instance.new("Frame")
+		flash.Name = "Flash"
+		flash.Active = false
+		flash.BorderSizePixel = 0
+		flash.BackgroundColor3 = Color3.new(1, 1, 1)
+		flash.BackgroundTransparency = 0.25
+		flash.Size = UDim2.fromScale(1, 1)
+		flash.ZIndex = 50
+		flash.Parent = holder
+		local flashGradient = Instance.new("UIGradient")
+		flashGradient.Color = rainbowSequence()
+		flashGradient.Rotation = 35
+		flashGradient.Parent = flash
+		type Bit = { Frame: Frame, X: number, Y: number, Speed: number, Spin: number }
+		local bits: { Bit } = {}
+		local pieces = math.max(
+			0,
+			math.floor(if compact then openingCfg.PhoneConfetti else openingCfg.Confetti)
+		)
+		for _ = 1, pieces do
+			local bit = Instance.new("Frame")
+			bit.Name = "Confetti"
+			bit.Active = false
+			bit.BorderSizePixel = 0
+			bit.ZIndex = 51
+			bit.BackgroundColor3 = Color3.fromHSV(math.random(), 0.75, 1)
+			bit.Size = UDim2.fromOffset(math.random(7, 12), math.random(10, 16))
+			bit.Parent = holder
+			table.insert(bits, {
+				Frame = bit,
+				X = math.random() * 0.98,
+				Y = -math.random() * 0.6,
+				Speed = 0.3 + math.random() * 0.4,
+				Spin = (math.random() - 0.5) * 700,
+			})
+		end
+		local began = os.clock()
+		local seconds = math.max(0.5, openingCfg.CrazySeconds)
+		crazyConnection = RunService.Heartbeat:Connect(function(dt)
+			local t = os.clock() - began
+			if t >= seconds or not panel.Visible or not holder.Parent then
+				stopCrazy()
+				return
+			end
+			flash.BackgroundTransparency = math.clamp(0.25 + t / 0.9, 0.25, 1)
+			flashGradient.Offset = Vector2.new(math.sin(t * 3) * 0.3, 0)
+			local fade = math.clamp((seconds - t) / 0.6, 0, 1) -- the last moment fades out
+			for _, b in bits do
+				b.Y += b.Speed * dt
+				b.Frame.Visible = b.Y >= 0
+				b.Frame.Position = UDim2.fromScale(b.X, math.max(b.Y, 0))
+				b.Frame.Rotation += b.Spin * dt
+				b.Frame.BackgroundTransparency = 1 - fade
+			end
+		end)
+	end
+
 	-- Rays (and for CRAZY, confetti) behind the reveal card.
 	local function burst(parent: Frame, rarity: string)
 		local level = rarityLevel(rarity)
@@ -1231,6 +1456,7 @@ function CrateUI.Mount(gui: ScreenGui)
 
 	local function showReveal(result: Result)
 		stopSpin()
+		clearStage()
 		unseen = nil
 		busy = false
 		revealStop()
@@ -1435,8 +1661,21 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 	end
 
+	-- Where the status line and Skip sit: under the strip, or at the bottom under the chest.
+	local function placeControls(chest: boolean)
+		reel.Visible = not chest
+		stage.Visible = chest
+		if chest then
+			status.Position = UDim2.new(0, 0, 1, -36)
+			skip.Position = UDim2.new(1, 0, 1, -36)
+		else
+			status.Position = UDim2.new(0, 0, 0.4, reelHeight / 2 + 12)
+			skip.Position = UDim2.new(1, 0, 0.4, reelHeight / 2 + 12)
+		end
+	end
+
 	-- Spins the strip from its start to the winning card (the server already decided).
-	playResult = function(result: Result)
+	local function playReel(result: Result)
 		local crate = CrateOdds.Get(result.CrateId)
 		if not result.Ok or not result.Reel or not result.WinIndex then
 			busy = false
@@ -1445,6 +1684,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 		stopSpin()
 		stopBurst()
+		clearStage()
 		revealStop()
 		revealStop = function() end
 		busy = true
@@ -1456,6 +1696,7 @@ function CrateUI.Mount(gui: ScreenGui)
 			child:Destroy()
 		end
 		reveal.Visible = false
+		placeControls(false)
 		showOnly(openView)
 		status.Text = ("%s...%s"):format(
 			if crate then crate.Name else text.Title,
@@ -1549,6 +1790,436 @@ function CrateUI.Mount(gui: ScreenGui)
 			end
 		end)
 	end
+
+	-- The chest opening -------------------------------------------------------------------------
+	local function bounceOut(u: number): number
+		local n, d = 7.5625, 2.75
+		if u < 1 / d then
+			return n * u * u
+		elseif u < 2 / d then
+			u -= 1.5 / d
+			return n * u * u + 0.75
+		elseif u < 2.5 / d then
+			u -= 2.25 / d
+			return n * u * u + 0.9375
+		end
+		u -= 2.625 / d
+		return n * u * u + 0.984375
+	end
+	local function backOut(u: number): number
+		local c1 = 1.70158
+		return 1 + (c1 + 1) * (u - 1) ^ 3 + c1 * (u - 1) ^ 2
+	end
+	local function easeOut(u: number): number
+		return 1 - (1 - u) ^ 3
+	end
+	local function rainbowAt(shift: number): ColorSequence
+		local keys = {}
+		for i = 0, 6 do
+			local hue = (i / 6 + shift) % 1
+			table.insert(keys, ColorSequenceKeypoint.new(i / 6, Color3.fromHSV(hue, 0.75, 1)))
+		end
+		return ColorSequence.new(keys)
+	end
+
+	local PEDESTAL_TOP = 0.32 -- of the crate size
+	-- The spinning pedestal the skin lands on (pivot: the middle of its bottom).
+	local function pedestal(size: number, ringColor: Color3): (Model, BasePart)
+		local m = Instance.new("Model")
+		m.Name = "Pedestal"
+		local function disc(name: string, height: number, width: number, y: number): Part
+			local p = Instance.new("Part")
+			p.Name = name
+			p.Anchored = true
+			p.CanCollide = false
+			p.Shape = Enum.PartType.Cylinder
+			p.Size = Vector3.new(height, width, width)
+			p.CFrame = CFrame.new(0, y, 0) * CFrame.Angles(0, 0, math.rad(90))
+			p.Color = Color3.fromRGB(70, 60, 92)
+			p.Material = Enum.Material.SmoothPlastic
+			p.Parent = m
+			return p
+		end
+		local base = disc("Base", size * 0.22, size * 1.15, size * 0.11)
+		local ring = disc("Ring", size * 0.06, size * 1.22, size * 0.2)
+		ring.Color = ringColor
+		ring.Material = Enum.Material.Neon
+		local top = disc("Top", size * 0.1, size, size * 0.27)
+		top.Color = Color3.fromRGB(95, 84, 122)
+		m.PrimaryPart = base
+		base.PivotOffset = base.CFrame:ToObjectSpace(CFrame.new())
+		return m, ring
+	end
+
+	--[[
+		Plays one result as the chest opening: drop and bounce, shake faster and faster, the lid
+		bursts open (no lid: the chest pops) with a beam in the colour of the rarity the SERVER
+		gave, the skin flies out onto a spinning pedestal, then the reveal card. Everything shown
+		comes from `result`; nothing here is random except where coins and confetti fly.
+	]]
+	local function playChest(result: Result)
+		local crate = CrateOdds.Get(result.CrateId)
+		if not result.Ok or not result.ItemId then
+			busy = false
+			setMessage(result.Message, true)
+			return
+		end
+		stopSpin()
+		stopBurst()
+		clearStage()
+		revealStop()
+		revealStop = function() end
+		busy = true
+		unseen = result
+		current = crate or current
+		lastPaid = result.Paid or lastPaid
+		reveal.Visible = false
+		placeControls(true)
+		showOnly(openView)
+		status.Text = ("%s...%s"):format(
+			if crate then crate.Name else text.Title,
+			if Layout.IsTouch() then "" else "   " .. text.SkipHint
+		)
+		setMessage("")
+		skip.Visible = true
+
+		local item = Items.Get(result.ItemId)
+		local rarity = result.Rarity or (item and Items.Rarity(item)) or Config.Rarity.Default
+		local beamColor, rainbow = CrateLook.BeamColor(rarity)
+		local celebrate = rainbow or result.OneInAMillion == true
+		local look = CrateLook.Of(crate or {})
+		local size = cfg.Stand.CrateSize
+
+		-- 2D: a halo and the beam behind the 3D picture, coins and words in front of it.
+		local halo = Instance.new("Frame")
+		halo.Name = "Halo"
+		halo.BorderSizePixel = 0
+		halo.BackgroundColor3 = look.Glow
+		halo.BackgroundTransparency = cardsCfg.HaloTransparency
+		halo.AnchorPoint = Vector2.new(0.5, 0.5)
+		halo.Position = UDim2.fromScale(0.5, 0.6)
+		halo.Size = UDim2.fromScale(0.4, 0.7)
+		halo.Parent = stage
+		local haloRound = Instance.new("UICorner")
+		haloRound.CornerRadius = UDim.new(0.5, 0)
+		haloRound.Parent = halo
+		local haloSoft = Instance.new("UIGradient")
+		haloSoft.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.9),
+			NumberSequenceKeypoint.new(0.5, 0),
+			NumberSequenceKeypoint.new(1, 0.9),
+		})
+		haloSoft.Parent = halo
+
+		local beam = Instance.new("Frame")
+		beam.Name = "Beam"
+		beam.ZIndex = 2
+		beam.BorderSizePixel = 0
+		beam.BackgroundColor3 = beamColor
+		beam.AnchorPoint = Vector2.new(0.5, 1)
+		beam.Position = UDim2.fromScale(0.5, 0.5)
+		beam.Size = UDim2.fromScale(0.14, 0)
+		beam.Visible = false
+		beam:SetAttribute("Rarity", rarity)
+		beam:SetAttribute("Rainbow", rainbow)
+		beam.Parent = stage
+		local beamGradient = Instance.new("UIGradient")
+		beamGradient.Rotation = 90 -- (top to bottom: it fades out upwards)
+		beamGradient.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.6, 0.35),
+			NumberSequenceKeypoint.new(1, 0.1),
+		})
+		beamGradient.Color = if rainbow
+			then rainbowAt(0)
+			else ColorSequence.new(Color3.new(1, 1, 1))
+		beamGradient.Parent = beam
+
+		local viewport = newViewport(stage)
+		viewport.Name = "ChestView"
+		viewport.ZIndex = 3
+		viewport.BackgroundTransparency = 1
+		viewport.Size = UDim2.fromScale(1, 1)
+		local ambient = viewport.Ambient
+		local camera = Instance.new("Camera")
+		camera.FieldOfView = 40
+		local focus = Vector3.new(0, size * 0.75, -size * 0.3)
+		local away = openingCfg.CameraDistance
+		camera.CFrame =
+			CFrame.lookAt(focus + Vector3.new(0, size * away * 0.2, -size * away), focus)
+		camera.Parent = viewport
+		viewport.CurrentCamera = camera
+
+		-- The chest (the crate's built model or your own; its part named "Lid" opens).
+		local chest: Model? = nil
+		if crate then
+			local ok, model = pcall(CrateArt.Preview, crate, size)
+			if ok and model then
+				chest = model
+			else
+				warn("[CrateUI] chest failed: " .. tostring(model))
+			end
+		end
+		local lid: CrateLook.Lid? = nil
+		local chestScale = 1
+		local chestHeight = size
+		if chest then
+			chest.Parent = viewport
+			chest:PivotTo(CFrame.new())
+			lid = CrateLook.Lid(chest)
+			chestScale = chest:GetScale()
+			local _, extent = chest:GetBoundingBox()
+			chestHeight = extent.Y
+		end
+		stage:SetAttribute("HasLid", lid ~= nil)
+
+		-- The skin (the same 3D preview as the reveal card), shown once it flies out.
+		local skin: Model? = nil
+		local skinScale, skinFeet = 1, 0
+		local stopFx: () -> () = function() end
+		if item then
+			local ok, model = pcall(Cosmetics.Preview, item)
+			if ok and model then
+				skin = model
+				model.Name = "Skin"
+				local _, extent = model:GetBoundingBox()
+				local longest = math.max(extent.X, extent.Y, extent.Z)
+				if longest > 0.01 then
+					model:ScaleTo(model:GetScale() * size * 1.2 / longest)
+				end
+				skinScale = model:GetScale()
+				local box, boxSize = model:GetBoundingBox()
+				skinFeet = model:GetPivot().Position.Y - (box.Position.Y - boxSize.Y / 2)
+				stopFx = SkinFx.AnimatePreview(model)
+			end
+		end
+		local stand, ring = pedestal(size, beamColor)
+		-- (the skin and pedestal aren't on the stage until they fly in: clear them up too)
+		stageStop = function()
+			stopFx()
+			stand:Destroy()
+			if skin then
+				skin:Destroy()
+			end
+		end
+		local pedX, pedZ = -size * 0.95, -size * 0.5 -- (the viewer's right of the chest)
+
+		local drop = math.max(0.05, openingCfg.DropSeconds)
+		local shake = math.max(0.05, openingCfg.ShakeSeconds)
+		local burstTime = math.max(0.05, openingCfg.BurstSeconds)
+		local fly = math.max(0.05, openingCfg.FlySeconds)
+		local hold = math.max(0, openingCfg.PedestalSeconds)
+		local tBurst = drop + shake
+		local tFly = tBurst + burstTime
+		local tEnd = tFly + fly + hold
+
+		type Coin = { Frame: Frame, X: number, Y: number, VX: number, VY: number }
+		local coinBits: { Coin } = {}
+		local burstDone = false
+		local flying = false
+		local function burstOpen()
+			if burstDone then
+				return
+			end
+			burstDone = true
+			beam.Visible = true
+			viewport.Ambient = ambient:Lerp(beamColor, 0.4)
+			if celebrate then
+				crazyBurst()
+			else
+				Sounds.PlaySpec(openingCfg.Sounds.Burst)
+			end
+			if result.Duplicate then
+				-- Coins pour out: the duplicate's real refund from the server.
+				Sounds.PlaySpec(openingCfg.Sounds.Coins)
+				local pour = math.max(
+					0,
+					math.floor(if compact then openingCfg.PhoneCoinPour else openingCfg.CoinPour)
+				)
+				for _ = 1, pour do
+					local coin = Instance.new("Frame")
+					coin.Name = "Coin"
+					coin.ZIndex = 5
+					coin.BorderSizePixel = 0
+					coin.BackgroundColor3 = Color3.fromRGB(255, 205, 60)
+					coin.AnchorPoint = Vector2.new(0.5, 0.5)
+					coin.Size = UDim2.fromOffset(14, 14)
+					coin.Parent = stage
+					local round = Instance.new("UICorner")
+					round.CornerRadius = UDim.new(0.5, 0)
+					round.Parent = coin
+					local rim = Instance.new("UIStroke")
+					rim.Color = Color3.fromRGB(190, 130, 20)
+					rim.Thickness = 2
+					rim.Parent = coin
+					table.insert(coinBits, {
+						Frame = coin,
+						X = 0.5,
+						Y = 0.48,
+						VX = (math.random() - 0.5) * 0.7,
+						VY = -0.7 - math.random() * 0.6,
+					})
+				end
+				local back = label(openingCfg.CoinsBack:format(result.Refund or 0), 22, stage)
+				back.Name = "CoinsBack"
+				back.ZIndex = 6
+				back.TextColor3 = Color3.fromRGB(255, 215, 80)
+				back.TextStrokeTransparency = 0.3
+				back.AnchorPoint = Vector2.new(0.5, 0)
+				back.Position = UDim2.fromScale(0.5, 0.06)
+				back.Size = UDim2.new(1, -20, 0, 30)
+			end
+		end
+
+		local shakePhase = 0
+		local nextTick = 0
+		local lastChestScale = chestScale
+		local lastSkinScale = skinScale
+		local function pose(t: number, dt: number)
+			local chestX = 0
+			if t >= tFly then
+				chestX = easeOut(math.clamp((t - tFly) / fly, 0, 1)) * size * 0.95
+			end
+			if chest then
+				local y = 0
+				if t < drop then
+					y = (1 - bounceOut(t / drop)) * size * 3
+				end
+				local roll, side = 0, 0
+				if t >= drop and t < tBurst then
+					local u = (t - drop) / shake
+					shakePhase += dt * math.pi * 2 * (5 + 25 * u) -- faster and faster
+					local amp = u ^ 1.5 * look.Shake
+					roll = math.sin(shakePhase) * openingCfg.ShakeDegrees * amp
+					side = math.sin(shakePhase * 1.37) * openingCfg.ShakeStuds * amp
+					if t >= nextTick then
+						Sounds.PlaySpec(openingCfg.Sounds.Shake)
+						local gap = openingCfg.ShakeTickStart
+							+ (openingCfg.ShakeTickEnd - openingCfg.ShakeTickStart) * u
+						nextTick = t + math.max(0.03, gap)
+					end
+				end
+				if not lid then
+					-- No lid to open: the chest pops instead.
+					local pop = 1
+					if t >= tBurst and t < tFly then
+						pop = 1 + 0.28 * math.sin(math.pi * (t - tBurst) / burstTime)
+					end
+					if pop ~= lastChestScale / chestScale then
+						chest:ScaleTo(chestScale * pop)
+						lastChestScale = chestScale * pop
+					end
+				end
+				chest:PivotTo(CFrame.new(chestX + side, y, 0) * CFrame.Angles(0, 0, math.rad(roll)))
+				if lid then
+					local angle = 0
+					if t >= tBurst then
+						angle = backOut(math.clamp((t - tBurst) / burstTime, 0, 1))
+							* openingCfg.LidAngle
+					end
+					CrateLook.LidPose(lid, angle)
+				end
+			end
+			if t >= tBurst then
+				burstOpen()
+				local u = math.clamp((t - tBurst) / burstTime, 0, 1)
+				beam.Size = UDim2.fromScale(0.12 + 0.06 * u, 0.75 * easeOut(u))
+				beam.BackgroundTransparency = math.clamp((t - tFly) / fly, 0, 1) * 0.9
+				if rainbow then
+					beamGradient.Color = rainbowAt(t * 0.6)
+					ring.Color = Color3.fromHSV((t * 0.6) % 1, 0.7, 1)
+				end
+			end
+			for _, coin in coinBits do
+				coin.VY += 2.4 * dt
+				coin.X += coin.VX * dt
+				coin.Y += coin.VY * dt
+				coin.Frame.Position = UDim2.fromScale(coin.X, coin.Y)
+				coin.Frame.Visible = coin.Y < 1.1
+			end
+			if t >= tFly then
+				if not flying then
+					flying = true
+					stand.Parent = viewport
+					if skin then
+						skin.Parent = viewport
+					end
+				end
+				local u = math.clamp((t - tFly) / fly, 0, 1)
+				local e = easeOut(u)
+				local yaw = math.rad(openingCfg.PedestalSpin * (t - tFly))
+				stand:PivotTo(
+					CFrame.new(pedX, -size * 1.6 * (1 - e), pedZ) * CFrame.Angles(0, yaw, 0)
+				)
+				if skin then
+					local from = Vector3.new(chestX, chestHeight * 0.85, 0)
+					local to = Vector3.new(pedX, size * PEDESTAL_TOP, pedZ)
+					local at = from:Lerp(to, e)
+						+ Vector3.new(0, math.sin(math.pi * u) * size * 1.3, 0)
+					local k = 0.3 + 0.7 * e
+					if skinScale * k ~= lastSkinScale then
+						skin:ScaleTo(skinScale * k)
+						lastSkinScale = skinScale * k
+					end
+					skin:PivotTo(
+						CFrame.new(at + Vector3.new(0, skinFeet * k, 0)) * CFrame.Angles(0, yaw, 0)
+					)
+				end
+			end
+		end
+
+		skipNow = function()
+			if spinConnection then
+				-- Straight to the reveal; a CRAZY still gets its celebration.
+				if celebrate and not burstDone then
+					crazyBurst()
+				end
+				showReveal(result)
+			end
+		end
+		skipConnection = skip.Activated:Connect(function()
+			local fn = skipNow
+			if fn then
+				fn()
+			end
+		end)
+		Sounds.PlaySpec(openingCfg.Sounds.Drop)
+		pose(0, 0)
+		local began = os.clock()
+		local last = began
+		spinConnection = RunService.Heartbeat:Connect(function()
+			if not panel.Visible then
+				stopSpin() -- the result is kept in `unseen` and shown next time the panel opens
+				return
+			end
+			local now = os.clock()
+			local t = now - began
+			local dt = now - last
+			last = now
+			if t >= tEnd then
+				showReveal(result)
+				return
+			end
+			pose(t, dt)
+		end)
+	end
+
+	-- The opening for one result, in the style Config.Crates.Opening.Style picks.
+	playResult = function(result: Result)
+		if openingCfg.Style == "Reel" then
+			playReel(result)
+		else
+			playChest(result)
+		end
+	end
+
+	-- A tap anywhere on the chest skips to the reveal (like Space and Skip).
+	stage.Activated:Connect(function()
+		local fn = skipNow
+		if fn then
+			fn()
+		end
+	end)
 
 	-- The next result of a multi-open (spins its strip).
 	playNext = function()
@@ -1887,6 +2558,8 @@ function CrateUI.Mount(gui: ScreenGui)
 		-- Free the 3D previews while the panel is closed.
 		stopSpin()
 		stopBurst()
+		stopCrazy()
+		clearStage()
 		revealStop()
 		revealStop = function() end
 		if busy and unseen == nil then

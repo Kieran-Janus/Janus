@@ -20,7 +20,11 @@
 	CrateOdds.Roll(crate, rng) -> item?    a random item, using `rng` (a Random)
 	CrateOdds.Reel(crate, winnerId, rng, cards, winIndex) -> { itemId }
 	                                       the opening animation's strip: random picks from
-	                                       the crate with the winner at winIndex
+	                                       the crate with the winner at winIndex. The cards
+	                                       within Config.Crates.Opening.TeaseGuard places of
+	                                       the winner are never rarer than the win (no fake
+	                                       near misses)
+	CrateOdds.RarityIndex(rarity) -> number its place in Config.Rarity.Order (1 = commonest)
 	CrateOdds.Format(percent) -> string    "0.100%", or "0.0001%" for tiny chances
 	CrateOdds.CoinPrice(crate) -> number?  coins to open it (nil = not sold for coins)
 	CrateOdds.ProductId(crate) -> number   its Robux Developer Product id (0 = not for sale)
@@ -242,14 +246,36 @@ function CrateOdds.Reel(
 	local chances = CrateOdds.Chances(crate)
 	local count = math.max(1, math.floor(cards))
 	local win = math.clamp(math.floor(winIndex), 1, count)
+	-- No teasing near misses: the cards next to the winner (Config.Crates.Opening.TeaseGuard
+	-- places either side) are drawn only from the rarities up to the one actually won, with
+	-- their real chances among those. Every other card is an honest draw from the whole crate.
+	local guard = math.max(0, math.floor(tonumber(Config.Crates.Opening.TeaseGuard) or 0))
+	local winner = Items.Get(winnerId)
+	local wonLevel = if winner then CrateOdds.RarityIndex(Items.Rarity(winner)) else nil
+	local near: { Chance } = chances
+	if guard > 0 and wonLevel then
+		near = {}
+		for _, c in chances do
+			if CrateOdds.RarityIndex(c.Rarity) <= wonLevel then
+				table.insert(near, c)
+			end
+		end
+	end
 	local reel = table.create(count, winnerId)
 	for i = 1, count do
 		if i ~= win then
-			local item = CrateOdds.Pick(chances, rng:NextNumber())
+			local pool = if math.abs(i - win) <= guard then near else chances
+			local item = CrateOdds.Pick(pool, rng:NextNumber())
 			reel[i] = if item then item.Id else winnerId
 		end
 	end
 	return reel
+end
+
+-- A rarity's place in Config.Rarity.Order (1 = the commonest); unknown rarities count as the
+-- commonest.
+function CrateOdds.RarityIndex(rarity: string?): number
+	return table.find(Config.Rarity.Order, rarity or "") or 1
 end
 
 function CrateOdds.Format(percent: number): string

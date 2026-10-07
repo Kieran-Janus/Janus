@@ -91,9 +91,16 @@ local function display(
 		Material = Enum.Material.Neon,
 		CastShadow = false,
 	}, m)
-	Kit.light(ring, crate.Color:Lerp(Color3.new(1, 1, 1), 0.3), size * 3.2, 1.3, false)
+	Kit.light(
+		ring,
+		crate.Color:Lerp(Color3.new(1, 1, 1), 0.3),
+		size * 3.2,
+		Config.Crates.Stand.LightBrightness,
+		false
+	)
 
-	-- The crate floats a little above the plinth and bobs (client HubAmbience).
+	-- The crate floats a little above the plinth and comes alive (client CrateIdle; with
+	-- Config.Crates.Idle off it only bobs, client HubAmbience).
 	local stand = top.CFrame * CFrame.new(0, 0.15 + 0.25, 0)
 	-- (only for looks: the prompt is on its own part below)
 	local crateModel = Kit.prop(crate.Id, stand, m, CrateArt.Height(size), function()
@@ -102,8 +109,10 @@ local function display(
 		return built
 	end, { Visual = true, FitLargest = true })
 	crateModel.Name = crate.Id
+	-- With Config.Crates.Idle on, the client's CrateIdle bobs, sways and peeks it instead (it
+	-- has its own Look.Bob), so it isn't tagged to float as well.
 	local bob = Config.Crates.Stand.Bob
-	if bob > 0 and crateModel.PrimaryPart then
+	if bob > 0 and crateModel.PrimaryPart and not Config.Crates.Idle.On then
 		Kit.float(crateModel, bob, rng)
 	end
 

@@ -377,6 +377,7 @@ describe("Buy buttons in view on a short phone screen", function()
 	it("builds 3D pictures only on the cards the slowing strip shows", function()
 		local p = screen(640, 302, true)
 		p.Config.Features.Crates = true
+		p.Config.Crates.Opening.Style = "Reel" -- (the spinning strip, not the chest)
 		local reelCfg = p.Config.Crates.Reel
 		local CrateUI = p.rt:require(p.Client.CrateUI)
 		CrateUI.Mount(p.gui)

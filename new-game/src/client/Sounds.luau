@@ -3,8 +3,9 @@
 	2D sound effects for this player (Config.Sounds), and the Music / Sounds settings.
 
 	Sounds.Play(name)      plays Config.Sounds[name] once (no-op for "" or unknown names).
-	Sounds.PlaySpec(spec)  plays { SoundId, Volume?, PitchMin?, PitchMax? } once, for
-	                       features that keep their sounds in their own config file.
+	Sounds.PlaySpec(spec, at?)  plays { SoundId, Volume?, PitchMin?, PitchMax? } once, for
+	                       features that keep their sounds in their own config file; with
+	                       `at` (a part or Attachment) it is a 3D sound coming from there.
 	Mount() also wires the automatic ones:
 	  - click and hover on every button in the game UI (anything added to PlayerGui)
 	  - pumpkin pickup (random pitch), coins gained, round start, countdown ticks,
@@ -33,7 +34,8 @@ export type Spec = {
 
 -- Plays a sound described by `spec` once, in the Effects group (so the Sounds setting
 -- mutes it). Features keep their sound ids in their own config file and call this.
-function Sounds.PlaySpec(spec: Spec)
+-- `at` (a BasePart or Attachment) makes it a 3D sound coming from there.
+function Sounds.PlaySpec(spec: Spec, at: Instance?)
 	if type(spec) ~= "table" or type(spec.SoundId) ~= "string" or spec.SoundId == "" then
 		return
 	end
@@ -44,7 +46,7 @@ function Sounds.PlaySpec(spec: Spec)
 	local high = spec.PitchMax or low
 	sound.PlaybackSpeed = low + math.random() * (high - low)
 	sound.SoundGroup = effectsGroup
-	sound.Parent = SoundService
+	sound.Parent = if at and (at:IsA("BasePart") or at:IsA("Attachment")) then at else SoundService
 	sound:Play()
 	sound.Ended:Once(function()
 		sound:Destroy()

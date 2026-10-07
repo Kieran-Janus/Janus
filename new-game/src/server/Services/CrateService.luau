@@ -370,34 +370,63 @@ local function shortNumber(n: number): string
 	return tostring(n)
 end
 
+-- The rarity crate of the rainbow rarity (CRAZY), for testing its opening in Studio.
+local function crazyCrate(): CrateOdds.Crate?
+	for _, crate in CrateOdds.List() do
+		local level = crate.Rarity and (Config.Rarity.Levels :: any)[crate.Rarity]
+		if level and level.Rainbow == true then
+			return crate
+		end
+	end
+	return nil
+end
+
+-- Opens `which` for nothing and plays it on the player's screen (F8 test buttons).
+local function openFree(player: Player, which: CrateOdds.Crate?): string
+	if not which then
+		return "There are no crates in Config.Crates.List."
+	end
+	if CrateService.IsRestricted(player) then
+		return text().Restricted
+	end
+	local result = CrateService.Grant(player, which, "Free")
+	if not result then
+		return "That crate is empty."
+	end
+	saveIfRare(player, result)
+	ShopService.Push(player)
+	CrateService.SendResult(player, result)
+	return ("Free %s: %s (%s)%s"):format(
+		which.Name,
+		tostring(result.ItemName),
+		tostring(result.Rarity),
+		if result.Duplicate then (", duplicate +%d"):format(result.Refund or 0) else ""
+	)
+end
+
 local function registerAdmin()
 	local crate = freeCrate()
 	AdminService.Register(
 		"CrateFree",
 		("Crates: open free %s"):format(if crate then crate.Name else "crate"),
 		function(player, _data)
-			local which = freeCrate()
-			if not which then
-				return "There are no crates in Config.Crates.List."
-			end
-			if CrateService.IsRestricted(player) then
-				return text().Restricted
-			end
-			local result = CrateService.Grant(player, which, "Free")
-			if not result then
-				return "That crate is empty."
-			end
-			saveIfRare(player, result)
-			ShopService.Push(player)
-			CrateService.SendResult(player, result)
-			return ("Free %s: %s (%s)%s"):format(
-				which.Name,
-				tostring(result.ItemName),
-				tostring(result.Rarity),
-				if result.Duplicate then (", duplicate +%d"):format(result.Refund or 0) else ""
-			)
+			return openFree(player, freeCrate())
 		end
 	)
+	-- Studio only: the CRAZY opening (rainbow beam, confetti) without 80,000 coins.
+	local crazy = crazyCrate()
+	if crazy and RunService:IsStudio() then
+		AdminService.Register(
+			"CrateFreeCrazy",
+			("Crates: open free %s"):format(crazy.Name),
+			function(player, _data)
+				if not RunService:IsStudio() then
+					return "Studio only."
+				end
+				return openFree(player, crazyCrate())
+			end
+		)
+	end
 	local coins = Config.Crates.Admin.Coins
 	AdminService.Register(
 		"CrateCoins",

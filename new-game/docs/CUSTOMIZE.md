@@ -359,7 +359,32 @@ Mystery crates give a random skin. Everything about them is in `src/shared/Confi
   an invisible part tagged `CrateDisplay` with the attribute `CrateId`: move or copy them in
   Studio, or tag any part of your own. Your own crate look: a model named after the crate's Id
   (e.g. `PumpkinCrate`) in `ReplicatedStorage > Custom > Props`. It shows on the stand and in the crate panel, sized by its longest side (a long coffin stays on its plinth; a model you stood upright stays upright). With a Toolbox code: `require(game.ServerScriptService.Server.Tools.Swap).Toolbox("PumpkinCrate", 5420577601)`. Its front is its pivot's front (turn the pivot if it shows its side).
-- **Test it**: F8 > "Crates: open free Pumpkin Crate" and "Crates: +100k coins". Which crate the free button opens: `Admin.FreeCrate`. To see what players in a blocked region see, set `Policy.TestAsRestricted = true` (Studio only).
+- **How each crate looks** (`LookDefaults` and each crate's `Look` in `Crates.luau`): `Style` is the
+  chest's shape: `Pumpkin` (carved pumpkin, leafy lid), `Candy` (wrapped candy box with a bow),
+  `Coffin` (a ghost peeks out), `Tomb` (mossy tombstone chest), `Monster` (furry, googly eyes that
+  follow players, teeth), `Moon` (starry, crescent moon) or `Chest` with an `Emblem` on the front
+  (a head piece name like `WolfHead`, or `Gem`). Colours are the crate's `Color`, `Trim`, `Glow`
+  and the Look's `Accent`. `Bob`, `Sway`, `PeekEvery`, `PeekAngle`, `Shake`, `Sparkles` and
+  `Sounds` (`SoundId = ""` = silent) tune how it moves; give one crate its own value to change only
+  that one. `New = true` puts a NEW ribbon on its card.
+- **The stand comes alive** (`Idle`, client side, only crates near the camera; phones get fewer
+  sparkles and a shorter range): crates bob and sway, the lid peeks open every few seconds with a
+  puff of light and sparkles, a soft ring glows under each one, and when you walk close
+  (`WakeDistance`) the nearest crate wiggles and shows its name, price and an Odds button that
+  opens its page. `Stand.LightBrightness` is the light under each crate.
+- **Opening** (`Opening`): the chest drops in and bounces, shakes faster and faster
+  (`ShakeSeconds`), then the lid bursts open with a beam in the colour of the rarity you really
+  won (`BeamColors`; CRAZY is a rainbow) and the skin flies out onto a spinning pedestal before the
+  reveal card. CRAZY: a full-screen rainbow burst, confetti and `Sounds.CrazyBurst`. A duplicate:
+  coins pour out with "+X coins back". Space or a tap skips; Quick open shows everything at once.
+  `Style = "Reel"` brings back the old spinning strip. `CameraDistance` = how big the chest looks.
+- **Your own crate model** still works everywhere: it bobs, sways and shakes, and its lid opens only
+  if it has a part named `Lid` (the stand's built chests all have one).
+- **Fair to players (kids)**: the beam, the reel and the reveal always show the server's real
+  result; on the reel the cards next to yours (`Opening.TeaseGuard`) never show a rarer skin than
+  the one you won, so there are no teasing near misses; no countdowns or "only X left"; the odds are
+  one tap away on every card and on the stand.
+- **Test it**: F8 > "Crates: open free Pumpkin Crate", "Crates: open free CRAZY Crate" (the CRAZY celebration) and "Crates: +100k coins". Which crate the free button opens: `Admin.FreeCrate`. To see what players in a blocked region see, set `Policy.TestAsRestricted = true` (Studio only).
 - Or ask Claude Code: `/add-crate a Witchy crate with 20 new skins`.
 
 **Roblox's rule for paid random items (please keep it):** players must see every item and its
