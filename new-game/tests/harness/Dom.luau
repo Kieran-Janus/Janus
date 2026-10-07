@@ -512,6 +512,10 @@ local function writeProp(
 	level: number,
 	internal: boolean?
 )
+	local w = d.world
+	if w then
+		w.propWrites = (w.propWrites or 0) + 1 -- (perf.spec: how much per-frame code changes)
+	end
 	local set = member.set
 	if set then
 		set(d.u, d, value)

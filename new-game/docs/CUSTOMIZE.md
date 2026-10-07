@@ -38,6 +38,7 @@ Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Mod
 | Ghost mode rules (fly speed, haunt) | `Config.Ghost` |
 | Voice range and echo | `Config.Voice` |
 | Turn any v2 feature on or off | `src/shared/Config/Features.luau` (one `true`/`false` line each) |
+| How hard the lobby and map animations work on phones (how far candles animate, flicker rate, how often they look for something nearby) | `Config.Performance` (the `Phone...` lines are for small touch screens; `tests/specs/perf.spec.luau` checks idle work stays near zero) |
 | Hub layout, lighting, music, decorations | `Config.Hub` (then F8 > Rebuild hub to try it, and raise `Config.Hub.BuildVersion` so saved hubs update) |
 | Hub colours | `Config.Hub.Palette` (the `hubPalette` list at the top of `Config/init.luau`) |
 | Where the Ready pad, shop, crate stand, minigames and parkour go | `Config.Lobby.Zones` (`src/shared/Config/Lobby.luau`) |
@@ -321,7 +322,7 @@ A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
 
 ---
 
-- **All the UI animation** (panels popping in and out, button squash, the Menu's tiles, the coins rolling): `Config.UI.Motion` in `src/shared/Config/init.luau`; `On = false` makes everything instant. Rounds: `Config.Voting.Animate`, `Config.Juice.Animate`, `Config.Results.Animate`; the Shop: `Config.Shop.Juice.Animate`; minigames: `Config.Minigames.Effects.On`; the lobby's keeper, Ready ring, floor signs, cauldron and bats: `Config.Lobby.Life`.
+- **All the UI animation** (panels popping in and out, button squash, the Menu's tiles, the coins rolling): `Config.UI.Motion` in `src/shared/Config/init.luau`; `On = false` makes everything instant. Rounds: `Config.Voting.Animate`, `Config.Juice.Animate`, `Config.Results.Animate`; the Shop: `Config.Shop.Juice.Animate`; minigames: `Config.Minigames.Effects.On`; the lobby's keeper, Ready ring, floor signs, cauldron and bats: `Config.Lobby.Life`. Hide & Seek and ScareMaze banners, the BOO cooldown ring, the jumpscare's zoom, the ghost panel and spectate bar, daily reward toasts, NPC typing, announcements (stacking: `Config.Announce`) and the Voting Board: `Config.ScreenMotion` (`src/shared/Config/ScreenMotion.luau`; `On = false` makes them instant).
 
 ## Crates
 Mystery crates give a random skin. Everything about them is in `src/shared/Config/Crates.luau`

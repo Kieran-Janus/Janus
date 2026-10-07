@@ -4,7 +4,8 @@
 	Settings: Config.MapLife (src/shared/Config/MapLife.luau). Off: Config.Features.MapLife =
 	false, or each part with its own On.
 
-	Only things within MapLife.Range of the camera (PhoneRange on phones) move.
+	Only things within MapLife.Range of the camera (PhoneRange on phones) move. With no round
+	map, pumpkins or wobble going on (the lobby) nothing here runs per frame at all.
 	  Pickups   King Hunt pumpkins (tag PumpkinPickup, set by PumpkinService) bob, spin and
 	            their glow light breathes. When one is collected near you (it disappears while
 	            its round is still on, with a player right next to it) a sparkle burst and a
@@ -31,6 +32,7 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
+local FramePace = require(script.Parent.FramePace)
 local Layout = require(script.Parent.Layout)
 local MinigameFx = require(script.Parent.MinigameFx)
 
@@ -279,6 +281,9 @@ function MapLife.Mount(_gui: ScreenGui?)
 		table.insert(connections, CollectionService:GetInstanceRemovedSignal(tag):Connect(remove))
 	end
 
+	-- Starts the frame loop if it stopped (set below, once the loop is defined).
+	local ensureLoop: () -> () = function() end
+
 	-- Pickups -----------------------------------------------------------------------------------
 
 	local pickCfg = cfg.Pickups
@@ -379,6 +384,7 @@ function MapLife.Mount(_gui: ScreenGui?)
 			Watch = nil,
 		}
 		pickups[instance] = p
+		ensureLoop()
 		p.Watch = instance.AncestryChanged:Connect(function()
 			if not instance:IsDescendantOf(workspace) then
 				removePickup(instance)
@@ -412,8 +418,12 @@ function MapLife.Mount(_gui: ScreenGui?)
 		end
 	end
 
-	local function updatePickups(now: number, eye: Vector3)
+	-- `scanning`: also look at the pumpkins that aren't animating (not every frame).
+	local function updatePickups(now: number, eye: Vector3, scanning: boolean)
 		for part, p in pickups do
+			if not scanning and not p.Proxy then
+				continue
+			end
 			if not part:IsDescendantOf(workspace) then
 				continue
 			end
@@ -532,7 +542,9 @@ function MapLife.Mount(_gui: ScreenGui?)
 		end
 		for _, f in flies do
 			local part = f.Part
-			part.Color = color
+			if part.Color ~= color then
+				part.Color = color
+			end
 			local pos = part.Position
 			local offset = pos - centre
 			if Vector3.new(offset.X, 0, offset.Z).Magnitude > ambCfg.Radius then
@@ -614,6 +626,7 @@ function MapLife.Mount(_gui: ScreenGui?)
 			BottomRel = pivot:ToObjectSpace(bottom),
 			Start = now,
 		})
+		ensureLoop()
 		return true
 	end
 
@@ -651,6 +664,7 @@ function MapLife.Mount(_gui: ScreenGui?)
 	local function addCandidate(instance: Instance)
 		if instance:IsA("Model") or instance:IsA("BasePart") then
 			candidates[instance] = true
+			ensureLoop()
 		end
 	end
 	local function removeCandidate(instance: Instance)
@@ -675,30 +689,67 @@ function MapLife.Mount(_gui: ScreenGui?)
 		end
 	end
 
+	-- The frame loop only runs while there is a round map, pumpkins or something animating:
+	-- in the lobby it disconnects itself (and comes back when a map or a pumpkin arrives).
+	-- Things not animating yet are only looked at now and then (FramePace.ScanSeconds).
+	local loop: RBXScriptConnection? = nil
+	local nextIdleScan = 0
+
+	local function hasWork(): boolean
+		return next(pickups) ~= nil
+			or next(candidates) ~= nil
+			or #wobbling > 0
+			or #flies > 0
+			or workspace:FindFirstChild("Map") ~= nil
+	end
+
+	local function frame()
+		local now = os.clock()
+		local dt = math.clamp(now - last, 0, 0.25)
+		last = now
+		local scanning = now >= nextIdleScan
+		if scanning then
+			nextIdleScan = now + FramePace.ScanSeconds()
+		end
+		if now >= nextScreenCheck then
+			nextScreenCheck = now + 1
+			phone = Layout.IsPhone()
+			range = if phone then cfg.PhoneRange else cfg.Range
+		end
+		local camera = workspace.CurrentCamera
+		if not camera then
+			return
+		end
+		local eye = camera.CFrame.Position
+		if pickCfg.On then
+			updatePickups(now, eye, scanning)
+		end
+		if ambCfg.On and (scanning or #flies > 0) then
+			updateFlies(now, dt, camera)
+		end
+		if wobCfg.On and (scanning or #wobbling > 0) then
+			updateWobbles(now, eye)
+		end
+		local current = loop
+		if scanning and current and not hasWork() then
+			current:Disconnect()
+			loop = nil
+		end
+	end
+
+	ensureLoop = function()
+		if alive and not loop then
+			last = os.clock()
+			nextIdleScan = 0
+			loop = RunService.RenderStepped:Connect(frame)
+		end
+	end
+	ensureLoop()
 	table.insert(
 		connections,
-		RunService.RenderStepped:Connect(function()
-			local now = os.clock()
-			local dt = math.clamp(now - last, 0, 0.25)
-			last = now
-			if now >= nextScreenCheck then
-				nextScreenCheck = now + 1
-				phone = Layout.IsPhone()
-				range = if phone then cfg.PhoneRange else cfg.Range
-			end
-			local camera = workspace.CurrentCamera
-			if not camera then
-				return
-			end
-			local eye = camera.CFrame.Position
-			if pickCfg.On then
-				updatePickups(now, eye)
-			end
-			if ambCfg.On then
-				updateFlies(now, dt, camera)
-			end
-			if wobCfg.On then
-				updateWobbles(now, eye)
+		workspace.ChildAdded:Connect(function(child)
+			if child.Name == "Map" then
+				ensureLoop()
 			end
 		end)
 	)
@@ -709,6 +760,11 @@ function MapLife.Mount(_gui: ScreenGui?)
 			c:Disconnect()
 		end
 		table.clear(connections)
+		local current = loop
+		if current then
+			current:Disconnect()
+			loop = nil
+		end
 		for part in pickups do
 			local p = pickups[part]
 			pickups[part] = nil

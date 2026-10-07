@@ -21,7 +21,7 @@ type Entry = { UserId: number, Name: string, Pumpkins: number }
 local LeaderboardService = {}
 
 local store: OrderedDataStore? = nil
-local dirty: { [Player]: boolean } = {}
+local dirty: { [Player]: number } = {} -- the lifetime total still to write to the store
 local names: { [number]: string } = {}
 
 local function nameOf(userId: number): string
@@ -51,17 +51,19 @@ local function isRealUser(userId: number): boolean
 end
 
 local function save(player: Player)
-	if not store or not dirty[player] or not isRealUser(player.UserId) then
+	local amount = dirty[player]
+	if not store or not amount or not isRealUser(player.UserId) then
 		return
 	end
 	dirty[player] = nil
 	local activeStore = store
-	local amount = total(player)
 	local ok, err = pcall(function()
 		activeStore:SetAsync(tostring(player.UserId), amount)
 	end)
 	if not ok then
-		dirty[player] = true
+		if player.Parent == Players and dirty[player] == nil then
+			dirty[player] = amount -- (not for a player who left meanwhile: nothing would clear it)
+		end
 		warn("[LeaderboardService] save failed: " .. tostring(err))
 	end
 end
@@ -172,7 +174,11 @@ function LeaderboardService.Record(player: Player, pumpkins: number)
 		return
 	end
 	DataService.Add(player, "PumpkinsCollected", pumpkins)
-	dirty[player] = true
+	-- Only a save that loaded has the real lifetime total: one that didn't load holds just this
+	-- session's pumpkins, and writing that would wipe the player's total off the board.
+	if DataService.IsLoaded(player) then
+		dirty[player] = total(player)
+	end
 end
 
 function LeaderboardService.Start()

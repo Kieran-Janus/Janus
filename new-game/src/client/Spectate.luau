@@ -8,6 +8,8 @@
 	buttons switch too (Config.Lobby.Spectate keys). It stops by itself when the round ends.
 	You stay in the lobby the whole time (you can still walk around). Who can be watched comes
 	from src/client/SpectateTargets.luau, shared with the ghost screen.
+	Motion (Config.ScreenMotion.Spectate): the bar slides up, a new name fades in, buttons
+	squash when pressed. Looks only: Back / Next / Stop act at once.
 
 	Spectate.Mount(gui)
 	Spectate.Toggle()             start watching, or stop if already watching
@@ -22,8 +24,10 @@ local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Layout = require(script.Parent.Layout)
+local ScreenFx = require(script.Parent.ScreenFx)
 local SpectateTargets = require(script.Parent.SpectateTargets)
 local Theme = require(script.Parent.Theme)
+local UIMotion = require(script.Parent.UIMotion)
 
 local Spectate = {}
 
@@ -34,6 +38,7 @@ local STREAM_EVERY = 3 -- seconds between "stream the map to me" reminders while
 -- size (a wider bar would shrink and its text with it).
 local PHONE_WIDTH = 300
 local PHONE_HEIGHT = 88
+local BAR_HOME = UDim2.new(0.5, 0, 1, -24) -- where the bar sits (it slides up into place)
 
 local active = false
 local mounted = false
@@ -54,9 +59,13 @@ local function canWatch(): boolean
 		and Players.LocalPlayer:GetAttribute("InRound") ~= true
 end
 
+-- A new name fades in (the words change at once).
 local function setName(text: string)
-	if nameLabel then
-		nameLabel.Text = text
+	local label = nameLabel
+	if label and label.Text ~= text then
+		label.Text = text
+		local motion = Config.ScreenMotion.Spectate
+		ScreenFx.FadeText(label, motion.NameFadeFrom, motion.NameFadeSeconds)
 	end
 end
 
@@ -84,7 +93,13 @@ end
 local function refreshVisibility()
 	local cfg = Config.Lobby.Spectate
 	if bar then
-		bar.Visible = active or showingMessage
+		local show = active or showingMessage
+		if show and not bar.Visible then
+			bar.Visible = true
+			local motion = Config.ScreenMotion.Spectate
+			ScreenFx.Slide(bar, BAR_HOME, Vector2.new(0, motion.SlideDistance), motion.SlideSeconds)
+		end
+		bar.Visible = show
 		if twoRows then
 			-- Just the name line while it only shows a message.
 			bar.Size = UDim2.fromOffset(PHONE_WIDTH, if active then PHONE_HEIGHT else 44)
@@ -200,6 +215,9 @@ local function button(text: string, parent: Instance): TextButton
 	b.Text = text
 	b.Parent = parent
 	Theme.round(b, 8)
+	if ScreenFx.On() then
+		UIMotion.Press(b) -- squashes when pressed (the click itself is never held up)
+	end
 	return b
 end
 
@@ -218,7 +236,7 @@ function Spectate.Mount(gui: ScreenGui)
 	local panel = Theme.panel(gui)
 	panel.Name = "SpectateBar"
 	panel.AnchorPoint = Vector2.new(0.5, 1)
-	panel.Position = UDim2.new(0.5, 0, 1, -24)
+	panel.Position = BAR_HOME
 	panel.Size = if twoRows
 		then UDim2.fromOffset(PHONE_WIDTH, PHONE_HEIGHT)
 		else UDim2.fromOffset(520, 52)

@@ -37,6 +37,7 @@ local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local CrateUI = require(script.Parent.CrateUI)
+local FramePace = require(script.Parent.FramePace)
 local Layout = require(script.Parent.Layout)
 local ShopJuice = require(script.Parent.ShopJuice)
 local SkinFx = require(script.Parent.SkinFx)
@@ -1096,11 +1097,9 @@ function ShopUI.Mount(gui: ScreenGui)
 	end
 
 	-- While the shop is open: CRAZY borders shimmer (and swell), Rare borders shine, and the
-	-- 3D previews in view slowly turn (PC; phones keep them still).
-	RunService.Heartbeat:Connect(function()
-		if not panel.Visible then
-			return
-		end
+	-- 3D previews in view slowly turn (PC; phones keep them still). Connected only while the
+	-- panel is open: a closed shop runs nothing per frame.
+	FramePace.WhileVisible(panel, RunService.Heartbeat, function()
 		local now = os.clock()
 		local t = now / skinSettings.ShimmerSeconds
 		local animate = ShopJuice.On()

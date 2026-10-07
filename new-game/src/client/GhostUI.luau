@@ -6,6 +6,8 @@
 	  - Spectate mode: camera follows a survivor or a King, with previous/next buttons and a
 	    "Watch King" button (who can be watched: src/client/SpectateTargets.luau)
 	  - the moment you're caught, a short camera orbit around the King (Config.Ghost.HauntCam)
+	Motion (Config.ScreenMotion.Ghost): the panel slides up, a new name fades in, buttons squash
+	when pressed. Looks only: every button acts at once.
 ]]
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -15,8 +17,10 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Layout = require(script.Parent.Layout)
+local ScreenFx = require(script.Parent.ScreenFx)
 local SpectateTargets = require(script.Parent.SpectateTargets)
 local Theme = require(script.Parent.Theme)
+local UIMotion = require(script.Parent.UIMotion)
 
 local GhostUI = {}
 
@@ -29,6 +33,9 @@ local function button(text: string, parent: Instance): TextButton
 	b.Text = text
 	b.Parent = parent
 	Theme.round(b, 8)
+	if ScreenFx.On() then
+		UIMotion.Press(b) -- squashes when pressed (the click itself is never held up)
+	end
 	return b
 end
 
@@ -40,7 +47,9 @@ function GhostUI.Mount(gui: ScreenGui)
 	local panel = Theme.panel(gui)
 	panel.Name = "Ghost"
 	panel.AnchorPoint = Vector2.new(0.5, 1)
-	panel.Position = UDim2.new(0.5, 0, 1, -24)
+	local home = UDim2.new(0.5, 0, 1, -24)
+	local motion = Config.ScreenMotion.Ghost
+	panel.Position = home
 	panel.Size = UDim2.fromOffset(480, 150)
 	panel.Visible = false
 	Layout.Fit(panel, true)
@@ -109,9 +118,17 @@ function GhostUI.Mount(gui: ScreenGui)
 		return "Watching " .. SpectateTargets.Name(t)
 	end
 
+	-- A new name fades in (the words change at once).
+	local function setWatching(words: string)
+		if watching.Text ~= words then
+			watching.Text = words
+			ScreenFx.FadeText(watching, motion.NameFadeFrom, motion.NameFadeSeconds)
+		end
+	end
+
 	local function watch(step: number)
 		target = SpectateTargets.Step(target, step)
-		watching.Text = if target then label(target) else "Nobody left to watch"
+		setWatching(if target then label(target) else "Nobody left to watch")
 	end
 
 	watchKing.Activated:Connect(function()
@@ -126,9 +143,9 @@ function GhostUI.Mount(gui: ScreenGui)
 		end
 		if best then
 			target = best
-			watching.Text = label(best)
+			setWatching(label(best))
 		else
-			watching.Text = "The King isn't here yet"
+			setWatching("The King isn't here yet")
 		end
 	end)
 	prev.Activated:Connect(function()
@@ -213,6 +230,7 @@ function GhostUI.Mount(gui: ScreenGui)
 
 	-- Refresh -------------------------------------------------------------------
 	local wasOut = player:GetAttribute("Out") == true
+	local shownMode: unknown = nil
 	local function refresh()
 		local out = player:GetAttribute("Out") == true
 		if out and not wasOut and ReplicatedStorage:GetAttribute("State") == "Playing" then
@@ -220,6 +238,10 @@ function GhostUI.Mount(gui: ScreenGui)
 		end
 		wasOut = out
 		local mode = player:GetAttribute("GhostMode")
+		if out and not panel.Visible then
+			panel.Visible = true
+			ScreenFx.Slide(panel, home, Vector2.new(0, motion.SlideDistance), motion.SlideSeconds)
+		end
 		panel.Visible = out
 		setStreaming(out and mode == "Spectate")
 		if not out then
@@ -233,6 +255,11 @@ function GhostUI.Mount(gui: ScreenGui)
 		for id, b in modeButtons do
 			b.BackgroundColor3 = if id == mode then Theme.Selected else Theme.Button
 		end
+		local picked = if typeof(mode) == "string" then modeButtons[mode] else nil
+		if mode ~= shownMode and picked and ScreenFx.On() then
+			UIMotion.Bump(picked) -- the mode the server switched you to
+		end
+		shownMode = mode
 		hauntButton.Visible = mode == "Haunt"
 		prev.Visible = mode == "Spectate"
 		nextButton.Visible = mode == "Spectate"

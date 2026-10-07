@@ -446,7 +446,9 @@ function RoundJuiceUI.Mount(gui: ScreenGui)
 
 	local nextBeat = 0
 	local level = 0
-	RunService.RenderStepped:Connect(function()
+	-- Runs every frame only while you are in a round (nothing per frame in the lobby).
+	local beating: RBXScriptConnection? = nil
+	local function beat()
 		local now = os.clock()
 		if now >= nextBeat then
 			level = danger()
@@ -460,7 +462,9 @@ function RoundJuiceUI.Mount(gui: ScreenGui)
 			end
 		end
 		if level <= 0 then
-			vignette.Visible = false
+			if vignette.Visible then
+				vignette.Visible = false
+			end
 			return
 		end
 		vignette.Visible = true
@@ -469,7 +473,24 @@ function RoundJuiceUI.Mount(gui: ScreenGui)
 		local phase = 1 - math.clamp((nextBeat - now) / interval, 0, 1)
 		local thump = math.max(math.exp(-phase * 12), 0.7 * math.exp(-math.abs(phase - 0.22) * 14))
 		setOpacity(hb.MaxOpacity * (0.35 + 0.65 * level) * (0.4 + 0.6 * thump))
-	end)
+	end
+	local function watchRound()
+		local want = inRound()
+		local current = beating
+		if want and not current then
+			nextBeat = 0
+			beating = RunService.RenderStepped:Connect(beat)
+		elseif not want and current then
+			current:Disconnect()
+			beating = nil
+			level = 0
+			vignette.Visible = false
+		end
+	end
+	ReplicatedStorage:GetAttributeChangedSignal("State"):Connect(watchRound)
+	player:GetAttributeChangedSignal("InRound"):Connect(watchRound)
+	player:GetAttributeChangedSignal("Out"):Connect(watchRound)
+	watchRound()
 end
 
 return RoundJuiceUI

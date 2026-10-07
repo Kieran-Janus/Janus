@@ -6,7 +6,8 @@
 	             animates them (a lobby saved before that still has the HubFloat tag on them).
 	  "HubFlicker" PointLights flicker like candles
 	Anything tagged later (the hub may be built after this client starts) is picked up too.
-	Cheap on phones (Config.Performance): only things near the camera animate, and the
+	Cheap on phones (Config.Performance): only things near the camera animate (looked for a
+	few times a second, not every frame; closer still on phones), and the
 	flicker updates a few times a second rather than every frame.
 ]]
 local CollectionService = game:GetService("CollectionService")
@@ -15,6 +16,8 @@ local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
+local FramePace = require(script.Parent.FramePace)
+local Layout = require(script.Parent.Layout)
 
 type Float = { Base: CFrame?, Bob: number, Phase: number }
 type Flicker = { Brightness: number, Seed: number }
@@ -83,21 +86,23 @@ function HubAmbience.Mount()
 		flickers[instance :: PointLight] = nil
 	end)
 
+	-- Every few frames (FramePace.ScanSeconds): which floats and lights are near the camera.
+	-- In between, only those move: nothing far away costs anything per frame.
+	local nearFloats: { Model } = {}
+	local nearFlickers: { PointLight } = {}
+	local nextScan = 0
 	local nextFlicker = 0
 	local maxDistance = perf.AmbienceDistance
-	RunService.RenderStepped:Connect(function()
-		local t = os.clock()
-		local eye = workspace.CurrentCamera.CFrame.Position
+	local flickerHz = perf.FlickerHz
+
+	local function scan(now: number, eye: Vector3)
+		local phone = Layout.IsPhone()
+		nextScan = now + FramePace.ScanSeconds()
+		maxDistance = if phone then perf.PhoneAmbienceDistance else perf.AmbienceDistance
+		flickerHz = if phone then perf.PhoneFlickerHz else perf.FlickerHz
+		table.clear(nearFloats)
 		for m, f in floats do
 			if not m.Parent then
-				floats[m] = nil
-				continue
-			end
-			-- (checked every frame: with streaming the crate's CratePrompt may arrive later)
-			if skipCrates and HubAmbience.IsStandCrate(m) then
-				if f.Base then
-					m:PivotTo(f.Base) -- back where it was, for CrateIdle to take over
-				end
 				floats[m] = nil
 				continue
 			end
@@ -109,17 +114,12 @@ function HubAmbience.Mount()
 				base = m:GetPivot()
 				f.Base = base
 			end
-			if (base.Position - eye).Magnitude <= maxDistance then
-				-- World-space bob: many models (candles) are built from rotated cylinders, so a
-				-- local offset would slide them sideways instead of up and down.
-				m:PivotTo(CFrame.new(0, math.sin(t * 1.5 + f.Phase) * f.Bob, 0) * base)
+			if ((base :: CFrame).Position - eye).Magnitude <= maxDistance then
+				table.insert(nearFloats, m)
 			end
 		end
-		if t < nextFlicker then
-			return
-		end
-		nextFlicker = t + 1 / perf.FlickerHz
-		for l, f in flickers do
+		table.clear(nearFlickers)
+		for l in flickers do
 			local holder = l.Parent
 			-- (in a part, or in an Attachment: the light a custom prop gets, Kit.prop)
 			local at: Vector3? = if holder and holder:IsA("BasePart")
@@ -129,9 +129,49 @@ function HubAmbience.Mount()
 			if not holder then
 				flickers[l] = nil
 			elseif at and (at - eye).Magnitude <= maxDistance then
+				table.insert(nearFlickers, l)
+			end
+		end
+	end
+
+	-- Every frame while something near the camera moves; otherwise only the scans run (from a
+	-- timer: no per-frame work at all far from everything).
+	FramePace.IdleLoop(RunService.RenderStepped, function(scanNow: boolean): boolean
+		local t = os.clock()
+		local eye = workspace.CurrentCamera.CFrame.Position
+		if scanNow or t >= nextScan then
+			scan(t, eye)
+		end
+		for _, m in nearFloats do
+			local f = floats[m]
+			if not f or not m.Parent then
+				continue
+			end
+			-- (checked every frame: with streaming the crate's CratePrompt may arrive later)
+			if skipCrates and HubAmbience.IsStandCrate(m) then
+				if f.Base then
+					m:PivotTo(f.Base) -- back where it was, for CrateIdle to take over
+				end
+				floats[m] = nil
+				continue
+			end
+			local base = f.Base :: CFrame
+			-- World-space bob: many models (candles) are built from rotated cylinders, so a
+			-- local offset would slide them sideways instead of up and down.
+			m:PivotTo(CFrame.new(0, math.sin(t * 1.5 + f.Phase) * f.Bob, 0) * base)
+		end
+		local busy = #nearFloats > 0 or #nearFlickers > 0
+		if t < nextFlicker or #nearFlickers == 0 then
+			return busy
+		end
+		nextFlicker = t + 1 / math.max(flickerHz, 1)
+		for _, l in nearFlickers do
+			local f = flickers[l]
+			if f and l.Parent then
 				l.Brightness = f.Brightness * (0.8 + 0.25 * math.noise(t * 3, f.Seed))
 			end
 		end
+		return busy
 	end)
 end
 

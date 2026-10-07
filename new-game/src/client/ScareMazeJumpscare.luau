@@ -9,6 +9,8 @@
 	                                 (face colours and emoji: Config.ScareMaze.Jumpscare.Faces)
 	Set Config.ScareMaze.Jumpscare.ImageId to an image ("rbxassetid://...") to show that
 	instead of the faces built here.
+	Its zoom and giggly wobble: Config.ScreenMotion.Jumpscare (with the motion off the face just
+	shows for the same time, no zoom, flash, wobble or camera shake).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,6 +18,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local ScreenFx = require(script.Parent.ScreenFx)
 local Sounds = require(script.Parent.Sounds)
 
 local ScareMazeJumpscare = {}
@@ -188,9 +191,11 @@ function ScareMazeJumpscare.Play(kind: string)
 	dim.BorderSizePixel = 0
 	dim.Parent = gui
 
+	local motion = Config.ScreenMotion.Jumpscare
+	local animate = ScreenFx.On()
 	local face = buildFace(kind, gui)
 	local scale = Instance.new("UIScale")
-	scale.Scale = 0.15
+	scale.Scale = if animate then motion.ZoomFrom else 1
 	scale.Parent = face
 
 	local flash = Instance.new("Frame")
@@ -204,14 +209,41 @@ function ScareMazeJumpscare.Play(kind: string)
 
 	gui.Enabled = true
 	Sounds.PlaySpec(cfg.Sting)
+	if not animate then
+		-- No motion: the face just shows (no zoom, flash, wobble or shake) and goes.
+		flash.BackgroundTransparency = 1
+		task.delay(cfg.Seconds, function()
+			if token == playing then
+				gui.Enabled = false
+				gui:ClearAllChildren()
+			end
+		end)
+		return
+	end
 	TweenService:Create(
 		scale,
 		TweenInfo.new(cfg.Seconds * 0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-		{ Scale = 1.1 }
+		{ Scale = motion.ZoomTo }
 	):Play()
 	TweenService:Create(flash, TweenInfo.new(cfg.Seconds * 0.4), { BackgroundTransparency = 1 })
 		:Play()
 	shake(cfg.Seconds, cfg.ShakeStuds, token)
+	-- A giggly wobble: silly, not scary.
+	if motion.WobbleDegrees > 0 and motion.WobbleSeconds > 0 then
+		face.Rotation = -motion.WobbleDegrees
+		local times = math.max(math.floor(cfg.Seconds * 0.7 / motion.WobbleSeconds), 1)
+		TweenService:Create(
+			face,
+			TweenInfo.new(
+				motion.WobbleSeconds,
+				Enum.EasingStyle.Sine,
+				Enum.EasingDirection.InOut,
+				times - 1,
+				true
+			),
+			{ Rotation = motion.WobbleDegrees }
+		):Play()
+	end
 
 	task.delay(cfg.Seconds * 0.75, function()
 		if token ~= playing then

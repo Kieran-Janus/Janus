@@ -504,6 +504,9 @@ local function updateAim()
 		return
 	end
 	local equipped = CandyGunClient.Equipped()
+	if not equipped and not hidMouse and not (cross.Visible or hint.Visible or bar.Visible) then
+		return -- no gun out and everything already hidden: nothing to do this frame
+	end
 	local touch = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
 	local showCross = equipped and not touch
 	local wantHidden = showCross and not usingGamepad()

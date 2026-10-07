@@ -7,6 +7,7 @@
 	everyone dance. A dance with an AnimationId plays that animation instead (only the
 	dancer's own screen plays it; Roblox shows it to everyone).
 	Your own dance stops when you walk or jump (and the server stops it too).
+	Nothing runs per frame while nobody is dancing.
 
 	Dances.Request(id)     ask the server to dance `id` ("" = stop); used by the dance bar
 	Dances.Current() -> string?   the dance your character is doing
@@ -98,10 +99,15 @@ local function playOwnTrack(character: Model, id: string, animationId: string)
 	end
 end
 
+-- The frame loop only runs while someone is dancing (see Mount).
+local loop: RBXScriptConnection? = nil
+local seen: { [Model]: boolean } = {}
+
 local function step()
 	local now = os.clock()
 	local me = Players.LocalPlayer
-	local seen: { [Model]: boolean } = {}
+	table.clear(seen)
+	local dancing = false
 	for _, player in Players:GetPlayers() do
 		local character = player.Character
 		if not character then
@@ -111,6 +117,7 @@ local function step()
 		if type(id) ~= "string" or id == "" then
 			continue
 		end
+		dancing = true
 		local def = defOf(id)
 		local animationId = if def then def.AnimationId else ""
 		if animationId ~= "" then
@@ -151,14 +158,55 @@ local function step()
 		end
 		Dances.Request("")
 	end
+	-- Nobody dancing and nothing left to undo: stop until a Dance attribute appears again.
+	local current = loop
+	if current and not dancing and next(active) == nil and not ownTrack then
+		current:Disconnect()
+		loop = nil
+	end
+end
+
+local function ensureLoop()
+	if not loop then
+		-- After Roblox's animations have set the joints this frame, so the dance wins.
+		loop = RunService.PreSimulation:Connect(step)
+	end
+end
+
+local watched: { [Model]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+local function watchCharacter(character: Model?)
+	if not character or watched[character] then
+		return
+	end
+	watched[character] = true
+	character:GetAttributeChangedSignal("Dance"):Connect(ensureLoop)
+	if character:GetAttribute("Dance") ~= nil then
+		ensureLoop()
+	end
+end
+
+local watchedPlayers: { [Player]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+local function watchPlayer(player: Player)
+	if watchedPlayers[player] then
+		return
+	end
+	watchedPlayers[player] = true
+	watchCharacter(player.Character)
+	player:GetPropertyChangedSignal("Character"):Connect(function()
+		watchCharacter(player.Character)
+	end)
 end
 
 function Dances.Mount(_gui: ScreenGui)
 	if not Config.Features.Dances then
 		return
 	end
-	-- After Roblox's animations have set the joints this frame, so the dance wins.
-	RunService.PreSimulation:Connect(step)
+	Players.PlayerAdded:Connect(watchPlayer)
+	for _, player in Players:GetPlayers() do
+		watchPlayer(player)
+	end
 end
 
 return Dances

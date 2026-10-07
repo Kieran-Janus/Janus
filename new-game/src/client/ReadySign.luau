@@ -107,7 +107,10 @@ function ReadySign.Mount()
 						local gui = sign:FindFirstChildWhichIsA("BillboardGui")
 						if gui and sign:IsA("BasePart") then
 							local flat = (sign.Position - eye) * Vector3.new(1, 0, 1)
-							gui.Enabled = flat.Magnitude > hideNear
+							local want = flat.Magnitude > hideNear
+							if gui.Enabled ~= want then
+								gui.Enabled = want
+							end
 						end
 					end
 				end

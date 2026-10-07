@@ -5,7 +5,8 @@
 	Config.Lobby.Life.On = false, or each part with its own On.
 
 	Only things within Life.Range of the camera (Life.PhoneRange on phones) animate; when the
-	camera moves away (and when you leave) everything goes back exactly where it was.
+	camera moves away (and when you leave) everything goes back exactly where it was. While
+	nothing is near, it only looks around a few times a second (Config.Performance.IdleScanHz).
 	  Keeper     every Model tagged ShopKeeper holding a character Model (Life.Keeper.Models:
 	             the built "Keeper" or a custom "Look") breathes, turns (yaw only, within
 	             MaxTurn degrees) to the nearest player and waves one arm when a player walks
@@ -29,6 +30,7 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local Tags = require(ReplicatedStorage.Shared.Tags)
+local FramePace = require(script.Parent.FramePace)
 local Layout = require(script.Parent.Layout)
 
 type Keeper = {
@@ -51,7 +53,16 @@ type Keeper = {
 	NpcWatch: RBXScriptConnection?, -- the NPC's new children (a custom look swapped in)
 }
 
-type Ring = { Pad: Instance, Part: Part, Phase: number }
+type Ring = {
+	Pad: Instance,
+	Part: Part,
+	Phase: number,
+	Shown: boolean, -- pulsing (near the camera)
+	Speed: number?, -- the PulseSpeed attribute last set
+	Centre: Vector3?, -- the pad's footprint, measured on each scan (it can be moved)
+	Bottom: number,
+	Width: number,
+}
 
 type Sign = {
 	Part: BasePart,
@@ -140,6 +151,7 @@ function LobbyLife.Mount(_gui: ScreenGui?)
 	local fxFolder = Instance.new("Folder")
 	fxFolder.Name = "LobbyLifeFx"
 	fxFolder.Parent = workspace
+	local loop: FramePace.IdleLoop -- (the frame loop, started at the end)
 
 	local phone = false
 	local range = life.Range
@@ -405,7 +417,16 @@ function LobbyLife.Mount(_gui: ScreenGui?)
 		ring.Color = padCfg.Color
 		ring.Transparency = 1
 		ring.Size = Vector3.new(0.1, 1, 1)
-		rings[instance] = { Pad = instance, Part = ring, Phase = rng:NextNumber(0, math.pi * 2) }
+		rings[instance] = {
+			Pad = instance,
+			Part = ring,
+			Phase = rng:NextNumber(0, math.pi * 2),
+			Shown = false,
+			Speed = nil,
+			Centre = nil,
+			Bottom = 0,
+			Width = 0,
+		}
 	end
 
 	local function removePad(instance: Instance)
@@ -444,29 +465,44 @@ function LobbyLife.Mount(_gui: ScreenGui?)
 		return cf.Position, cf.Position.Y - half, width
 	end
 
-	local function updateRings(dt: number, eye: Vector3)
+	local function hideRing(r: Ring)
+		if r.Shown then
+			r.Shown = false
+			r.Part.Transparency = 1
+		end
+	end
+
+	-- `scanning`: also measure the pads again (a bounding box per pad: not every frame).
+	local function updateRings(dt: number, eye: Vector3, scanning: boolean)
 		local count = ReplicatedStorage:GetAttribute("ReadyCount")
 		local speed = if typeof(count) == "number" and count > 0
 			then padCfg.FastSpeed
 			else padCfg.SlowSpeed
 		for pad, r in rings do
-			local centre, bottom, width = padShape(pad)
-			if not centre or not pad:IsDescendantOf(workspace) then
-				r.Part.Transparency = 1
+			if scanning or (r.Shown and not r.Centre) then
+				if pad:IsDescendantOf(workspace) then
+					r.Centre, r.Bottom, r.Width = padShape(pad)
+				else
+					r.Centre = nil
+				end
+			end
+			local centre = r.Centre
+			if not centre or not pad.Parent or (centre - eye).Magnitude > range then
+				hideRing(r)
 				continue
 			end
-			if (centre - eye).Magnitude > range then
-				r.Part.Transparency = 1
-				continue
-			end
+			r.Shown = true
 			r.Phase += dt * speed
 			local w = (math.sin(r.Phase) + 1) / 2
-			local across = (width + padCfg.RingWidth * 2) * (1 + padCfg.Grow * w)
+			local across = (r.Width + padCfg.RingWidth * 2) * (1 + padCfg.Grow * w)
 			r.Part.Size = Vector3.new(0.1, across, across)
-			r.Part.CFrame = CFrame.new(centre.X, bottom + 0.08, centre.Z)
+			r.Part.CFrame = CFrame.new(centre.X, r.Bottom + 0.08, centre.Z)
 				* CFrame.Angles(0, 0, math.rad(90))
 			r.Part.Transparency = padCfg.Faintest + (padCfg.Brightest - padCfg.Faintest) * w
-			r.Part:SetAttribute("PulseSpeed", speed)
+			if r.Speed ~= speed then
+				r.Speed = speed
+				r.Part:SetAttribute("PulseSpeed", speed)
+			end
 		end
 	end
 
@@ -855,6 +891,7 @@ function LobbyLife.Mount(_gui: ScreenGui?)
 			connections,
 			ReplicatedStorage:GetAttributeChangedSignal("ReadyCount"):Connect(function()
 				bounceStart = os.clock()
+				loop.Wake()
 			end)
 		)
 	end
@@ -868,46 +905,74 @@ function LobbyLife.Mount(_gui: ScreenGui?)
 		end)
 	end
 
-	table.insert(
-		connections,
-		RunService.RenderStepped:Connect(function()
-			local now = os.clock()
-			local dt = math.clamp(now - last, 0, 0.25)
-			last = now
-			if now >= nextScreenCheck then
-				nextScreenCheck = now + 1
-				phone = Layout.IsPhone()
-				range = if phone then life.PhoneRange else life.Range
+	-- Is anything animating (or put out of place) right now? While nothing is, the frame loop
+	-- stops and only looks around now and then from a timer (FramePace.IdleLoop).
+	local function busy(): boolean
+		if bounceStart or #bats > 0 or (cauldron and cauldron.Active) then
+			return true
+		end
+		for _, k in keepers do
+			if k.Active or k.Dirty then
+				return true
 			end
-			local camera = workspace.CurrentCamera
-			if not camera then
-				return
+		end
+		for _, r in rings do
+			if r.Shown then
+				return true
 			end
-			local eye = camera.CFrame.Position
-			for _, k in keepers do
-				updateKeeper(k, now, dt, eye)
+		end
+		for _, s in signs do
+			if s.Active then
+				return true
 			end
-			if padCfg.On then
-				updateRings(dt, eye)
-				updateSignBounce(now, eye)
-			end
-			if floorCfg.On then
-				updateFloorSigns(now, eye)
-			end
-			if cauldronCfg.On then
-				updateCauldron(now, eye)
-			end
-			if batCfg.On then
-				updateBats(now, camera)
-			end
-		end)
-	)
+		end
+		return false
+	end
+	local nextIdleScan = 0
+
+	loop = FramePace.IdleLoop(RunService.RenderStepped, function(scanNow: boolean): boolean
+		local now = os.clock()
+		local dt = math.clamp(now - last, 0, 0.25)
+		last = now
+		local scanning = scanNow or now >= nextIdleScan
+		if scanning then
+			nextIdleScan = now + FramePace.ScanSeconds()
+		end
+		if now >= nextScreenCheck then
+			nextScreenCheck = now + 1
+			phone = Layout.IsPhone()
+			range = if phone then life.PhoneRange else life.Range
+		end
+		local camera = workspace.CurrentCamera
+		if not camera then
+			return false
+		end
+		local eye = camera.CFrame.Position
+		for _, k in keepers do
+			updateKeeper(k, now, dt, eye)
+		end
+		if padCfg.On then
+			updateRings(dt, eye, scanning)
+			updateSignBounce(now, eye)
+		end
+		if floorCfg.On then
+			updateFloorSigns(now, eye)
+		end
+		if cauldronCfg.On then
+			updateCauldron(now, eye)
+		end
+		if batCfg.On then
+			updateBats(now, camera)
+		end
+		return busy()
+	end)
 
 	stopper = function()
 		for _, c in connections do
 			c:Disconnect()
 		end
 		table.clear(connections)
+		loop.Stop()
 		for npc in keepers do
 			removeKeeper(npc)
 		end

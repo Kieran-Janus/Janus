@@ -5,6 +5,8 @@
 	  Invite tile   - (in the Menu) Roblox's invite-friends prompt (Config.Social.InviteButton).
 	  Daily toast   - "Day 3 streak! +100 Coins" when the server pays the daily reward.
 	  Favourite     - Roblox's "favourite this experience" prompt, once, when the server says.
+	Motion (Config.ScreenMotion.Rewards): toasts slide down and stack, the daily coins count up
+	to the real number with confetti and sparkles, the code box pops open, buttons squash.
 ]]
 local AvatarEditorService = game:GetService("AvatarEditorService")
 local Players = game:GetService("Players")
@@ -14,24 +16,57 @@ local SocialService = game:GetService("SocialService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Layout = require(script.Parent.Layout)
+local MinigameFx = require(script.Parent.MinigameFx)
+local ScreenFx = require(script.Parent.ScreenFx)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
+local UIMotion = require(script.Parent.UIMotion)
 
 local RewardsUI = {}
 
-local function toast(gui: ScreenGui, text: string, seconds: number)
+local TOAST_HEIGHT = 54
+local toasts: { Frame } = {} -- the toasts showing now, top to bottom
+
+-- Where the i-th toast showing sits (they stack downwards).
+local function slot(i: number): UDim2
+	return UDim2.new(0.5, 0, 0.14, (i - 1) * (TOAST_HEIGHT + Config.ScreenMotion.Rewards.Gap))
+end
+
+-- A toast near the top that slides down into place, stays `seconds`, then slides back up
+-- (the others move up into its place). Returns its label.
+local function toast(gui: ScreenGui, text: string, seconds: number): TextLabel
+	local motion = Config.ScreenMotion.Rewards
 	local frame = Theme.panel(gui)
 	frame.Name = "Toast"
 	frame.AnchorPoint = Vector2.new(0.5, 0)
-	frame.Position = UDim2.fromScale(0.5, 0.14)
-	frame.Size = UDim2.fromOffset(360, 54)
+	table.insert(toasts, frame)
+	local home = slot(#toasts)
+	frame.Position = home
+	frame.Size = UDim2.fromOffset(360, TOAST_HEIGHT)
 	Layout.Fit(frame)
 	local label = Theme.label(text, 20, frame)
 	label.Size = UDim2.fromScale(1, 1)
 	label.TextColor3 = Theme.Selected
+	ScreenFx.Slide(frame, home, Vector2.new(0, -motion.SlideDistance), motion.SlideSeconds)
 	task.delay(seconds, function()
-		frame:Destroy()
+		local index = table.find(toasts, frame)
+		if index then
+			table.remove(toasts, index)
+		end
+		for i, other in toasts do
+			ScreenFx.MoveTo(other, slot(i), motion.SlideSeconds)
+		end
+		ScreenFx.SlideOut(
+			frame,
+			frame.Position,
+			Vector2.new(0, -motion.SlideDistance),
+			motion.OutSeconds,
+			function()
+				frame:Destroy()
+			end
+		)
 	end)
+	return label
 end
 
 function RewardsUI.Mount(gui: ScreenGui)
@@ -105,6 +140,9 @@ function RewardsUI.Mount(gui: ScreenGui)
 			message.TextColor3 = if okResult then Theme.Selected else Theme.Muted
 			if okResult then
 				Sounds.Play("CodeRedeemed")
+				if ScreenFx.On() then
+					UIMotion.Bump(message) -- the server's answer, already showing
+				end
 			end
 			if okResult then
 				input.Text = ""
@@ -120,9 +158,17 @@ function RewardsUI.Mount(gui: ScreenGui)
 			submit()
 		end
 	end)
+	if ScreenFx.On() then
+		UIMotion.Press(redeem)
+		UIMotion.Press(close)
+	end
 	codesButton.Activated:Connect(function()
-		box.Visible = not box.Visible
+		local open = not box.Visible
+		box.Visible = open
 		message.Text = ""
+		if open and ScreenFx.On() then
+			UIMotion.PopIn(box)
+		end
 	end)
 	close.Activated:Connect(function()
 		box.Visible = false
@@ -148,8 +194,39 @@ function RewardsUI.Mount(gui: ScreenGui)
 
 	-- Daily streak ------------------------------------------------------------------------------
 	Remotes.Event("DailyReward").OnClientEvent:Connect(function(streak: number, coins: number)
-		toast(gui, ("Day %d streak! +%d %s"):format(streak, coins, Config.Economy.CurrencyName), 5)
+		if typeof(streak) ~= "number" or typeof(coins) ~= "number" then
+			return
+		end
+		local function words(n: number): string
+			return ("Day %d streak! +%d %s"):format(streak, n, Config.Economy.CurrencyName)
+		end
+		local label = toast(gui, words(coins), 5)
 		Sounds.Play("DailyReward")
+		if not ScreenFx.On() then
+			return -- the real words, shown still
+		end
+		-- A little celebration: the coins count up to the real number, confetti, sparkles, and
+		-- the toast bumps when the count lands.
+		local motion = Config.ScreenMotion.Rewards
+		label.Text = words(0)
+		task.delay(motion.CountDelay, function()
+			if label.Parent then
+				MinigameFx.CountUp(label, coins, motion.CountSeconds, words)
+			end
+		end)
+		task.delay(motion.CountDelay + motion.CountSeconds, function()
+			local frame = label.Parent
+			if frame and frame:IsA("GuiObject") and frame.Parent then
+				UIMotion.Bump(frame)
+			end
+		end)
+		MinigameFx.Confetti(gui, ScreenFx.Count(motion.StreakConfetti))
+		ScreenFx.Burst(
+			gui,
+			UDim2.new(0.5, 0, 0.14, TOAST_HEIGHT / 2),
+			motion.StreakColors,
+			ScreenFx.Count(motion.StreakSparkles)
+		)
 	end)
 
 	-- Favourite prompt ------------------------------------------------------------------------------

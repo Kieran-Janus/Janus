@@ -3,7 +3,8 @@
 	Robux purchases (Config.Monetization). Nothing here trusts the client: the client may
 	open Roblox's purchase prompt, but only Roblox's callbacks grant anything.
 
-	VIP gamepass  - checked on join and when a purchase finishes; sets the player's "VIP"
+	VIP gamepass  - checked (UserOwnsGamePassAsync) on join and when a purchase finishes, never
+	                taken from the purchase event alone (it can be faked); sets the player's "VIP"
 	                attribute. Perks: speed (SprintService), VIP-only cosmetics (ShopService),
 	                chat tag (client) and the King tracker below.
 	Coin packs    - Developer Products granted in ProcessReceipt. Each receipt id is stored in
@@ -247,8 +248,10 @@ end
 function MonetizationService.Start()
 	MarketplaceService.ProcessReceipt = processReceipt
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, purchased)
+		-- An exploiter can fake this event with purchased = true, so ask Roblox whether they
+		-- really own the pass (a pass bought in this server shows as owned straight away).
 		if purchased and passId == Config.Monetization.VipGamePassId and passId ~= 0 then
-			setVip(player)
+			task.spawn(checkVip, player)
 		end
 	end)
 	Remotes.Function("TrackKing").OnServerInvoke = onTrackKing

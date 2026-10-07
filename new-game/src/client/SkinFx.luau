@@ -51,6 +51,7 @@ local folder: Folder? = nil
 local started = false
 local heartbeat: RBXScriptConnection? = nil
 local nextPick = 0
+local ensureLoop: () -> () -- (defined below, after step)
 
 local function settings()
 	return Config.Skins.Effects
@@ -192,6 +193,9 @@ local function onTagged(instance: Instance)
 		Effect = nil,
 	}
 	nextPick = 0 -- pick who animates on the next frame
+	if started then
+		ensureLoop()
+	end
 end
 
 local function onUntagged(instance: Instance)
@@ -309,9 +313,15 @@ local function step()
 			end
 		end
 	end
+	-- No CRAZY skins about and no previews: nothing runs per frame until one turns up.
+	local current = heartbeat
+	if current and next(entries) == nil and next(previews) == nil then
+		current:Disconnect()
+		heartbeat = nil
+	end
 end
 
-local function ensureLoop()
+ensureLoop = function()
 	if not heartbeat then
 		heartbeat = RunService.Heartbeat:Connect(step)
 	end

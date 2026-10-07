@@ -6,17 +6,22 @@
 	  Leaderboard - adds the current top list from the gravestone
 	  PhotoSpot   - opens the dance bar instead (Config.Dances; hides when you walk away)
 	  OpensShop   - NPCs with this set (the Pumpkin Shop) open the shop on that tab
+	Motion (Config.ScreenMotion.NpcDialog): the box pops in, the words type out (tap them to see
+	them all), buttons squash when pressed.
 ]]
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local ShopUI = require(script.Parent.ShopUI)
 local Layout = require(script.Parent.Layout)
+local ScreenFx = require(script.Parent.ScreenFx)
 local Theme = require(script.Parent.Theme)
 local Dances = require(script.Parent.Dances)
+local UIMotion = require(script.Parent.UIMotion)
 
 local NpcDialogUI = {}
 
@@ -38,6 +43,9 @@ local function button(text: string, parent: Instance): TextButton
 	b.Text = text
 	b.Parent = parent
 	Theme.round(b, 8)
+	if ScreenFx.On() then
+		UIMotion.Press(b) -- squashes when pressed (the click itself is never held up)
+	end
 	return b
 end
 
@@ -76,18 +84,77 @@ function NpcDialogUI.Mount(gui: ScreenGui)
 	closeButton.Position = UDim2.new(1, -12, 1, -10)
 	closeButton.Size = UDim2.fromOffset(90, 34)
 
+	-- The words type out (Config.ScreenMotion.NpcDialog): the whole page is in body.Text at
+	-- once and MaxVisibleGraphemes shows more of it each moment. A tap on the words shows them
+	-- all; Next and Close always work straight away.
+	local motion = Config.ScreenMotion.NpcDialog
+	local typing: Tween? = nil
+	local typed = Instance.new("NumberValue")
+	typed:GetPropertyChangedSignal("Value"):Connect(function()
+		if typing then
+			body.MaxVisibleGraphemes = math.floor(typed.Value)
+		end
+	end)
+	local function finishTyping()
+		local tween = typing
+		typing = nil
+		if tween then
+			tween:Cancel()
+			tween:Destroy()
+		end
+		body.MaxVisibleGraphemes = -1
+	end
+	local skip = Instance.new("TextButton")
+	skip.Name = "Skip"
+	skip.BackgroundTransparency = 1
+	skip.AutoButtonColor = false
+	skip.Text = ""
+	skip.Position = body.Position
+	skip.Size = body.Size
+	skip.ZIndex = body.ZIndex + 1
+	skip.Parent = dialog
+	skip.Activated:Connect(finishTyping)
+
 	local pages: { string } = {}
 	local page = 1
 	local function showPage()
-		body.Text = pages[page] or ""
+		finishTyping()
+		local words = pages[page] or ""
+		body.Text = words
 		nextButton.Visible = page < #pages
+		local count = utf8.len(words) or #words
+		local seconds = math.min(count / math.max(motion.CharsPerSecond, 1), motion.MaxTypeSeconds)
+		if not ScreenFx.On() or count == 0 or seconds <= 0 then
+			return
+		end
+		typed.Value = 0
+		body.MaxVisibleGraphemes = 0
+		local tween = TweenService:Create(
+			typed,
+			TweenInfo.new(seconds, Enum.EasingStyle.Linear),
+			{ Value = count }
+		)
+		typing = tween
+		tween.Completed:Once(function()
+			if typing == tween then
+				typing = nil
+				tween:Destroy()
+				body.MaxVisibleGraphemes = -1
+			end
+		end)
+		tween:Play()
 	end
 	nextButton.Activated:Connect(function()
 		page = math.min(page + 1, #pages)
 		showPage()
 	end)
 	closeButton.Activated:Connect(function()
-		dialog.Visible = false
+		finishTyping()
+		if ScreenFx.On() then
+			UIMotion.PopOut(dialog)
+		else
+			dialog.Visible = false
+		end
 	end)
 
 	-- Photo spot dance bar (Config.Dances) ---------------------------------------------------
@@ -181,7 +248,11 @@ function NpcDialogUI.Mount(gui: ScreenGui)
 		if def.Kind == "PhotoSpot" and Config.Features.Dances then
 			dialog.Visible = false
 			photoAnchor = prompt.Parent :: BasePart
+			local was = emoteBar.Visible
 			emoteBar.Visible = true
+			if not was and ScreenFx.On() then
+				UIMotion.PopIn(emoteBar)
+			end
 			return
 		end
 
@@ -210,6 +281,9 @@ function NpcDialogUI.Mount(gui: ScreenGui)
 		page = 1
 		showPage()
 		dialog.Visible = true
+		if ScreenFx.On() then
+			UIMotion.PopIn(dialog) -- (also cancels a close still shrinking it: ends full size)
+		end
 	end)
 end
 

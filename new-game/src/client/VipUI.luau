@@ -46,9 +46,16 @@ function VipUI.Mount(gui: ScreenGui)
 
 	local direction: Vector3? = nil
 	local showUntil = 0
-	RunService.RenderStepped:Connect(function()
+	-- Turns the arrow each frame, only while it shows (connected by show() below).
+	local steering: RBXScriptConnection? = nil
+	local function steer()
 		if not direction or os.clock() > showUntil then
 			holder.Visible = false
+			local current = steering
+			if current then
+				current:Disconnect()
+				steering = nil
+			end
 			return
 		end
 		local camera = workspace.CurrentCamera
@@ -62,7 +69,13 @@ function VipUI.Mount(gui: ScreenGui)
 		local angle = math.atan2(direction:Dot(right), direction:Dot(forward))
 		arrow.Rotation = math.deg(angle)
 		holder.Visible = true
-	end)
+	end
+	local function show(seconds: number)
+		showUntil = os.clock() + seconds
+		if not steering then
+			steering = RunService.RenderStepped:Connect(steer)
+		end
+	end
 
 	local function canTrack(): boolean
 		return player:GetAttribute("VIP") == true
@@ -80,7 +93,7 @@ function VipUI.Mount(gui: ScreenGui)
 		if wait > 0 then
 			info.Text = ("Tracker ready in %ds"):format(math.ceil(wait))
 			direction = direction or Vector3.new(0, 0, -1)
-			showUntil = os.clock() + 1.5
+			show(1.5)
 			ShopJuice.Shake(holder)
 			return
 		end
@@ -93,7 +106,7 @@ function VipUI.Mount(gui: ScreenGui)
 			if ok and typeof(dir) == "Vector3" and typeof(distance) == "number" then
 				direction = if dir.Magnitude > 0 then dir else Vector3.new(0, 0, -1)
 				info.Text = ("Pumpkin King: %d studs"):format(math.floor(distance))
-				showUntil = os.clock() + cfg.Tracker.ShowSeconds
+				show(cfg.Tracker.ShowSeconds)
 				ShopJuice.Pop(holder, Config.Shop.Juice.PopScale, Config.Shop.Juice.PopTime)
 			end
 		end)

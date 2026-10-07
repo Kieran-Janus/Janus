@@ -9,12 +9,17 @@
 	like any other vote; players not on the Ready pad see a hint instead). Otherwise it shows
 	the round state, mode, map and difficulty. The SurfaceGui lives in PlayerGui (Adornee = the
 	board) so its buttons are clickable.
+	Motion (Config.ScreenMotion.VoteBoard): when the vote opens the choices pop in one by one;
+	a new count updates the same button, which pulses and flashes. A vote is sent the moment
+	you click.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local ScreenFx = require(script.Parent.ScreenFx)
 local Theme = require(script.Parent.Theme)
 
 type Option = { Id: string, Name: string, Votes: number }
@@ -100,7 +105,27 @@ function VoteBoardUI.Mount()
 		return label
 	end
 
-	local function row(kind: string, options: { Option }, order: number)
+	-- While a vote is open: its buttons by "kind:id", and the counts they show, so a new count
+	-- updates the same button (and pulses it) instead of rebuilding the board.
+	local motion = Config.ScreenMotion.VoteBoard
+	local buttons: { [string]: TextButton } = {}
+	local counts: { [string]: number } = {}
+	local drawn = "" -- what the board was last drawn for (the same = update in place)
+
+	local function pulse(b: TextButton)
+		if not ScreenFx.On() then
+			return
+		end
+		ScreenFx.Punch(b, motion.PulseScale, motion.PulseSeconds)
+		b.BackgroundColor3 = motion.FlashColor
+		TweenService:Create(
+			b,
+			TweenInfo.new(motion.PulseSeconds * 2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{ BackgroundColor3 = Theme.Button }
+		):Play()
+	end
+
+	local function row(kind: string, options: { Option }, order: number, popIn: boolean)
 		local frame = Instance.new("Frame")
 		frame.BackgroundTransparency = 1
 		frame.LayoutOrder = order
@@ -111,7 +136,7 @@ function VoteBoardUI.Mount()
 		rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		rowLayout.Padding = UDim.new(0.02, 0)
 		rowLayout.Parent = frame
-		for _, option in options do
+		for i, option in options do
 			local b = Instance.new("TextButton")
 			b.BackgroundColor3 = Theme.Button
 			b.TextColor3 = Theme.Text
@@ -124,14 +149,60 @@ function VoteBoardUI.Mount()
 			b.Activated:Connect(function()
 				castVote:FireServer(kind, option.Id)
 			end)
+			local key = kind .. ":" .. option.Id
+			buttons[key] = b
+			counts[key] = option.Votes
+			if popIn then
+				-- The choices pop in one by one when the vote opens (they work at once).
+				ScreenFx.Punch(b, 0, motion.RowPopSeconds, nil, (order + i) * motion.RowStagger)
+			end
+		end
+	end
+
+	-- What the open vote looks like (its choices and the hint): the same = update in place.
+	local function shapeOf(state: VoteState): string
+		local parts = {
+			if state.ReadyOnly and player:GetAttribute("Ready") ~= true then "hint" else "pick",
+		}
+		for _, list in { state.Maps, state.Difficulties } do
+			for _, option in list do
+				table.insert(parts, option.Id .. "=" .. option.Name)
+			end
+			table.insert(parts, "|")
+		end
+		return table.concat(parts, ",")
+	end
+
+	-- New counts on the buttons already there; the ones that changed pulse.
+	local function update(state: VoteState)
+		for kind, list in { Map = state.Maps, Difficulty = state.Difficulties } do
+			for _, option in list do
+				local key = kind .. ":" .. option.Id
+				local b = buttons[key]
+				if b and counts[key] ~= option.Votes then
+					counts[key] = option.Votes
+					b.Text = ("%s\n%d"):format(option.Name, option.Votes)
+					pulse(b)
+				end
+			end
 		end
 	end
 
 	local function render()
+		local state = current
+		local open = state ~= nil and state.Open
+		local shape = if state and open then shapeOf(state) else "closed"
+		if state and open and shape == drawn then
+			update(state)
+			return
+		end
+		local opening = open and not string.find(drawn, "|", 1, true)
+		drawn = shape
+		table.clear(buttons)
+		table.clear(counts)
 		clear()
 		local words = Config.Npcs.BoardText
 		text(words.Title, 0, 0.16, Config.Hub.Colors.Orange)
-		local state = current
 		if state and state.Open then
 			-- Only Ready players can vote (when the server says so): the others get a hint.
 			if state.ReadyOnly and player:GetAttribute("Ready") ~= true then
@@ -139,10 +210,10 @@ function VoteBoardUI.Mount()
 			else
 				text(words.Pick, 1, 0.1, Theme.Muted)
 			end
-			row("Map", state.Maps, 2)
+			row("Map", state.Maps, 2, opening)
 			if #state.Difficulties > 0 then
 				text(words.Difficulty, 3, 0.1, Theme.Muted)
-				row("Difficulty", state.Difficulties, 4)
+				row("Difficulty", state.Difficulties, 4, opening)
 			end
 		else
 			local raw = ReplicatedStorage:GetAttribute("State")

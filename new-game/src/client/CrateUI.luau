@@ -45,6 +45,7 @@ local CrateArt = require(ReplicatedStorage.Shared.CrateArt)
 local CrateLook = require(ReplicatedStorage.Shared.CrateLook)
 local CrateOdds = require(ReplicatedStorage.Shared.CrateOdds)
 local Items = require(ReplicatedStorage.Shared.Items)
+local FramePace = require(script.Parent.FramePace)
 local Layout = require(script.Parent.Layout)
 local PanelManager = require(script.Parent.PanelManager)
 local SkinFx = require(script.Parent.SkinFx)
@@ -455,9 +456,10 @@ function CrateUI.Mount(gui: ScreenGui)
 	end
 
 	-- A few previews per check, so scrolling never stutters.
+	-- (connected only while the panel is open: a closed panel runs nothing per frame)
 	local nextLazy = 0
-	RunService.Heartbeat:Connect(function()
-		if not panel.Visible or #lazyViews == 0 then
+	FramePace.WhileVisible(panel, RunService.Heartbeat, function()
+		if #lazyViews == 0 then
 			return
 		end
 		local now = os.clock()
@@ -491,9 +493,9 @@ function CrateUI.Mount(gui: ScreenGui)
 	-- The crate cards' chests turn slowly: only built ones (near the screen) that are really on
 	-- screen, only while the list is showing (nothing runs once the panel closes).
 	local cardsCfg = cfg.Cards
-	RunService.Heartbeat:Connect(function()
+	FramePace.WhileVisible(panel, RunService.Heartbeat, function()
 		local speed = cardsCfg.SpinSpeed
-		if speed == 0 or not panel.Visible or not listView.Visible then
+		if speed == 0 or not listView.Visible then
 			return
 		end
 		local yaw = math.rad((os.clock() * speed) % 360)

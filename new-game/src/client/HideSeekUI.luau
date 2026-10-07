@@ -9,6 +9,10 @@
 	  - a short message line: who found whom, "The pumpkins are glowing!", decoy misses
 	  - no chat bubbles while a round is on (they float over a hider's head, right on their
 	    pumpkin); the chat window still works. Config.HideSeek.HideChatBubbles = false keeps them.
+	Motion (Config.ScreenMotion.HideSeek, via src/client/ScreenFx.luau): the role banner pops in
+	with a little shake, TAGGED! punches in with sparkles, the head-start count grows a touch
+	with each number, messages pop, the glow warning breathes gently. Looks only: the words are
+	set first, so nothing waits for an animation.
 	The candy gun's aiming, crosshair and world effects are in src/client/CandyGunClient.luau,
 	mounted from here once the first Hide & Seek round starts.
 	On/off: Config.Features.HideSeek (off = Mount does nothing and nothing shows).
@@ -27,15 +31,14 @@ local TweenService = game:GetService("TweenService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local CandyGunClient = require(script.Parent.CandyGunClient)
 local Layout = require(script.Parent.Layout)
+local ScreenFx = require(script.Parent.ScreenFx)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
+local UIMotion = require(script.Parent.UIMotion)
 
 local HideSeekUI = {}
 
 local MODE = "HideSeek"
-local BANNER_SECONDS = 4
-local FEED_SECONDS = 3.5
-local FOUND_BANNER_SECONDS = 2.5 -- after "You were found!", don't replace it with the role banner
 
 local function inMode(): boolean
 	return ReplicatedStorage:GetAttribute("Mode") == MODE
@@ -58,6 +61,7 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	end
 	local cfg = Config.HideSeek
 	local text = cfg.Text
+	local motion = Config.ScreenMotion.HideSeek -- how long banners stay, and their animations
 	local player = Players.LocalPlayer
 
 	-- Big banner ---------------------------------------------------------------------------------
@@ -75,8 +79,6 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	bannerSize.MaxTextSize = 60
 	bannerSize.MinTextSize = 20
 	bannerSize.Parent = banner
-	local bannerScale = Instance.new("UIScale")
-	bannerScale.Parent = banner
 
 	local tip = Theme.label("", 20, gui)
 	tip.Name = "HideSeekTip"
@@ -91,7 +93,15 @@ function HideSeekUI.Mount(gui: ScreenGui)
 
 	local bannerToken = 0
 	local foundAt = -math.huge
-	local function showBanner(message: string, color: Color3, tipText: string?, seconds: number?)
+	-- tagged = the seeker's TAGGED! (punches in bigger, with sparkles); otherwise the role pop
+	-- with a little shake.
+	local function showBanner(
+		message: string,
+		color: Color3,
+		tipText: string?,
+		seconds: number?,
+		tagged: boolean?
+	)
 		bannerToken += 1
 		local token = bannerToken
 		banner.Text = message
@@ -102,21 +112,45 @@ function HideSeekUI.Mount(gui: ScreenGui)
 		tip.Text = tipText or ""
 		tip.TextTransparency = 0
 		tip.Visible = tipText ~= nil and tipText ~= ""
-		bannerScale.Scale = 1.5
-		TweenService:Create(
-			bannerScale,
-			TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-			{ Scale = 1 }
-		):Play()
-		task.delay(seconds or BANNER_SECONDS, function()
+		if tagged then
+			ScreenFx.Punch(
+				banner,
+				motion.TaggedPopScale,
+				motion.TaggedPopSeconds,
+				motion.TaggedShakeDegrees
+			)
+			ScreenFx.Burst(
+				gui,
+				banner.Position,
+				motion.TaggedColors,
+				ScreenFx.Count(motion.TaggedSparkles)
+			)
+		else
+			-- Tilts left one time, right the next.
+			local side = if token % 2 == 0 then 1 else -1
+			ScreenFx.Punch(
+				banner,
+				motion.RolePopScale,
+				motion.RolePopSeconds,
+				motion.RoleShakeDegrees * side
+			)
+		end
+		if tip.Visible then
+			ScreenFx.FadeText(tip, 1, motion.RolePopSeconds, motion.RolePopSeconds * 0.5)
+		end
+		task.delay(seconds or motion.BannerSeconds, function()
 			if token ~= bannerToken then
 				return
 			end
-			local fade = TweenInfo.new(0.4)
-			TweenService:Create(banner, fade, { TextTransparency = 1, TextStrokeTransparency = 1 })
-				:Play()
-			TweenService:Create(tip, fade, { TextTransparency = 1 }):Play()
-			task.wait(0.45)
+			local fadeSeconds = if ScreenFx.On() then motion.FadeSeconds else 0
+			if fadeSeconds > 0 then
+				local fade = TweenInfo.new(fadeSeconds)
+				TweenService
+					:Create(banner, fade, { TextTransparency = 1, TextStrokeTransparency = 1 })
+					:Play()
+				TweenService:Create(tip, fade, { TextTransparency = 1 }):Play()
+				task.wait(fadeSeconds + 0.05)
+			end
 			if token == bannerToken then
 				banner.Visible = false
 				tip.Visible = false
@@ -151,13 +185,22 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	feed.Visible = false
 	Layout.Fit(feed)
 	local feedToken = 0
-	local function showFeed(message: string, color: Color3?)
+	-- glow = the last-seconds warning: it breathes gently instead of popping.
+	local function showFeed(message: string, color: Color3?, glow: boolean?)
 		feedToken += 1
 		local token = feedToken
 		feed.Text = message
 		feed.TextColor3 = color or Theme.Text
 		feed.Visible = true
-		task.delay(FEED_SECONDS, function()
+		if glow then
+			ScreenFx.Pulse(feed, motion.GlowPulses, motion.GlowPulseSeconds, motion.GlowPulseFade)
+		else
+			ScreenFx.Pulse(feed, 0, 0, 0) -- (ends a glow pulse still going: solid text)
+			if ScreenFx.On() then
+				UIMotion.Bump(feed) -- a quick pop (a candy miss too)
+			end
+		end
+		task.delay(motion.FeedSeconds, function()
 			if token == feedToken then
 				feed.Visible = false
 			end
@@ -198,8 +241,6 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	local countingSize = Instance.new("UITextSizeConstraint")
 	countingSize.MaxTextSize = 90
 	countingSize.Parent = counting
-	local countingScale = Instance.new("UIScale")
-	countingScale.Parent = counting
 	local peek = Theme.label(text.CountingTip, 22, blind)
 	peek.Name = "Tip"
 	peek.AnchorPoint = Vector2.new(0.5, if phone then 1 else 0)
@@ -257,8 +298,8 @@ function HideSeekUI.Mount(gui: ScreenGui)
 			counting.Text = text.Counting:format(n)
 			if n ~= lastCount then
 				lastCount = n
-				countingScale.Scale = 1.2
-				TweenService:Create(countingScale, TweenInfo.new(0.3), { Scale = 1 }):Play()
+				-- Calm: each new number grows a touch and settles (no shake).
+				ScreenFx.Punch(counting, motion.CountPulseScale, motion.CountPulseSeconds)
 			end
 		end
 
@@ -306,7 +347,7 @@ function HideSeekUI.Mount(gui: ScreenGui)
 		if not inMode() or role == previous then
 			return
 		end
-		if os.clock() - foundAt < FOUND_BANNER_SECONDS then
+		if os.clock() - foundAt < motion.FoundBannerSeconds then
 			return -- "You were found!" is showing
 		end
 		if role == "Hider" then
@@ -346,10 +387,10 @@ function HideSeekUI.Mount(gui: ScreenGui)
 					if cfg.TaggedBecomeSeekers then text.FoundYou else text.FoundGhost,
 					cfg.Colors.Seeker,
 					nil,
-					FOUND_BANNER_SECONDS + 1
+					motion.FoundBannerSeconds + 1
 				)
 			elseif info.Seeker == player then
-				showBanner(text.Tagged, cfg.Colors.Tagged, nil, 1.5)
+				showBanner(text.Tagged, cfg.Colors.Tagged, nil, 1.5, true)
 			end
 			if involved() then
 				showFeed(
@@ -372,7 +413,7 @@ function HideSeekUI.Mount(gui: ScreenGui)
 			end
 		elseif kind == "Glow" then
 			if involved() then
-				showFeed(text.Glow, cfg.Effects.GlowColor)
+				showFeed(text.Glow, cfg.Effects.GlowColor, true)
 			end
 		end
 	end

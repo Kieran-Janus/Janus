@@ -11,7 +11,8 @@
 	next to that part named after the crate Id (or with the attribute PropName = Id): the built
 	chest or your own model from ReplicatedStorage.Custom.Props.
 
-	Only crates within Idle.Range of the camera (Idle.PhoneRange on phones) move:
+	Only crates within Idle.Range of the camera (Idle.PhoneRange on phones) move (while none
+	is, it only looks a few times a second: Config.Performance.IdleScanHz):
 	  - they bob (Look.Bob studs) and rock (Look.Sway degrees), each with its own rhythm;
 	  - every Look.PeekEvery seconds the lid peeks open (Look.PeekAngle) with a puff of light in
 	    the crate's Glow colour, sparkles (Look.Sparkles; phones Idle.PhoneSparkleShare of them)
@@ -34,6 +35,7 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local CrateLook = require(ReplicatedStorage.Shared.CrateLook)
 local Tags = require(ReplicatedStorage.Shared.Tags)
+local FramePace = require(script.Parent.FramePace)
 local Layout = require(script.Parent.Layout)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
@@ -538,141 +540,144 @@ function CrateIdle.Mount(_gui: ScreenGui?)
 	local range = idle.Range
 	local nextScreenCheck = 0
 	local last = os.clock()
-	table.insert(
-		connections,
-		RunService.RenderStepped:Connect(function()
-			local now = os.clock()
-			local dt = math.clamp(now - last, 0, 0.25)
-			last = now
-			if now >= nextScreenCheck then
-				nextScreenCheck = now + 1
-				phone = Layout.IsPhone()
-				range = if phone then idle.PhoneRange else idle.Range
-			end
-			local camera = workspace.CurrentCamera
-			if not camera then
-				return
-			end
-			local eye = camera.CFrame.Position
-			local character = player.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart")
-			local rootPos = if root and root:IsA("BasePart") then root.Position else nil
-			-- Only the crate nearest to you shows its label (several awake at once would overlap).
-			local nearest: State? = nil
-			local nearestDistance = math.huge
-			if rootPos then
-				for holder, s in states do
-					if holder.Parent and s.Base then
-						local d = ((s.Base :: CFrame).Position - rootPos).Magnitude
-						if d < nearestDistance then
-							nearest, nearestDistance = s, d
-						end
-					end
-				end
-			end
+	-- Every frame while a crate near the camera is animating; while none is, only a look now
+	-- and then from a timer (FramePace.IdleLoop: no per-frame work at all).
+	local loop = FramePace.IdleLoop(RunService.RenderStepped, function(): boolean
+		local now = os.clock()
+		local dt = math.clamp(now - last, 0, 0.25)
+		last = now
+		if now >= nextScreenCheck then
+			nextScreenCheck = now + 1
+			phone = Layout.IsPhone()
+			range = if phone then idle.PhoneRange else idle.Range
+		end
+		local camera = workspace.CurrentCamera
+		if not camera then
+			return false
+		end
+		local eye = camera.CFrame.Position
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		local rootPos = if root and root:IsA("BasePart") then root.Position else nil
+		-- Only the crate nearest to you shows its label (several awake at once would overlap).
+		local nearest: State? = nil
+		local nearestDistance = math.huge
+		if rootPos then
 			for holder, s in states do
-				if not holder.Parent then
-					continue -- (streamed out: the removed signal cleans it up)
-				end
-				if not ready(s, now) then
-					continue
-				end
-				local model = s.Model :: Model
-				local base = s.Base :: CFrame
-				if (base.Position - eye).Magnitude > range then
-					if s.Active then
-						sleep(s)
-					end
-					continue
-				end
-				if not s.Active then
-					s.Active = true
-					if s.NextPeek < now then
-						s.NextPeek = now + s.Look.PeekEvery * rng:NextNumber(0.2, 1)
+				if holder.Parent and s.Base then
+					local d = ((s.Base :: CFrame).Position - rootPos).Magnitude
+					if d < nearestDistance then
+						nearest, nearestDistance = s, d
 					end
 				end
-				local lk = s.Look
-
-				-- Wake up when you walk up to it; fall asleep again a bit further away.
-				local reach = idle.WakeDistance + (if s.Awake then idle.WakeHysteresis else 0)
-				local near = rootPos ~= nil and (rootPos - base.Position).Magnitude <= reach
-				if near and not s.Awake then
-					s.Awake = true
-					s.WiggleStart = now
-					Sounds.PlaySpec(lk.Sounds.Wake :: any, s.Holder)
-					if idle.WakeLabel then
-						s.Label = s.Label or makeLabel(s)
-						local label = s.Label :: BillboardGui
-						local price = label:FindFirstChild("Price", true)
-						if price and price:IsA("TextLabel") then
-							price.Text = priceText(s.Def)
-						end
-					end
-				elseif not near and s.Awake then
-					s.Awake = false
-					if s.Label then
-						s.Label.Enabled = false
-					end
-				end
-				if s.Label then
-					s.Label.Enabled = s.Awake and s == nearest
-				end
-
-				-- Bob and sway, plus the happy wiggle.
-				local y = math.sin(now * idle.BobSpeed + s.Phase) * lk.Bob
-				local sway = math.sin(now * idle.SwaySpeed + s.Phase * 1.3) * lk.Sway
-				local twist = 0
-				if s.WiggleStart then
-					local p = (now - s.WiggleStart) / math.max(idle.WiggleSeconds, 0.01)
-					if p >= 1 then
-						s.WiggleStart = nil
-					else
-						local fade = 1 - p
-						y += math.abs(math.sin(p * math.pi * idle.WiggleHops)) * idle.WiggleHeight * fade
-						twist = math.sin(p * math.pi * 2 * idle.WiggleHops)
-							* idle.WiggleTwist
-							* fade
-					end
-				end
-				model:PivotTo(
-					CFrame.new(0, y, 0) * base * CFrame.Angles(0, math.rad(twist), math.rad(sway))
-				)
-
-				-- The lid peeks (only a crate with a lid).
-				local lid = s.Lid
-				if lid and not lidOk(lid) then
-					s.Lid = nil
-					lid = nil
-				end
-				if lid then
-					if not s.PeekStart and lk.PeekEvery > 0 and now >= s.NextPeek then
-						s.NextPeek = now + lk.PeekEvery
-						startPeek(s, now, phone)
-					end
-					local started = s.PeekStart
-					if started then
-						local p = (now - started) / math.max(idle.PeekSeconds, 0.01)
-						if p >= 1 then
-							s.PeekStart = nil
-							CrateLook.LidPose(lid, 0)
-							if s.Light then
-								s.Light.Brightness = 0
-								s.Light.Enabled = false
-							end
-						else
-							local curve = math.sin(p * math.pi)
-							CrateLook.LidPose(lid, curve * lk.PeekAngle)
-							if s.Light then
-								s.Light.Brightness = idle.PeekLightBrightness * curve
-							end
-						end
-					end
-				end
-
-				look(s, dt)
 			end
-		end)
-	)
+		end
+		for holder, s in states do
+			if not holder.Parent then
+				continue -- (streamed out: the removed signal cleans it up)
+			end
+			if not ready(s, now) then
+				continue
+			end
+			local model = s.Model :: Model
+			local base = s.Base :: CFrame
+			if (base.Position - eye).Magnitude > range then
+				if s.Active then
+					sleep(s)
+				end
+				continue
+			end
+			if not s.Active then
+				s.Active = true
+				if s.NextPeek < now then
+					s.NextPeek = now + s.Look.PeekEvery * rng:NextNumber(0.2, 1)
+				end
+			end
+			local lk = s.Look
+
+			-- Wake up when you walk up to it; fall asleep again a bit further away.
+			local reach = idle.WakeDistance + (if s.Awake then idle.WakeHysteresis else 0)
+			local near = rootPos ~= nil and (rootPos - base.Position).Magnitude <= reach
+			if near and not s.Awake then
+				s.Awake = true
+				s.WiggleStart = now
+				Sounds.PlaySpec(lk.Sounds.Wake :: any, s.Holder)
+				if idle.WakeLabel then
+					s.Label = s.Label or makeLabel(s)
+					local label = s.Label :: BillboardGui
+					local price = label:FindFirstChild("Price", true)
+					if price and price:IsA("TextLabel") then
+						price.Text = priceText(s.Def)
+					end
+				end
+			elseif not near and s.Awake then
+				s.Awake = false
+				if s.Label then
+					s.Label.Enabled = false
+				end
+			end
+			if s.Label then
+				s.Label.Enabled = s.Awake and s == nearest
+			end
+
+			-- Bob and sway, plus the happy wiggle.
+			local y = math.sin(now * idle.BobSpeed + s.Phase) * lk.Bob
+			local sway = math.sin(now * idle.SwaySpeed + s.Phase * 1.3) * lk.Sway
+			local twist = 0
+			if s.WiggleStart then
+				local p = (now - s.WiggleStart) / math.max(idle.WiggleSeconds, 0.01)
+				if p >= 1 then
+					s.WiggleStart = nil
+				else
+					local fade = 1 - p
+					y += math.abs(math.sin(p * math.pi * idle.WiggleHops)) * idle.WiggleHeight * fade
+					twist = math.sin(p * math.pi * 2 * idle.WiggleHops) * idle.WiggleTwist * fade
+				end
+			end
+			model:PivotTo(
+				CFrame.new(0, y, 0) * base * CFrame.Angles(0, math.rad(twist), math.rad(sway))
+			)
+
+			-- The lid peeks (only a crate with a lid).
+			local lid = s.Lid
+			if lid and not lidOk(lid) then
+				s.Lid = nil
+				lid = nil
+			end
+			if lid then
+				if not s.PeekStart and lk.PeekEvery > 0 and now >= s.NextPeek then
+					s.NextPeek = now + lk.PeekEvery
+					startPeek(s, now, phone)
+				end
+				local started = s.PeekStart
+				if started then
+					local p = (now - started) / math.max(idle.PeekSeconds, 0.01)
+					if p >= 1 then
+						s.PeekStart = nil
+						CrateLook.LidPose(lid, 0)
+						if s.Light then
+							s.Light.Brightness = 0
+							s.Light.Enabled = false
+						end
+					else
+						local curve = math.sin(p * math.pi)
+						CrateLook.LidPose(lid, curve * lk.PeekAngle)
+						if s.Light then
+							s.Light.Brightness = idle.PeekLightBrightness * curve
+						end
+					end
+				end
+			end
+
+			look(s, dt)
+		end
+		for _, s in states do
+			if s.Active then
+				return true
+			end
+		end
+		return false
+	end)
 
 	-- Leaving the game: put everything back and tidy up.
 	table.insert(
@@ -684,6 +689,7 @@ function CrateIdle.Mount(_gui: ScreenGui?)
 			for _, c in connections do
 				c:Disconnect()
 			end
+			loop.Stop()
 			for holder in states do
 				remove(holder)
 			end

@@ -145,6 +145,11 @@ local function checkFriends(player: Player)
 			local ok, result = pcall(function()
 				return player:IsFriendsWithAsync(other.UserId)
 			end)
+			-- (That asked Roblox and waited: either of them may have left meanwhile, and their
+			-- tables were cleared then. Don't bring them back.)
+			if player.Parent ~= Players or other.Parent ~= Players or not friends[player] then
+				continue
+			end
 			local yes = ok and result == true
 			friends[player][other.UserId] = yes
 			friends[other] = friends[other] or {}

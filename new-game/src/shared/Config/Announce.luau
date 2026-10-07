@@ -47,4 +47,10 @@ return {
 		},
 	} :: { [string]: Style },
 	MaxQueue = 4, -- banners waiting their turn (older ones are dropped)
+	-- Several at once stack under each other (the newest at the bottom); more wait their turn.
+	MaxShown = 3,
+	PhoneMaxShown = 1, -- phones: one at a time, so they never cover the middle of the screen
+	PhoneMaxSeconds = 4, -- phones: a banner stays at most this long (Huge ones too)
+	Gap = 6, -- space between stacked banners
+	-- The slide-in and shine: Config.ScreenMotion.Announce.
 }

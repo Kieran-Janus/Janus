@@ -12,6 +12,8 @@
 	  Rarity.luau      Common / Uncommon / Rare / CRAZY prices and colours
 	  Crates.luau      crates and their odds
 	  MapLife.luau     round maps come alive (bobbing pumpkins, fireflies, wobbling decoys)
+	  ScreenMotion.luau  animations of the Hide & Seek, ScareMaze, ghost, spectate, rewards,
+	                   NPC dialogue, announcement and Voting Board screens
 	  Menu.luau        the top-left menu tiles
 	  Maps/<Id>.luau   one file per round map (added to Maps.List below)
 	  Skins/           crate skins, one file per theme (added to Shop.Items below), and
@@ -79,6 +81,7 @@ local Config = {
 	TowerParkour = require(script.TowerParkour),
 	Announce = require(script.Announce),
 	MapLife = require(script.MapLife),
+	ScreenMotion = require(script.ScreenMotion),
 
 	Game = {
 		Name = "Pumpkin Panic", -- working title, see docs/DESIGN.md
@@ -526,10 +529,18 @@ local Config = {
 		SettingsCooldown = 0.3, -- per-player spam guard on the Settings toggles
 	},
 
-	-- Keeping low-end phones smooth.
+	-- Keeping low-end phones smooth. Lower numbers = less work per second (and choppier motion);
+	-- the Phone... ones are used on small touch screens instead.
 	Performance = {
 		AmbienceDistance = 170, -- floating candles / flickering lights only animate this close to the camera
+		PhoneAmbienceDistance = 130,
 		FlickerHz = 20, -- light flicker updates per second (not every frame)
+		PhoneFlickerHz = 12,
+		-- While nothing near the camera is animating, the lobby and map animations (candles,
+		-- shopkeeper, Ready ring, crate stand, map pumpkins) only look for something nearby this
+		-- many times a second instead of every frame. Things already animating move every frame.
+		IdleScanHz = 8,
+		PhoneIdleScanHz = 5,
 		ShopStateCooldown = 0.2, -- a client asking for its shop state faster than this gets the last answer
 		HauntTryCooldown = 0.25, -- spam guard on the Haunt button when it misses
 		SpectateFocusCooldown = 0.5, -- spam guard: spectators asking the server to stream the map to them

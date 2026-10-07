@@ -14,6 +14,10 @@
 	    cooldown, and the Survivors outlined through the walls (src/client/ScareMazeXRay.luau)
 	  - ESCAPED! / "You stopped!" / "Now you're a Haunter" / "+1 catch!" messages
 	  - the full-screen jumpscare when the server says so (src/client/ScareMazeJumpscare.luau)
+	Motion (Config.ScreenMotion.ScareMaze): the team banner pops in with a little shake, each
+	3-2-1 number punches in (never too big to read), BOO squashes when pressed and bumps when
+	ready, a ring round it fills up with the real cooldown, escaping throws confetti. BOO is
+	sent the moment you press: the animation only follows.
 	The remotes (ScareMazeBoo, ScareMazeScare) are only looked up once a ScareMaze round is on:
 	the server makes them when it loads the mode, before it tells clients the mode.
 ]]
@@ -21,15 +25,17 @@ local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Rules = require(ReplicatedStorage.Shared.ScareMazeRules)
 local Layout = require(script.Parent.Layout)
+local MinigameFx = require(script.Parent.MinigameFx)
 local ScareMazeJumpscare = require(script.Parent.ScareMazeJumpscare)
 local ScareMazeXRay = require(script.Parent.ScareMazeXRay)
+local ScreenFx = require(script.Parent.ScreenFx)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
+local UIMotion = require(script.Parent.UIMotion)
 
 local ScareMazeUI = {}
 
@@ -62,6 +68,7 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 	local cfg = Config.ScareMaze
 	local text = cfg.Text
 	local colors = cfg.Colors
+	local motion = Config.ScreenMotion.ScareMaze
 	local player = Players.LocalPlayer
 
 	local root = Instance.new("Frame")
@@ -111,16 +118,12 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 	local subMessage = shout("SubMessage", 22, root)
 	subMessage.Position = UDim2.new(0.5, 0, 0.4, 46)
 	subMessage.Size = UDim2.new(0.92, 0, 0, 30)
-	local messageScale = Instance.new("UIScale")
-	messageScale.Parent = message
 
 	-- The red 3-2-1.
 	local countdown = shout("Countdown", 100, root)
 	countdown.TextColor3 = colors.MeterEmpty
 	countdown.Position = UDim2.fromScale(0.5, 0.6)
 	countdown.Size = UDim2.fromOffset(200, 120)
-	local countdownScale = Instance.new("UIScale")
-	countdownScale.Parent = countdown
 
 	-- KEEP MOVING meter.
 	local meter = Theme.panel(root)
@@ -177,8 +180,9 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 	booStroke.Color = Color3.new(1, 1, 1)
 	booStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	booStroke.Parent = boo
-	local booScale = Instance.new("UIScale")
-	booScale.Parent = boo
+	if ScreenFx.On() then
+		UIMotion.Press(boo) -- squashes under your finger
+	end
 	local booKey = Theme.label(text.BooKey, 14, boo)
 	booKey.Name = "Key"
 	booKey.AnchorPoint = Vector2.new(0.5, 1)
@@ -198,6 +202,61 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 	local shadeCorner = Instance.new("UICorner")
 	shadeCorner.CornerRadius = UDim.new(0.5, 0)
 	shadeCorner.Parent = booShade
+
+	-- The cooldown ring round the button: two half circles, each a clipped ring whose
+	-- UIGradient hides part of it; turning the gradients sweeps the ring round clockwise from
+	-- the top. Set every frame from the real cooldown, so it fills smoothly.
+	local ring = Instance.new("Frame")
+	ring.Name = "CooldownRing"
+	ring.BackgroundTransparency = 1
+	ring.AnchorPoint = Vector2.new(0.5, 0.5)
+	ring.Position = UDim2.fromScale(0.5, 0.5)
+	ring.Size = UDim2.new(1, motion.RingGap * 2, 1, motion.RingGap * 2)
+	ring.Visible = false
+	ring.Parent = boo
+	local halves: { UIGradient } = {}
+	for i, side in { "Right", "Left" } do
+		local clip = Instance.new("Frame")
+		clip.Name = side
+		clip.BackgroundTransparency = 1
+		clip.ClipsDescendants = true
+		clip.Size = UDim2.fromScale(0.5, 1)
+		clip.Position = UDim2.fromScale(if i == 1 then 0.5 else 0, 0)
+		clip.Parent = ring
+		local circle = Instance.new("Frame")
+		circle.Name = "Circle"
+		circle.BackgroundTransparency = 1
+		circle.Size = UDim2.fromScale(2, 1)
+		circle.Position = UDim2.fromScale(if i == 1 then -1 else 0, 0)
+		circle.Parent = clip
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0.5, 0)
+		corner.Parent = circle
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = motion.RingThickness
+		stroke.Color = motion.RingColor
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Parent = circle
+		-- Right half: the left side of the gradient shows; left half: the right side.
+		local shown, hidden = if i == 1 then 0 else 1, if i == 1 then 1 else 0
+		local gradient = Instance.new("UIGradient")
+		gradient.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, shown),
+			NumberSequenceKeypoint.new(0.499, shown),
+			NumberSequenceKeypoint.new(0.5, hidden),
+			NumberSequenceKeypoint.new(1, hidden),
+		})
+		gradient.Parent = stroke
+		halves[i] = gradient
+	end
+	-- 0 = empty, 1 = a full ring.
+	local function setRing(progress: number)
+		local angle = math.clamp(progress, 0, 1) * 360
+		halves[1].Rotation = math.clamp(angle, 0, 180)
+		halves[2].Rotation = math.clamp(angle - 180, 0, 180)
+		ring:SetAttribute("Progress", math.clamp(progress, 0, 1))
+	end
+	setRing(0)
 
 	-- State ---------------------------------------------------------------------------------------
 	local function roundState(): string
@@ -226,9 +285,10 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 		message.Visible = true
 		subMessage.Text = sub or ""
 		subMessage.Visible = sub ~= nil
-		messageScale.Scale = 1.6
-		TweenService:Create(messageScale, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = 1 })
-			:Play()
+		ScreenFx.Punch(message, motion.MessagePopScale, motion.MessagePopSeconds)
+		if sub then
+			ScreenFx.FadeText(subMessage, 1, motion.HintFadeSeconds, motion.HintFadeDelay)
+		end
 		task.delay(seconds, function()
 			if token == messageToken then
 				message.Visible = false
@@ -249,6 +309,13 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 			else text.SurvivorHint:format(cfg.StopSeconds)
 		teamTitle.Visible = true
 		teamHint.Visible = true
+		ScreenFx.Punch(
+			teamTitle,
+			motion.TeamPopScale,
+			motion.TeamPopSeconds,
+			motion.TeamShakeDegrees
+		)
+		ScreenFx.FadeText(teamHint, 1, motion.HintFadeSeconds, motion.HintFadeDelay)
 		task.delay(cfg.IntroSeconds + 1.5, function()
 			if token == teamToken then
 				teamTitle.Visible = false
@@ -285,9 +352,9 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 		if remote then
 			remote:FireServer()
 		end
-		booScale.Scale = 1.25
-		TweenService:Create(booScale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 })
-			:Play()
+		if ScreenFx.On() then
+			UIMotion.Bump(boo) -- after the BOO has gone out: the look never delays it
+		end
 	end
 	boo.Activated:Connect(doBoo)
 	local bound = false
@@ -365,6 +432,15 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 		if state == "Escaped" then
 			showMessage(text.Escaped, colors.Escaped, 3, text.EscapedHint)
 			Sounds.PlaySpec(cfg.Sounds.Escaped :: any)
+			if ScreenFx.On() then
+				MinigameFx.Confetti(gui, ScreenFx.Count(motion.EscapeConfetti))
+				ScreenFx.Burst(
+					gui,
+					message.Position,
+					motion.EscapeColors,
+					ScreenFx.Count(motion.EscapeSparkles)
+				)
+			end
 		elseif state == "Out" and inRound() then
 			local left = ReplicatedStorage:GetAttribute("TimeLeft")
 			local timeUp = typeof(left) == "number" and left <= 1
@@ -394,6 +470,8 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 	-- Every frame: the meter and the BOO cooldown ---------------------------------------------------
 	local tracker: Rules.Tracker? = nil
 	local shown = 0 -- the number the 3-2-1 shows
+	local tilt = 1 -- the 3-2-1 tilts left, then right
+	local cooling = false -- BOO is recharging
 	RunService.RenderStepped:Connect(function()
 		if not root.Visible then
 			tracker = nil
@@ -403,8 +481,18 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 		if boo.Visible then
 			local readyAt = player:GetAttribute(ATTR.BooReadyAt)
 			local left = if typeof(readyAt) == "number" then readyAt - t else 0
-			booShade.Visible = left > 0
-			booShade.Text = if left > 0 then tostring(math.ceil(left)) else ""
+			local now = left > 0
+			booShade.Visible = now
+			booShade.Text = if now then tostring(math.ceil(left)) else ""
+			ring.Visible = now
+			if now then
+				setRing(1 - left / math.max(cfg.Boo.Cooldown, 0.01))
+			elseif cooling and ScreenFx.On() then
+				UIMotion.Bump(boo) -- ready again
+			end
+			cooling = now
+		else
+			cooling = false
 		end
 		if not meter.Visible then
 			countdown.Visible = false
@@ -446,14 +534,13 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 			if n ~= shown and n > 0 then
 				shown = n
 				countdown.Text = tostring(n)
-				countdownScale.Scale = 1.5
-				TweenService
-					:Create(
-						countdownScale,
-						TweenInfo.new(0.25, Enum.EasingStyle.Back),
-						{ Scale = 1 }
-					)
-					:Play()
+				tilt = -tilt
+				ScreenFx.Punch(
+					countdown,
+					motion.CountdownPopScale,
+					motion.CountdownPopSeconds,
+					motion.CountdownTilt * tilt
+				)
 				Sounds.Play("CountdownTick")
 			end
 		else

@@ -32,6 +32,7 @@ local TweenService = game:GetService("TweenService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local ParkourLogic = require(ReplicatedStorage.Shared.ParkourLogic)
 local Tags = require(ReplicatedStorage.Shared.Tags)
+local FramePace = require(script.Parent.FramePace)
 local Layout = require(script.Parent.Layout)
 local MenuUI = require(script.Parent.MenuUI)
 local MinigameFx = require(script.Parent.MinigameFx)
@@ -239,8 +240,9 @@ function ParkourUI.MountCourse(gui: ScreenGui, spec: CourseSpec)
 	end
 	player:GetAttributeChangedSignal(prefix .. "Run"):Connect(refreshTimer)
 	player:GetAttributeChangedSignal(prefix .. "Reached"):Connect(refreshTimer)
-	RunService.Heartbeat:Connect(function()
-		if timer.Visible and attr("Run") == "Running" then
+	-- (connected only while the timer shows: nothing runs per frame off the course)
+	FramePace.WhileVisible(timer, RunService.Heartbeat, function()
+		if attr("Run") == "Running" then
 			refreshTimer()
 		end
 	end)
