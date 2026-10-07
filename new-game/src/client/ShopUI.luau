@@ -194,7 +194,9 @@ function ShopUI.Mount(gui: ScreenGui)
 	local cardHeight = if compact then 158 else 190
 	local previewHeight = if compact then 72 else 100
 	local PHONE_CARD_HEIGHT = cardHeight
-	local CARD_PARTS = 86 -- a phone card's height without its 3D preview (name, button, gaps)
+	-- A phone card's height without its 3D preview (a one-line name, the button, gaps).
+	local NAME_HEIGHT = if compact then 18 else 34
+	local CARD_PARTS = if compact then 70 else 86
 	local MIN_PREVIEW = 30
 	local pageSize =
 		math.max(1, if compact then skinSettings.PhonePageSize else skinSettings.PageSize)
@@ -660,9 +662,10 @@ function ShopUI.Mount(gui: ScreenGui)
 		end
 
 		local name = Theme.label(item.Name, 14, frame)
-		name.TextWrapped = true
+		name.TextWrapped = not compact -- (phones: one line, so the 3D preview gets the room)
+		name.TextTruncate = if compact then Enum.TextTruncate.AtEnd else Enum.TextTruncate.None
 		name.Position = UDim2.fromOffset(6, previewHeight + 10)
-		name.Size = UDim2.new(1, -12, 0, 34)
+		name.Size = UDim2.new(1, -12, 0, NAME_HEIGHT)
 
 		local action = button("", frame)
 		action.Position = UDim2.new(0, 8, 1, -40)

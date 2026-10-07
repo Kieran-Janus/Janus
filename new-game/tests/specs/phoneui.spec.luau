@@ -341,6 +341,20 @@ describe("Buy buttons in view on a short phone screen", function()
 				cards += 1
 				local preview = card:FindFirstChildOfClass("ViewportFrame")
 				expect(preview.Size.Y.Offset).toBeGreaterThanOrEqual(30)
+				-- The one-line name sits between the preview and the button, overlapping neither.
+				local label = nil
+				local action = nil
+				for _, child in card:GetChildren() do
+					if child:IsA("TextLabel") and child.Name == "TextLabel" then
+						label = child
+					elseif child:IsA("TextButton") then
+						action = child
+					end
+				end
+				local nameBottom = label.Position.Y.Offset + label.Size.Y.Offset
+				local buttonTop = card.Size.Y.Offset + action.Position.Y.Offset
+				expect(label.Position.Y.Offset).toBeGreaterThanOrEqual(preview.Size.Y.Offset)
+				expect(nameBottom).toBeLessThanOrEqual(buttonTop)
 				-- A price always says what it costs in (honest labels): "Buy 500 Coins".
 				for _, b in card:GetDescendants() do
 					if b:IsA("TextButton") and b.Text:find("^Buy") then
