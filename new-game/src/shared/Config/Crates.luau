@@ -123,6 +123,9 @@ return {
 	PhonePageSize = 6,
 	-- A server-wide announcement when anyone unboxes a CRAZY skin (Config.Announce has the looks).
 	AnnounceCrazy = true,
+	-- Seconds the announcement waits after the crate is opened, so the winner sees their own
+	-- reveal first (about the length of the opening: drop, shake, burst, fly, pedestal).
+	AnnounceDelay = 4.5,
 	-- After winning one of these rarities the save is written straight away (other wins are
 	-- saved by the normal autosave, Config.Data.AutosaveSeconds).
 	SaveRightAway = { Rare = true, Crazy = true } :: { [string]: boolean },

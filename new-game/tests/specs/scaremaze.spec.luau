@@ -740,8 +740,15 @@ describe("ScareMaze screen", function()
 		me:SetAttribute("BooReadyAt", client.workspace:GetServerTimeNow() + 5)
 		client:advance(0.1)
 		expect(boo:FindFirstChild("Cooldown").Visible).toBe(true)
+		-- The seconds left replace the word (both at once read "BO8O!").
+		expect(boo.Text).toBe("")
+		expect(boo:FindFirstChild("Cooldown").Text).toBe("5")
 		client:triggerAction("ScareMazeBoo")
 		expect(#client:calls("RemoteEvent", "FireServer")).toBe(fired)
+		-- Ready again: the word is back.
+		client:advance(5.1)
+		expect(boo:FindFirstChild("Cooldown").Visible).toBe(false)
+		expect(boo.Text).toBe(text.BooButton)
 	end)
 
 	it("hides everything when the round is over", function()

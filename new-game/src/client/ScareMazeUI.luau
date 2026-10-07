@@ -484,6 +484,8 @@ function ScareMazeUI.Mount(gui: ScreenGui)
 			local now = left > 0
 			booShade.Visible = now
 			booShade.Text = if now then tostring(math.ceil(left)) else ""
+			-- The seconds left replace the word while it recharges (both at once read "BO8O!").
+			boo.Text = if now then "" else text.BooButton
 			ring.Visible = now
 			if now then
 				setRing(1 - left / math.max(cfg.Boo.Cooldown, 0.01))

@@ -388,3 +388,28 @@ describe("MapLife round setup and teardown", function()
 		expect(#rt.errors).toBe(0)
 	end)
 end)
+
+describe("FramePace idle loop", function()
+	it("keeps scanning after one scan throws (a part removed mid-scan)", function()
+		local rt = Runtime.new({ client = true })
+		local FramePace = rt:require("StarterPlayer.StarterPlayerScripts.Client.FramePace")
+		local run = rt.game:GetService("RunService")
+		local scans = 0
+		local loop = FramePace.IdleLoop(run.Heartbeat, function(scan: boolean): boolean
+			if scan then
+				scans += 1
+				if scans == 2 then
+					error("a part was removed")
+				end
+			end
+			return false -- nothing animating: the timer keeps looking
+		end)
+		local gap = FramePace.ScanSeconds()
+		rt:advance(gap * 6 + 0.05)
+		loop.Stop()
+		expect(scans).toBeGreaterThan(4) -- the error didn't end the scans
+		local stopped = scans
+		rt:advance(gap * 4)
+		expect(scans).toBe(stopped) -- Stop still stops them
+	end)
+end)

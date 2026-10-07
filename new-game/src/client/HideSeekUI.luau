@@ -92,6 +92,7 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	Layout.Fit(tip)
 
 	local bannerToken = 0
+	local fades: { Tween } = {} -- the last banner's fade-out, stopped when a new one shows
 	local foundAt = -math.huge
 	-- tagged = the seeker's TAGGED! (punches in bigger, with sparkles); otherwise the role pop
 	-- with a little shake.
@@ -104,6 +105,10 @@ function HideSeekUI.Mount(gui: ScreenGui)
 	)
 		bannerToken += 1
 		local token = bannerToken
+		for _, fade in fades do
+			fade:Cancel()
+		end
+		table.clear(fades)
 		banner.Text = message
 		banner.TextColor3 = color
 		banner.TextTransparency = 0
@@ -145,10 +150,17 @@ function HideSeekUI.Mount(gui: ScreenGui)
 			local fadeSeconds = if ScreenFx.On() then motion.FadeSeconds else 0
 			if fadeSeconds > 0 then
 				local fade = TweenInfo.new(fadeSeconds)
-				TweenService
-					:Create(banner, fade, { TextTransparency = 1, TextStrokeTransparency = 1 })
-					:Play()
-				TweenService:Create(tip, fade, { TextTransparency = 1 }):Play()
+				fades = {
+					TweenService:Create(
+						banner,
+						fade,
+						{ TextTransparency = 1, TextStrokeTransparency = 1 }
+					),
+					TweenService:Create(tip, fade, { TextTransparency = 1 }),
+				}
+				for _, tween in fades do
+					tween:Play()
+				end
 				task.wait(fadeSeconds + 0.05)
 			end
 			if token == bannerToken then

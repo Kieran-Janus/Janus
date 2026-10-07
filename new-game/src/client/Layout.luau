@@ -217,6 +217,7 @@ function Layout.SideButton(text: string, order: number): TextButton
 	b.Font = Theme.Font
 	b.TextSize = 16
 	b.Text = text
+	b.TextWrapped = true -- a long name ("Tormented Tower") takes two lines instead of spilling out
 	b.AutoButtonColor = true
 	Theme.round(b)
 	styleSideButton(b)

@@ -50,7 +50,12 @@ function FramePace.IdleLoop(signal: RBXScriptSignal, step: (scan: boolean) -> bo
 			if stopped or token ~= mine or connection then
 				return
 			end
-			if step(true) then
+			-- Protected: one error (a part removed mid-scan) must not stop the scans for good.
+			local ok, animating = pcall(step, true)
+			if not ok then
+				warn("[FramePace] An idle scan failed: " .. tostring(animating))
+			end
+			if ok and animating then
 				loop.Wake()
 			else
 				idle()

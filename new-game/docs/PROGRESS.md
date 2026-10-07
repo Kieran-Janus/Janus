@@ -12,7 +12,7 @@ The `/next-milestone` command reads this file. Update the Status column when a m
 | M6 | Shop, pumpkin currency, saving, VIP pass and products | blocked | create gamepass/product IDs in Creator Hub |
 | V1 | Verify the overnight cloud work in Studio (run `/verify`): skins tab, custom models, codes, daily streak, invite, F8 admin panel, anti-teleport pumpkins | done | 2-player test (see notes) |
 | M7 | UI polish, thumbnails and icon, security audit, playtest | in progress | upload thumbnails, friends playtest |
-| V2 | v2 update: Ready pad, 3 modes and 5 maps, lobby redesign, parkour, Candy Rush, Web Scour, secret pumpkins, rarity prices, about 630 skins and 34 crates, top-left Menu, witch/Boo Guide/tutorial removed, Pumpkin Vendor fix (see `docs/V2-CHANGES.md`) | in progress: Studio checks passed 6 Oct (solo, 2 players, phone, tablet); 7 Oct additions tested offline; 3-player ScareMaze to do | yes: 3-player ScareMaze, Robux ids, friends test |
+| V2 | v2 update: Ready pad, 3 modes and 5 maps, lobby redesign, parkour, Candy Rush, Web Scour, secret pumpkins, rarity prices, about 630 skins and 34 crates, top-left Menu, witch/Boo Guide/tutorial removed, Pumpkin Vendor fix (see `docs/V2-CHANGES.md`) | in progress: Studio checks passed 6 Oct (solo, 2 players, phone, tablet) and 8 Oct (7 Oct additions, 3-player ScareMaze); phone look at the 7 Oct animations to do | yes: Robux ids, friends test |
 | Launch | Set the experience public on 20 October | todo | yes: only the owner does this |
 
 Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a note below).
@@ -76,22 +76,22 @@ Spec: `docs/V2-SPEC.md`. Plain-English guide: `docs/V2-CHANGES.md`. Every featur
 | Config split into `src/shared/Config/` (one file per feature), feature switches | | verified in Studio (Parkour, CandyRush, Crates, Menu, ReadyPad switched off and on cleanly) |
 | Pumpkin Vendor fix: `ShopKeeper` tag, spawn / Ready pad / shopkeeper always put back, custom keeper checks | | verified in Studio (the owner's custom PumpkinVendor has no visible parts, so the built keeper is used) |
 | Witch Wanda, Boo Guide and the tutorial removed (Pumpkin Shop is the only shopkeeper) | `Tutorial` (off) | verified in Studio |
-| Ready pad, playlist vote, back to the lobby after a round | `ReadyPad` | verified in Studio solo; 2-player check to do |
-| Lobby spectating (Menu > Spectate, Watch the round) | `LobbySpectate` | built + tested offline, needs a 2-player Studio check |
+| Ready pad, playlist vote, back to the lobby after a round | `ReadyPad` | verified in Studio (solo, 2 and 3 players) |
+| Lobby spectating (Menu > Spectate, Watch the round) | `LobbySpectate` | verified in Studio (3 players: King, players, Q/E, auto-stop at round end) |
 | Game modes framework (King Hunt moved into `Modes/KingHunt.luau`) | `KingHunt` | verified in Studio (both maps) |
-| Pumpkin Hide & Seek + Pumpkin Farm and Hedge Maze maps | `HideSeek` | verified in Studio solo (fixed: the force button now reaches Hedge Maze); 2-player check to do |
-| ScareMaze + cornfield maze map | `ScareMaze` | verified in Studio solo (freeze, OUT when still, escape); Haunters need a 3-player check |
+| Pumpkin Hide & Seek + Pumpkin Farm and Hedge Maze maps | `HideSeek` | verified in Studio (solo and 2 players; both maps; candy splats) |
+| ScareMaze + cornfield maze map | `ScareMaze` | verified in Studio (3 players with the real MinPlayersForHaunters: BOO, cooldown ring, x-ray, OUT -> Haunter, catch credit) |
 | Lobby redesign (town square, prop kit, round Ready pad, shop stall) | | verified in Studio (Lighting = Future) |
 | Lobby editing: zones, sections, Bake, Locked, BuildVersion, palette, props override | | verified in Studio (Bake.Hub, BuildVersion 4, 3,877 parts, 83 lights) |
 | Parkour "Spooky Sky Climb" | `Parkour` | verified in Studio; difficulty for kids needs a human try |
-| Candy Rush | `CandyRush` | verified in Studio solo; 2-player race to do |
+| Candy Rush | `CandyRush` | verified in Studio (solo and 2-player race) |
 | Web Scour | `WebScour` | verified in Studio |
 | Secret pumpkins (11 Easter eggs) | `EasterEggs` | verified in Studio (all 11 reachable) |
 | Rarity prices (125 / 500 / 1,000 / 100,000), 5 coins per pumpkin | | verified in Studio |
 | 126 skins (120 crate skins in 6 themes), CRAZY effects, paged Skins tab | `SkinEffects` | verified in Studio (R15; R6 not checked) |
 | 10 crates with odds preview, coin and Robux crates, region rule | `Crates`, `RobuxCrates` | verified in Studio; Robux needs product ids |
-| Top-left Menu in the top bar, side buttons moved into it, one panel at a time | `Menu` | verified in Studio (fixed: blank button, clicks in first person); phone check to do |
-| Review fixes: Hide & Seek fair play, anti-teleport, saved-lobby repair, phone layouts, safer Robux receipts, saved Web Scour cooldown | | built + tested offline |
+| Top-left Menu in the top bar, side buttons moved into it, one panel at a time | `Menu` | verified in Studio (PC, phone, tablet) |
+| Review fixes: Hide & Seek fair play, anti-teleport, saved-lobby repair, phone layouts, safer Robux receipts, saved Web Scour cooldown | | verified in Studio |
 
 **Studio check, 6 Oct 2026 (`/verify-v2`, solo part):** every solo step passed or was fixed. Fixed: the Menu button drew over its own icon and word (a blank orange box); "Hide & Seek: force next round" never moved on to Hedge Maze once a round had used the first pick; panels couldn't be clicked with the camera zoomed into first person (PanelManager now shows a Modal button while a panel is open); selene 0.27.1 couldn't read the current Roblox standard library (now 0.29.0, 6 style warnings tidied). Still to do: the 2-player test (Ready pad voting, spectating, Hide & Seek, Candy Rush race, Web Scour together), ScareMaze Haunters (3 players) and phone/tablet layouts. To watch: in Candy Rush your own character can stand between the camera and your lane, and a click that lands on your avatar doesn't count.
 
@@ -113,5 +113,12 @@ All of this is in git and passes the offline tests (`lune run tests/run`). Guide
 1. **Robux products** (Creator Hub > Monetization; steps in `docs/V2-CHANGES.md` > "Robux setup"): the VIP pass (`Config.Monetization.VipGamePassId`), 3 coin packs (`Config.Monetization.Products`) and the crate products (each crate's `Robux.ProductId` in `src/shared/Config/Crates.luau`; at least the 6 classic stand crates). Every id is `0` today, so the buttons say "Coming soon". Then M6 can be `done`.
 2. **Publish** the place (File > Publish to Roblox) and buy one cheap product in a live server.
 3. **A friends test** on the published game (voice, ghost modes, Candy Rush races, crates on real phones).
-4. **ScareMaze with 3 players** (Test > Clients and Servers > 3 players): the BOO cooldown ring and real Haunters were not seen in Studio yet.
-5. Run `/verify-v2` once to see today's animations, crates and phone screens in Studio.
+4. ~~ScareMaze with 3 players~~ done 8 Oct (below).
+5. ~~Run `/verify-v2`~~ done 8 Oct, except a look at the 7 Oct animations on a phone (Test > Device > iPhone 14, landscape).
+
+## 8 Oct 2026: `/verify-v2` of the 7 Oct work, 3-player ScareMaze
+Played in Studio (solo, then Test > Clients and Servers with 3 players). Offline tests: 4,091 before, all passing after the new ones were added.
+- **Passed:** start-up with no errors or warnings; the saved lobby (BuildVersion 10, Locked; 3,990 of 4,300 parts, 85 of 90 lights on; every tag present); Menu (every tile, one panel at a time, codes); crates (preview, odds, a 600-coin opening with the light beam, Equip now, free CRAZY with rainbow and confetti, the region rule, the Shop still selling skins); skins of each rarity, unequip and reset; King Hunt, Hide & Seek (both maps, candy splats) and ScareMaze rounds; Web Scour (+32 coins, a second hunt pays nothing); Candy Rush solo; Parkour and Tormented Tower teleports; Photo Spot dances; Settings; VIP & Packs ("Coming soon"); the egg behind the Pumpkin Shop (+50, 6/11); Parkour, Candy Rush, Crates, Menu and ReadyPad switched off and on again; 36 remotes fed bad values (wrong types, NaN, huge numbers, other players) with no server errors and the save unchanged; 60 fps in the lobby.
+- **3 players, real `MinPlayersForHaunters` = 3:** 1 Haunter and 2 Survivors; BOO's jumpscare, the 8 s cooldown and its ring; Survivors seen through the walls; the red 3-2-1 and OUT; an OUT Survivor turning into a Haunter; the catch credited; results with teams, badges and MVP. Spectating from the lobby (King, then players with Q/E) and stopping by itself when the round ends.
+- **Fixed:** the CRAZY unbox banner showed before the winner's own chest opened (it now waits `Config.Crates.AnnounceDelay`, 4.5 s); the BOO button showed "BO8O!" while recharging (the number now replaces the word); "Tormented Tower" spilled out of its side button with the Menu off (it wraps). From a code review of the 7 Oct commits: a ghost's camera could stay on the old map when the round ended during the spectate glide (`SpectateTargets`); one error in an idle lobby animation scan stopped that animation for the rest of the session (`FramePace`); a second TAGGED! arriving during the first one's fade-out stayed invisible (`HideSeekUI`). Each has a test that fails without the fix.
+- **Not a bug:** in King Hunt the Ghost Cat steals pumpkins, so a count can go down.

@@ -523,9 +523,15 @@ describe("CrateService (coins)", function()
 			return list
 		end
 		data.Coins = 400000
+		local before = #announcements()
 		local crazy = w.open(player, "CrazyCrate")
 		expect(crazy.Rarity).toBe("Crazy")
+		-- Not before the winner's own reveal has played (Config.Crates.AnnounceDelay).
+		expect(Config.Crates.AnnounceDelay).toBeGreaterThan(0)
+		expect(#announcements()).toBe(before)
+		w.rt:advance(Config.Crates.AnnounceDelay + 0.1)
 		local said = announcements()
+		expect(#said).toBe(before + 1)
 		expect(said[#said].Text).toBe(
 			Config.Crates.Text.AnnounceCrazy:format(player.DisplayName, crazy.ItemName)
 		)
@@ -539,6 +545,7 @@ describe("CrateService (coins)", function()
 		million.Odds = odds
 		expect(lucky.ItemId).toBe(million.Id)
 		expect(lucky.OneInAMillion).toBe(true)
+		w.rt:advance(Config.Crates.AnnounceDelay + 0.1)
 		said = announcements()
 		expect(said[#said].Text).toBe(
 			Config.Crates.Text.AnnounceMillion:format(player.DisplayName, million.Name)

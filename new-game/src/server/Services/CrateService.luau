@@ -208,11 +208,14 @@ function CrateService.Grant(
 		Paid = paid,
 		OneInAMillion = if item.OneInAMillion then true else nil,
 	}
-	-- A CRAZY skin: the whole server hears about it (extra big for a one-in-a-million one).
+	-- A CRAZY skin: the whole server hears about it (extra big for a one-in-a-million one), once
+	-- the winner's own reveal has played, so the banner doesn't spoil it.
 	if rarity == "Crazy" and Config.Crates.AnnounceCrazy then
 		local t = text()
 		local words = if item.OneInAMillion then t.AnnounceMillion else t.AnnounceCrazy
-		AnnounceService.All(
+		task.delay(
+			math.max(0, Config.Crates.AnnounceDelay),
+			AnnounceService.All,
 			words:format(player.DisplayName, item.Name),
 			if item.OneInAMillion then "Huge" else "Big"
 		)

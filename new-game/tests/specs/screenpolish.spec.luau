@@ -200,6 +200,30 @@ describe("Hide & Seek screen motion", function()
 		expect(feed:GetAttribute("MotionScale")).toBeNil() -- the pop ended at full size
 	end)
 
+	it("shows a second TAGGED! that arrives while the first one is fading", function()
+		local c = mount()
+		local m = c.motion.HideSeek
+		c.player:SetAttribute("HideSeekRole", "Seeker")
+		c.storage:SetAttribute("State", "Playing")
+		c.rt:advance(m.BannerSeconds + 1)
+		local function tag(name: string)
+			local hider = c.rt:addPlayer({ Name = name, character = false })
+			c.rt:fire(
+				c.remotes.HideSeekEvent,
+				"OnClientEvent",
+				"Tagged",
+				{ Seeker = c.player, Hider = hider }
+			)
+		end
+		tag("First")
+		c.rt:advance(1.5 + m.FadeSeconds / 2) -- the first banner is half faded
+		tag("Second")
+		c.rt:advance(m.FadeSeconds) -- the old fade would have finished by now
+		local banner = c.gui.HideSeekBanner
+		expect(banner.Visible).toBe(true)
+		expect(banner.TextTransparency).toBe(0)
+	end)
+
 	it("counts the head start calmly and lets the glow warning breathe, ending solid", function()
 		local c = mount()
 		local m = c.motion.HideSeek
@@ -910,6 +934,26 @@ describe("Spectate camera glide", function()
 			c.Spectate.RestoreCamera()
 			expect(c.camera.CameraSubject).toBe(c.mine)
 		end
+	end)
+
+	it("ends on your new character when you respawn during the glide back", function()
+		-- The round ends while a ghost spectates: the camera glides back to your character, which
+		-- is replaced half-way. A removed character keeps its Humanoid, so the glide must not
+		-- hand the camera to the old one (it would stay on the unloaded map).
+		local c = setup()
+		c.Spectate.Follow(c.others[1])
+		c.rt:advance(0.6)
+		c.Spectate.RestoreCamera()
+		c.rt:advance(0.1)
+		local old = c.player.Character
+		old.Parent = nil
+		c.player.Character = nil
+		local fresh = c.rt:spawnCharacter(c.player, c.rt.env.CFrame.new(0, 5, 80))
+		expect(c.mine.Parent).toBe(old) -- (the old Humanoid still has its Parent)
+		c.rt:advance(0.6)
+		expect(c.Spectate.Gliding()).toBe(false)
+		expect(c.camera.CameraType).toBe(c.rt.env.Enum.CameraType.Custom)
+		expect(c.camera.CameraSubject).toBe(fresh:FindFirstChildOfClass("Humanoid"))
 	end)
 
 	it("lets the ghost's haunt cam take the camera from a glide", function()

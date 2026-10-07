@@ -365,7 +365,7 @@ Mystery crates give a random skin. Everything about them is in `src/shared/Confi
   the preview shows "0.0001%". These skins (`OneInAMillion = true`: Night Lord Supreme in Vampire
   Castle, Disco Demon in Monster Disco, Star Voyager in Alien Abduction) are never in the CRAZY Crate.
   Anyone unboxing a CRAZY skin is announced to the whole server (an extra-big banner for these),
-  words in `Text.AnnounceCrazy` / `Text.AnnounceMillion`, switch: `AnnounceCrazy`.
+  words in `Text.AnnounceCrazy` / `Text.AnnounceMillion`, switch: `AnnounceCrazy`; it waits `AnnounceDelay` seconds (4.5) so the winner sees their own reveal first.
 - **Prices**: each crate's `Price` (coins): 600 for themed crates (doubled in the big skin update),
   the rarity crates stay just under the shop price of their rarity (the comment at the top of
   `Crates.luau` explains why). A Robux price is set in Creator Hub: make a Developer

@@ -159,8 +159,16 @@ local function endGlide(handBack: boolean)
 	if handBack then
 		camera.CameraType = Enum.CameraType.Custom
 	end
-	if current.Subject.Parent then
+	if current.Subject:IsDescendantOf(workspace) then
 		camera.CameraSubject = current.Subject
+	elseif handBack then
+		-- Its character was removed during the glide (e.g. a respawn as the round ended; a
+		-- removed character keeps its Humanoid, so check Workspace): back to your own one.
+		local character = Players.LocalPlayer.Character
+		local own = character and character:FindFirstChildOfClass("Humanoid")
+		if own then
+			camera.CameraSubject = own
+		end
 	end
 end
 
@@ -200,7 +208,7 @@ local function glideTo(camera: Camera, humanoid: Humanoid)
 		local seconds = Config.ScreenMotion.SpectateCamera.GlideSeconds
 		local a = math.clamp((os.clock() - g.Started) / seconds, 0, 1)
 		local focus = focusOf(g.Subject)
-		if not focus or not g.Subject.Parent then
+		if not focus or not g.Subject:IsDescendantOf(workspace) then
 			endGlide(true)
 			return
 		end
