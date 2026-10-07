@@ -144,6 +144,19 @@ return {
 		LaneTaken = "Someone is on this pad",
 	},
 
+	-- Little celebrations on the player's own screen (src/client/CandyRushUI.luau). Only for fun:
+	-- grabs still count the moment you click. Shared numbers: Config.Minigames.Effects.
+	Effects = {
+		On = true, -- false = no sparkles, "+1"s, confetti or smooth bars (the race is the same)
+		GrabSparkles = 14, -- sparkles where your candy was when you grab it (phones: fewer)
+		PlusText = "+1", -- floats up next to your candy count
+		BarSeconds = 0.22, -- lane progress bars slide to their new length in this many seconds
+		CountdownScale = 1.9, -- the 3-2-1 / GO! starts this big and punches down to size
+		CountdownTilt = 10, -- degrees it starts tilted (0 = straight)
+		WinConfetti = 60, -- confetti pieces when YOU win (phones: fewer)
+		BounceSeconds = 0.3, -- new candies bounce in over this many seconds
+	},
+
 	-- Sounds: "rbxassetid://..." or "" for none. The pop is heard by everyone near the stand;
 	-- the others only by the player.
 	Sounds = {

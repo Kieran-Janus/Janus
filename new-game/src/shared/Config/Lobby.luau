@@ -163,6 +163,94 @@ return {
 		KeepAreas = { "Webs", "Runes", "Mist", "Fireflies", "FloatingCandles", "Course" },
 	},
 
+	-- The lobby comes alive (src/client/LobbyLife.luau): small animations each player's own
+	-- screen plays, so the server never moves anything. Only things within Range studs of the
+	-- camera move (PhoneRange on phones); everything goes back exactly where it was when the
+	-- camera moves away. Each part has its own On switch; On = false here switches all of it off.
+	-- Nothing made here can be bumped into, clicked or touched.
+	Life = {
+		On = true, -- false = no lobby life at all
+		Range = 120, -- studs from the camera: closer than this animates
+		PhoneRange = 80, -- the same on phones (less work for small devices)
+		-- The Pumpkin Shop keeper (any Model tagged ShopKeeper holding a character Model named
+		-- in Models: the built "Keeper" or your custom "Look"). It breathes, turns to face the
+		-- nearest player and waves when one walks up. A custom model without arm parts does a
+		-- little happy wiggle instead.
+		Keeper = {
+			On = true, -- false = the keeper stands still
+			Models = { "Keeper", "Look" }, -- names of the character models inside the NPC
+			ArmNames = { "Arm", "RightArm", "Right Arm", "RightUpperArm" }, -- parts that can wave
+			BreathHeight = 0.12, -- studs the keeper rises and sinks while breathing
+			BreathSpeed = 1.8, -- breathing speed (bigger = faster)
+			TurnRange = 28, -- studs: a player closer than this gets looked at
+			MaxTurn = 50, -- degrees the keeper may turn left or right from its counter
+			TurnSpeed = 3, -- how quickly it turns (bigger = snappier)
+			WaveDistance = 14, -- studs: walking this close makes it wave
+			WaveRearm = 6, -- extra studs you must walk away before it waves again
+			WaveSeconds = 1.8, -- how long a wave lasts
+			WaveRaise = 120, -- degrees the arm lifts to wave
+			WaveSwing = 25, -- degrees the raised arm swings side to side
+			WaveSwings = 3, -- how many swings in one wave
+			WiggleAngle = 8, -- degrees of the whole-body wiggle (models without arms)
+			WiggleHop = 0.5, -- studs of the little hop in that wiggle
+		},
+		-- A soft glowing ring round every Ready pad (tag ReadyPad) that pulses, faster while
+		-- someone is ready, and the floating READY sign (tag ReadySign) does a little bounce
+		-- whenever the number of ready players changes.
+		ReadyPad = {
+			On = true, -- false = no ring and no bounce
+			Color = Color3.fromRGB(70, 255, 225), -- the ring's colour
+			RingWidth = 1.6, -- studs the ring reaches past the pad's edge
+			Brightest = 0.45, -- ring transparency at the top of a pulse (0 = solid)
+			Faintest = 0.85, -- ring transparency at the bottom of a pulse (1 = invisible)
+			Grow = 0.08, -- how much bigger the ring gets at the top of a pulse (0.08 = 8%)
+			SlowSpeed = 1.6, -- pulse speed with nobody ready
+			FastSpeed = 5, -- pulse speed while someone is ready
+			BounceHeight = 1.2, -- studs the sign hops when the count changes
+			BounceSeconds = 0.6, -- how long the hop lasts
+			BounceHops = 2, -- hops per bounce
+		},
+		-- The glowing floor signs (tag FloorSign) shimmer like wet glowing paint.
+		FloorSigns = {
+			On = true, -- false = signs stay steady
+			Speed = 1.3, -- shimmer speed
+			TextFade = 0.22, -- how far the words fade at the dimmest point (0 = never, 1 = gone)
+			FrameFade = 0.35, -- the same for the thin glowing frame
+			LightDip = 0.3, -- the sign's light dims by this share at its dimmest
+			UpdatesPerSecond = 12, -- how often the shimmer updates (fewer = cheaper)
+		},
+		-- The cauldron in the middle of the plaza (a prop named "Cauldron") puffs green bubbles
+		-- now and then, and its "Bubble" parts bob in the brew.
+		Cauldron = {
+			On = true, -- false = a still cauldron
+			Color = Color3.fromRGB(140, 255, 120), -- the puffs' colour
+			EveryMin = 1.5, -- seconds between puffs (a random time between these two)
+			EveryMax = 3.5,
+			Puffs = 6, -- bubbles in one puff
+			PhonePuffs = 3, -- the same on phones
+			BubbleBob = 0.25, -- studs the brew's bubbles bob
+			BubbleSpeed = 2.2, -- bubbling speed
+			ScanSeconds = 6, -- how often to look for the cauldron until it is found
+		},
+		-- Now and then a little bat flaps across the sky near you while you are in the lobby.
+		Bats = {
+			On = true, -- false = no bats
+			Max = 2, -- most bats flying at once
+			PhoneMax = 1, -- the same on phones
+			EveryMin = 6, -- seconds between bats (a random time between these two)
+			EveryMax = 14,
+			Height = 22, -- studs above the camera they fly
+			Distance = 30, -- studs in front of the camera their path passes
+			Span = 140, -- studs each bat flies before vanishing
+			Speed = 22, -- studs per second
+			FlapSpeed = 14, -- wing beats speed
+			FlapAngle = 40, -- degrees the wings beat
+			Size = 1.4, -- body size in studs (wings are wider)
+			Color = Color3.fromRGB(30, 22, 40),
+			HubRadius = 200, -- only while the camera is this close to the lobby's spawn (tag HubSpawn)
+		},
+	},
+
 	-- Watching the round from the lobby (Config.Features.LobbySpectate): Menu > Spectate, or the
 	-- "Watch the round" button the lobby shows while a round is being played.
 	-- Keys: change the lists below (keyboard keys and gamepad buttons both work).

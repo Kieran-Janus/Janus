@@ -15,7 +15,15 @@
 	ParkourStarted, ParkourReached, ParkourBest, ParkourRuns, ParkourRewardAt, the
 	ReplicatedStorage attribute ParkourCheckpoints and the ParkourEvent remote. The only thing
 	it asks the server is ParkourRequest("GoToStart" | "Stop").
+
+	Celebrations (Config.Parkour.Effects, for both courses; all off with its On = false or
+	Config.Minigames.Effects.On = false; src/client/MinigameFx.luau): sparkles burst up from
+	the checkpoint you reach (on this computer only, never solid) and its message punches in;
+	the finish sets off fireworks over the finish pad and confetti, and the banner and your time
+	pop; a new best time gets a big "NEW BEST!" and extra confetti; the running timer swells a
+	little on every whole second. Everything still comes from the server: effects only decorate.
 ]]
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -23,8 +31,10 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local ParkourLogic = require(ReplicatedStorage.Shared.ParkourLogic)
+local Tags = require(ReplicatedStorage.Shared.Tags)
 local Layout = require(script.Parent.Layout)
 local MenuUI = require(script.Parent.MenuUI)
+local MinigameFx = require(script.Parent.MinigameFx)
 local PanelManager = require(script.Parent.PanelManager)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
@@ -34,6 +44,43 @@ local ParkourUI = {}
 local cfg = Config.Parkour -- the look, sounds and timings (shared by every course)
 local screen = cfg.Screen
 local colors = screen.Colors
+local fx = cfg.Effects
+
+local function effectsOn(): boolean
+	return MinigameFx.Enabled(fx)
+end
+
+-- The top of the part (or model) with this tag nearest to `from` (within 60 studs), or nil.
+local function nearestTop(tag: string?, from: Vector3?): Vector3?
+	if not tag then
+		return nil
+	end
+	local best: Vector3? = nil
+	local bestDistance = math.huge
+	for _, instance in CollectionService:GetTagged(tag) do
+		local top: Vector3? = nil
+		if instance:IsA("BasePart") then
+			top = instance.Position + Vector3.new(0, instance.Size.Y / 2, 0)
+		elseif instance:IsA("Model") then
+			local ok, cf, size = pcall(function()
+				return instance:GetBoundingBox()
+			end)
+			if ok then
+				top = cf.Position + Vector3.new(0, size.Y / 2, 0)
+			end
+		end
+		if top then
+			local distance = if from then (top - from).Magnitude else 0
+			if distance < bestDistance then
+				best, bestDistance = top, distance
+			end
+		end
+	end
+	if best and (from == nil or bestDistance <= 60) then
+		return best
+	end
+	return nil
+end
 
 -- One course's screen: its switch, player attributes (<Prefix>Run...), remotes and words.
 export type CourseSpec = {
@@ -163,11 +210,13 @@ function ParkourUI.MountCourse(gui: ScreenGui, spec: CourseSpec)
 	gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
 	place()
 
+	local lastWhole = -1 -- the whole second the timer showed last (for its little swell)
 	local function refreshTimer()
 		local state = attr("Run")
 		local running = state == "Running"
 		timer.Visible = state == "Ready" or running
 		if not timer.Visible then
+			lastWhole = -1
 			return
 		end
 		local count = checkpointCount()
@@ -175,6 +224,14 @@ function ParkourUI.MountCourse(gui: ScreenGui, spec: CourseSpec)
 		if running then
 			local elapsed = workspace:GetServerTimeNow() - number(attr("Started"))
 			time.Text = text.Timer:format(ParkourLogic.FormatTime(elapsed))
+			-- Updated every frame (smooth); it swells a touch as each whole second ticks over.
+			local whole = math.floor(math.max(elapsed, 0))
+			if whole ~= lastWhole then
+				if lastWhole >= 0 and fx.TickBump > 1 and effectsOn() then
+					MinigameFx.Punch(time, fx.TickBump)
+				end
+				lastWhole = whole
+			end
 		else
 			time.Text = text.Ready
 		end
@@ -267,6 +324,97 @@ function ParkourUI.MountCourse(gui: ScreenGui, spec: CourseSpec)
 	closeBanner.AnchorPoint = Vector2.new(1, 0)
 	closeBanner.Position = UDim2.new(1, -8, 0, 8)
 	closeBanner.Size = UDim2.fromOffset(32, 32)
+	-- Celebrations (effects) -------------------------------------------------------------------
+	local function feet(): Vector3?
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if root and root:IsA("BasePart") then
+			return root.Position - Vector3.new(0, 3, 0)
+		end
+		return nil
+	end
+	local tags = Tags :: any
+	local function celebrateCheckpoint()
+		MinigameFx.Punch(popLabel)
+		local here = feet()
+		local at = nearestTop(tags[prefix .. "Checkpoint"], here) or here
+		if at then
+			MinigameFx.Burst(
+				at + Vector3.new(0, 0.5, 0),
+				fx.CheckpointColors,
+				MinigameFx.Count(fx.CheckpointSparkles)
+			)
+		end
+	end
+	local function celebrateFinish(newBest: boolean)
+		MinigameFx.PopFit(banner, 0.6, 0.35)
+		MinigameFx.Punch(bannerTime, 1.6)
+		local here = feet()
+		local at = nearestTop(tags[prefix .. "Finish"], here) or here
+		if at then
+			local rng = Random.new()
+			local sparkles = MinigameFx.Count(fx.FireworkSparkles)
+			for i = 1, math.max(0, math.floor(fx.Fireworks)) do
+				local spot = at
+					+ Vector3.new(
+						rng:NextNumber(-6, 6),
+						fx.FireworkHeight + rng:NextNumber(-2, 2),
+						rng:NextNumber(-6, 6)
+					)
+				local color = fx.CheckpointColors[(i - 1) % #fx.CheckpointColors + 1]
+				task.delay((i - 1) * fx.FireworkGap, function()
+					MinigameFx.Burst(spot, { colors.Finish, color, Color3.new(1, 1, 1) }, sparkles)
+				end)
+			end
+		end
+		MinigameFx.Confetti(
+			gui,
+			MinigameFx.Count(if newBest then fx.NewBestConfetti else fx.FinishConfetti)
+		)
+		if newBest then
+			MinigameFx.Punch(bannerBest, 1.5)
+			-- The big "NEW BEST!" words over the banner, gone after NewBestSeconds.
+			local old = gui:FindFirstChild(prefix .. "NewBest")
+			if old then
+				old:Destroy()
+			end
+			local words = Instance.new("TextLabel")
+			words.Name = prefix .. "NewBest"
+			words.AnchorPoint = Vector2.new(0.5, 0.5)
+			words.Position = UDim2.fromScale(0.5, 0.2)
+			words.Size = UDim2.new(0.8, 0, 0, 70)
+			words.BackgroundTransparency = 1
+			words.Font = Enum.Font.FredokaOne
+			words.Text = fx.NewBestText
+			words.TextColor3 = colors.Finish
+			words.TextStrokeColor3 = Color3.fromRGB(90, 40, 10)
+			words.TextStrokeTransparency = 0
+			words.Active = false
+			words.ZIndex = 9
+			words.Parent = gui
+			textSize(words, 60)
+			local widestWords = Instance.new("UISizeConstraint")
+			widestWords.MaxSize = Vector2.new(520, 70)
+			widestWords.Parent = words
+			Layout.KeepBelowHud({ words })
+			MinigameFx.Punch(words, 2.2, -12)
+			task.delay(fx.NewBestSeconds, function()
+				if not words.Parent then
+					return
+				end
+				local fade = TweenService:Create(
+					words,
+					TweenInfo.new(0.4),
+					{ TextTransparency = 1, TextStrokeTransparency = 1 }
+				)
+				fade.Completed:Once(function()
+					words:Destroy()
+				end)
+				fade:Play()
+			end)
+		end
+	end
+
 	local bannerId = 0
 	closeBanner.Activated:Connect(function()
 		bannerId += 1
@@ -290,6 +438,9 @@ function ParkourUI.MountCourse(gui: ScreenGui, spec: CourseSpec)
 		bannerId += 1
 		local id = bannerId
 		banner.Visible = true
+		if effectsOn() then
+			celebrateFinish(info.NewBest == true)
+		end
 		task.delay(screen.FinishSeconds, function()
 			if bannerId == id then
 				banner.Visible = false
@@ -453,6 +604,9 @@ function ParkourUI.MountCourse(gui: ScreenGui, spec: CourseSpec)
 					colors.Checkpoint
 				)
 				play(cfg.Sounds.Checkpoint)
+				if effectsOn() then
+					celebrateCheckpoint()
+				end
 			elseif kind == "Back" then
 				local checkpoint = number(data.Checkpoint)
 				local message

@@ -4,6 +4,8 @@
 	  King tracker - T (or the on-screen button) asks the server TrackKing(); the answer is
 	                 shown as an arrow pointing to the nearest King for a few seconds.
 	  Chat tag     - "[VIP]" in front of VIP players' chat messages.
+	The tracker pops when a new reading comes in and wiggles while it's still recharging
+	(src/client/ShopJuice.luau, Config.Shop.Juice).
 ]]
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -14,6 +16,7 @@ local TextChatService = game:GetService("TextChatService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Layout = require(script.Parent.Layout)
+local ShopJuice = require(script.Parent.ShopJuice)
 local Theme = require(script.Parent.Theme)
 
 local VipUI = {}
@@ -78,6 +81,7 @@ function VipUI.Mount(gui: ScreenGui)
 			info.Text = ("Tracker ready in %ds"):format(math.ceil(wait))
 			direction = direction or Vector3.new(0, 0, -1)
 			showUntil = os.clock() + 1.5
+			ShopJuice.Shake(holder)
 			return
 		end
 		asking = true
@@ -90,6 +94,7 @@ function VipUI.Mount(gui: ScreenGui)
 				direction = if dir.Magnitude > 0 then dir else Vector3.new(0, 0, -1)
 				info.Text = ("Pumpkin King: %d studs"):format(math.floor(distance))
 				showUntil = os.clock() + cfg.Tracker.ShowSeconds
+				ShopJuice.Pop(holder, Config.Shop.Juice.PopScale, Config.Shop.Juice.PopTime)
 			end
 		end)
 	end

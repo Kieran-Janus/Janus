@@ -654,3 +654,219 @@ describe("The Candy Rush screen", function()
 		expect(#client.errors).toBe(0)
 	end)
 end)
+
+describe("Candy Rush celebrations", function()
+	local Dom = require("../harness/Dom")
+
+	-- A client at the stand: one of your candies 10 studs in front of the camera, the screen a
+	-- PC (1600 x 900) or a phone (640 x 302 touch). off = "Game" | "All" switches effects off.
+	local function stand(opts: { phone: boolean?, off: string? }?)
+		local o = opts or {}
+		local client = Runtime.new({ client = true })
+		local env = client.env
+		local Config = client:require("ReplicatedStorage.Shared.Config")
+		Config.Features.CandyRush = true
+		if o.off == "Game" then
+			Config.Minigames.CandyRush.Effects.On = false
+		elseif o.off == "All" then
+			Config.Minigames.Effects.On = false
+		end
+		local me = client.game:GetService("Players").LocalPlayer
+		local remotes = client:create(
+			"Folder",
+			{ Name = "Remotes" },
+			client.game:GetService("ReplicatedStorage")
+		)
+		local state = client:create("RemoteEvent", { Name = "CandyRushState" }, remotes)
+		client:create("RemoteEvent", { Name = "CandyRushGrab" }, remotes)
+		local gui = client:create("ScreenGui", { Name = "GameUI" }, me:WaitForChild("PlayerGui"))
+		if o.phone then
+			gui:SetAttribute("ForceTouch", true)
+			Dom.rawSet(gui, "AbsoluteSize", env.Vector2.new(640, 302))
+		else
+			Dom.rawSet(gui, "AbsoluteSize", env.Vector2.new(1600, 900))
+		end
+		local Client = client:find("StarterPlayer.StarterPlayerScripts.Client")
+		client:require(Client.Layout).Mount(gui)
+		local station = client:create("Model", { Name = "CandyStand" }, client.workspace)
+		client.game:GetService("CollectionService"):AddTag(station, "CandyRushStation")
+		local folder = client:create("Folder", { Name = "Candies" }, station)
+		client:require(Client.CandyRushUI).Mount(gui)
+		client:advance(0.5)
+		local spot = env.Vector3.new(0, 5, -10)
+		client.workspace.CurrentCamera.CFrame = env.CFrame.new(env.Vector3.new(0, 5, 0), spot)
+		local candy = client:create("Model", { Name = "Candy_Lane1" })
+		local part = client:create("Part", {
+			Name = "Hitbox",
+			Size = env.Vector3.new(2, 2, 1),
+			CFrame = env.CFrame.new(spot),
+			Color = env.Color3.fromRGB(255, 105, 180),
+		}, candy)
+		candy.PrimaryPart = part
+		candy:SetAttribute("Lane", 1)
+		candy:SetAttribute("OwnerUserId", me.UserId)
+		candy.Parent = folder
+		client:advance(0.5) -- (bounced in)
+		local function send(popped: number, phase: string?, extra: { [string]: any }?)
+			local message = {
+				Phase = phase or "Live",
+				Total = 10,
+				Solo = false,
+				Lanes = {
+					{
+						Lane = 1,
+						UserId = me.UserId,
+						Name = me.DisplayName,
+						Popped = popped,
+						Out = false,
+						Color = env.Color3.new(1, 0, 1),
+					},
+				},
+				Needed = 0,
+				InRace = true,
+				YourLane = 1,
+				StartedAt = 0,
+			}
+			for k, v in extra or {} do
+				message[k] = v
+			end
+			client:fire(state, "OnClientEvent", message)
+		end
+		local function tap()
+			local point = client.workspace.CurrentCamera:WorldToViewportPoint(spot)
+			client:fire(
+				client.game:GetService("UserInputService"),
+				"TouchTapInWorld",
+				env.Vector2.new(point.X, point.Y),
+				false
+			)
+		end
+		local function bursts(): { any }
+			local fxFolder = client.workspace:FindFirstChild("MinigameFx")
+			return if fxFolder then fxFolder:GetChildren() else {}
+		end
+		return {
+			client = client,
+			Config = Config,
+			fx = Config.Minigames.CandyRush.Effects,
+			gui = gui,
+			me = me,
+			candy = candy,
+			spot = spot,
+			send = send,
+			tap = tap,
+			bursts = bursts,
+		}
+	end
+
+	it("sends your grab at once, then celebrates the server's count and cleans up", function()
+		local w = stand()
+		local client, gui = w.client, w.gui
+		w.send(3)
+		client:advance(0.1)
+		w.tap()
+		-- The grab went to the server straight away, before any effect.
+		local sent = client:calls("RemoteEvent", "FireServer")
+		expect(#sent).toBe(1)
+		expect(sent[1].args[1]).toBe(w.candy)
+		expect(#w.bursts()).toBe(0) -- nothing celebrates until the server counts it
+		expect(gui.CandyRush:FindFirstChild("FxFloat")).toBeNil()
+		-- The server counts it: the candy goes, the count says 4.
+		w.candy:Destroy()
+		w.send(4)
+		expect(gui.CandyRush.YourCandies.Text).toBe("4/10") -- the real number, at once
+		local list = w.bursts()
+		expect(#list).toBe(1)
+		expect((list[1].Position - w.spot).Magnitude).toBeLessThan(0.01)
+		expect(list[1].CanCollide).toBe(false)
+		expect(list[1].CanQuery).toBe(false)
+		local emits = client:calls("ParticleEmitter", "Emit")
+		expect(emits[#emits].args[1]).toBe(w.fx.GrabSparkles)
+		local plus = gui.CandyRush:FindFirstChild("FxFloat")
+		expect(plus).toBeTruthy()
+		expect(plus.Text).toBe(w.fx.PlusText)
+		-- The bar slides to 4/10.
+		local fill = gui.CandyRush.Lanes.Lane1.Bar.Fill
+		client:advance(w.fx.BarSeconds + 0.05)
+		expect(fill.Size.X.Scale).toBeNear(0.4, 1e-6)
+		client:advance(2)
+		expect(#w.bursts()).toBe(0)
+		expect(gui.CandyRush:FindFirstChild("FxFloat")).toBeNil()
+		expect(#client.errors).toBe(0)
+	end)
+
+	it("punches the countdown in and throws confetti when you win", function()
+		local w = stand()
+		local client, gui = w.client, w.gui
+		w.send(0, "Countdown", { Count = 3, InRace = false })
+		local countdown = gui.CandyRushCountdown
+		expect(countdown.Text).toBe("3")
+		expect(math.abs(countdown.Rotation)).toBe(w.fx.CountdownTilt)
+		expect(countdown:FindFirstChildOfClass("UIScale").Scale).toBe(w.fx.CountdownScale)
+		client:advance(0.5)
+		expect(countdown.Rotation).toBe(0)
+		expect(countdown:FindFirstChildOfClass("UIScale").Scale).toBe(1)
+		w.send(10, "Results", {
+			Winner = { UserId = w.me.UserId, Name = "Me" },
+			Reason = "Finished",
+			Coins = 25,
+		})
+		local confetti = gui:FindFirstChild("FxConfetti")
+		expect(confetti).toBeTruthy()
+		expect(#confetti:GetChildren()).toBe(w.fx.WinConfetti)
+		expect(gui.CandyRushBanner.Details.Text).toMatch("%+25") -- the real coins
+		client:advance(4)
+		expect(gui:FindFirstChild("FxConfetti")).toBeNil()
+		expect(gui.CandyRushBanner:GetAttribute("MotionScale")).toBe(1)
+		expect(#client.errors).toBe(0)
+	end)
+
+	it("makes fewer sparkles and confetti on phones", function()
+		local w = stand({ phone = true })
+		local client, gui = w.client, w.gui
+		local Effects = w.Config.Minigames.Effects
+		w.send(3)
+		w.candy:Destroy()
+		w.send(4)
+		local emits = client:calls("ParticleEmitter", "Emit")
+		local phone = emits[#emits].args[1]
+		expect(phone).toBeLessThan(w.fx.GrabSparkles)
+		expect(phone).toBe(math.floor(w.fx.GrabSparkles * Effects.PhoneShare + 0.5))
+		w.send(
+			10,
+			"Results",
+			{ Winner = { UserId = w.me.UserId, Name = "Me" }, Reason = "Finished" }
+		)
+		expect(#gui.FxConfetti:GetChildren()).toBe(
+			math.floor(w.fx.WinConfetti * Effects.PhoneShare + 0.5)
+		)
+		expect(#client.errors).toBe(0)
+	end)
+
+	it("does none of it when effects are off (its own switch or the shared one)", function()
+		for _, off in { "Game", "All" } do
+			local w = stand({ off = off })
+			local client, gui = w.client, w.gui
+			w.send(0, "Countdown", { Count = 3, InRace = false })
+			expect(gui.CandyRushCountdown.Rotation).toBe(0)
+			w.send(3)
+			w.tap()
+			expect(#client:calls("RemoteEvent", "FireServer")).toBe(1) -- still sent at once
+			w.candy:Destroy()
+			w.send(4)
+			expect(gui.CandyRush.YourCandies.Text).toBe("4/10")
+			-- (the bar is at its real length at once)
+			expect(gui.CandyRush.Lanes.Lane1.Bar.Fill.Size.X.Scale).toBeNear(0.4, 1e-6)
+			expect(#w.bursts()).toBe(0)
+			expect(gui.CandyRush:FindFirstChild("FxFloat")).toBeNil()
+			w.send(
+				10,
+				"Results",
+				{ Winner = { UserId = w.me.UserId, Name = "Me" }, Reason = "Finished" }
+			)
+			expect(gui:FindFirstChild("FxConfetti")).toBeNil()
+			expect(#client:calls("ParticleEmitter", "Emit")).toBe(0)
+			expect(#client.errors).toBe(0)
+		end
+	end)
+end)

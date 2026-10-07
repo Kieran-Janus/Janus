@@ -523,8 +523,45 @@ describe("WebScourUI", function()
 		expect(args[1]).toBe("Catch")
 		expect(args[2]).toBe(1)
 		expect(args[3]).toBe(2)
+		-- The catch was sent at once (above, before any effect), with a puff right away.
+		local puffs = client:calls("ParticleEmitter", "Emit")
+		expect(#puffs).toBe(1)
+		expect(puffs[1].args[1]).toBe(cfg.Effects.CatchSparkles)
 		client:fire(run, "OnClientEvent", { Op = "Found", RunId = 1, Id = 2, Found = 1, Total = 3 })
 		expect(gui.WebScour.Progress.Text).toBe("1/3 found")
+		local plus = gui.WebScour:FindFirstChild("FxFloat")
+		expect(plus).toBeTruthy()
+		expect(plus.Text).toBe(cfg.Effects.PlusText)
+		client:advance(1.5)
+		expect(gui.WebScour:FindFirstChild("FxFloat")).toBeNil() -- floated away
+
+		-- The time bar drains with the real time left: 1.7 s of 45 s gone.
+		local bar = gui.WebScour.TimeBar
+		expect(bar.Visible).toBe(true)
+		expect(bar.Fill.Size.X.Scale).toBeNear((cfg.TimeLimit - 1.7) / cfg.TimeLimit, 0.01)
+		-- The critters hop now and then: one of them goes higher than its bob.
+		local first = folder:FindFirstChild(list[1].Kind .. "1")
+		local base = list[1].Position.Y
+		local highest = -math.huge
+		for _ = 1, 50 do
+			client:advance(0.1)
+			highest = math.max(highest, first.Hitbox.Position.Y - base)
+		end
+		expect(highest).toBeGreaterThan(0.3)
+		-- The last seconds: the clock swells calmly once a second, the bar turns warm.
+		client:advance(cfg.TimeLimit - 7.2 - cfg.HintLastSeconds + 0.5) -- ~0.5 s into them
+		expect(bar.Fill.BackgroundColor3).toBe(cfg.Effects.TimeBarLowColor)
+		local pulse = gui.WebScour.Time.Pulse
+		local sizes = {}
+		for _ = 1, 10 do
+			client:advance(0.1)
+			table.insert(sizes, pulse.Scale)
+		end
+		for _, s in sizes do
+			expect(s).toBeGreaterThanOrEqual(1)
+			expect(s).toBeLessThanOrEqual(1 + cfg.Effects.Pulse + 1e-6)
+		end
+		expect(math.max(table.unpack(sizes)) - math.min(table.unpack(sizes))).toBeGreaterThan(0.02)
 
 		client:fire(run, "OnClientEvent", {
 			Op = "End",
@@ -541,10 +578,102 @@ describe("WebScourUI", function()
 		expect(gui.WebScour.Visible).toBe(false)
 		expect(gui.WebScourBanner.Visible).toBe(true)
 		expect(gui.WebScourBanner.Title.Text).toBe(cfg.Text.TimeUp)
-		expect(gui.WebScourBanner.Coins.Text).toMatch("%+2")
+		expect(gui:FindFirstChild("FxConfetti")).toBeNil() -- only for finding them all
+		client:advance(cfg.Effects.CoinsCountSeconds)
+		expect(gui.WebScourBanner.Coins.Text).toBe(cfg.Text.Coins:format(2, "Coins"))
 		client:advance(cfg.BannerSeconds + 2)
 		expect(gui.WebScourBanner.Visible).toBe(false)
+		expect(gui.WebScourBanner:GetAttribute("MotionScale")).toBe(1)
 		expect(client.workspace:FindFirstChild("WebScourCritters")).toBeNil()
+		expect(#client.errors).toBe(0)
+	end)
+
+	local function hunt(setup: ((any) -> ())?)
+		local srv = server()
+		local client = Runtime.new({ client = true })
+		client:replicateFrom(srv)
+		local C = client:require("ReplicatedStorage.Shared.Config")
+		if setup then
+			setup(C)
+		end
+		local player = client.game:GetService("Players").LocalPlayer
+		local gui = client:create("ScreenGui", { Name = "GameUI" }, player.PlayerGui)
+		client:require("StarterPlayer.StarterPlayerScripts.Client.WebScourUI").Mount(gui)
+		client:advance(0.5)
+		local run = client:find("ReplicatedStorage.Remotes.WebScourRun")
+		local root = player.Character:GetPivot().Position
+		client:fire(run, "OnClientEvent", {
+			Op = "Start",
+			RunId = 1,
+			TimeLimit = cfg.TimeLimit,
+			Critters = {
+				{ Id = 1, Position = root + client.env.Vector3.new(3, 2, 0), Kind = "Pink" },
+			},
+			Best = 0,
+			CooldownLeft = 0,
+		})
+		client:advance(0.2)
+		return client, gui, run, player
+	end
+
+	it("celebrates finding them all with confetti, cleaned up after", function()
+		local client, gui, run = hunt()
+		client:fire(run, "OnClientEvent", { Op = "Found", RunId = 1, Id = 1, Found = 1, Total = 1 })
+		client:fire(run, "OnClientEvent", {
+			Op = "End",
+			RunId = 1,
+			Reason = "AllFound",
+			Found = 1,
+			Total = 1,
+			Time = 12.3,
+			Coins = 31,
+			Best = 12.3,
+			NewBest = true,
+			CooldownLeft = 0,
+		})
+		local confetti = gui:FindFirstChild("FxConfetti")
+		expect(confetti).toBeTruthy()
+		expect(#confetti:GetChildren()).toBe(cfg.Effects.AllFoundConfetti)
+		client:advance(cfg.Effects.CoinsCountSeconds + 0.05)
+		expect(gui.WebScourBanner.Coins.Text).toBe(cfg.Text.Coins:format(31, "Coins"))
+		client:advance(5)
+		expect(gui:FindFirstChild("FxConfetti")).toBeNil()
+		expect(#client.errors).toBe(0)
+	end)
+
+	it("plays the plain hunt when effects are off", function()
+		local client, gui, run, player = hunt(function(C)
+			C.Minigames.WebScour.Effects.On = false
+		end)
+		local folder = client.workspace.WebScourCritters
+		local critter = folder:FindFirstChild("Pink1")
+		local base = critter.Hitbox.Position.Y
+		local highest = -math.huge
+		for _ = 1, 60 do
+			client:advance(0.1)
+			highest = math.max(highest, critter.Hitbox.Position.Y - base)
+		end
+		expect(highest).toBeLessThanOrEqual(0.5 + 1e-6) -- only the gentle bob, no hops
+		expect(gui.WebScour.TimeBar.Visible).toBe(false)
+		client:triggerPrompt(critter.Hitbox:FindFirstChildOfClass("ProximityPrompt"), player)
+		local sent = client:calls("RemoteEvent", "FireServer")
+		expect(sent[#sent].args[1]).toBe("Catch") -- still sent at once
+		client:fire(run, "OnClientEvent", { Op = "Found", RunId = 1, Id = 1, Found = 1, Total = 1 })
+		expect(gui.WebScour:FindFirstChild("FxFloat")).toBeNil()
+		client:fire(run, "OnClientEvent", {
+			Op = "End",
+			RunId = 1,
+			Reason = "AllFound",
+			Found = 1,
+			Total = 1,
+			Time = 9,
+			Coins = 31,
+			Best = 9,
+			NewBest = true,
+			CooldownLeft = 0,
+		})
+		expect(gui.WebScourBanner.Coins.Text).toBe(cfg.Text.Coins:format(31, "Coins")) -- at once
+		expect(gui:FindFirstChild("FxConfetti")).toBeNil()
 		expect(#client.errors).toBe(0)
 	end)
 end)

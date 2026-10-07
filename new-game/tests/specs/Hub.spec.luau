@@ -511,4 +511,22 @@ describe("ReadySign", function()
 			expect(sign.States[state]).toBeA("string")
 		end
 	end)
+
+	it("hides the sign while the camera is right under it", function()
+		local anchor = client:create("Part", {
+			Name = "ReadySign",
+			Anchored = true,
+			CFrame = client.env.CFrame.new(0, 18, 0),
+		}, client.workspace)
+		local gui = client:create("BillboardGui", { Name = "Sign" }, anchor)
+		client.game:GetService("CollectionService"):AddTag(anchor, "ReadySign")
+		local camera = client.workspace.CurrentCamera
+		camera.CFrame = client.env.CFrame.new(3, 6, 4) -- standing on the pad
+		ReadySign.Mount()
+		client:advance(0.5)
+		expect(gui.Enabled).toBe(false)
+		camera.CFrame = client.env.CFrame.new(0, 10, 60) -- across the plaza
+		client:advance(0.5)
+		expect(gui.Enabled).toBe(true)
+	end)
 end)

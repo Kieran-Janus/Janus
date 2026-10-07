@@ -18,11 +18,19 @@
 
 	Escape: Roblox keeps the Escape key for its own menu, so when that menu opens (Escape or
 	its top-bar button) the open panel closes too; in Studio the key itself also works.
+
+	Motion (src/client/UIMotion.luau, Config.UI.Motion): a registered panel pops in whenever it
+	becomes visible. Closing (Escape, CloseTop, CloseAll, another panel opening, or the panel's
+	own code setting Visible = false) still hides it AT ONCE, so every `Visible` check stays
+	true to what the player can use; what shrinks away is a short-lived copy of it (a "ghost",
+	in the ScreenGui PanelGhosts beside the game UI, no clicks) that removes itself.
 ]]
 local ContextActionService = game:GetService("ContextActionService")
 local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+
+local UIMotion = require(script.Parent.UIMotion)
 
 local PanelManager = {}
 
@@ -73,7 +81,73 @@ local function updateBinding()
 	end
 end
 
-local function onVisibleChanged(panel: GuiObject)
+local ghostGui: ScreenGui? = nil
+local ghosts: { [GuiObject]: GuiObject } = {}
+
+-- The ScreenGui the ghosts shrink in: a twin of the panel's ScreenGui (same insets and scale),
+-- drawn just under it, so a test or module looking through the game UI never finds a ghost.
+local function ghostLayer(panel: GuiObject): ScreenGui?
+	local screen = panel:FindFirstAncestorOfClass("ScreenGui")
+	if not (screen and screen.Parent and panel.Parent == screen) then
+		return nil
+	end
+	local layer = ghostGui
+	if not layer or layer.Parent ~= screen.Parent then
+		if layer then
+			layer:Destroy()
+		end
+		local made = Instance.new("ScreenGui")
+		made.Name = "PanelGhosts"
+		made.ResetOnSpawn = false
+		made.Parent = screen.Parent
+		Instance.new("UIScale").Parent = made
+		ghostGui = made
+		layer = made
+	end
+	assert(layer, "a layer was just made")
+	layer.ScreenInsets = screen.ScreenInsets
+	layer.IgnoreGuiInset = screen.IgnoreGuiInset
+	layer.ZIndexBehavior = screen.ZIndexBehavior
+	layer.DisplayOrder = screen.DisplayOrder - 1
+	local scale = layer:FindFirstChildOfClass("UIScale")
+	local screenScale = screen:FindFirstChild("ScreenScale")
+	if scale then
+		scale.Scale = if screenScale and screenScale:IsA("UIScale") then screenScale.Scale else 1
+	end
+	return layer
+end
+
+local function clearGhost(panel: GuiObject)
+	local ghost = ghosts[panel]
+	ghosts[panel] = nil
+	if ghost then
+		ghost:Destroy()
+	end
+end
+
+local function animateVisible(panel: GuiObject)
+	if panel.Visible then
+		clearGhost(panel)
+		UIMotion.PopIn(panel)
+		return
+	end
+	clearGhost(panel)
+	local layer = ghostLayer(panel)
+	local ghost = layer and UIMotion.Ghost(panel, layer)
+	if ghost then
+		ghosts[panel] = ghost
+		ghost.Destroying:Once(function()
+			if ghosts[panel] == ghost then
+				ghosts[panel] = nil
+			end
+		end)
+	end
+end
+
+local function onVisibleChanged(panel: GuiObject, animate: boolean)
+	if animate then
+		animateVisible(panel)
+	end
 	if panel.Visible then
 		-- Close the panels that were already open. A panel opened in this same moment isn't
 		-- in the list yet: it closes this one when its own turn comes, so the last one wins.
@@ -97,16 +171,17 @@ function PanelManager.Register(panel: GuiObject)
 	end
 	registered[panel] = true
 	local changed = panel:GetPropertyChangedSignal("Visible"):Connect(function()
-		onVisibleChanged(panel)
+		onVisibleChanged(panel, true)
 	end)
 	panel.Destroying:Once(function()
 		changed:Disconnect()
 		registered[panel] = nil
+		clearGhost(panel)
 		forget(panel)
 		updateBinding()
 	end)
 	if panel.Visible then
-		onVisibleChanged(panel)
+		onVisibleChanged(panel, false) -- already open: no pop
 	end
 end
 

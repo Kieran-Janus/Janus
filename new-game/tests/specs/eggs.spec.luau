@@ -344,12 +344,35 @@ describe("EasterEggUI", function()
 			Total = total,
 		})
 		expect(gui.EasterEggToast.Visible).toBe(true)
+		-- Celebrations: sparkles burst at the egg, the coins count up to the real number.
+		local fxFolder = client.workspace:FindFirstChild("MinigameFx")
+		expect(fxFolder).toBeTruthy()
+		local burst = fxFolder:FindFirstChild("Burst")
+		expect(burst).toBeTruthy()
+		expect((burst.Position - shop.Position).Magnitude).toBeLessThan(0.01)
+		expect(burst.CanCollide).toBe(false)
+		local emits = client:calls("ParticleEmitter", "Emit")
+		expect(emits[#emits].args[1]).toBe(cfg.Effects.Sparkles) -- (not a phone)
+		client:advance(cfg.Effects.CoinsCountSeconds + 0.05)
 		expect(gui.EasterEggToast.Detail.Text).toBe(cfg.Text.Toast:format(50, "Coins", 1, total))
 		client:advance(cfg.ToastSeconds + 1)
 		expect(gui.EasterEggToast.Visible).toBe(false)
+		expect(#fxFolder:GetChildren()).toBe(0) -- the sparkles cleaned up
 
 		EasterEggUI.Open()
 		expect(gui.EasterEggs.Visible).toBe(true)
+		-- The found egg's row shines once, then the shine is gone.
+		local shines = 0
+		for _, d in gui.EasterEggs.List:GetDescendants() do
+			if d.Name == "FxShine" then
+				shines += 1
+			end
+		end
+		expect(shines).toBe(1)
+		client:advance(cfg.Effects.ShineSeconds + 0.1)
+		for _, d in gui.EasterEggs.List:GetDescendants() do
+			expect(d.Name).never.toBe("FxShine")
+		end
 		local rows = 0
 		for _, child in gui.EasterEggs.List:GetChildren() do
 			if child:IsA("Frame") then
@@ -364,5 +387,44 @@ describe("EasterEggUI", function()
 		client:flush()
 		expect(shop.LocalTransparencyModifier).toBe(0)
 		expect(#client.errors).toBe(0)
+	end)
+
+	it("shows the plain toast with the exact coins at once when effects are off", function()
+		local srv = server()
+		for _, flag in { "Game", "All" } do
+			local client = Runtime.new({ client = true })
+			client:replicateFrom(srv)
+			local C = client:require("ReplicatedStorage.Shared.Config")
+			if flag == "Game" then
+				C.EasterEggs.Effects.On = false
+			else
+				C.Minigames.Effects.On = false
+			end
+			local player = client.game:GetService("Players").LocalPlayer
+			local gui = client:create("ScreenGui", { Name = "GameUI" }, player.PlayerGui)
+			local EasterEggUI =
+				client:require("StarterPlayer.StarterPlayerScripts.Client.EasterEggUI")
+			EasterEggUI.Mount(gui)
+			client:advance(0.5)
+			player:SetAttribute("EasterEggsFound", "ShopPumpkin")
+			client:flush()
+			local home = gui.EasterEggToast.Position
+			client:fire(client:find("ReplicatedStorage.Remotes.EasterEggFound"), "OnClientEvent", {
+				Id = "ShopPumpkin",
+				Name = "Shy Shop Pumpkin",
+				Coins = 50,
+				Found = 1,
+				Total = 10,
+			})
+			expect(gui.EasterEggToast.Visible).toBe(true)
+			expect(gui.EasterEggToast.Detail.Text).toBe(cfg.Text.Toast:format(50, "Coins", 1, 10))
+			expect(gui.EasterEggToast.Position).toBe(home) -- no slide
+			expect(client.workspace:FindFirstChild("MinigameFx")).toBeNil()
+			EasterEggUI.Open()
+			for _, d in gui.EasterEggs.List:GetDescendants() do
+				expect(d.Name).never.toBe("FxShine")
+			end
+			expect(#client.errors).toBe(0)
+		end
 	end)
 end)

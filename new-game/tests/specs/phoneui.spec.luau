@@ -341,6 +341,12 @@ describe("Buy buttons in view on a short phone screen", function()
 				cards += 1
 				local preview = card:FindFirstChildOfClass("ViewportFrame")
 				expect(preview.Size.Y.Offset).toBeGreaterThanOrEqual(30)
+				-- A price always says what it costs in (honest labels): "Buy 500 Coins".
+				for _, b in card:GetDescendants() do
+					if b:IsA("TextButton") and b.Text:find("^Buy") then
+						expect(b.Text:find(p.Config.Economy.CurrencyName, 1, true)).toBeTruthy()
+					end
+				end
 				expect(card.Size.Y.Offset).toBe(grid.CellSize.Y.Offset)
 			end
 		end

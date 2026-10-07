@@ -229,7 +229,18 @@ function Layout.Fit(panel: GuiObject, bottom: boolean?)
 	local fitScale = Instance.new("UIScale")
 	fitScale.Name = "FitScale"
 	fitScale.Parent = panel
+	-- A gui has one UIScale, so the pop-in/pop-out animation (src/client/UIMotion.luau) asks
+	-- through the attribute MotionScale (1 or missing = none): FitScale = fitted size x motion.
+	-- The fit waits while an animation plays and runs again when it ends.
+	local fitted = 1
+	local function motion(): number
+		local value = panel:GetAttribute("MotionScale")
+		return if type(value) == "number" then value else 1
+	end
 	local function fit()
+		if motion() ~= 1 then
+			return
+		end
 		local screen = Layout.Screen()
 		local total = scaleValue() * fitScale.Scale
 		if total <= 0 then
@@ -247,9 +258,17 @@ function Layout.Fit(panel: GuiObject, bottom: boolean?)
 		local s = math.min(1, (screen.X - 2 * sideClear) / size.X, (screen.Y - 2 * margin) / size.Y)
 		s = math.max(s, 0.3)
 		if math.abs(fitScale.Scale - s) > 0.005 then
+			fitted = s
 			fitScale.Scale = s
 		end
 	end
+	panel:GetAttributeChangedSignal("MotionScale"):Connect(function()
+		local m = motion()
+		fitScale.Scale = fitted * m
+		if m == 1 then
+			fit()
+		end
+	end)
 	table.insert(fitters, fit)
 	panel.Destroying:Once(function()
 		local index = table.find(fitters, fit)

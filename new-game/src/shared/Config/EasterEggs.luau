@@ -83,6 +83,17 @@ return {
 		Found: { SoundId: string, Volume: number?, PitchMin: number?, PitchMax: number? },
 	},
 	ToastSeconds = 4,
+	-- Little celebrations on the finder's screen (src/client/EasterEggUI.luau). Only for fun:
+	-- the server still decides every find and its coins. Shared numbers: Config.Minigames.Effects.
+	Effects = {
+		On = true, -- false = no sparkles, sliding toast, counting coins or shine
+		Sparkles = 30, -- sparkles bursting from the egg you found (phones: fewer)
+		ToastSlide = 36, -- pixels the toast slides up into place from
+		ToastSlideSeconds = 0.35,
+		CoinsCountSeconds = 0.8, -- the coins in the toast count up this fast
+		ShineSeconds = 0.7, -- a shine sweeps across each found egg in the Secret Pumpkins list
+		ShineStagger = 0.08, -- seconds between one row's shine and the next
+	},
 	-- The picture next to each egg in the Menu > Secret Pumpkins list (any emoji).
 	Icons = {
 		GoldenPumpkin = "🎃",

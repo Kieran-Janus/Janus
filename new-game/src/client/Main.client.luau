@@ -49,6 +49,7 @@ local ORDER = {
 	"Controls",
 	"VoiceMeter",
 	"HubAmbience",
+	"LobbyLife", -- the shopkeeper waves, the Ready pad pulses, floor signs shimmer, bats fly
 	"CrateIdle", -- the crates on the lobby stand bob, peek and wake up when you walk over
 	"ReadySign", -- the "READY x / y" sign over the Ready pad
 	"VoteBoardUI",

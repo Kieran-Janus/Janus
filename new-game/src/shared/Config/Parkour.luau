@@ -264,6 +264,28 @@ return {
 		},
 	},
 
+	-- Little celebrations on the climber's screen (src/client/ParkourUI.luau; the Tormented
+	-- Tower uses the same ones). Only for fun: the server still decides every checkpoint, time
+	-- and best. Shared numbers: Config.Minigames.Effects.
+	Effects = {
+		On = true, -- false = no bursts, fireworks, confetti or pops (the course is the same)
+		CheckpointSparkles = 26, -- sparkles bursting up from a checkpoint you reach (phones: fewer)
+		CheckpointColors = {
+			Color3.fromRGB(120, 230, 120),
+			Color3.fromRGB(255, 230, 120),
+			Color3.fromRGB(255, 255, 255),
+		},
+		Fireworks = 3, -- bursts in the sky over the finish
+		FireworkSparkles = 30, -- sparkles in each one (phones: fewer)
+		FireworkHeight = 14, -- studs above the finish they go off
+		FireworkGap = 0.35, -- seconds between them
+		FinishConfetti = 50, -- confetti pieces when you finish (phones: fewer)
+		NewBestConfetti = 90, -- confetti pieces for a new best time (instead of the above)
+		NewBestText = "NEW BEST!", -- the big words for a new best time
+		NewBestSeconds = 2.2, -- how long they stay up
+		TickBump = 1.03, -- the running timer swells this much on every whole second (1 = never)
+	},
+
 	-- How the pieces look (src/server/Hub/Sections/Parkour.luau).
 	Look = {
 		PumpkinTop = 0.75, -- share of a pumpkin's width that is flat on top to stand on

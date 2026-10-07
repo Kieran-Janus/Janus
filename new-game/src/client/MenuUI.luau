@@ -39,8 +39,11 @@ local Layout = require(script.Parent.Layout)
 local MenuLogic = require(script.Parent.MenuLogic)
 local PanelManager = require(script.Parent.PanelManager)
 local Theme = require(script.Parent.Theme)
+local UIMotion = require(script.Parent.UIMotion)
 
 local MenuUI = {}
+
+local wobbled = false -- the Menu button wobbles once per session, a little after joining
 
 export type TileDef = {
 	Id: string,
@@ -171,7 +174,25 @@ function MenuUI.Open()
 	end
 	current.Message.Text = keyHint()
 	refresh()
-	current.Panel.Visible = true
+	local wasOpen = current.Panel.Visible
+	current.Panel.Visible = true -- PanelManager pops the panel in
+	if wasOpen then
+		return
+	end
+	-- The tiles pop in one after another, in their order (Config.UI.Motion.TileStagger apart).
+	local shown: { TextButton } = {}
+	for _, tile in tiles do
+		if tile.Button.Visible then
+			table.insert(shown, tile.Button)
+		end
+	end
+	table.sort(shown, function(a, b)
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	local stagger = Config.UI.Motion.TileStagger
+	for i, button in shown do
+		UIMotion.PopIn(button, (i - 1) * stagger)
+	end
 end
 
 function MenuUI.Close()
@@ -360,6 +381,16 @@ local function buildButton(gui: ScreenGui)
 	place()
 
 	button.Activated:Connect(MenuUI.Toggle)
+
+	-- "Here I am!": one little wobble, once per session, so new players spot the Menu.
+	if not wobbled then
+		wobbled = true
+		task.delay(Config.UI.Motion.WobbleDelay, function()
+			if button.Parent and not MenuUI.IsOpen() then
+				UIMotion.Wobble(button)
+			end
+		end)
+	end
 end
 
 function MenuUI.Mount(gui: ScreenGui)

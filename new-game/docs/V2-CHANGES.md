@@ -260,6 +260,7 @@ Good to know:
 - A switched-off lobby area (parkour, Candy Rush, crates, Ready pad) is taken out of the running game. Your saved place still has it, so switching it back on brings it back.
 - Signposts and paths pointing at a switched-off area stay until the lobby is rebuilt (F8 > Rebuild hub, or `Bake.Hub()`).
 - With every mode switched off, King Hunt still plays, so a round can always start.
+- The little celebrations in the lobby minigames (sparkles, "+1", confetti, fireworks, NEW BEST!) have their own switch: `Effects = { On = true, ...` in `src/shared/Config/Minigames.luau` turns them all off, and each game's `Effects.On` (`CandyRush.luau`, `WebScour.luau`, `EasterEggs.luau`, `Parkour.luau`) turns off just that one. The games themselves work the same either way.
 - These have no switch: the lobby redesign, rarity prices and the crate skins. Change their numbers in Config (see [Change it](#change-it)) or undo them (next section).
 
 ---

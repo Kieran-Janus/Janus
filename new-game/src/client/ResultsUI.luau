@@ -7,7 +7,12 @@
 	  - survivors get a "Survived!" badge, caught players "Caught" (a mode can send its own
 	    badge text, team and extra detail per row)
 	  - your own row is highlighted (and always shown, even outside the top N)
+	  - each row grows in as it appears; a light sweeps across the top row and your own row
+	  - your coins pulse when they finish counting, then "You got X coins!" pops over the
+	    footer for a moment
 	  - "Next round in X" counts down with the server's Results timer
+	Config.Results.Animate = false shows everything at once (no slide, rows, count-up or
+	pops). The panel always closes after Config.Round.ResultsSeconds, animated or not.
 	Server -> client: RoundResults(rows, info). info.ScoreLabel heads the score column (e.g.
 	"Pumpkins"); info.Winner (optional) shows under the title; info.MvpLine (optional) is the
 	MVP text ("%s" = name, "%d" = score).
@@ -220,8 +225,55 @@ function ResultsUI.Mount(gui: ScreenGui)
 		return label
 	end
 
+	-- A light that sweeps once across a row (a white band in a gradient, moved by its Offset).
+	local function shine(frame: GuiObject, delay: number)
+		local band = Instance.new("Frame")
+		band.Name = "Shine"
+		band.BackgroundColor3 = cfg.Colors.Shine
+		band.BackgroundTransparency = 0
+		band.BorderSizePixel = 0
+		band.Size = UDim2.fromScale(1, 1)
+		band.ZIndex = 2
+		band.Parent = frame
+		corner(band, 8)
+		local gradient = Instance.new("UIGradient")
+		gradient.Rotation = 15
+		gradient.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(0.42, 1),
+			NumberSequenceKeypoint.new(0.5, 0.55),
+			NumberSequenceKeypoint.new(0.58, 1),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		gradient.Offset = Vector2.new(-1, 0)
+		gradient.Parent = band
+		local sweep = TweenService:Create(
+			gradient,
+			TweenInfo.new(
+				cfg.ShineSeconds,
+				Enum.EasingStyle.Quad,
+				Enum.EasingDirection.InOut,
+				0,
+				false,
+				delay
+			),
+			{ Offset = Vector2.new(1, 0) }
+		)
+		sweep.Completed:Once(function()
+			band:Destroy()
+		end)
+		sweep:Play()
+	end
+
 	-- Coins labels to count up: { label, total, isMine }
-	type Counter = { Label: TextLabel, Total: number, Mine: boolean }
+	-- (Shine: the top player's row and yours get a light sweep once they are in.)
+	type Counter = {
+		Label: TextLabel,
+		Total: number,
+		Mine: boolean,
+		Frame: Frame,
+		Shine: boolean,
+	}
 
 	local function playerRow(
 		list: Instance,
@@ -235,6 +287,9 @@ function ResultsUI.Mount(gui: ScreenGui)
 		if mine then
 			frame.BackgroundTransparency = 0.6
 			frame.BackgroundColor3 = cfg.Colors.MyRow
+		elseif rank == 1 and result.Top and scoreOf(result) > 0 then
+			frame.BackgroundTransparency = 0.8
+			frame.BackgroundColor3 = cfg.Colors.TopRow
 		end
 		-- "1. Name", plus the team and any extra detail the mode sent ("1. Name (Seekers, found 3)").
 		local extras = {}
@@ -266,7 +321,13 @@ function ResultsUI.Mount(gui: ScreenGui)
 			badge(custom or text.Caught, cfg.Colors.Caught, slot)
 		end
 		frame.Visible = false
-		return { Label = coins, Total = result.Coins, Mine = mine }
+		return {
+			Label = coins,
+			Total = result.Coins,
+			Mine = mine,
+			Frame = frame,
+			Shine = mine or (rank == 1 and result.Top and scoreOf(result) > 0),
+		}
 	end
 
 	roundResults.OnClientEvent:Connect(function(rows: { ResultRow }, info: ResultInfo?)
@@ -402,24 +463,14 @@ function ResultsUI.Mount(gui: ScreenGui)
 			middle = math.min(middle, screenHeight - Config.UI.EdgeMargin - half)
 			target = UDim2.new(0.5, 0, 0, math.floor(middle + 0.5))
 		end
-		panel.Position = UDim2.new(0.5, 0, target.Y.Scale + 0.12, target.Y.Offset)
-		panel.Visible = true
-		TweenService:Create(
-			panel,
-			TweenInfo.new(cfg.PopSeconds, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-			{ Position = target }
-		):Play()
+		local animate = cfg.Animate
+		local shineFor: { [GuiObject]: boolean } = {}
+		for _, counter in counters do
+			shineFor[counter.Frame] = counter.Shine
+		end
 
-		-- Rows one after another, then the coins count up.
-		task.spawn(function()
-			for _, frame in rowFrames do
-				if token ~= hideToken then
-					return
-				end
-				frame.Visible = true
-				task.wait(cfg.RowDelay)
-			end
-			-- Your own row is always the last one; scroll down to it if it's out of view.
+		-- Your own row is always the last one; scroll down to it if it's out of view.
+		local function showMine()
 			local mine = list:FindFirstChild("MyRow")
 			if mine and mine:IsA("GuiObject") then
 				local viewBottom = list.AbsolutePosition.Y + list.AbsoluteSize.Y
@@ -430,33 +481,144 @@ function ResultsUI.Mount(gui: ScreenGui)
 					)
 				end
 			end
-			task.wait(cfg.CountUpDelay)
-			local started = os.clock()
-			local lastSound = 0
-			local myLast = 0
-			while token == hideToken do
-				local t = math.clamp((os.clock() - started) / cfg.CountUpSeconds, 0, 1)
-				for _, counter in counters do
-					local value = math.floor(counter.Total * t + 0.5)
-					counter.Label.Text = "+" .. value
-					if
-						counter.Mine
-						and value > myLast
-						and os.clock() - lastSound >= cfg.CoinSoundEvery
-					then
-						Sounds.Play("Coins")
-						lastSound = os.clock()
-					end
-					if counter.Mine then
-						myLast = value
-					end
+		end
+
+		-- "You got X coins!" over the footer for a moment (a child of the footer, so the
+		-- panel's list layout and size don't change).
+		local function youGot(coins: number)
+			local pill = Theme.label(text.YouGot:format(coins), 20, footer)
+			pill.Name = "YouGot"
+			pill.Font = Enum.Font.GothamBlack
+			pill.AnchorPoint = Vector2.new(0.5, 0.5)
+			pill.Position = UDim2.fromScale(0.5, 0.5)
+			pill.Size = UDim2.new(0.8, 0, 0, 30)
+			pill.BackgroundTransparency = 0
+			pill.BackgroundColor3 = cfg.Colors.YouGot
+			pill.TextColor3 = Theme.Background
+			pill.ZIndex = 3
+			corner(pill, 15)
+			local scale = Instance.new("UIScale")
+			scale.Scale = 0
+			scale.Parent = pill
+			TweenService:Create(
+				scale,
+				TweenInfo.new(
+					cfg.CoinPulseSeconds * 1.5,
+					Enum.EasingStyle.Back,
+					Enum.EasingDirection.Out
+				),
+				{ Scale = 1 }
+			):Play()
+			task.delay(cfg.YouGotSeconds, function()
+				if token ~= hideToken or not pill.Parent then
+					return
 				end
-				if t >= 1 then
-					break
-				end
-				task.wait()
+				local out = TweenService:Create(
+					scale,
+					TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+					{ Scale = 0 }
+				)
+				out.Completed:Once(function()
+					pill:Destroy()
+				end)
+				out:Play()
+			end)
+		end
+
+		if not animate then
+			-- Everything at once, with the final numbers.
+			panel.Position = target
+			panel.Visible = true
+			for _, frame in rowFrames do
+				frame.Visible = true
 			end
-		end)
+			for _, counter in counters do
+				counter.Label.Text = "+" .. counter.Total
+			end
+			showMine()
+		else
+			panel.Position = UDim2.new(0.5, 0, target.Y.Scale + 0.12, target.Y.Offset)
+			panel.Visible = true
+			TweenService:Create(
+				panel,
+				TweenInfo.new(cfg.PopSeconds, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+				{ Position = target }
+			):Play()
+
+			-- Rows one after another (each grows in), then the coins count up.
+			task.spawn(function()
+				for _, frame in rowFrames do
+					if token ~= hideToken then
+						return
+					end
+					local grow = Instance.new("UIScale")
+					grow.Scale = cfg.RowStartScale
+					grow.Parent = frame
+					frame.Visible = true
+					TweenService:Create(
+						grow,
+						TweenInfo.new(
+							cfg.RowInSeconds,
+							Enum.EasingStyle.Back,
+							Enum.EasingDirection.Out
+						),
+						{ Scale = 1 }
+					):Play()
+					if shineFor[frame] then
+						shine(frame, cfg.RowInSeconds + cfg.ShineDelay)
+					end
+					task.wait(cfg.RowDelay)
+				end
+				showMine()
+				task.wait(cfg.CountUpDelay)
+				local started = os.clock()
+				local lastSound = 0
+				local myLast = 0
+				while token == hideToken do
+					local t = math.clamp((os.clock() - started) / cfg.CountUpSeconds, 0, 1)
+					for _, counter in counters do
+						local value = math.floor(counter.Total * t + 0.5)
+						counter.Label.Text = "+" .. value
+						if
+							counter.Mine
+							and value > myLast
+							and os.clock() - lastSound >= cfg.CoinSoundEvery
+						then
+							Sounds.Play("Coins")
+							lastSound = os.clock()
+						end
+						if counter.Mine then
+							myLast = value
+						end
+					end
+					if t >= 1 then
+						break
+					end
+					task.wait()
+				end
+				if token ~= hideToken then
+					return
+				end
+				-- Your coins pulse, then the "You got X coins!" moment.
+				for _, counter in counters do
+					if counter.Mine and counter.Total > 0 then
+						local pulse = Instance.new("UIScale")
+						pulse.Scale = cfg.CoinPulseScale
+						pulse.Parent = counter.Label
+						TweenService:Create(
+							pulse,
+							TweenInfo.new(
+								cfg.CoinPulseSeconds,
+								Enum.EasingStyle.Back,
+								Enum.EasingDirection.Out
+							),
+							{ Scale = 1 }
+						):Play()
+						youGot(counter.Total)
+					end
+				end
+			end)
+		end
 
 		task.delay(Config.Round.ResultsSeconds, function()
 			if token == hideToken then

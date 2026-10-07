@@ -15,16 +15,23 @@
 	(src/server/Services/WebScourService.luau); a critter that was too far away comes back.
 	In the last HintLastSeconds the critters glow through the webs and trees, to help.
 	Remotes: WebScourRun (server -> client), WebScourAction (client -> server).
+
+	Celebrations (Config.Minigames.WebScour.Effects, all off with its On = false or
+	Config.Minigames.Effects.On = false; src/client/MinigameFx.luau): critters hop now and
+	then while they wait, a catch puff, a "+1" when the server counts a catch, a bar under the
+	clock that drains with the REAL time left (and calmly pulses once a second in the last
+	HintLastSeconds), and a finish banner that pops, counts its coins up to the real number
+	and throws confetti when you found them all. Catches are sent the moment you click.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local WebScourRules = require(ReplicatedStorage.Shared.WebScourRules)
 local Layout = require(script.Parent.Layout)
+local MinigameFx = require(script.Parent.MinigameFx)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
 
@@ -32,6 +39,11 @@ local WebScourUI = {}
 
 local cfg = Config.Minigames.WebScour
 local text = cfg.Text
+local fx = cfg.Effects
+
+local function effectsOn(): boolean
+	return MinigameFx.Enabled(fx)
+end
 
 local PENDING_SECONDS = 1.5 -- a caught critter comes back if the server hasn't answered by then
 
@@ -47,6 +59,7 @@ type Critter = {
 	Parts: { BasePart },
 	Pending: number?, -- os.clock() when we asked the server, nil = not waiting
 	Caught: boolean,
+	HopAt: number, -- os.clock() of its next little hop (effects)
 }
 
 local function number(value: unknown): number
@@ -234,6 +247,27 @@ function WebScourUI.Mount(gui: ScreenGui)
 	stopButton.AnchorPoint = Vector2.new(1, 0.5)
 	stopButton.Position = UDim2.new(1, -8, 0.5, 0)
 	stopButton.Size = UDim2.fromOffset(64, 40)
+	-- The time bar: drains with the real time left (effects).
+	local timeBar = Instance.new("Frame")
+	timeBar.Name = "TimeBar"
+	timeBar.AnchorPoint = Vector2.new(0, 1)
+	timeBar.Position = UDim2.new(0, 12, 1, -4)
+	timeBar.Size = UDim2.new(1, -90, 0, 4)
+	timeBar.BackgroundColor3 = Theme.Button
+	timeBar.BorderSizePixel = 0
+	timeBar.Visible = false
+	timeBar.Parent = bar
+	Theme.round(timeBar, 2)
+	local timeFill = Instance.new("Frame")
+	timeFill.Name = "Fill"
+	timeFill.BorderSizePixel = 0
+	timeFill.BackgroundColor3 = fx.TimeBarColor
+	timeFill.Size = UDim2.fromScale(1, 1)
+	timeFill.Parent = timeBar
+	Theme.round(timeFill, 2)
+	local clockPulse = Instance.new("UIScale")
+	clockPulse.Name = "Pulse"
+	clockPulse.Parent = clock
 
 	-- Keep the bar just below the bar at the top (the Hud), wherever that is.
 	local function place()
@@ -315,6 +349,11 @@ function WebScourUI.Mount(gui: ScreenGui)
 	local found = 0
 	local hinting = false
 	local lastTick = -1
+	local timeLimit = 0
+	local hopRng = Random.new()
+	local function nextHop(now: number): number
+		return now + hopRng:NextNumber(fx.HopEvery.Min, math.max(fx.HopEvery.Max, fx.HopEvery.Min))
+	end
 	local action: RemoteEvent? = nil
 	local loop: RBXScriptConnection? = nil
 
@@ -367,7 +406,7 @@ function WebScourUI.Mount(gui: ScreenGui)
 		burst.SpreadAngle = Vector2.new(180, 180)
 		burst.Rate = 0
 		burst.Parent = holder
-		burst:Emit(18)
+		burst:Emit(if effectsOn() then MinigameFx.Count(fx.CatchSparkles) else 18)
 		task.delay(1.2, function()
 			holder:Destroy()
 		end)
@@ -488,6 +527,7 @@ function WebScourUI.Mount(gui: ScreenGui)
 			Parts = parts,
 			Pending = nil,
 			Caught = false,
+			HopAt = nextHop(os.clock()),
 		}
 		prompt.Triggered:Connect(function()
 			catch(critter)
@@ -501,6 +541,7 @@ function WebScourUI.Mount(gui: ScreenGui)
 	local function step()
 		local now = os.clock()
 		local camera = workspace.CurrentCamera
+		local on = effectsOn()
 		for _, critter in critters do
 			if critter.Caught then
 				continue
@@ -512,6 +553,17 @@ function WebScourUI.Mount(gui: ScreenGui)
 			end
 			local t = now * 2 + critter.Phase
 			local bob = math.sin(t) * 0.25
+			-- Now and then a little hop with a wiggle (effects).
+			local wiggle = 0
+			if on and now >= critter.HopAt then
+				local hopDone = (now - critter.HopAt) / math.max(fx.HopSeconds, 0.05)
+				if hopDone >= 1 then
+					critter.HopAt = nextHop(now)
+				else
+					bob += math.sin(math.pi * hopDone) * fx.HopHeight
+					wiggle = math.sin(hopDone * math.pi * 2) * 0.35
+				end
+			end
 			local turn: CFrame
 			if camera then -- face the player, with a little wiggle
 				local to = camera.CFrame.Position - critter.Base.Position
@@ -520,7 +572,7 @@ function WebScourUI.Mount(gui: ScreenGui)
 			else
 				turn = CFrame.Angles(0, now * 0.8 + critter.Phase, 0)
 			end
-			local pivot = critter.Base * CFrame.new(0, bob, 0) * turn
+			local pivot = critter.Base * CFrame.new(0, bob, 0) * turn * CFrame.Angles(0, 0, wiggle)
 			for _, p in critter.Model:GetChildren() do
 				if p:IsA("BasePart") then
 					local offset = p:GetAttribute("Offset")
@@ -536,7 +588,21 @@ function WebScourUI.Mount(gui: ScreenGui)
 		local left = math.max(deadline - now, 0)
 		local wholeLeft = math.ceil(left)
 		clock.Text = string.format("%d:%02d", wholeLeft // 60, wholeLeft % 60)
-		if left <= cfg.HintLastSeconds and left > 0 then
+		-- The bar drains with the real time left; in the last seconds the clock swells once a
+		-- second, right as the number changes, and settles (calm, never faster than real time).
+		local lastSeconds = left <= cfg.HintLastSeconds and left > 0
+		timeBar.Visible = on and timeLimit > 0
+		if on and timeLimit > 0 then
+			timeFill.Size = UDim2.fromScale(math.clamp(left / timeLimit, 0, 1), 1)
+			timeFill.BackgroundColor3 = if lastSeconds then fx.TimeBarLowColor else fx.TimeBarColor
+		end
+		if on and lastSeconds then
+			local fraction = left - math.floor(left)
+			clockPulse.Scale = 1 + fx.Pulse * fraction * fraction
+		elseif clockPulse.Scale ~= 1 then
+			clockPulse.Scale = 1
+		end
+		if lastSeconds then
 			local whole = math.ceil(left)
 			if whole ~= lastTick then
 				lastTick = whole
@@ -564,7 +630,9 @@ function WebScourUI.Mount(gui: ScreenGui)
 		total = 0
 		found = 0
 		lastTick = -1
-		deadline = os.clock() + number(message.TimeLimit)
+		timeLimit = number(message.TimeLimit)
+		deadline = os.clock() + timeLimit
+		clockPulse.Scale = 1
 		clock.TextColor3 = Theme.Text
 		local container = Instance.new("Folder")
 		container.Name = "WebScourCritters"
@@ -612,9 +680,19 @@ function WebScourUI.Mount(gui: ScreenGui)
 			setVisible(critter, false)
 			critter.Highlight.Enabled = false
 		end
+		local before = found
 		found = number(message.Found)
 		total = math.max(number(message.Total), total)
 		updateProgress()
+		if found > before and effectsOn() then
+			MinigameFx.FloatText(
+				bar,
+				fx.PlusText,
+				Color3.fromRGB(255, 215, 80),
+				UDim2.fromOffset(150, 20)
+			)
+			MinigameFx.Punch(progress, 1.25)
+		end
 	end
 
 	local function onMiss(message: { [string]: any })
@@ -658,25 +736,35 @@ function WebScourUI.Mount(gui: ScreenGui)
 		local wait = number(message.CooldownLeft)
 		bannerTitle.Text = titleText
 		bannerLine.Text = table.concat(details, "  ·  ")
-		bannerCoins.Text = if coins > 0
-			then text.Coins:format(coins, Config.Economy.CurrencyName)
-			elseif wait > 0 then text.JustForFun:format(WebScourRules.FormatWait(wait))
-			else ""
+		local on = effectsOn()
+		if coins > 0 then
+			-- (counts up to the real number when effects are on; always ends on it)
+			MinigameFx.CountUp(
+				bannerCoins,
+				coins,
+				if on then fx.CoinsCountSeconds else 0,
+				function(n: number): string
+					return text.Coins:format(n, Config.Economy.CurrencyName)
+				end
+			)
+		else
+			MinigameFx.CountUp(bannerCoins, 0, 0, function(_: number): string
+				return if wait > 0
+					then text.JustForFun:format(WebScourRules.FormatWait(wait))
+					else ""
+			end)
+		end
 		Sounds.PlaySpec(if reason == "AllFound" then cfg.Sounds.AllFound else cfg.Sounds.TimeUp)
 		banner.Visible = true
 		bannerToken += 1
 		local mine = bannerToken
-		local scale = banner:FindFirstChild("Pop")
-		if not scale then
-			local created = Instance.new("UIScale")
-			created.Name = "Pop"
-			created.Parent = banner
-			scale = created
-		end
-		if scale and scale:IsA("UIScale") then
-			scale.Scale = 0.6
-			TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 })
-				:Play()
+		-- (through Layout.Fit's MotionScale: a second UIScale on the banner would fight its fit)
+		MinigameFx.PopFit(banner, 0.6, 0.35)
+		if on then
+			MinigameFx.Punch(bannerTitle, 1.3)
+			if reason == "AllFound" then
+				MinigameFx.Confetti(gui, MinigameFx.Count(fx.AllFoundConfetti))
+			end
 		end
 		task.delay(cfg.BannerSeconds, function()
 			if bannerToken == mine then

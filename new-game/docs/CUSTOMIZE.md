@@ -26,8 +26,9 @@ Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Mod
 | --- | --- |
 | Game name on the HUD | `Config.Game.Name` (the Roblox page name is set in Creator Hub) |
 | Round length, intermission, results time | `Config.Round` |
-| Results screen timings, text, colours | `Config.Results` |
-| "RUN!", heartbeat warning, +1 pop-ups, last-30-seconds, survivors-left | `Config.Juice` |
+| Results screen timings, text, colours, motion (row pops, shine, "You got X coins!"; `Animate = false` = no motion) | `Config.Results` |
+| 3-2-1 countdown, "GO!", "RUN!", heartbeat warning, +1 pop-ups, last-30-seconds, survivors-left (`Animate = false` = no motion) | `Config.Juice` |
+| Vote panel text and motion (cards popping in, count ticks, winner pop; `Animate = false` = no motion) | `Config.Voting` |
 | Coins per pumpkin, survivor bonus | `Config.Rewards` |
 | Easy/Hard pumpkins, reward multiplier | `Config.Difficulty.Levels` |
 | King speed, hearing, sight, how many Kings | `Config.King.Difficulty` |
@@ -64,8 +65,10 @@ Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Mod
 | Server-wide announcement banners | `Config.Announce` (`src/shared/Config/Announce.luau`) |
 | Photo Spot dances | `Config.Dances` (`src/shared/Config/Dances.luau`, see "Photo Spot dances" below) |
 | Glowing floor signs in front of each lobby area | `Config.Lobby.FloorSigns` (`src/shared/Config/Lobby.luau`) |
+| Lobby life: the shopkeeper breathes, turns and waves, the Ready pad pulses, floor signs shimmer, the cauldron bubbles, bats fly by (each with its own switch) | `Config.Lobby.Life` (`src/shared/Config/Lobby.luau`, client `src/client/LobbyLife.luau`) |
 | What in the lobby is solid | `Config.Lobby.Solid` (`src/shared/Config/Lobby.luau`, see "A solid lobby" below) |
 | Secret pumpkins (Easter eggs) | `src/shared/Config/EasterEggs.luau` |
+| Minigame celebrations (sparkles, "+1", confetti, fireworks, NEW BEST!) in Candy Rush, Web Scour, secret pumpkins and both parkour courses | one switch for all: `Config.Minigames.Effects.On` (`src/shared/Config/Minigames.luau`, also the phone share and shared sizes); each game's own `Effects` table (`CandyRush.luau`, `WebScour.luau`, `EasterEggs.luau`, `Parkour.luau`) |
 | Sound effects (clicks, pickups, King footsteps, minions, rewards) | `Config.Sounds` (SoundId "" = silent) |
 | Hub music, King roar | `Config.Hub.Music`, `Config.King.Heard.RoarSoundId` |
 | UI colours and font | `src/client/Theme.luau` |
@@ -317,6 +320,8 @@ A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
 
 ---
 
+- **All the UI animation** (panels popping in and out, button squash, the Menu's tiles, the coins rolling): `Config.UI.Motion` in `src/shared/Config/init.luau`; `On = false` makes everything instant. Rounds: `Config.Voting.Animate`, `Config.Juice.Animate`, `Config.Results.Animate`; the Shop: `Config.Shop.Juice.Animate`; minigames: `Config.Minigames.Effects.On`; the lobby's keeper, Ready ring, floor signs, cauldron and bats: `Config.Lobby.Life`.
+
 ## Crates
 Mystery crates give a random skin. Everything about them is in `src/shared/Config/Crates.luau`
 (switch them off with `Config.Features.Crates = false`, or only the Robux ones with
@@ -450,6 +455,7 @@ The "Spooky Sky Climb" behind the clock tower. Settings: `src/shared/Config/Park
 - **Solid pieces:** everything on the course you can see and bump into is solid: gravestones with their foot and dirt mound, crypt lids, broom handles, bands and straws, candies and their wrappers, bat bodies, heads, ears and wings, the finish island and the trophy. Only glow, words (plaques, signs), moss, flat painted details, slime and effects are walk-through. The parkour course is in `Config.Lobby.Solid.KeepAreas`, so the lobby's solid pass leaves it alone: it is built solid in `src/server/Hub/Sections/Parkour.luau`. A pumpkin's round body is only a look (it can be your own `ParkourPumpkin` model), so an invisible solid `Core` inside it is what you bump into. Solid bits hanging under a piece (the bat's body, the rock island under the finish: `Look.Island`) are listed in `Hang` so the head-room check counts them; `lune run tests/run -- parkour` checks both rules.
 - **See it:** F8 > Rebuild hub tries it in a playtest. To keep it, run `Bake.Hub()` in edit mode (or `Bake.Hub(true)` for a Locked lobby) or raise `Config.Hub.BuildVersion`.
 - **Or move pieces by hand** in a baked lobby (`Workspace.Hub.Parkour`): the game finds the working parts by tag, not by name or place. `ParkourStart` (start pad), `ParkourCheckpoint` with the attribute `Index` = 1, 2, 3 in climbing order, `ParkourFinish` (the trophy), `ParkourHazard` (slime), `ParkourBoard` (best times). The jumps in between are just parts: move, copy or delete them freely.
+- **Celebrations** (also in the Tormented Tower): `Effects` (sparkles bursting from each checkpoint, fireworks and confetti at the finish, a big "NEW BEST!" for a new best time, a little swell of the timer each second; `On = false` turns them off).
 - Or ask Claude Code: `/add-parkour-jump a spooky ghost platform after the second checkpoint`.
 
 ---
@@ -475,6 +481,7 @@ The candy stand on the west side of the lobby. Settings: `src/shared/Config/Cand
 - **Looks and words:** `Candy`, `Stand`, `Text`, `Sounds`.
 - **In Studio:** the stand is a Model tagged `CandyRushStation`; a copy of it is a second, separate race. The board is tagged `CandyRushBoard`. Each pad is tagged `CandyRushPad` with the attribute `Lane` (1 = the left column of the board as you look at it). Move or resize them freely.
 - Your own candies: models named `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn` in `Custom > Props`.
+- **Celebrations:** `Effects` (sparkles and "+1" when the server counts your grab, sliding lane bars, the punchy 3-2-1-GO, confetti when you win; `On = false` turns them off). Grabs are sent the moment you click either way.
 - Test alone: F8 > "Candy Rush: start solo test".
 
 ---
@@ -487,6 +494,7 @@ The Spider Grove scavenger hunt. Settings: `src/shared/Config/WebScour.luau`.
 - **Where they hide:** every web lists its hiding spots as clock hours (`Grove.Webs[...].Spots`, 12 = top, 3 = right; halves like 1.5 work). Each spot snaps to the nearest knot where a ring thread crosses a spoke (`SpotDistance` = how far out), so every spider sits on a strand, never on the floor or a tree. 16 spots in all.
 - **Looks and words:** `Grove` (trees, webs, lantern, spider, colours), `Text`, `Sounds`.
 - **In Studio:** the lantern is the part tagged `WebScourStart` (your own lantern model works too: tag the Model). The hiding spots are invisible parts tagged `WebScourSpot`: move, copy or delete them (keep them on a web). Delete the lantern and a new one is put back; the rest of the grove stays as you left it.
+- **Celebrations:** `Effects` (critters hop now and then, "+1" per catch, a bar that drains with the real time left and a calm once-a-second pulse in the last `HintLastSeconds`, coins counting up and confetti when you find them all; `On = false` turns them off).
 - Test: F8 > "Web Scour: start".
 
 ---
@@ -528,6 +536,7 @@ Hidden pumpkins, candies, skulls and ghosts around the lobby. Each pays its coin
 - **Or place one by hand:** give any part the tag `EasterEgg` and the attributes `EggId` (text) and `Coins` (number). An `EggId` from the list pays the list's coins.
 - **Move one:** drag it in a baked lobby (`Workspace.Hub.EasterEggs`).
 - Your own egg look: a model named `EggGoldenPumpkin` (or `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost`) in `Custom > Props`. For **one egg only**, name it `Egg` + the egg's Id (e.g. `EggForestGhost`, Ids in `Config.EasterEggs.List`), or with a Toolbox code: `require(game.ServerScriptService.Server.Tools.Swap).Egg("ForestGhost", 15145049241)` (rebuilds that egg in the lobby; save after).
+- **Celebrations:** `Effects` (sparkles at the egg, a toast that slides in with its coins counting up, a shine over found eggs in Menu > Secret Pumpkins; `On = false` turns them off).
 - Test: F8 > "Easter eggs: reset mine" lets you find them all again.
 - Or ask Claude Code: `/add-secret-pumpkin a candy skull on top of the clock tower, 75 coins`.
 

@@ -436,5 +436,37 @@ describe("TowerUI", function()
 		expect(gui.TowerFinish.Visible).toBe(true)
 		expect(gui.TowerFinish.Title.Text).toBe(text.Finished)
 		expect(gui.TowerFinish.Coins.Text).toBe(text.SkinWon:format("Tormented Soul"))
+		-- The shared parkour celebrations: a big NEW BEST! and confetti, gone after.
+		local fx = C.Parkour.Effects
+		expect(gui:FindFirstChild("TowerNewBest")).toBeTruthy()
+		expect(#gui.FxConfetti:GetChildren()).toBe(fx.NewBestConfetti)
+		client:advance(C.Parkour.Screen.FinishSeconds + 1)
+		expect(gui:FindFirstChild("TowerNewBest")).toBeNil()
+		expect(gui:FindFirstChild("FxConfetti")).toBeNil()
+	end)
+
+	it("bursts sparkles from the tower checkpoint you reach", function()
+		local CS = client.game:GetService("CollectionService")
+		local pad
+		for _, p in CS:GetTagged("TowerCheckpoint") do
+			if p:IsA("BasePart") then
+				pad = p
+				break
+			end
+		end
+		expect(pad).toBeTruthy()
+		local V3 = client.env.Vector3
+		player.Character:PivotTo(
+			client.env.CFrame.new(pad.Position + V3.new(0, pad.Size.Y / 2 + 3, 0))
+		)
+		local event = client:find("ReplicatedStorage.Remotes.TowerEvent")
+		client:fire(event, "OnClientEvent", "Checkpoint", { Index = 1, Count = 3 })
+		local burst = client.workspace.MinigameFx:FindFirstChild("Burst")
+		expect(burst).toBeTruthy()
+		local top = pad.Position + V3.new(0, pad.Size.Y / 2, 0)
+		expect((burst.Position - top).Magnitude).toBeLessThan(1)
+		client:advance(2)
+		expect(#client.workspace.MinigameFx:GetChildren()).toBe(0)
+		expect(#client.errors).toBe(0)
 	end)
 end)

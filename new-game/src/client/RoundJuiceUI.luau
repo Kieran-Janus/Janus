@@ -2,12 +2,16 @@
 --[[
 	Round moments (Config.Juice), all local to this player and only while playing (in the
 	round, or watching it with Spectate from the lobby):
+	  - big 3-2-1 at the end of the intermission (players about to play): each number pops
+	    in and shrinks away; then "GO!" when the round starts straight after it
 	  - "RUN!" banner when the King appears (KingCount goes up)
 	  - red heartbeat pulse at the screen edges while a King chases you (the server marks
 	    each King with TargetUserId) and is within Heartbeat.Distance; faster when closer
-	  - "+1" floating up from you on every pumpkin pickup
+	  - "+1" popping out of you and arcing up on every pumpkin pickup
 	  - "Last 30 seconds!" warning
 	  - "X survivors left" when someone is caught
+	Banners punch in with a little wobble. Config.Juice.Animate = false shows the same
+	messages without motion (TweenService only; the heartbeat is the one per-frame part).
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,6 +35,7 @@ end
 
 function RoundJuiceUI.Mount(gui: ScreenGui)
 	local cfg = Config.Juice
+	local motion = cfg.Motion
 	local player = Players.LocalPlayer
 
 	-- Banners ---------------------------------------------------------------------------------------
@@ -56,19 +61,43 @@ function RoundJuiceUI.Mount(gui: ScreenGui)
 		banner.TextTransparency = 0
 		banner.TextStrokeTransparency = 0.2
 		banner.Visible = true
-		bannerScale.Scale = 1.6
-		TweenService:Create(
-			bannerScale,
-			TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-			{ Scale = 1 }
-		):Play()
+		if cfg.Animate then
+			-- Punch in: big and tilted, snapping to size while it wobbles straight.
+			bannerScale.Scale = motion.BannerPopScale
+			banner.Rotation = if token % 2 == 0 then motion.ShakeDegrees else -motion.ShakeDegrees
+			TweenService:Create(
+				bannerScale,
+				TweenInfo.new(
+					motion.BannerPopSeconds,
+					Enum.EasingStyle.Back,
+					Enum.EasingDirection.Out
+				),
+				{ Scale = 1 }
+			):Play()
+			TweenService:Create(
+				banner,
+				TweenInfo.new(
+					motion.ShakeSeconds,
+					Enum.EasingStyle.Elastic,
+					Enum.EasingDirection.Out
+				),
+				{ Rotation = 0 }
+			):Play()
+		else
+			bannerScale.Scale = 1
+			banner.Rotation = 0
+		end
 		task.delay(seconds, function()
 			if token ~= bannerToken then
 				return
 			end
+			if not cfg.Animate then
+				banner.Visible = false
+				return
+			end
 			local fade = TweenService:Create(
 				banner,
-				TweenInfo.new(0.3),
+				TweenInfo.new(motion.FadeSeconds),
 				{ TextTransparency = 1, TextStrokeTransparency = 1 }
 			)
 			fade:Play()
@@ -89,8 +118,25 @@ function RoundJuiceUI.Mount(gui: ScreenGui)
 	pop.TextStrokeTransparency = 0.3
 	pop.Visible = false
 	pop.ZIndex = 12
-	-- On short phone screens both move down together, clear of the top bar.
-	Layout.KeepBelowHud({ banner, pop })
+	local popScale = Instance.new("UIScale")
+	popScale.Parent = pop
+
+	-- The big 3-2-1, where the banners show (they never show at the same time).
+	local count = Theme.label("", 64, gui)
+	count.Name = "JuiceCountdown"
+	count.Font = Enum.Font.GothamBlack
+	count.AnchorPoint = banner.AnchorPoint
+	count.Position = banner.Position
+	count.Size = banner.Size
+	count.TextScaled = true
+	count.TextStrokeTransparency = 0.2
+	count.Visible = false
+	count.ZIndex = 13
+	local countScale = Instance.new("UIScale")
+	countScale.Parent = count
+
+	-- On short phone screens they all move down together, clear of the top bar.
+	Layout.KeepBelowHud({ banner, pop, count })
 	local popToken = 0
 	local function showPop(text: string, color: Color3, seconds: number)
 		popToken += 1
@@ -98,6 +144,16 @@ function RoundJuiceUI.Mount(gui: ScreenGui)
 		pop.Text = text
 		pop.TextColor3 = color
 		pop.Visible = true
+		if cfg.Animate then
+			popScale.Scale = motion.PopStartScale
+			TweenService:Create(
+				popScale,
+				TweenInfo.new(motion.PopSeconds, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+				{ Scale = 1 }
+			):Play()
+		else
+			popScale.Scale = 1
+		end
 		task.delay(seconds, function()
 			if token == popToken then
 				pop.Visible = false
@@ -110,6 +166,88 @@ function RoundJuiceUI.Mount(gui: ScreenGui)
 			and player:GetAttribute("InRound") == true
 			and not player:GetAttribute("Out")
 	end
+
+	-- 3-2-1 -----------------------------------------------------------------------------------------
+	-- Players about to play: on the Ready pad, or everyone when there is no pad.
+	local function aboutToPlay(): boolean
+		if ReplicatedStorage:GetAttribute("State") ~= "Intermission" then
+			return false
+		end
+		local pads = Config.Features.ReadyPad
+			and (ReplicatedStorage:GetAttribute("ReadyPads") or 0) > 0
+		return not pads or player:GetAttribute("Ready") == true
+	end
+
+	local countToken = 0
+	local function hideCount()
+		countToken += 1
+		count.Visible = false
+	end
+	local function showCount(n: number)
+		countToken += 1
+		local token = countToken
+		local c = cfg.Countdown
+		count.Text = tostring(n)
+		count.TextColor3 = c.Color
+		count.TextTransparency = 0
+		count.TextStrokeTransparency = 0.2
+		count.Visible = true
+		if not cfg.Animate then
+			countScale.Scale = 1
+			return
+		end
+		-- Pops in big, holds, then shrinks and fades before the next number.
+		countScale.Scale = c.PopScale
+		TweenService:Create(
+			countScale,
+			TweenInfo.new(c.PopSeconds, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+			{ Scale = 1 }
+		):Play()
+		task.delay(c.PopSeconds + c.HoldSeconds, function()
+			if token ~= countToken then
+				return
+			end
+			local info =
+				TweenInfo.new(c.ShrinkSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+			TweenService:Create(countScale, info, { Scale = 0.4 }):Play()
+			local fade = TweenService:Create(
+				count,
+				info,
+				{ TextTransparency = 1, TextStrokeTransparency = 1 }
+			)
+			fade:Play()
+			fade.Completed:Once(function()
+				if token == countToken then
+					count.Visible = false
+				end
+			end)
+		end)
+	end
+
+	ReplicatedStorage:GetAttributeChangedSignal("TimeLeft"):Connect(function()
+		local left = ReplicatedStorage:GetAttribute("TimeLeft")
+		if
+			aboutToPlay()
+			and typeof(left) == "number"
+			and left >= 1
+			and left <= cfg.Countdown.From
+		then
+			showCount(left)
+		end
+	end)
+
+	-- GO! when the round starts straight after the intermission (the countdown).
+	local lastState = ReplicatedStorage:GetAttribute("State")
+	ReplicatedStorage:GetAttributeChangedSignal("State"):Connect(function()
+		local state = ReplicatedStorage:GetAttribute("State")
+		if state ~= "Intermission" and count.Visible then
+			hideCount()
+		end
+		if state == "Playing" and lastState == "Intermission" and inRound() then
+			showBanner(cfg.Start.Text, cfg.Start.Color, cfg.Start.Seconds)
+		end
+		lastState = state
+	end)
 
 	-- RUN! ------------------------------------------------------------------------------------------
 	local lastKings = ReplicatedStorage:GetAttribute("KingCount") or 0
@@ -160,22 +298,58 @@ function RoundJuiceUI.Mount(gui: ScreenGui)
 		local billboard = Instance.new("BillboardGui")
 		billboard.Name = "PickupPop"
 		billboard.Adornee = head
-		billboard.Size = UDim2.fromOffset(80, 40)
+		billboard.Size = UDim2.fromOffset(160, 40)
 		billboard.StudsOffsetWorldSpace = Vector3.new(math.random() * 1.2 - 0.6, 2, 0)
 		billboard.AlwaysOnTop = true
 		billboard.LightInfluence = 0
 		local label = Theme.label(p.Text:format(gained), 30, billboard)
 		label.Font = Enum.Font.GothamBlack
-		label.Size = UDim2.fromScale(1, 1)
+		label.AnchorPoint = Vector2.new(0.5, 0.5)
+		label.Position = UDim2.fromScale(0.5, 0.5)
+		label.Size = UDim2.fromScale(0.5, 1)
 		label.TextColor3 = p.Color
 		label.TextStrokeTransparency = 0.2
 		billboard.Parent = gui
+		-- The billboard rises fast then slows while the label drifts sideways at a steady pace
+		-- inside it: together an arc.
 		local info = TweenInfo.new(p.Seconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 		TweenService:Create(billboard, info, {
 			StudsOffsetWorldSpace = billboard.StudsOffsetWorldSpace + Vector3.new(0, p.Rise, 0),
 		}):Play()
-		TweenService:Create(label, info, { TextTransparency = 1, TextStrokeTransparency = 1 })
-			:Play()
+		if cfg.Animate then
+			local scale = Instance.new("UIScale")
+			scale.Scale = 0.3
+			scale.Parent = label
+			TweenService:Create(
+				scale,
+				TweenInfo.new(
+					motion.PickupPopSeconds,
+					Enum.EasingStyle.Back,
+					Enum.EasingDirection.Out
+				),
+				{ Scale = 1 }
+			):Play()
+			local side = if math.random() < 0.5 then -1 else 1
+			TweenService:Create(
+				label,
+				TweenInfo.new(p.Seconds, Enum.EasingStyle.Linear),
+				{ Position = UDim2.fromScale(0.5 + side * motion.PickupDrift, 0.5) }
+			):Play()
+			-- Readable first, then it fades.
+			local after = p.Seconds * motion.PickupFadeAfter
+			TweenService:Create(
+				label,
+				TweenInfo.new(
+					p.Seconds - after,
+					Enum.EasingStyle.Quad,
+					Enum.EasingDirection.In,
+					0,
+					false,
+					after
+				),
+				{ TextTransparency = 1, TextStrokeTransparency = 1 }
+			):Play()
+		end
 		task.delay(p.Seconds, function()
 			billboard:Destroy()
 		end)

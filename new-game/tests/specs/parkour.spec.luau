@@ -902,6 +902,7 @@ describe("ParkourUI", function()
 			client:fire(tile, "Activated")
 			client:advance(0.2)
 		end
+		client:advance(Config.UI.Motion.PopInSeconds) -- (the panel's pop-in tween ends)
 		expect(gui.ParkourPanel.Visible).toBe(true)
 		expect(client.scheduler:pending()).toBe(waiting) -- (a loop each time before the fix)
 		-- Closed for longer than a second: the loop stops, and opening starts it again.
@@ -909,9 +910,198 @@ describe("ParkourUI", function()
 		client:advance(1.5)
 		expect(client.scheduler:pending()).toBe(waiting - 1)
 		client:fire(tile, "Activated")
-		client:advance(0.2)
+		client:advance(0.2 + Config.UI.Motion.PopInSeconds)
 		expect(client.scheduler:pending()).toBe(waiting)
 		client:fire(gui.ParkourPanel.CloseButton, "Activated")
 		client:advance(1.5)
+	end)
+end)
+
+describe("ParkourUI celebrations", function()
+	local Dom = require("../harness/Dom")
+	local server = Runtime.new()
+	server:require("ServerScriptService.Server.Services.HubService").Start()
+	server:require("ServerScriptService.Server.Services.ParkourService").Start()
+
+	-- A client with the course, on a PC (1600 x 900) or a phone (640 x 302 touch).
+	-- off = "Game" | "All" switches the effects off.
+	local function climber(opts: { phone: boolean?, off: string? }?)
+		local o = opts or {}
+		local client = Runtime.new({ client = true })
+		client:replicateFrom(server)
+		local env = client.env
+		local Config = client:require("ReplicatedStorage.Shared.Config")
+		if o.off == "Game" then
+			Config.Parkour.Effects.On = false
+		elseif o.off == "All" then
+			Config.Minigames.Effects.On = false
+		end
+		local Client = client:find("StarterPlayer.StarterPlayerScripts.Client")
+		local player = client.game:GetService("Players").LocalPlayer
+		local gui = client:create("ScreenGui", { Name = "GameUI" }, player.PlayerGui)
+		if o.phone then
+			gui:SetAttribute("ForceTouch", true)
+			Dom.rawSet(gui, "AbsoluteSize", env.Vector2.new(640, 302))
+		else
+			Dom.rawSet(gui, "AbsoluteSize", env.Vector2.new(1600, 900))
+		end
+		client:require(Client.Layout).Mount(gui)
+		client:require(Client.PanelManager).Mount(gui)
+		client:require(Client.MenuUI).Mount(gui)
+		client:require(Client.ParkourUI).Mount(gui)
+		client:advance(0.5)
+		local CS = client.game:GetService("CollectionService")
+		local function pad(tag: string, index: number?): any
+			for _, p in CS:GetTagged(tag) do
+				if p:IsA("BasePart") and (index == nil or p:GetAttribute("Index") == index) then
+					return p
+				end
+			end
+			return nil
+		end
+		local function standOn(p: any)
+			player.Character:PivotTo(
+				env.CFrame.new(p.Position + env.Vector3.new(0, p.Size.Y / 2 + 3, 0))
+			)
+		end
+		local function fxParts(): { any }
+			local folder = client.workspace:FindFirstChild("MinigameFx")
+			return if folder then folder:GetChildren() else {}
+		end
+		return {
+			client = client,
+			Config = Config,
+			fx = Config.Parkour.Effects,
+			text = Config.Parkour.Text,
+			gui = gui,
+			player = player,
+			event = client:find("ReplicatedStorage.Remotes.ParkourEvent"),
+			pad = pad,
+			standOn = standOn,
+			fxParts = fxParts,
+		}
+	end
+
+	it("bursts sparkles from the checkpoint you reach and punches its message in", function()
+		local c = climber()
+		local checkpoint = c.pad("ParkourCheckpoint", 1)
+		expect(checkpoint).toBeTruthy()
+		c.standOn(checkpoint)
+		c.client:fire(c.event, "OnClientEvent", "Checkpoint", { Index = 1, Count = 3 })
+		expect(c.gui.ParkourPop.Text).toBe(c.text.Checkpoint:format(1, 3)) -- at once
+		expect(c.gui.ParkourPop.FxPunch.Scale).toBeGreaterThan(1)
+		local parts = c.fxParts()
+		expect(#parts).toBe(1)
+		local top = checkpoint.Position + c.client.env.Vector3.new(0, checkpoint.Size.Y / 2, 0)
+		expect((parts[1].Position - top).Magnitude).toBeLessThan(1)
+		expect(parts[1].CanCollide).toBe(false)
+		expect(parts[1].Anchored).toBe(true)
+		local emits = c.client:calls("ParticleEmitter", "Emit")
+		expect(emits[#emits].args[1]).toBe(c.fx.CheckpointSparkles)
+		c.client:advance(2)
+		expect(#c.fxParts()).toBe(0)
+		expect(c.gui.ParkourPop.FxPunch.Scale).toBe(1)
+		expect(#c.client.errors).toBe(0)
+	end)
+
+	it("sets off fireworks and confetti at the finish, and a big NEW BEST!", function()
+		local c = climber()
+		local finish = c.pad("ParkourFinish")
+		expect(finish).toBeTruthy()
+		c.standOn(finish)
+		c.client:fire(c.event, "OnClientEvent", "Finish", {
+			Time = 61.5,
+			Best = 61.5,
+			NewBest = true,
+			Coins = c.Config.Parkour.Reward.Coins,
+			Wait = 72000,
+		})
+		local gui = c.gui
+		-- The real numbers straight away.
+		expect(gui.ParkourFinish.Time.Text).toBe(c.text.FinishTime:format("1:01.50"))
+		expect(gui.ParkourFinish.Best.Text).toBe(c.text.NewBest)
+		expect(gui.ParkourFinish.Time.FxPunch.Scale).toBeGreaterThan(1)
+		expect(#gui.FxConfetti:GetChildren()).toBe(c.fx.NewBestConfetti)
+		local words = gui:FindFirstChild("ParkourNewBest")
+		expect(words).toBeTruthy()
+		expect(words.Text).toBe(c.fx.NewBestText)
+		-- Fireworks one after another over the finish.
+		c.client:advance(c.fx.FireworkGap * (c.fx.Fireworks - 1) + 0.05)
+		local fireworks = c.fxParts()
+		expect(#fireworks).toBe(c.fx.Fireworks)
+		for _, f in fireworks do
+			expect(f.Position.Y).toBeGreaterThan(finish.Position.Y + c.fx.FireworkHeight - 3)
+		end
+		c.client:advance(c.fx.NewBestSeconds + 1)
+		expect(gui:FindFirstChild("ParkourNewBest")).toBeNil()
+		expect(gui:FindFirstChild("FxConfetti")).toBeNil()
+		expect(#c.fxParts()).toBe(0)
+		expect(gui.ParkourFinish:GetAttribute("MotionScale")).toBe(1)
+		-- A finish that isn't a new best: the normal confetti, no big words.
+		c.client:fire(c.event, "OnClientEvent", "Finish", {
+			Time = 70,
+			Best = 61.5,
+			NewBest = false,
+			Coins = 0,
+			Wait = 100,
+		})
+		expect(#gui.FxConfetti:GetChildren()).toBe(c.fx.FinishConfetti)
+		expect(gui:FindFirstChild("ParkourNewBest")).toBeNil()
+		expect(gui.ParkourFinish.Time.Text).toBe(c.text.FinishTime:format("1:10.00"))
+		c.client:advance(c.Config.Parkour.Screen.FinishSeconds + 1)
+		expect(gui:FindFirstChild("FxConfetti")).toBeNil()
+		expect(#c.client.errors).toBe(0)
+	end)
+
+	it("swells the running timer a little on each whole second", function()
+		local c = climber()
+		local start = c.client.workspace:GetServerTimeNow() - 4.5
+		c.player:SetAttribute("ParkourStarted", start)
+		c.player:SetAttribute("ParkourRun", "Running")
+		c.client:advance(0.1)
+		local time = c.gui.ParkourTimer.Time
+		expect(time:FindFirstChild("FxPunch")).toBeNil() -- (not on the first frame)
+		c.client:advance(0.45) -- 5 s ticks over
+		expect(time.FxPunch.Scale).toBe(c.fx.TickBump)
+		expect(time.Text).toMatch("^0:05%.")
+		c.client:advance(0.4)
+		expect(time.FxPunch.Scale).toBe(1)
+		c.player:SetAttribute("ParkourRun", "")
+	end)
+
+	it("makes fewer sparkles and confetti on phones", function()
+		local c = climber({ phone = true })
+		local share = c.Config.Minigames.Effects.PhoneShare
+		c.standOn(c.pad("ParkourCheckpoint", 1))
+		c.client:fire(c.event, "OnClientEvent", "Checkpoint", { Index = 1, Count = 3 })
+		local emits = c.client:calls("ParticleEmitter", "Emit")
+		expect(emits[#emits].args[1]).toBe(math.floor(c.fx.CheckpointSparkles * share + 0.5))
+		expect(emits[#emits].args[1]).toBeLessThan(c.fx.CheckpointSparkles)
+		c.client:fire(c.event, "OnClientEvent", "Finish", { Time = 80, Best = 80, NewBest = true })
+		expect(#c.gui.FxConfetti:GetChildren()).toBe(math.floor(c.fx.NewBestConfetti * share + 0.5))
+		expect(#c.client.errors).toBe(0)
+	end)
+
+	it("shows only the plain messages when effects are off", function()
+		for _, off in { "Game", "All" } do
+			local c = climber({ off = off })
+			c.standOn(c.pad("ParkourCheckpoint", 1))
+			c.client:fire(c.event, "OnClientEvent", "Checkpoint", { Index = 1, Count = 3 })
+			expect(c.gui.ParkourPop.Text).toBe(c.text.Checkpoint:format(1, 3))
+			c.client:fire(
+				c.event,
+				"OnClientEvent",
+				"Finish",
+				{ Time = 80, Best = 80, NewBest = true }
+			)
+			expect(c.gui.ParkourFinish.Visible).toBe(true)
+			expect(c.gui.ParkourFinish.Time.Text).toBe(c.text.FinishTime:format("1:20.00"))
+			expect(c.gui:FindFirstChild("FxConfetti")).toBeNil()
+			expect(c.gui:FindFirstChild("ParkourNewBest")).toBeNil()
+			c.client:advance(2)
+			expect(c.client.workspace:FindFirstChild("MinigameFx")).toBeNil()
+			expect(#c.client:calls("ParticleEmitter", "Emit")).toBe(0)
+			expect(#c.client.errors).toBe(0)
+		end
 	end)
 end)

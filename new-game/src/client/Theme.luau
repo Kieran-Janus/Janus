@@ -1,5 +1,7 @@
 --!strict
 -- Shared look for client UI so every panel matches the HUD.
+local UIMotion = require(script.Parent.UIMotion)
+
 local Theme = {}
 
 Theme.Background = Color3.fromRGB(20, 20, 30)
@@ -27,7 +29,7 @@ function Theme.label(text: string, size: number, parent: Instance): TextLabel
 end
 
 -- A rounded button in the game's font. `parent` can be nil (parent it yourself later);
--- `color` is the background (default Theme.Button).
+-- `color` is the background (default Theme.Button). It squashes when pressed (UIMotion.Press).
 function Theme.button(text: string, parent: Instance?, color: Color3?): TextButton
 	local button = Instance.new("TextButton")
 	button.BackgroundColor3 = color or Theme.Button
@@ -37,6 +39,7 @@ function Theme.button(text: string, parent: Instance?, color: Color3?): TextButt
 	button.Text = text
 	button.AutoButtonColor = true
 	Theme.round(button, 8)
+	UIMotion.Press(button)
 	button.Parent = parent
 	return button
 end

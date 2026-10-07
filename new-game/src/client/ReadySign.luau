@@ -93,6 +93,28 @@ function ReadySign.Mount()
 	end
 	player:GetAttributeChangedSignal("Ready"):Connect(refreshAll)
 	refreshAll()
+
+	-- Standing under the sign (on the pad) you can only see its cut-off bottom covering the top
+	-- of the screen, and the Hud already shows the count: hide it while the camera is that close.
+	local hideNear = Config.Hub.ReadyArea.Sign.HideNear
+	if hideNear > 0 then
+		task.spawn(function()
+			while true do
+				local camera = workspace.CurrentCamera
+				if camera then
+					local eye = camera.CFrame.Position
+					for _, sign in CollectionService:GetTagged(Tags.ReadySign) do
+						local gui = sign:FindFirstChildWhichIsA("BillboardGui")
+						if gui and sign:IsA("BasePart") then
+							local flat = (sign.Position - eye) * Vector3.new(1, 0, 1)
+							gui.Enabled = flat.Magnitude > hideNear
+						end
+					end
+				end
+				task.wait(0.25)
+			end
+		end)
+	end
 end
 
 return ReadySign

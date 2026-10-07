@@ -14,6 +14,11 @@
 
 	It reads the attributes the server keeps up to date (EasterEggsFound on the player,
 	EasterEggsActive on ReplicatedStorage) and listens to the EasterEggFound remote.
+
+	Celebrations (Config.EasterEggs.Effects, all off with its On = false or
+	Config.Minigames.Effects.On = false; src/client/MinigameFx.luau): a sparkle burst at the
+	egg you found, a toast that slides up into place with its coins counting up to the real
+	number, and a shine across each found egg when you open Secret Pumpkins.
 ]]
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
@@ -24,6 +29,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local EasterEggRules = require(ReplicatedStorage.Shared.EasterEggRules)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Layout = require(script.Parent.Layout)
+local MinigameFx = require(script.Parent.MinigameFx)
 local PanelManager = require(script.Parent.PanelManager)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
@@ -32,6 +38,21 @@ local EasterEggUI = {}
 
 local cfg = Config.EasterEggs
 local text = cfg.Text
+local fx = cfg.Effects
+
+local function effectsOn(): boolean
+	return MinigameFx.Enabled(fx)
+end
+
+-- Where the egg with this id is (nil if it isn't in the lobby).
+local function eggPosition(id: string): Vector3?
+	for _, instance in CollectionService:GetTagged(Tags.EasterEgg) do
+		if instance:IsA("BasePart") and instance:GetAttribute("EggId") == id then
+			return instance.Position
+		end
+	end
+	return nil
+end
 
 local openPanel: (() -> ())? = nil
 
@@ -136,9 +157,6 @@ function EasterEggUI.Mount(gui: ScreenGui)
 	toast.ZIndex = 7
 	Layout.Fit(toast)
 	Layout.KeepBelowHud({ toast }) -- (on short phone screens 0.15 is on the bar at the top)
-	local pop = Instance.new("UIScale")
-	pop.Name = "Pop"
-	pop.Parent = toast
 	local toastTitle = Theme.label("", 22, toast)
 	toastTitle.Name = "Title"
 	toastTitle.Font = Enum.Font.GothamBlack
@@ -158,12 +176,53 @@ function EasterEggUI.Mount(gui: ScreenGui)
 		limit.Parent = label
 	end
 	local toastToken = 0
-	local function showToast(name: string, coins: number, found: number, total: number)
+	local slide: Tween? = nil
+	local toastHome = toast.Position
+	local function showToast(id: string, name: string, coins: number, found: number, total: number)
+		local on = effectsOn()
 		toastTitle.Text = text.ToastTitle:format(name)
-		toastLine.Text = text.Toast:format(coins, Config.Economy.CurrencyName, found, total)
-		toast.Visible = true
-		pop.Scale = 0.6
-		TweenService:Create(pop, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+		-- The coins count up to the real number (straight to it with effects off).
+		MinigameFx.CountUp(
+			toastLine,
+			coins,
+			if on then fx.CoinsCountSeconds else 0,
+			function(n: number): string
+				return text.Toast:format(n, Config.Economy.CurrencyName, found, total)
+			end
+		)
+		local sliding = slide
+		if sliding then -- a second egg while the first toast still slides: start from home
+			slide = nil
+			sliding:Cancel()
+			toast.Position = toastHome
+		end
+		toast.Visible = true -- (Layout.KeepBelowHud puts it in place as it shows)
+		-- (through Layout.Fit's MotionScale: a second UIScale on the toast would fight its fit)
+		MinigameFx.PopFit(toast, 0.6, 0.35)
+		if on then
+			toastHome = toast.Position
+			toast.Position = toastHome + UDim2.fromOffset(0, fx.ToastSlide)
+			local tween = TweenService:Create(
+				toast,
+				TweenInfo.new(fx.ToastSlideSeconds, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+				{ Position = toastHome }
+			)
+			slide = tween
+			tween.Completed:Once(function()
+				if slide == tween then
+					slide = nil
+				end
+			end)
+			tween:Play()
+			local at = eggPosition(id)
+			if at then
+				MinigameFx.Burst(
+					at,
+					{ cfg.Colors.Gold, cfg.Colors.Sparkle, Color3.new(1, 1, 1) },
+					MinigameFx.Count(fx.Sparkles)
+				)
+			end
+		end
 		Sounds.PlaySpec(cfg.Sounds.Found)
 		toastToken += 1
 		local mine = toastToken
@@ -241,9 +300,12 @@ function EasterEggUI.Mount(gui: ScreenGui)
 		label.TextColor3 = if found then Color3.fromRGB(255, 215, 90) else Theme.Muted
 		label.Position = UDim2.fromOffset(44, 0)
 		label.Size = UDim2.new(1, -50, 1, 0)
+		return frame
 	end
 
+	local foundRows: { Frame } = {} -- the found eggs' rows, in list order (for the shine)
 	local function refreshPanel()
+		table.clear(foundRows)
 		for _, child in list:GetChildren() do
 			if child:IsA("Frame") then
 				child:Destroy()
@@ -272,11 +334,14 @@ function EasterEggUI.Mount(gui: ScreenGui)
 			if found[id] then
 				local coins = if def then def.Coins else 0
 				local look = if def and def.Look then def.Look else "GoldenPumpkin"
-				row(
-					i,
-					cfg.Icons[look] or cfg.Icons.GoldenPumpkin,
-					text.FoundLine:format(name, coins),
-					true
+				table.insert(
+					foundRows,
+					row(
+						i,
+						cfg.Icons[look] or cfg.Icons.GoldenPumpkin,
+						text.FoundLine:format(name, coins),
+						true
+					)
 				)
 			else
 				local hint = if def then def.Hint else ""
@@ -300,6 +365,11 @@ function EasterEggUI.Mount(gui: ScreenGui)
 		refreshPanel()
 		sizePanel()
 		panel.Visible = true
+		if effectsOn() then -- a shine sweeps down the found eggs, one after another
+			for i, frame in foundRows do
+				MinigameFx.Shine(frame, fx.ShineSeconds, (i - 1) * fx.ShineStagger)
+			end
+		end
 	end
 
 	local function onChange()
@@ -324,10 +394,11 @@ function EasterEggUI.Mount(gui: ScreenGui)
 			end
 			local m = message :: { [string]: any }
 			local name = if type(m.Name) == "string" then m.Name else ""
+			local id = if type(m.Id) == "string" then m.Id else ""
 			local function number(value: unknown): number
 				return if type(value) == "number" and value == value then value else 0
 			end
-			showToast(name, number(m.Coins), number(m.Found), number(m.Total))
+			showToast(id, name, number(m.Coins), number(m.Found), number(m.Total))
 		end)
 	end)
 end

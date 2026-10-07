@@ -15,6 +15,13 @@
 	Items.Price. Robux buttons open Roblox's own purchase prompt and are disabled while an ID
 	in Config.Monetization is still 0.
 
+	Feel (src/client/ShopJuice.luau, every time in Config.Shop.Juice, Animate = false = none):
+	cards pop in one after another on a new page, lift under the mouse, previews slowly turn
+	(PC, cards in view only), Rare borders shine and CRAZY rainbow borders swell. A purchase
+	the server confirms pops the card, bursts sparkles, rolls the coins down and springs the
+	button in; a refused one wiggles the button and says exactly how many more coins you need.
+	Putting something on pops its checkmark and shows a small "Wearing it!" toast.
+
 	ShopUI.Open(tab?, filters?)   tab: a slot ("Skin", "Hat"...) or "Packs"; filters (optional):
 	                              { Owned = true, Rarity = "Rare", Theme = "Pumpkin" }
 	                              Safe to call before Mount (does nothing until then).
@@ -31,6 +38,7 @@ local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local CrateUI = require(script.Parent.CrateUI)
 local Layout = require(script.Parent.Layout)
+local ShopJuice = require(script.Parent.ShopJuice)
 local SkinFx = require(script.Parent.SkinFx)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
@@ -60,8 +68,14 @@ type Card = {
 	Item: any,
 	Frame: Frame,
 	Action: TextButton,
+	Check: TextLabel, -- the checkmark on the card you're wearing
 	Stop: () -> (),
+	NeedText: string?, -- "Need 300 more Coins" while NeedUntil (os.clock) hasn't passed
+	NeedUntil: number?,
 }
+
+-- A turning 3D preview: the camera circles `Center` at `Offset`.
+type Spin = { Camera: Camera, Center: Vector3, Offset: Vector3, Frame: GuiObject }
 
 local ANY = "Any" -- the "every rarity / every theme" filter value
 
@@ -75,11 +89,12 @@ local function button(text: string, parent: Instance): TextButton
 	b.AutoButtonColor = true
 	b.Parent = parent
 	Theme.round(b, 8)
+	ShopJuice.Press(b)
 	return b
 end
 
--- A ViewportFrame showing `model`, framed to fit.
-local function preview(model: Model, parent: Instance): ViewportFrame
+-- A ViewportFrame showing `model`, framed to fit (and how to turn its camera: see Spin).
+local function preview(model: Model, parent: Instance): (ViewportFrame, Spin)
 	local viewport = Instance.new("ViewportFrame")
 	viewport.BackgroundColor3 = Color3.fromRGB(35, 30, 48)
 	viewport.Ambient = Color3.fromRGB(200, 190, 210)
@@ -91,14 +106,24 @@ local function preview(model: Model, parent: Instance): ViewportFrame
 	local cf, size = model:GetBoundingBox()
 	local camera = Instance.new("Camera")
 	camera.FieldOfView = 40
-	local distance = size.Magnitude * 1.5 + 0.5
-	camera.CFrame = CFrame.lookAt(
-		cf.Position + Vector3.new(distance * 0.45, distance * 0.3, -distance),
-		cf.Position
-	)
+	local distance = size.Magnitude * Config.Shop.PreviewDistance + 0.5
+	local offset = Vector3.new(distance * 0.45, distance * 0.3, -distance)
+	camera.CFrame = CFrame.lookAt(cf.Position + offset, cf.Position)
 	camera.Parent = viewport
 	viewport.CurrentCamera = camera
-	return viewport
+	return viewport, { Camera = camera, Center = cf.Position, Offset = offset, Frame = viewport }
+end
+
+-- 80000 -> "80,000" (easier to read for big prices).
+local function commas(n: number): string
+	local out = tostring(math.floor(n))
+	while true do
+		local swapped, count = out:gsub("^(-?%d+)(%d%d%d)", "%1,%2")
+		out = swapped
+		if count == 0 then
+			return out
+		end
+	end
 end
 
 -- Rainbow colours for the CRAZY shimmer.
@@ -108,6 +133,18 @@ local function rainbowSequence(): ColorSequence
 		table.insert(keys, ColorSequenceKeypoint.new(i / 6, Color3.fromHSV(i / 6, 0.75, 1)))
 	end
 	return ColorSequence.new(keys)
+end
+
+-- A Rare border: its colour with one soft white band (moved along by the shine).
+local function shineSequence(colour: Color3): ColorSequence
+	local light = colour:Lerp(Color3.new(1, 1, 1), 0.75)
+	return ColorSequence.new({
+		ColorSequenceKeypoint.new(0, colour),
+		ColorSequenceKeypoint.new(0.4, colour),
+		ColorSequenceKeypoint.new(0.5, light),
+		ColorSequenceKeypoint.new(0.6, colour),
+		ColorSequenceKeypoint.new(1, colour),
+	})
 end
 
 function ShopUI.Mount(gui: ScreenGui)
@@ -133,7 +170,10 @@ function ShopUI.Mount(gui: ScreenGui)
 	local filters = { Owned = false, Rarity = ANY, Theme = ANY }
 	local page = 1
 	local cards: { Card } = {}
-	local shimmers: { { Stroke: UIGradient, Tag: TextLabel } } = {}
+	local shimmers: { { Stroke: UIGradient, Tag: TextLabel, Border: UIStroke } } = {}
+	local shines: { UIGradient } = {} -- Rare borders (and the VIP card)
+	local spins: { Spin } = {}
+	local juice = Config.Shop.Juice
 
 	-- Shop button (a tile in the Menu, see Layout.SideButton) ---------------------------------
 	local shopButton = Layout.SideButton(if Layout.IsPhone() then "Shop" else "Shop (B)", 4)
@@ -177,6 +217,56 @@ function ShopUI.Mount(gui: ScreenGui)
 	coinsLabel.AnchorPoint = Vector2.new(1, 0)
 	coinsLabel.Position = UDim2.new(1, -56, 0, 8)
 	coinsLabel.Size = UDim2.new(0.4, -56, 0, 32)
+
+	-- The coins counter: jumps to a value, or (after a purchase / reward) rolls to it.
+	local function coinText(n: number): string
+		return ("%s %s"):format(commas(n), currency)
+	end
+	local shownCoins: number? = nil
+	local rollTarget: number? = nil
+	local stopRoll: () -> () = function() end
+	local function showCoins(value: number, roll: boolean)
+		if rollTarget == value then
+			return -- already rolling there
+		end
+		stopRoll()
+		rollTarget = nil
+		local from = shownCoins
+		shownCoins = value
+		if roll and from and from ~= value and panel.Visible and ShopJuice.On() then
+			rollTarget = value
+			stopRoll = ShopJuice.Count(coinsLabel, from, value, coinText, function()
+				rollTarget = nil
+			end)
+		else
+			coinsLabel.Text = coinText(value)
+		end
+	end
+
+	-- "Wearing it!": a small note that pops up over the cards for a moment.
+	local toast = Theme.label("", 16, panel)
+	toast.Name = "Toast"
+	toast.Visible = false
+	toast.ZIndex = 15
+	toast.AnchorPoint = Vector2.new(0.5, 1)
+	toast.Position = UDim2.new(0.5, 0, 1, -44)
+	toast.Size = UDim2.fromOffset(170, 34)
+	toast.BackgroundTransparency = 0.05
+	toast.BackgroundColor3 = Color3.fromRGB(60, 140, 70)
+	Theme.round(toast, 17)
+	local toastToken = 0
+	local function showToast(text: string)
+		toastToken += 1
+		local mine = toastToken
+		toast.Text = text
+		toast.Visible = true
+		ShopJuice.Bounce(toast)
+		task.delay(juice.ToastSeconds, function()
+			if toastToken == mine then
+				toast.Visible = false
+			end
+		end)
+	end
 
 	local close = button("X", panel)
 	close.AnchorPoint = Vector2.new(1, 0)
@@ -307,12 +397,13 @@ function ShopUI.Mount(gui: ScreenGui)
 	end
 
 	local function updateButtons()
-		coinsLabel.Text = ("%d %s"):format(state.Coins, currency)
+		showCoins(state.Coins, false)
 		for _, c in cards do
 			local item = c.Item
 			local action = c.Action
 			local price = Items.Price(item)
 			action.AutoButtonColor = true
+			c.Check.Visible = state.Equipped[item.Slot] == item.Id
 			if state.Equipped[item.Slot] == item.Id then
 				action.Text = "Unequip"
 				action.BackgroundColor3 = Theme.Button
@@ -327,11 +418,67 @@ function ShopUI.Mount(gui: ScreenGui)
 				action.Text = "From crates"
 				action.AutoButtonColor = false
 				action.BackgroundColor3 = Color3.fromRGB(70, 65, 80)
+			elseif c.NeedUntil and os.clock() < c.NeedUntil and c.NeedText then
+				-- Just tried without enough coins: how many more (the price comes back after).
+				action.Text = c.NeedText
+				action.BackgroundColor3 = Color3.fromRGB(170, 60, 60)
 			else
-				action.Text = ("Buy  %d"):format(price)
+				action.Text = Config.Shop.BuyText:format(commas(price), currency)
 				action.BackgroundColor3 = Theme.Selected
 			end
 		end
+	end
+
+	local function findCard(id: string): Card?
+		for _, c in cards do
+			if c.Item.Id == id then
+				return c
+			end
+		end
+		return nil
+	end
+
+	-- The checkmark on a card you just put on pops in, and the "Wearing it!" toast shows.
+	local function wearing(c: Card)
+		if ShopJuice.On() then
+			local s = ShopJuice.Scale(c.Check)
+			s.Scale = 0.2
+			ShopJuice.Tween(s, 0.12, { Scale = juice.CheckPop }).Completed:Once(function()
+				ShopJuice.Tween(s, 0.18, { Scale = 1 }, Enum.EasingStyle.Back)
+			end)
+		end
+		showToast(juice.ToastText)
+	end
+
+	-- A purchase the server confirmed: pop, sparkles, the button springs in.
+	local function celebrate(id: string)
+		local c = findCard(id)
+		if not c then
+			return
+		end
+		ShopJuice.Pop(c.Frame, juice.PopScale, juice.PopTime)
+		ShopJuice.Sparkles(c.Frame)
+		ShopJuice.Bounce(c.Action)
+		if state.Equipped[c.Item.Slot] == id then
+			wearing(c) -- (buying puts it on)
+		end
+	end
+
+	-- Not enough coins: the button wiggles and says exactly how many more.
+	local function refuse(id: string, missing: number)
+		local c = findCard(id)
+		if not c then
+			return
+		end
+		c.NeedText = juice.NeedText:format(commas(missing), currency)
+		c.NeedUntil = os.clock() + juice.NeedSeconds
+		updateButtons()
+		ShopJuice.Shake(c.Action)
+		task.delay(juice.NeedSeconds, function()
+			if c.Action.Parent then
+				updateButtons()
+			end
+		end)
 	end
 
 	-- After the server answers: the buttons change, and with the Owned filter on the page too.
@@ -346,19 +493,23 @@ function ShopUI.Mount(gui: ScreenGui)
 		end
 	end
 
-	local function act(fn: () -> ())
+	-- Asks the server (fn), then updates the cards; fn may return an effect to play after that.
+	local function act(fn: () -> (() -> ())?)
 		if busy then
 			return
 		end
 		busy = true
 		task.spawn(function()
-			local ok, err = pcall(fn)
+			local ok, result = pcall(fn)
 			if not ok then
 				message.Text = "Something went wrong, try again."
-				warn("[ShopUI] " .. tostring(err))
+				warn("[ShopUI] " .. tostring(result))
 			end
 			busy = false
 			afterChange()
+			if ok and result and panel.Visible then
+				result()
+			end
 		end)
 	end
 
@@ -369,22 +520,44 @@ function ShopUI.Mount(gui: ScreenGui)
 			act(function()
 				setState(equipItem:InvokeServer(slot, ""))
 				message.Text = ""
+				return nil
 			end)
 		elseif usable(item) then
 			act(function()
 				setState(equipItem:InvokeServer(slot, item.Id))
+				if state.Equipped[slot] ~= item.Id then
+					return nil -- the server said no
+				end
 				message.Text = "Wearing " .. item.Name .. "."
+				return function()
+					local c = findCard(item.Id)
+					if c then
+						wearing(c)
+					end
+				end
 			end)
 		elseif item.VipOnly then
 			ShopUI.Open("Packs")
 		elseif Items.Price(item) ~= nil then
 			act(function()
 				local bought, text, new = buyItem:InvokeServer(item.Id)
-				if bought then
-					Sounds.Play("Purchase")
-				end
 				setState(new)
 				message.Text = tostring(text)
+				if bought then
+					Sounds.Play("Purchase")
+					showCoins(state.Coins, true)
+					return function()
+						celebrate(item.Id)
+					end
+				end
+				-- The server's coins, so the number is exact.
+				local missing = (Items.Price(item) or 0) - state.Coins
+				if missing > 0 and not owns(item.Id) then
+					return function()
+						refuse(item.Id, missing)
+					end
+				end
+				return nil
 			end)
 		end
 	end
@@ -416,6 +589,8 @@ function ShopUI.Mount(gui: ScreenGui)
 		end
 		cards = {}
 		shimmers = {}
+		shines = {}
+		spins = {}
 		for _, child in list:GetChildren() do
 			if child:IsA("GuiObject") or child:IsA("UIGridLayout") or child:IsA("UIListLayout") then
 				child:Destroy()
@@ -423,7 +598,8 @@ function ShopUI.Mount(gui: ScreenGui)
 		end
 	end
 
-	local function makeCard(item: any, order: number)
+	-- `place`: the card's place on its page (1 = first), for the pop-in one after another.
+	local function makeCard(item: any, order: number, place: number)
 		local frame = card(cardHeight)
 		frame.LayoutOrder = order
 		local info = Items.RarityInfo(item)
@@ -435,9 +611,10 @@ function ShopUI.Mount(gui: ScreenGui)
 		border.Parent = frame
 
 		local model = Cosmetics.Preview(item)
-		local view = preview(model, frame)
+		local view, spin = preview(model, frame)
 		view.Position = UDim2.fromOffset(8, 8)
 		view.Size = UDim2.new(1, -16, 0, previewHeight)
+		table.insert(spins, spin)
 		local tag = rarityTag(item, frame)
 		local stop = function() end
 		if info.Rainbow then
@@ -445,8 +622,41 @@ function ShopUI.Mount(gui: ScreenGui)
 			local gradient = Instance.new("UIGradient")
 			gradient.Color = rainbowSequence()
 			gradient.Parent = border
-			table.insert(shimmers, { Stroke = gradient, Tag = tag })
+			table.insert(shimmers, { Stroke = gradient, Tag = tag, Border = border })
 			stop = SkinFx.AnimatePreview(model)
+		elseif Items.Rarity(item) == "Rare" then
+			local gradient = Instance.new("UIGradient")
+			gradient.Name = "Shine"
+			gradient.Color = shineSequence(info.Color)
+			gradient.Parent = border
+			border.Color = Color3.new(1, 1, 1) -- (the gradient gives the colour)
+			table.insert(shines, gradient)
+		end
+		ShopJuice.Hover(frame, border)
+
+		-- The checkmark on the card you're wearing (top right of the preview).
+		local check = Theme.label("✓", 18, frame)
+		check.Name = "Check"
+		check.Visible = false
+		check.ZIndex = 3
+		check.AnchorPoint = Vector2.new(1, 0)
+		check.Position = UDim2.new(1, -12, 0, 12)
+		check.Size = UDim2.fromOffset(24, 24)
+		check.BackgroundTransparency = 0
+		check.BackgroundColor3 = Color3.fromRGB(60, 160, 70)
+		Theme.round(check, 12)
+
+		-- A new page: the cards pop in one after another.
+		if ShopJuice.On() then
+			local s = ShopJuice.Scale(frame)
+			s.Scale = 0
+			ShopJuice.Tween(
+				s,
+				juice.EnterTime,
+				{ Scale = 1 },
+				Enum.EasingStyle.Back,
+				(place - 1) * juice.EnterStagger
+			)
 		end
 
 		local name = Theme.label(item.Name, 14, frame)
@@ -457,10 +667,19 @@ function ShopUI.Mount(gui: ScreenGui)
 		local action = button("", frame)
 		action.Position = UDim2.new(0, 8, 1, -40)
 		action.Size = UDim2.new(1, -16, 0, 32)
+		-- ("Buy 100,000 Coins" must fit: the text shrinks, but never below MinTextSize)
+		action.TextScaled = true
+		local fit = Instance.new("UITextSizeConstraint")
+		fit.MaxTextSize = action.TextSize
+		fit.MinTextSize = Config.UI.MinTextSize
+		fit.Parent = action
 		action.Activated:Connect(function()
 			onAction(item)
 		end)
-		table.insert(cards, { Item = item, Frame = frame, Action = action, Stop = stop })
+		table.insert(
+			cards,
+			{ Item = item, Frame = frame, Action = action, Check = check, Stop = stop }
+		)
 	end
 
 	renderPage = function()
@@ -489,8 +708,9 @@ function ShopUI.Mount(gui: ScreenGui)
 			updateButtons() -- (the coins label)
 			return
 		end
-		for i = (page - 1) * pageSize + 1, math.min(#items, page * pageSize) do
-			makeCard(items[i], i)
+		local first = (page - 1) * pageSize + 1
+		for i = first, math.min(#items, page * pageSize) do
+			makeCard(items[i], i, i - first + 1)
 		end
 		list.CanvasPosition = Vector2.zero
 		updateButtons()
@@ -536,7 +756,8 @@ function ShopUI.Mount(gui: ScreenGui)
 	end
 	local themeChip = chip("Theme", "", 130, 20)
 	-- Crates (Skins tab): opens the crate panel on the shown theme's crate.
-	local cratesChip = chip("Crates", Config.Crates.Text.ShopChip, 100, 30)
+	-- (first in the row: on narrow screens the row scrolls sideways and kids miss what's at the end)
+	local cratesChip = chip("Crates", Config.Crates.Text.ShopChip, 100, 0)
 	cratesChip.BackgroundColor3 = Color3.fromRGB(170, 60, 120)
 	cratesChip.Activated:Connect(function()
 		local crateId: string? = nil
@@ -685,7 +906,19 @@ function ShopUI.Mount(gui: ScreenGui)
 		-- VIP card.
 		local vipCfg = Config.Monetization
 		local vip = card(150)
+		vip.Name = "VipCard"
 		vip.Size = UDim2.new(1, -10, 0, 150)
+		-- A gold border with the same soft shine as Rare cards.
+		local vipBorder = Instance.new("UIStroke")
+		vipBorder.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		vipBorder.Thickness = 2.5
+		vipBorder.Color = Color3.new(1, 1, 1)
+		vipBorder.Parent = vip
+		local vipShine = Instance.new("UIGradient")
+		vipShine.Name = "Shine"
+		vipShine.Color = shineSequence(vipCfg.ChatTag.Color)
+		vipShine.Parent = vipBorder
+		table.insert(shines, vipShine)
 		local vipTitle = Theme.label(vipCfg.VipName, 20, vip)
 		vipTitle.TextColor3 = vipCfg.ChatTag.Color
 		vipTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -715,7 +948,20 @@ function ShopUI.Mount(gui: ScreenGui)
 		-- Coin packs.
 		for index, product in vipCfg.Products do
 			local row = card(64)
+			row.Name = "Pack"
 			row.LayoutOrder = index
+			ShopJuice.Hover(row)
+			if ShopJuice.On() then
+				local s = ShopJuice.Scale(row)
+				s.Scale = 0
+				ShopJuice.Tween(
+					s,
+					juice.EnterTime,
+					{ Scale = 1 },
+					Enum.EasingStyle.Back,
+					index * juice.EnterStagger
+				)
+			end
 			row.Size = UDim2.new(1, -10, 0, 64)
 			local name = Theme.label(product.Name, 17, row)
 			name.TextXAlignment = Enum.TextXAlignment.Left
@@ -755,7 +1001,7 @@ function ShopUI.Mount(gui: ScreenGui)
 
 	-- Everything for the current tab (cards are rebuilt; use updateButtons for state changes).
 	render = function()
-		coinsLabel.Text = ("%d %s"):format(state.Coins, currency)
+		showCoins(state.Coins, false)
 		for id, b in tabButtons do
 			b.BackgroundColor3 = if id == tab then Theme.Selected else Theme.Button
 		end
@@ -808,15 +1054,50 @@ function ShopUI.Mount(gui: ScreenGui)
 		renderPage()
 	end)
 
-	-- CRAZY cards shimmer while the shop is open.
+	-- Is `item` inside the list's visible area? (Unknown sizes, before layout, count as yes.)
+	local function inView(item: GuiObject): boolean
+		local height = list.AbsoluteSize.Y
+		if height <= 0 then
+			return true
+		end
+		local top = list.AbsolutePosition.Y
+		local y = item.AbsolutePosition.Y
+		return y + item.AbsoluteSize.Y >= top and y <= top + height
+	end
+
+	-- While the shop is open: CRAZY borders shimmer (and swell), Rare borders shine, and the
+	-- 3D previews in view slowly turn (PC; phones keep them still).
 	RunService.Heartbeat:Connect(function()
-		if not panel.Visible or #shimmers == 0 then
+		if not panel.Visible then
 			return
 		end
-		local t = os.clock() / skinSettings.ShimmerSeconds
+		local now = os.clock()
+		local t = now / skinSettings.ShimmerSeconds
+		local animate = ShopJuice.On()
 		for _, s in shimmers do
 			s.Stroke.Rotation = (t * 360) % 360
 			s.Tag.BackgroundColor3 = Color3.fromHSV(t % 1, 0.7, 1)
+			if animate then
+				s.Border.Thickness = 2.5 + juice.CrazyPulse * (0.5 + 0.5 * math.sin(now * 4))
+			end
+		end
+		if not animate then
+			return
+		end
+		if #shines > 0 and juice.RareShineSeconds > 0 then
+			-- The band sweeps across, then rests a moment off the edge.
+			local x = ((now / juice.RareShineSeconds) % 1) * 3 - 1.5
+			for _, g in shines do
+				g.Offset = Vector2.new(x, 0)
+			end
+		end
+		if juice.SpinSpeed > 0 and not compact and #spins > 0 then
+			local turn = CFrame.Angles(0, math.rad(now * juice.SpinSpeed), 0)
+			for _, s in spins do
+				if inView(s.Frame) then
+					s.Camera.CFrame = CFrame.lookAt(s.Center + turn * s.Offset, s.Center)
+				end
+			end
 		end
 	end)
 
@@ -902,10 +1183,11 @@ function ShopUI.Mount(gui: ScreenGui)
 		local stats = player:WaitForChild("leaderstats", 60)
 		local coins = stats and stats:WaitForChild("Coins", 60)
 		if coins and coins:IsA("IntValue") then
-			coins.Changed:Connect(function(value)
+			coins:GetPropertyChangedSignal("Value"):Connect(function()
+				local value = coins.Value
 				state.Coins = value
 				if panel.Visible then
-					coinsLabel.Text = ("%d %s"):format(value, currency)
+					showCoins(value, true)
 				end
 			end)
 		end

@@ -129,6 +129,22 @@ return {
 	},
 	BannerSeconds = 5, -- how long the finish banner stays up
 
+	-- Little celebrations on the hunter's screen (src/client/WebScourUI.luau). Only for fun:
+	-- catches are sent the moment you click. Shared numbers: Config.Minigames.Effects.
+	Effects = {
+		On = true, -- false = no hops, "+1"s, timer bar, pulse or confetti (the hunt is the same)
+		HopEvery = { Min = 2, Max = 4.5 }, -- seconds between a critter's little hops
+		HopHeight = 0.7, -- studs a critter hops up
+		HopSeconds = 0.35, -- how long one hop takes
+		CatchSparkles = 18, -- sparkles in the catch puff (phones: fewer)
+		PlusText = "+1", -- floats up by "3/6 found" when the server counts a catch
+		TimeBarColor = Color3.fromRGB(255, 200, 90), -- the bar that drains with the real time left
+		TimeBarLowColor = Color3.fromRGB(255, 120, 90), -- its colour in the last HintLastSeconds
+		Pulse = 0.08, -- the clock swells by this share once a second in the last HintLastSeconds
+		CoinsCountSeconds = 0.7, -- the coins in the finish banner count up this fast
+		AllFoundConfetti = 50, -- confetti pieces when you find them all (phones: fewer)
+	},
+
 	-- The Spider Grove (the look) ---------------------------------------------------------------
 	-- Positions are in studs from the middle of the Web Scour zone, seen from the plaza:
 	-- Vector3.new(right, up, back): right + = to the right, back + = further from the plaza.

@@ -148,6 +148,34 @@ local Config = {
 			SoundId = "rbxassetid://79637236152913", -- per beat ("Heartbeat", Creator Store); "" = none
 			Volume = 0.6,
 		},
+		-- Extra motion: numbers pop, banners punch in with a little shake, "+1" arcs up.
+		-- false = the same messages, just shown still (no tweens).
+		Animate = true,
+		-- Big 3-2-1 in the middle of the screen at the end of the intermission, for the players
+		-- about to play (on the Ready pad, or everyone when there is no pad).
+		Countdown = {
+			From = 3, -- numbers for the last this-many seconds
+			Color = Color3.fromRGB(255, 230, 120),
+			PopScale = 1.8, -- each number starts this big...
+			PopSeconds = 0.25, -- ...and snaps to its normal size in this long
+			HoldSeconds = 0.4, -- stays still this long...
+			ShrinkSeconds = 0.3, -- ...then shrinks and fades (keep the three under 1 second)
+		},
+		-- Banner when the round starts straight after the countdown (King Hunt). Modes with
+		-- their own intro (Hide & Seek's hiding time, ScareMaze's "Get ready") show their own.
+		Start = { Text = "GO!", Seconds = 1.2, Color = Color3.fromRGB(120, 230, 120) },
+		Motion = {
+			BannerPopScale = 1.6, -- banners start this big and snap down
+			BannerPopSeconds = 0.35,
+			ShakeDegrees = 7, -- banners start tilted this much and wobble straight
+			ShakeSeconds = 0.5,
+			FadeSeconds = 0.3, -- banners fade out in this long
+			PopStartScale = 0.5, -- "X survivors left" grows from this size
+			PopSeconds = 0.25,
+			PickupPopSeconds = 0.15, -- "+1" pops to full size in this long...
+			PickupDrift = 0.25, -- ...while drifting sideways (fraction of its box) as it rises
+			PickupFadeAfter = 0.4, -- starts fading after this fraction of Pickup.Seconds
+		},
 	},
 
 	-- The results screen after each round (src/client/ResultsUI.luau). It stays up for
@@ -163,6 +191,16 @@ local Config = {
 		-- show the whole panel: the rows scroll instead of the panel and its text shrinking).
 		MaxListHeight = 300,
 		PhoneMvpHeight = 56, -- phones get a slimmer MVP spotlight (the full one is 112 tall)
+		-- Extra motion (rows pop in, shine sweeps, coin pulse, "You got X coins!").
+		-- false = no motion: the panel, every row and the final coin totals show at once.
+		Animate = true,
+		RowStartScale = 0.8, -- each row grows from this size as it appears...
+		RowInSeconds = 0.25, -- ...in this long
+		ShineDelay = 0.15, -- after the top row / your row appears, a light sweeps across it
+		ShineSeconds = 0.8,
+		CoinPulseScale = 1.35, -- your coins pulse this big when they finish counting
+		CoinPulseSeconds = 0.3,
+		YouGotSeconds = 1.8, -- the "You got X coins!" pop stays this long
 		Text = {
 			Title = "Round over!",
 			Mvp = "MVP",
@@ -173,12 +211,16 @@ local Config = {
 			Caught = "Caught",
 			NextRound = "Next round in %d",
 			Nobody = "Nobody finished this round.",
+			YouGot = "You got %d coins!", -- pops once your coins finish counting up
 		},
 		Colors = {
 			Mvp = Color3.fromRGB(255, 210, 60),
 			Survived = Color3.fromRGB(110, 220, 120),
 			Caught = Color3.fromRGB(170, 160, 190),
 			MyRow = Color3.fromRGB(255, 130, 20), -- background tint of your own row
+			TopRow = Color3.fromRGB(255, 210, 60), -- background tint of the top player's row
+			Shine = Color3.fromRGB(255, 255, 255), -- the light sweeping across a row
+			YouGot = Color3.fromRGB(255, 210, 60), -- the "You got X coins!" pill
 		},
 	},
 
@@ -188,6 +230,31 @@ local Config = {
 		Seconds = 20,
 		-- How many choices the vote offers: Config.Modes.VoteChoices (Config/Modes.luau).
 		MinSecondsBetweenVotes = 0.5, -- per-player spam guard on the vote remote
+		-- The vote panel (src/client/VoteUI.luau).
+		Text = {
+			Heading = "Vote for the next game",
+			Difficulty = "Vote for the difficulty",
+			TimeLeft = "%ds", -- the seconds left, small and quiet beside the heading
+		},
+		-- Extra motion on the vote panel. A vote is always sent the moment you tap.
+		-- false = no motion: cards and counts change at once, the panel closes right away.
+		Animate = true,
+		Motion = {
+			CardInSeconds = 0.3, -- each card pops in...
+			CardStagger = 0.07, -- ...this long after the one before it
+			PressScale = 0.88, -- the card you tap squashes to this size and bounces back
+			BounceSeconds = 0.3,
+			HighlightColor = Color3.fromRGB(255, 230, 120), -- outline of the card you voted for
+			HighlightThickness = 3,
+			TickSeconds = 0.06, -- a count steps to its new number one vote at a time...
+			MaxTicks = 6, -- ...in at most this many steps (big jumps step faster)
+			PulseScale = 1.1, -- and the card pulses this big when it gets there
+			PulseSeconds = 0.25,
+			WinnerWaitSeconds = 4, -- after the vote, wait up to this long to learn the winner
+			WinnerScale = 1.15, -- the winning card pops this big...
+			WinnerSeconds = 1.6, -- ...and the panel closes this long later
+			WinnerColor = Color3.fromRGB(255, 200, 60),
+		},
 	},
 
 	Maps = {
@@ -490,6 +557,48 @@ local Config = {
 		-- egg pop-ups) move down on short phone screens so they never cover the bar at the top
 		-- (the Hud): they keep at least this many UI units under it.
 		BelowHudGap = 8,
+		-- Animated UI (src/client/UIMotion.luau): panels pop in and out, buttons squash when
+		-- pressed, coin numbers roll. On = false turns every animation off (everything instant).
+		-- Times are in seconds; sizes are multiples of normal size (1 = normal).
+		Motion = {
+			On = true,
+			PopInSeconds = 0.22, -- a panel (Menu, Shop, Crates...) growing in when it opens
+			PopOutSeconds = 0.12, -- ...and shrinking away when it closes
+			PopFrom = 0.6, -- the size a panel starts at when it pops in
+			PopOutTo = 0.7, -- the size it shrinks to before it disappears
+			PressScale = 0.92, -- a button squashes to this while pressed
+			PressSeconds = 0.06,
+			HoverScale = 1.05, -- grows a little under the mouse (PC only, never on touch)
+			HoverSeconds = 0.1,
+			BumpScale = 1.15, -- a quick pulse to catch the eye
+			BumpSeconds = 0.12,
+			CountSeconds = 0.6, -- a number rolling to its new value
+			FloatSeconds = 1.1, -- "+50" drifting away and fading
+			FloatDistance = 36, -- how far it drifts (UI units)
+			TileStagger = 0.03, -- the Menu's tiles pop in one after another, this far apart
+			WobbleDelay = 2, -- the Menu button wobbles once, this long after joining...
+			WobbleAngle = 10, -- ...tilting this many degrees...
+			WobbleSeconds = 0.1, -- ...this fast...
+			WobbleTimes = 3, -- ...this many times
+			-- A closing panel shrinks away as a short-lived copy (the real one hides at once).
+			-- Panels with more parts than this just vanish (copying them would cost too much).
+			GhostMaxParts = 500,
+		},
+		-- The bar at the top middle (src/client/Hud.luau): the round, its timer, one or two lines
+		-- of details and your coins. It grows with its words up to MaxWidth (never wider than
+		-- the screen) and wraps onto a second line instead of cutting words off.
+		Hud = {
+			MinWidth = 520,
+			MaxWidth = 860,
+			TitleHeight = 36, -- the top row (round name and timer, coins on the right)
+			TitleSize = 22, -- its text size (shrinks to fit, never below MinTextSize)
+			DetailSize = 15, -- the details' text size (shrinks to fit, never below MinTextSize)
+			DetailMaxLines = 2, -- details wrap onto at most this many lines
+			Padding = 10, -- room at the left, right and bottom
+			CoinsWidth = 104, -- the coins pill in the top-right corner
+			CoinsIcon = "💰", -- before the number (🪙 shows as an empty box in Roblox's font)
+			CoinsGain = Color3.fromRGB(255, 215, 70), -- the "+50" that drifts away when you earn coins
+		},
 	},
 
 	Player = {
@@ -683,6 +792,9 @@ local Config = {
 			Sign = {
 				Height = 18, -- studs above the plaza
 				MaxDistance = 300, -- hidden further away than this (studs)
+				-- Hidden while the camera is this close (flat distance, studs): from right under it
+				-- only its cut-off bottom shows, over the top of the screen. 0 = always shown.
+				HideNear = 12,
 				Title = "READY %d / %d", -- players ready / players needed to start
 				TitleEnough = "READY %d", -- once enough players are ready
 				TitleWaiting = "READY", -- before the server has counted anyone
@@ -978,6 +1090,45 @@ local Config = {
 		Title = "Pumpkin Shop", -- shown at the top of the shop panel
 		RequestCooldown = 0.25, -- per-player spam guard on buy/equip
 		OpenKey = Enum.KeyCode.B,
+		BuyText = "Buy %s %s", -- the buy button: price (with commas), currency name
+		PreviewDistance = 1.15, -- how far the camera is from an item in its card (smaller = bigger)
+		-- The shop's little animations (src/client/ShopJuice.luau, used by the shop, Packs & VIP,
+		-- Settings and the VIP tracker). Times are in seconds. Animate = false turns them all off:
+		-- things just change straight away. Phones get fewer (no turning previews, fewer sparkles).
+		Juice = {
+			Animate = true, -- false = no extra animation anywhere in the shop
+			HoverScale = 1.05, -- a card grows this much under the mouse (PC only)
+			HoverGlow = 1.5, -- ...and its border gets this much thicker
+			HoverTime = 0.12,
+			PressScale = 0.92, -- a button squashes to this size while you hold it
+			PressTime = 0.07,
+			SpinSpeed = 30, -- degrees a second the 3D previews turn (0 = still; never on phones)
+			RareShineSeconds = 2.4, -- one sweep of the soft shine across a Rare card's border
+			CrazyPulse = 1, -- a CRAZY card's rainbow border swells by this much, in and out
+			EnterTime = 0.2, -- a new page: how long one card takes to pop in...
+			EnterStagger = 0.04, -- ...and the wait between one card and the next
+			PopScale = 1.12, -- a card you just bought grows this much and springs back
+			PopTime = 0.1,
+			Sparkles = 12, -- sparkles bursting over a card you just bought...
+			PhoneSparkles = 6, -- ...on phones
+			SparkleReach = 70, -- how far they fly (pixels)
+			SparkleTime = 0.6,
+			SparkleColors = {
+				Color3.fromRGB(255, 220, 90),
+				Color3.fromRGB(255, 255, 255),
+				Color3.fromRGB(255, 150, 40),
+			},
+			CoinRollTime = 0.7, -- the coins counter rolls down to your new total in this time
+			BounceFrom = 0.7, -- a button that changes (Buy -> Unequip) springs in from this size
+			BounceTime = 0.25,
+			ShakeTime = 0.35, -- the Buy button wiggles this long when you can't afford it...
+			ShakePixels = 7, -- ...this far each way
+			NeedText = "Need %s more %s", -- then says how many more: amount, currency name
+			NeedSeconds = 1.8, -- ...for this long, then shows the price again
+			CheckPop = 1.4, -- the checkmark on the card you put on pops to this size
+			ToastText = "Wearing it!", -- the little message when you put something on
+			ToastSeconds = 1.4,
+		},
 		-- Shop tabs, in order; a player wears one item per slot. Skin comes first so it's put
 		-- on before the hat (a skin's head piece lifts the hat).
 		Slots = { "Skin", "Hat", "Trail", "Pet" },

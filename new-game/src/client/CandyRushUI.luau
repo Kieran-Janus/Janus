@@ -11,6 +11,12 @@
 	It also makes candies bounce in when they pop up, outlines YOUR candy, and plays the
 	countdown, GO, win and lose sounds (the pop sound comes from the server, for everyone near).
 	Nothing shows while you are not at the stand.
+
+	Celebrations (Config.Minigames.CandyRush.Effects, all off with its On = false or
+	Config.Minigames.Effects.On = false; src/client/MinigameFx.luau): a sparkle burst where your
+	candy was and a "+1" by your count each time the server counts a grab, lane bars that slide
+	to their new length, a 3-2-1-GO that punches in, and confetti when you win. Your click is
+	sent the moment you press: nothing here waits for an effect.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -22,6 +28,7 @@ local UserInputService = game:GetService("UserInputService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local Layout = require(script.Parent.Layout)
+local MinigameFx = require(script.Parent.MinigameFx)
 local Sounds = require(script.Parent.Sounds)
 local Theme = require(script.Parent.Theme)
 
@@ -29,6 +36,11 @@ local CandyRushUI = {}
 
 local cfg = Config.Minigames.CandyRush
 local text = cfg.Text
+local fx = cfg.Effects
+
+local function effectsOn(): boolean
+	return MinigameFx.Enabled(fx)
+end
 
 type LaneRow = {
 	Lane: number,
@@ -108,7 +120,7 @@ local function animateCandy(candy: Instance, me: Player)
 	end)
 	local tween = TweenService:Create(
 		size,
-		TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+		TweenInfo.new(fx.BounceSeconds, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
 		{ Value = 1 }
 	)
 	tween.Completed:Once(function()
@@ -117,7 +129,31 @@ local function animateCandy(candy: Instance, me: Player)
 	tween:Play()
 end
 
-local function watchCandies(me: Player)
+-- Where (and what colour) one of your candies was: the sparkles go there when the server
+-- counts the grab.
+type Spot = { Position: Vector3, Color: Color3, At: number }
+
+local function candySpot(candy: Instance): Spot?
+	if not candy:IsA("Model") then
+		return nil
+	end
+	local color: Color3? = nil
+	for _, d in candy:GetDescendants() do
+		if d:IsA("BasePart") and d.Transparency < 1 then
+			color = d.Color
+			break
+		end
+	end
+	local ok, pivot = pcall(function()
+		return candy:GetPivot()
+	end)
+	if not ok then
+		return nil
+	end
+	return { Position = pivot.Position, Color = color or Color3.new(1, 1, 1), At = os.clock() }
+end
+
+local function watchCandies(me: Player, onMineGone: (Spot) -> ())
 	local watched: { [Instance]: boolean } = setmetatable({}, { __mode = "k" }) :: any
 	local function watchFolder(folder: Instance)
 		if watched[folder] then
@@ -126,6 +162,14 @@ local function watchCandies(me: Player)
 		watched[folder] = true
 		folder.ChildAdded:Connect(function(child)
 			animateCandy(child, me)
+		end)
+		folder.ChildRemoved:Connect(function(child)
+			if child:GetAttribute("OwnerUserId") == me.UserId then
+				local spot = candySpot(child)
+				if spot then
+					onMineGone(spot)
+				end
+			end
 		end)
 	end
 	local function watchStation(station: Instance)
@@ -244,6 +288,26 @@ function CandyRushUI.Mount(gui: ScreenGui)
 	footer.Size = UDim2.new(1, -24, 0, 18)
 
 	local rows: { [number]: Row } = {}
+	-- The length each lane's bar is going to: it slides there when effects are on (shrinking,
+	-- e.g. back to 0 for a new race, is instant).
+	local fillTarget: { [Frame]: number } = {}
+	local function setFill(row: Row, fraction: number)
+		local fill = row.Fill
+		local before = fillTarget[fill]
+		if before == fraction then
+			return
+		end
+		fillTarget[fill] = fraction
+		if effectsOn() and before ~= nil and fraction > before and fx.BarSeconds > 0 then
+			TweenService:Create(
+				fill,
+				TweenInfo.new(fx.BarSeconds, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+				{ Size = UDim2.fromScale(fraction, 1) }
+			):Play()
+		else
+			fill.Size = UDim2.fromScale(fraction, 1)
+		end
+	end
 	local function rowFor(lane: number): Row
 		local row = rows[lane]
 		if row then
@@ -315,15 +379,27 @@ function CandyRushUI.Mount(gui: ScreenGui)
 	countdownScale.Parent = countdown
 	Layout.KeepBelowHud({ countdown }) -- (on short phone screens 0.3 is on the bar at the top)
 
+	local tiltSide = 1
 	local function popText(value: string, seconds: number?)
 		countdown.Text = value
 		countdown.Visible = true
-		countdownScale.Scale = 1.6
+		local on = effectsOn()
+		countdownScale.Scale = if on then fx.CountdownScale else 1.6
 		TweenService:Create(
 			countdownScale,
 			TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
 			{ Scale = 1 }
 		):Play()
+		if on and fx.CountdownTilt ~= 0 then
+			-- (each number leans the other way, so 3-2-1 rocks side to side)
+			tiltSide = -tiltSide
+			countdown.Rotation = tiltSide * fx.CountdownTilt
+			TweenService:Create(
+				countdown,
+				TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+				{ Rotation = 0 }
+			):Play()
+		end
 		if seconds then
 			task.delay(seconds, function()
 				if countdown.Text == value then
@@ -359,8 +435,6 @@ function CandyRushUI.Mount(gui: ScreenGui)
 	bannerLine.TextWrapped = true
 	bannerLine.Position = UDim2.new(0, 12, 0.55, 0)
 	bannerLine.Size = UDim2.new(1, -24, 0.45, -8)
-	local bannerScale = Instance.new("UIScale")
-	bannerScale.Parent = banner
 	Layout.KeepBelowHud({ banner })
 
 	-- Showing a state ---------------------------------------------------------------------------
@@ -411,13 +485,12 @@ function CandyRushUI.Mount(gui: ScreenGui)
 		bannerLine.Text = details
 		bannerStroke.Color = if won then GOLD else Theme.Muted
 		banner.Visible = true
-		bannerScale.Scale = 0.6
-		TweenService:Create(
-			bannerScale,
-			TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-			{ Scale = 1 }
-		):Play()
+		-- (through Layout.Fit's MotionScale: a second UIScale on the banner would fight its fit)
+		MinigameFx.PopFit(banner, 0.6, 0.35)
 		play(if won then cfg.Sounds.Win else cfg.Sounds.Lose)
+		if won and effectsOn() then
+			MinigameFx.Confetti(gui, MinigameFx.Count(fx.WinConfetti))
+		end
 		task.delay(cfg.ResultsSeconds, function()
 			if bannerTitle.Text == headline then
 				banner.Visible = false
@@ -482,7 +555,7 @@ function CandyRushUI.Mount(gui: ScreenGui)
 			local fraction = if shown
 				then math.clamp(info.Popped / math.max(state.Total, 1), 0, 1)
 				else 0
-			row.Fill.Size = UDim2.fromScale(fraction, 1)
+			setFill(row, fraction)
 			row.Count.Text = if info.Out
 				then text.OutTag
 				elseif shown then tostring(info.Popped)
@@ -510,9 +583,45 @@ function CandyRushUI.Mount(gui: ScreenGui)
 		panel.Visible = true
 	end
 
+	-- A grab the server counted: sparkles where the candy was, "+1" by your count.
+	local lastSpot: Spot? = nil
+	local lastPopped: number? = nil
+	local function rememberSpot(spot: Spot)
+		lastSpot = spot
+	end
+	local function celebrateGrab()
+		local spot = lastSpot
+		if spot and os.clock() - spot.At < 1.5 then
+			lastSpot = nil
+			MinigameFx.Burst(
+				spot.Position,
+				{ spot.Color, Color3.new(1, 1, 1), GOLD },
+				MinigameFx.Count(fx.GrabSparkles)
+			)
+		end
+		MinigameFx.FloatText(panel, fx.PlusText, GOLD, UDim2.new(1, -40, 0, 34))
+		MinigameFx.Punch(mine, 1.35)
+	end
+	local function checkGrab(state: State?)
+		local popped: number? = nil
+		if state and state.InRace and state.Phase == "Live" and not state.Out then
+			for _, info in state.Lanes do
+				if type(info) == "table" and info.UserId == me.UserId then
+					popped = info.Popped
+				end
+			end
+		end
+		local before = lastPopped
+		lastPopped = popped
+		if popped and before and popped > before and effectsOn() then
+			celebrateGrab()
+		end
+	end
+
 	local function onState(value: unknown)
 		local state = readState(value)
 		current = state
+		checkGrab(state)
 		if not state then
 			panel.Visible = false
 			countdown.Visible = false
@@ -560,7 +669,7 @@ function CandyRushUI.Mount(gui: ScreenGui)
 		end
 	end)
 
-	task.spawn(watchCandies, me)
+	task.spawn(watchCandies, me, rememberSpot)
 	task.spawn(function()
 		-- Required here, not at the top: the remote folder may not exist yet, and nothing above
 		-- should wait for it.
@@ -591,7 +700,11 @@ function CandyRushUI.Mount(gui: ScreenGui)
 				node = node.Parent
 			end
 			if node then
-				grab:FireServer(node)
+				grab:FireServer(node) -- sent right away; the sparkles wait for the server's count
+				local spot = candySpot(node)
+				if spot then
+					rememberSpot(spot)
+				end
 			end
 		end
 		UserInputService.InputBegan:Connect(function(input, processed)
