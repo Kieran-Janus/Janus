@@ -157,6 +157,7 @@ Every free model in the Toolbox (Creator Store) has a code: the number in its li
 - Run `.Toolbox` again with another code to change your mind: the model you had is kept in `ServerStorage > CustomBackups`.
 - Normal look back for **every copy**: delete the model from `Custom > Props` and run `require(game.ServerScriptService.Server.Tools.Swap).Props({ Revert = true })`. For **one thing**: delete its `Pumpkin_<code>` model from `Custom > Props`, then the same Revert line.
 - Pumpkins have several names: lobby pumpkins `Pumpkin`, carved ones `JackOLantern`, parkour pumpkins `ParkourPumpkin`, King Hunt pickups `CollectPumpkin`, Hide & Seek pumpkins `HidingPumpkin`. Use the list for "all pumpkins".
+- **Tools** (a torch, a sword: things you would hold) become a plain model: nobody can pick them up from the lobby.
 - **Packs**: a Toolbox code that is a pack (a folder of 7 different trees, 2 mushrooms...) is spread over the copies: the 1st copy gets the 1st model, the 2nd the 2nd, and so on, so every kind is used.
 - **Facing the wrong way?** Some Toolbox models are built back to front. Select the model in `Custom > Props`, turn its pivot round (Model tab > Pivot > Edit Pivot, rotate 180), then run `require(game.ServerScriptService.Server.Tools.Swap).Props()`.
 - **One secret pumpkin (Easter egg)**: `require(game.ServerScriptService.Server.Tools.Swap).Egg("ForestGhost", 15145049241)`; the egg Ids are in `Config.EasterEggs.List` (Name "Lost Forest Ghost" = Id `ForestGhost`).

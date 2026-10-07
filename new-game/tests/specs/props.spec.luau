@@ -1020,6 +1020,22 @@ describe("Swap tool (src/server/Tools/Swap.luau)", function()
 		expect(downloads).toBe(downloaded)
 	end)
 
+	it("turns a Toolbox tool (a torch) into a plain model nobody can pick up", function()
+		local w = world()
+		local rt = w.rt
+		local tool =
+			rt:create("Tool", { Name = "TorchProp" }, rt:find("ReplicatedStorage.Custom.Props"))
+		local handle =
+			rt:create("Part", { Name = "Handle", Size = w.Vector3.new(0.5, 3, 0.5) }, tool)
+		rt:create("TouchTransmitter", { Name = "TouchInterest" }, handle)
+		local copy = w.CustomAssets.Clone("Props", "TorchProp")
+		expect(copy.ClassName).toBe("Model")
+		expect(copy:FindFirstChild("Handle", true)).toBeTruthy()
+		for _, d in copy:GetDescendants() do
+			expect(d:IsA("Tool") or d:IsA("TouchTransmitter")).toBe(false)
+		end
+	end)
+
 	it("swaps a baked map's decoration to a walk-through custom model", function()
 		-- (a map baked before props remembered PropVisual swaps the same way)
 		local w = world()

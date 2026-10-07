@@ -590,13 +590,14 @@ local function loadToolbox(id: number): (Model?, string?)
 			)
 	end
 	local model: Model
-	if #items == 1 and items[1]:IsA("Model") then
+	if #items == 1 and items[1].ClassName == "Model" then -- (a Tool is a kind of Model too)
 		model = items[1] :: Model
 	else
 		model = Instance.new("Model")
 		for _, item in items do
-			if item:IsA("Accessory") then
-				-- A hat from the Toolbox: keep its parts, not the hat itself.
+			if item:IsA("Accessory") or item:IsA("Tool") then
+				-- A hat or a tool (a torch) from the Toolbox: keep its parts, not the hat or tool
+				-- itself (a Tool lying in the lobby could be picked up).
 				for _, child in item:GetChildren() do
 					child.Parent = model
 				end
@@ -607,8 +608,19 @@ local function loadToolbox(id: number): (Model?, string?)
 		end
 	end
 	for _, d in model:GetDescendants() do
+		if d:IsA("Tool") or d:IsA("Accessory") then
+			-- (one inside a model: same as above)
+			for _, child in d:GetChildren() do
+				child.Parent = d.Parent
+			end
+			d:Destroy()
+		end
+	end
+	for _, d in model:GetDescendants() do
 		if
-			d:IsA("LuaSourceContainer") or (d:IsA("JointInstance") and d.Name == "AccessoryWeld")
+			d:IsA("LuaSourceContainer")
+			or d:IsA("TouchTransmitter")
+			or (d:IsA("JointInstance") and d.Name == "AccessoryWeld")
 		then
 			d:Destroy()
 		end

@@ -67,10 +67,11 @@ function CustomAssets.Clone(category: string, name: string): Model?
 	end
 	local copy = source:Clone()
 	local model: Model
-	if copy:IsA("Model") then
+	if copy:IsA("Model") and not copy:IsA("Tool") then -- (a Tool lying around could be picked up)
 		model = copy
 	else
-		-- Accessory (e.g. a hat from the Toolbox) or a single MeshPart: wrap its parts.
+		-- Accessory (e.g. a hat from the Toolbox), Tool (a torch) or a single MeshPart: wrap its
+		-- parts.
 		model = Instance.new("Model")
 		model.Name = name
 		if copy:IsA("BasePart") then
@@ -93,6 +94,17 @@ function CustomAssets.Clone(category: string, name: string): Model?
 			if d:IsA("LuaSourceContainer") then
 				d:Destroy()
 			end
+		end
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("TouchTransmitter") or d:IsA("Tool") then
+			-- (nothing in a custom model can be picked up or touched like a tool)
+			if d:IsA("Tool") then
+				for _, child in d:GetChildren() do
+					child.Parent = d.Parent
+				end
+			end
+			d:Destroy()
 		end
 	end
 	if not model.PrimaryPart then
