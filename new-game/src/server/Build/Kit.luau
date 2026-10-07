@@ -278,6 +278,7 @@ local PROP_ATTRIBUTES = {
 	PropLook = true,
 	CustomProp = true,
 	CustomModel = true,
+	PropLit = true,
 }
 
 -- Tags that only change how something looks (everything else in Tags does something).
@@ -385,7 +386,14 @@ local function dressCustom(
 )
 	CustomAssets.Fit(custom, size)
 	local visual = options.Visual == true or options.Hitbox ~= nil
+	-- A light inside the model only shines where the built thing had one (or with ModelLights):
+	-- a Toolbox jack-o'-lantern with a light in it would otherwise push the lobby over its
+	-- phone light budget (Config.Hub.Budget).
+	local dark = options.Light == nil and Config.Custom.PropLights.ModelLights ~= true
 	for _, d in custom:GetDescendants() do
+		if dark and d:IsA("Light") then
+			d.Enabled = false
+		end
 		if d:IsA("LuaSourceContainer") then
 			d:Destroy()
 		elseif d:IsA("BasePart") then
@@ -453,6 +461,9 @@ function Kit.prop(
 	if custom then
 		dressCustom(custom, name, cframe, size, o, anchor == "Center")
 		custom:SetAttribute("CustomModel", o.Model)
+		-- Whether the built thing had a light: swaps of this custom one go by it, not by the
+		-- lights your model brings (dressCustom).
+		custom:SetAttribute("PropLit", o.Light ~= nil)
 	end
 	local m = custom or build()
 	m:SetAttribute("PropName", name)
@@ -637,7 +648,7 @@ function Kit.swapProp(old: Model, model: string?): Model?
 		Anchor = if old:GetAttribute("PropAnchor") == "Center" then "Center" else nil,
 		Visual = visual,
 		Hitbox = if typeof(rawHitbox) == "Vector3" then rawHitbox else fallbackHitbox(old),
-		Light = lightOf(old, name, size),
+		Light = if old:GetAttribute("PropLit") == false then nil else lightOf(old, name, size),
 		Model = if source ~= name then source else nil,
 	})
 	if custom == old then

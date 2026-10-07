@@ -135,7 +135,7 @@ end
 local function lightCount(root: any): number
 	local n = 0
 	for _, d in root:GetDescendants() do
-		if d:IsA("Light") then
+		if d:IsA("Light") and d.Enabled then
 			n += 1
 		end
 	end
@@ -367,8 +367,26 @@ describe("One custom model per prop name", function()
 		local budget = w.Config.Hub.Budget.MaxLights
 		local all = lightCount(w.HubBuilder.Build())
 		local only = world()
-		only.custom("JackOLantern")
-		local jacks = lightCount(only.HubBuilder.Build())
+		-- (a Toolbox jack-o'-lantern often has a light of its own inside)
+		local jack = only.custom("JackOLantern")
+		only.rt:create("PointLight", { Name = "OwnLight" }, jack.Look)
+		local onlyHub = only.HubBuilder.Build()
+		local jacks = lightCount(onlyHub)
+		-- Swapping them again (Swap.Props refreshes custom props) keeps their own lights off.
+		local refreshed = 0
+		for _, m in only.props(onlyHub) do
+			if
+				m:GetAttribute("PropName") == "JackOLantern"
+				and m:GetAttribute("PropLit") == false
+			then
+				local new = only.Kit.swapProp(m)
+				m:Destroy()
+				expect(new.Look.OwnLight.Enabled).toBe(false)
+				refreshed += 1
+			end
+		end
+		expect(refreshed).toBeGreaterThan(5)
+		expect(lightCount(onlyHub)).toBe(jacks)
 		T.note(
 			("%d lights built, %d with every prop custom, %d with a custom JackOLantern (budget %d)"):format(
 				builtHubLights,
@@ -908,6 +926,90 @@ describe("Swap tool (src/server/Tools/Swap.luau)", function()
 		expect(step.PrimaryPart.CanCollide).toBe(true)
 		local look = step:FindFirstChild("ParkourPumpkin", true)
 		expect(look:GetAttribute("CustomModel")).toBe("ParkourPumpkin_444444")
+
+		-- A pack (a folder of 3 trees) is spread over the copies: every kind is used, in turn.
+		Swap.LoadToolbox = function(id: number)
+			local pack = rt:create("Model", { Name = "Pack" })
+			local folder = rt:create("Folder", { Name = "Trees" }, pack)
+			for k = 1, 3 do
+				local tree = w.model("Tree" .. k)
+				tree.Parent = folder
+			end
+			return pack, nil
+		end
+		local trees = {}
+		for _, m in w.props(hub) do
+			if m:GetAttribute("PropName") == "DeadTree" then
+				table.insert(trees, m)
+			end
+		end
+		expect(#trees).toBeGreaterThanOrEqual(3)
+		expect(Swap.Selected(777777, trees)).toBe(#trees)
+		local kinds = {}
+		for _, m in w.props(hub) do
+			if m:GetAttribute("PropName") == "DeadTree" then
+				kinds[m:GetAttribute("CustomModel")] = (kinds[m:GetAttribute("CustomModel")] or 0)
+					+ 1
+			end
+		end
+		for _, name in { "DeadTree_777777", "DeadTree_777777_2", "DeadTree_777777_3" } do
+			expect(kinds[name]).toBeGreaterThanOrEqual(1)
+			expect(props:FindFirstChild(name)).toBeTruthy()
+		end
+		-- Swap.Toolbox with a pack: every copy of the name, the kinds taking turns.
+		Swap.Toolbox("Barrel", 888888)
+		local barrelKinds = {}
+		for _, m in w.props(hub) do
+			if m:GetAttribute("PropName") == "Barrel" then
+				expect(m:GetAttribute("CustomProp")).toBe(true)
+				barrelKinds[m:GetAttribute("CustomModel") or "Barrel"] = true
+			end
+		end
+		expect(barrelKinds.Barrel).toBe(true)
+		expect(barrelKinds.Barrel_2).toBe(true)
+
+		-- One secret pumpkin: only that egg changes, and it still counts as an egg.
+		Swap.LoadToolbox = function(id: number)
+			return w.model("Download" .. id), nil
+		end
+		local function egg(id: string): any
+			for _, part in w.tagged("EasterEgg", hub) do
+				if part:GetAttribute("EggId") == id then
+					return part
+				end
+			end
+			return nil
+		end
+		expect(egg("ForestGhost")).toBeTruthy()
+		expect(Swap.Egg("ForestGhost", 999999)).toBe(1)
+		expect(props:FindFirstChild("EggForestGhost")).toBeTruthy()
+		local ghost = egg("ForestGhost")
+		expect(ghost.Parent:GetAttribute("CustomProp")).toBe(true)
+		expect(ghost:GetAttribute("Coins")).toBeGreaterThan(0)
+		expect(egg("PhotoGhost").Parent:GetAttribute("CustomProp")).toBe(nil) -- the other ghost egg
+		-- A Toolbox model with a model inside (a lollipop): the egg part sits right in the egg's
+		-- model, so collecting it hides all of it; doing it again replaces the whole egg.
+		Swap.LoadToolbox = function(id: number)
+			local outer = rt:create("Model", { Name = "Outer" })
+			local inner = w.model("Inner")
+			inner.Parent = outer
+			rt:create("Part", { Name = "Stick", Size = w.Vector3.new(0.2, 2, 0.2) }, inner)
+			return outer, nil
+		end
+		for _ = 1, 2 do
+			expect(Swap.Egg("SpawnLolly", 121212)).toBe(1)
+		end
+		local lolly = egg("SpawnLolly")
+		expect(lolly.Parent.PrimaryPart).toBe(lolly)
+		expect(lolly.Parent.Parent.Name).toBe("EasterEggs")
+		local lollies = 0
+		for _, part in w.tagged("EasterEgg", hub) do
+			if part:GetAttribute("EggId") == "SpawnLolly" then
+				lollies += 1
+			end
+		end
+		expect(lollies).toBe(1)
+		expect(Swap.Egg("NoSuchEgg", 999999)).toBe(0)
 
 		-- Something holding several things, or a bad code, changes nothing.
 		local n, message = Swap.Selected(555555, { hub.Parkour.Course.Step01_Start })

@@ -487,8 +487,10 @@ function EasterEggs.BuildEgg(egg: Egg, base: CFrame, parent: Instance): (Model, 
 	end
 	local m: Model? = nil
 	local main: BasePart? = nil
-	-- Your own look: a model named Egg<Look> in ReplicatedStorage.Custom.Props.
-	local custom = CustomAssets.Clone("Props", "Egg" .. look)
+	-- Your own look: a model named Egg<Id> (this egg only, e.g. EggForestGhost) or Egg<Look>
+	-- (every egg with that look, e.g. EggGhost) in ReplicatedStorage.Custom.Props.
+	local custom = CustomAssets.Clone("Props", "Egg" .. egg.Id)
+		or CustomAssets.Clone("Props", "Egg" .. look)
 	if custom then
 		CustomAssets.Fit(custom, cfg.Size)
 		for _, d in custom:GetDescendants() do
@@ -504,6 +506,9 @@ function EasterEggs.BuildEgg(egg: Egg, base: CFrame, parent: Instance): (Model, 
 		CustomAssets.PlaceFeet(custom, base)
 		local biggest = custom.PrimaryPart or CustomAssets.BiggestPart(custom)
 		if biggest then
+			-- The egg part sits right in the egg's model (a Toolbox model may nest it deeper):
+			-- collecting an egg hides the whole model whose PrimaryPart it is.
+			biggest.Parent = custom
 			m, main = custom, biggest
 			custom:SetAttribute("CustomProp", true)
 		else

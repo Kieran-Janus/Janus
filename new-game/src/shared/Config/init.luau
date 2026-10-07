@@ -1331,9 +1331,14 @@ local Config = {
 		--                      budget: slower on phones
 		--   JackOLanternGlow   the glow's colour, brightness and reach (studs of light per stud
 		--                      of pumpkin height) when the built one had no light to copy
+		--   ModelLights        false = a light inside your model is switched off where the built
+		--                      thing has none (most lobby jack-o'-lanterns, the scarecrow), so a
+		--                      Toolbox model with a light in it keeps the lobby inside its phone
+		--                      light budget; true = every light your models bring shines
 		PropLights = {
 			AddLights = true,
 			EveryJackOLantern = false,
+			ModelLights = false,
 			JackOLanternGlow = {
 				Color = Color3.fromRGB(255, 170, 70),
 				Brightness = 1.2,

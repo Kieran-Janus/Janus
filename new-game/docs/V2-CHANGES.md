@@ -377,6 +377,8 @@ A Locked lobby or a baked map swaps by itself when you press Play. To keep it in
 **With a Toolbox code** (the number in a free model's link, or right-click it in the Toolbox > Copy Asset ID), in the command bar while the game is stopped:
 - every copy: `require(game.ServerScriptService.Server.Tools.Swap).Toolbox("Pumpkin", 11600489662)`
 - only the thing(s) you clicked: `require(game.ServerScriptService.Server.Tools.Swap).Selected(11600489662)` (every other copy stays as it is, and keeps its own look later)
+- one secret pumpkin: `require(game.ServerScriptService.Server.Tools.Swap).Egg("ForestGhost", 15145049241)`
+- a pack (a folder of several trees) is spread over the copies, so every kind is used
 Then save (Ctrl+S). Or just send Claude Code the code and say what it should replace. Guide: [`docs/CUSTOMIZE.md` > With a Toolbox code](CUSTOMIZE.md#with-a-toolbox-code-one-line-no-dragging).
 
 ### Your own characters

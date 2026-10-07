@@ -33,6 +33,9 @@
 	      names works too. The code can be the number or the Creator Store link.
 	  require(game.ServerScriptService.Server.Tools.Swap).Selected(11600489662)
 	      Only what you selected in Studio gets that look; every other copy stays as it is.
+	  require(game.ServerScriptService.Server.Tools.Swap).Egg("ForestGhost", 15145049241)
+	      One secret pumpkin (Easter egg, by its Id) gets that look.
+	A Toolbox pack (a folder of several trees) is spread over the copies: every kind is used.
 
 	Each one prints what it did and returns how many it changed (and that message).
 	Step by step: docs/CUSTOMIZE.md > "Swap every copy of something at once".
@@ -44,6 +47,7 @@ local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Tags = require(ReplicatedStorage.Shared.Tags)
 local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local Kit = require(script.Parent.Parent.Build.Kit)
 local MapService = require(script.Parent.Parent.Services.MapService)
@@ -659,6 +663,60 @@ local function storeCustom(name: string, model: Model, id: number)
 	model.Parent = props
 end
 
+--[[
+	A Toolbox pack (a folder of 7 trees, 2 mushrooms...): its separate models, each as a Model,
+	in order. A single model is a pack of one: { model }. Packs are spread over the copies (the
+	1st copy gets the 1st model, the 2nd the 2nd...), so a forest gets every kind of tree.
+]]
+local function variantsOf(model: Model): { Model }
+	local node: Instance = model
+	while true do
+		local holders: { Instance } = {}
+		for _, child in node:GetChildren() do
+			if child:IsA("BasePart") then
+				return { model } -- loose parts: it is one thing
+			elseif
+				(child:IsA("Model") or child:IsA("Folder"))
+				and child:FindFirstChildWhichIsA("BasePart", true)
+			then
+				table.insert(holders, child)
+			end
+		end
+		if #holders == 1 then
+			node = holders[1]
+			continue
+		end
+		if #holders < 2 then
+			return { model }
+		end
+		local list: { Model } = {}
+		for _, holder in holders do
+			if holder:IsA("Model") then
+				holder.Parent = nil
+				table.insert(list, holder)
+			else
+				local wrap = Instance.new("Model")
+				wrap.Name = holder.Name
+				for _, child in holder:GetChildren() do
+					child.Parent = wrap
+				end
+				table.insert(list, wrap)
+			end
+		end
+		model:Destroy()
+		return list
+	end
+end
+
+-- The Custom.Props names for a pack stored as `base`: base, base_2, base_3...
+local function variantNames(base: string, count: number): { string }
+	local names = { base }
+	for k = 2, count do
+		table.insert(names, ("%s_%d"):format(base, k))
+	end
+	return names
+end
+
 local function notCode(example: string): (number, string)
 	local message = ("That isn't a Toolbox code: use the number from the model's page, e.g. %s."):format(
 		example
@@ -688,18 +746,50 @@ function Swap.Toolbox(names: string | { string }, code: number | string): (numbe
 		say(problem :: string)
 		return 0, problem :: string
 	end
+	local variants = variantsOf(model)
 	undoable("Toolbox model", function()
-		for i, name in list do
-			storeCustom(name, if i == #list then model else model:Clone(), id)
+		for _, name in list do
+			for k, variantName in variantNames(name, #variants) do
+				storeCustom(variantName, variants[k]:Clone(), id)
+			end
 		end
 	end)
+	for _, variant in variants do
+		variant:Destroy()
+	end
 	say(
-		("Toolbox model %d is now Custom.Props.%s."):format(
+		("Toolbox model %d is now Custom.Props.%s%s."):format(
 			id,
-			table.concat(list, ", Custom.Props.")
+			table.concat(list, ", Custom.Props."),
+			if #variants > 1
+				then (" (a pack of %d, spread over the copies)"):format(#variants)
+				else ""
 		)
 	)
-	return Swap.Props()
+	local total, message = Swap.Props()
+	if #variants > 1 then
+		-- Copy 1 keeps the first model (its PropName), copy 2 gets the second, and so on.
+		undoable("Spread the Toolbox pack", function()
+			for _, name in list do
+				local packNames = variantNames(name, #variants)
+				for _, root in rootsOf(nil) do
+					local copies = Kit.findProps(root, function(m: Model): boolean
+						return m:GetAttribute("PropName") == name
+							and m:GetAttribute("CustomModel") == nil
+							and m:GetAttribute("CustomProp") == true
+							and not inUse(m)
+					end)
+					for i, old in copies do
+						local k = (i - 1) % #variants + 1
+						if k > 1 then
+							swapOne(old, packNames[k])
+						end
+					end
+				end
+			end
+		end)
+	end
+	return total, message
 end
 
 -- The prop to give a new look when you selected `thing` (itself, the one it is inside, or the
@@ -781,14 +871,20 @@ function Swap.Selected(code: number | string, things: { Instance }?): (number, s
 			say(problem :: string)
 			return 0, problem :: string
 		end
+		local variants = variantsOf(model)
 		local news: { Instance } = {}
+		local used: { [string]: number } = {} -- how many of each prop name so far (packs take turns)
 		undoable("Toolbox look for the selection", function()
 			local stored: { [string]: boolean } = {}
 			for _, prop in targets do
-				local custom = ("%s_%d"):format(prop:GetAttribute("PropName") :: string, id)
+				local propName = prop:GetAttribute("PropName") :: string
+				local names = variantNames(("%s_%d"):format(propName, id), #variants)
+				local k = (used[propName] or 0) % #variants + 1
+				used[propName] = (used[propName] or 0) + 1
+				local custom = names[k]
 				if not stored[custom] then
 					stored[custom] = true
-					storeCustom(custom, model:Clone(), id)
+					storeCustom(custom, variants[k]:Clone(), id)
 				end
 				local new = swapOne(prop, custom)
 				if new then
@@ -797,7 +893,9 @@ function Swap.Selected(code: number | string, things: { Instance }?): (number, s
 				end
 			end
 		end)
-		model:Destroy()
+		for _, variant in variants do
+			variant:Destroy()
+		end
 		if not things then
 			pcall(function()
 				game:GetService("Selection"):Set(news)
@@ -821,6 +919,78 @@ function Swap.Selected(code: number | string, things: { Instance }?): (number, s
 	local message = table.concat(lines, " ")
 	say(message)
 	return changed, message
+end
+
+--[[
+	One secret pumpkin (Easter egg) gets the look of a Toolbox model:
+	  require(game.ServerScriptService.Server.Tools.Swap).Egg("ForestGhost", 15145049241)
+	The first word is the egg's Id (Config.EasterEggs.List, or the EggId attribute on its Egg
+	part). The model is kept as Custom.Props.Egg<Id> (only that egg; Egg<Look>, e.g. EggGhost,
+	changes every egg with that look) and the egg in Workspace.Hub is rebuilt in its spot.
+]]
+function Swap.Egg(eggId: string, code: number | string): (number, string)
+	local id = assetId(code)
+	if not id then
+		return notCode('Egg("ForestGhost", 12345678)')
+	end
+	local known = false
+	for _, egg in Config.EasterEggs.List do
+		if egg.Id == eggId then
+			known = true
+		end
+	end
+	if not known then
+		local message = ("There is no egg with the Id %q (see Config.EasterEggs.List)."):format(
+			tostring(eggId)
+		)
+		say(message)
+		return 0, message
+	end
+	local model, problem = Swap.LoadToolbox(id)
+	if not model then
+		say(problem :: string)
+		return 0, problem :: string
+	end
+	local hub = workspace:FindFirstChild("Hub")
+	local rebuilt = 0
+	undoable("Toolbox look for an egg", function()
+		storeCustom("Egg" .. eggId, model, id)
+		if not hub then
+			return
+		end
+		for _, part in CollectionService:GetTagged(Tags.EasterEgg) do
+			if part:IsDescendantOf(hub) and part:GetAttribute("EggId") == eggId then
+				-- The whole egg: the outermost Model it is in below the EasterEggs group (a Toolbox
+				-- look may nest it; in an older saved hub the group and the hub are Models too).
+				local holder: Instance = part
+				while
+					holder.Parent
+					and holder.Parent:IsA("Model")
+					and holder.Parent ~= hub
+					and holder.Parent.Name ~= "EasterEggs"
+				do
+					holder = holder.Parent
+				end
+				holder:Destroy()
+			end
+		end
+		local EggSection = (require :: any)(script.Parent.Parent.Hub.Sections.EasterEggs)
+		for _, placed in EggSection.PlaceMissing(hub) do
+			if placed == eggId then
+				rebuilt += 1
+			end
+		end
+	end)
+	local message = ("The egg %s now looks like Toolbox model %d (Custom.Props.Egg%s)%s."):format(
+		eggId,
+		id,
+		eggId,
+		if rebuilt > 0 then " and was rebuilt in the lobby" else ""
+	) .. (if RunService:IsRunning()
+		then " (This playtest only: stop the game and run it in the command bar to keep it.)"
+		else " Save the place (Ctrl+S) to keep it. Ctrl+Z undoes it.")
+	say(message)
+	return rebuilt, message
 end
 
 return Swap

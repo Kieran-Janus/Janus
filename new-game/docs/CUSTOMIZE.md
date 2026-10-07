@@ -136,7 +136,7 @@ Want every pumpkin in the game to be **your** pumpkin? You don't have to click o
 Good to know:
 - **Size is automatic.** Each copy is scaled to the height of the thing it replaces (a small pumpkin stays small, a big one stays big), so any size of model works. To keep the size you built it at, add the attribute **KeepSize** (boolean, ticked) to your model.
 - **Facing**: the model's front is the front of its pivot (Model tab > **Pivot > Edit Pivot**, look at the arrow). Turned the wrong way? Rotate your model and try again.
-- **Lights**: a jack-o'-lantern, lantern, lamppost or candle with no light inside gets the glow light the built one had, so the maps don't go dark (switch: `Config.Custom.PropLights`). Jack-o'-lanterns that are built without a light (most of the lobby's: their faces glow by themselves) stay without one, so the lobby keeps within its phone light budget; `EveryJackOLantern = true` lights them all, but phones get slower.
+- **Lights**: a jack-o'-lantern, lantern, lamppost or candle with no light inside gets the glow light the built one had, so the maps don't go dark (switch: `Config.Custom.PropLights`). Jack-o'-lanterns that are built without a light (most of the lobby's: their faces glow by themselves) stay without one, so the lobby keeps within its phone light budget; `EveryJackOLantern = true` lights them all, but phones get slower. A light *inside* your model (many Toolbox jack-o'-lanterns have one) is switched off where the built thing has none, for the same reason; `ModelLights = true` keeps them all on.
 - **Decorations stay walk-through.** Store models are usually solid. Where the built thing is just decoration you walk through (the Pumpkin Patch field pumpkins, cobwebs, candles, crows, flowers, mushrooms, bats...), your model is too: nobody bumps into it, the King sees through it, and candy flies through it.
 - **Gameplay pieces keep working with any model.** For `CollectPumpkin`, `HidingPumpkin`, `ParkourPumpkin` and `Haystack` your model is only the *look*: an invisible part still does the job (the pickup you touch, the hitbox candy hits, the lid you land on, the spot that hides you from the King).
 - **Not sure what something is called?** Select it in Studio (in a playtest, or a baked lobby/map) and look at its **PropName** attribute (Properties > Attributes).
@@ -157,6 +157,9 @@ Every free model in the Toolbox (Creator Store) has a code: the number in its li
 - Run `.Toolbox` again with another code to change your mind: the model you had is kept in `ServerStorage > CustomBackups`.
 - Normal look back for **every copy**: delete the model from `Custom > Props` and run `require(game.ServerScriptService.Server.Tools.Swap).Props({ Revert = true })`. For **one thing**: delete its `Pumpkin_<code>` model from `Custom > Props`, then the same Revert line.
 - Pumpkins have several names: lobby pumpkins `Pumpkin`, carved ones `JackOLantern`, parkour pumpkins `ParkourPumpkin`, King Hunt pickups `CollectPumpkin`, Hide & Seek pumpkins `HidingPumpkin`. Use the list for "all pumpkins".
+- **Packs**: a Toolbox code that is a pack (a folder of 7 different trees, 2 mushrooms...) is spread over the copies: the 1st copy gets the 1st model, the 2nd the 2nd, and so on, so every kind is used.
+- **Facing the wrong way?** Some Toolbox models are built back to front. Select the model in `Custom > Props`, turn its pivot round (Model tab > Pivot > Edit Pivot, rotate 180), then run `require(game.ServerScriptService.Server.Tools.Swap).Props()`.
+- **One secret pumpkin (Easter egg)**: `require(game.ServerScriptService.Server.Tools.Swap).Egg("ForestGhost", 15145049241)`; the egg Ids are in `Config.EasterEggs.List` (Name "Lost Forest Ghost" = Id `ForestGhost`).
 - Or just tell Claude Code the code and what it should replace ("make every lobby pumpkin 11600489662", "make the pumpkin by the shop 11600489662").
 - It only works in Studio's command bar while the game is stopped (a running game can't download free models).
 
@@ -498,7 +501,7 @@ Hidden pumpkins, candies, skulls and ghosts around the lobby. Each pays its coin
   New eggs appear the next time the game starts, also in a saved lobby.
 - **Or place one by hand:** give any part the tag `EasterEgg` and the attributes `EggId` (text) and `Coins` (number). An `EggId` from the list pays the list's coins.
 - **Move one:** drag it in a baked lobby (`Workspace.Hub.EasterEggs`).
-- Your own egg look: a model named `EggGoldenPumpkin` (or `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost`) in `Custom > Props`.
+- Your own egg look: a model named `EggGoldenPumpkin` (or `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost`) in `Custom > Props`. For **one egg only**, name it `Egg` + the egg's Id (e.g. `EggForestGhost`, Ids in `Config.EasterEggs.List`), or with a Toolbox code: `require(game.ServerScriptService.Server.Tools.Swap).Egg("ForestGhost", 15145049241)` (rebuilds that egg in the lobby; save after).
 - Test: F8 > "Easter eggs: reset mine" lets you find them all again.
 - Or ask Claude Code: `/add-secret-pumpkin a candy skull on top of the clock tower, 75 coins`.
 
