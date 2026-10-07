@@ -106,7 +106,11 @@ local function preview(model: Model, parent: Instance): (ViewportFrame, Spin)
 	local cf, size = model:GetBoundingBox()
 	local camera = Instance.new("Camera")
 	camera.FieldOfView = 40
-	local distance = size.Magnitude * Config.Shop.PreviewDistance + 0.5
+	local distance = size.Magnitude
+			* (if Layout.IsPhone()
+				then Config.Shop.PhonePreviewDistance
+				else Config.Shop.PreviewDistance)
+		+ 0.5
 	local offset = Vector3.new(distance * 0.45, distance * 0.3, -distance)
 	camera.CFrame = CFrame.lookAt(cf.Position + offset, cf.Position)
 	camera.Parent = viewport
@@ -208,17 +212,40 @@ function ShopUI.Mount(gui: ScreenGui)
 	sizeLimit.MaxSize = Vector2.new(660, 460)
 	sizeLimit.Parent = panel
 
+	-- The rows above the cards (phones: tighter, so the cards and their pictures get the room).
+	local HEAD = if compact
+		then {
+			RowY = 6,
+			RowH = 28,
+			TabsY = 36,
+			TabsH = 30,
+			FilterY = 70,
+			FilterH = 28,
+			ListTop = 102,
+			ListTopNoFilter = 70,
+		}
+		else {
+			RowY = 8,
+			RowH = 32,
+			TabsY = 46,
+			TabsH = 34,
+			FilterY = 86,
+			FilterH = 30,
+			ListTop = 122,
+			ListTopNoFilter = 88,
+		}
+
 	local title = Theme.label(Config.Shop.Title, 22, panel)
 	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Position = UDim2.fromOffset(16, 8)
-	title.Size = UDim2.new(0.6, 0, 0, 32)
+	title.Position = UDim2.fromOffset(16, HEAD.RowY)
+	title.Size = UDim2.new(0.6, 0, 0, HEAD.RowH)
 
 	local coinsLabel = Theme.label("", 18, panel)
 	coinsLabel.TextColor3 = Theme.Selected
 	coinsLabel.TextXAlignment = Enum.TextXAlignment.Right
 	coinsLabel.AnchorPoint = Vector2.new(1, 0)
-	coinsLabel.Position = UDim2.new(1, -56, 0, 8)
-	coinsLabel.Size = UDim2.new(0.4, -56, 0, 32)
+	coinsLabel.Position = UDim2.new(1, -56, 0, HEAD.RowY)
+	coinsLabel.Size = UDim2.new(0.4, -56, 0, HEAD.RowH)
 
 	-- The coins counter: jumps to a value, or (after a purchase / reward) rolls to it.
 	local function coinText(n: number): string
@@ -272,13 +299,13 @@ function ShopUI.Mount(gui: ScreenGui)
 
 	local close = button("X", panel)
 	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -10, 0, 8)
-	close.Size = UDim2.fromOffset(36, 32)
+	close.Position = UDim2.new(1, -10, 0, HEAD.RowY)
+	close.Size = UDim2.fromOffset(36, HEAD.RowH)
 
 	local tabsBar = Instance.new("Frame")
 	tabsBar.BackgroundTransparency = 1
-	tabsBar.Position = UDim2.fromOffset(16, 46)
-	tabsBar.Size = UDim2.new(1, -32, 0, 34)
+	tabsBar.Position = UDim2.fromOffset(16, HEAD.TabsY)
+	tabsBar.Size = UDim2.new(1, -32, 0, HEAD.TabsH)
 	tabsBar.Parent = panel
 	local tabsLayout = Instance.new("UIListLayout")
 	tabsLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -291,8 +318,8 @@ function ShopUI.Mount(gui: ScreenGui)
 	filterBar.Name = "Filters"
 	filterBar.BackgroundTransparency = 1
 	filterBar.BorderSizePixel = 0
-	filterBar.Position = UDim2.fromOffset(16, 86)
-	filterBar.Size = UDim2.new(1, -32, 0, 30)
+	filterBar.Position = UDim2.fromOffset(16, HEAD.FilterY)
+	filterBar.Size = UDim2.new(1, -32, 0, HEAD.FilterH)
 	filterBar.ScrollBarThickness = 3
 	filterBar.ScrollingDirection = Enum.ScrollingDirection.X
 	filterBar.AutomaticCanvasSize = Enum.AutomaticSize.X
@@ -782,7 +809,7 @@ function ShopUI.Mount(gui: ScreenGui)
 	themeMenu.ZIndex = 20
 	themeMenu.BackgroundColor3 = Theme.Background
 	themeMenu.BorderSizePixel = 0
-	themeMenu.Position = UDim2.fromOffset(16, 118)
+	themeMenu.Position = UDim2.fromOffset(16, HEAD.FilterY + HEAD.FilterH + 2)
 	themeMenu.Size = UDim2.new(0, 240, 1, -130)
 	themeMenu.ScrollBarThickness = 6
 	themeMenu.AutomaticCanvasSize = Enum.AutomaticSize.Y
@@ -1011,7 +1038,7 @@ function ShopUI.Mount(gui: ScreenGui)
 		local items = tab ~= "Packs"
 		filterBar.Visible = items and state.Ready
 		pager.Visible = items and state.Ready
-		local top = if filterBar.Visible then 122 else 88
+		local top = if filterBar.Visible then HEAD.ListTop else HEAD.ListTopNoFilter
 		local bottom = if compact then 40 else 42
 		list.Position = UDim2.fromOffset(16, top)
 		list.Size = UDim2.new(1, -32, 1, -(top + bottom))
@@ -1036,7 +1063,7 @@ function ShopUI.Mount(gui: ScreenGui)
 		local b =
 			button(if id == "Packs" then "Packs & VIP" else Config.Shop.SlotNames[id], tabsBar)
 		b.LayoutOrder = i
-		b.Size = UDim2.fromOffset(if id == "Packs" then 130 else 100, 34)
+		b.Size = UDim2.fromOffset(if id == "Packs" then 130 else 100, HEAD.TabsH)
 		b.Activated:Connect(function()
 			if tab ~= id then
 				tab = id

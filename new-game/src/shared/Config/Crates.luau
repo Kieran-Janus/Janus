@@ -232,6 +232,7 @@ return {
 		FlySeconds = 0.7, -- the skin flying out onto the pedestal
 		PedestalSeconds = 1.2, -- the skin spinning on its pedestal before the reveal card
 		CameraDistance = 3.8, -- how far the camera is from the chest, in chest widths (smaller = bigger chest)
+		PhoneCameraDistance = 3, -- the same on phones (closer: a bigger chest on a small screen)
 		-- The beam's colour for each rarity (CRAZY is a rainbow).
 		BeamColors = {
 			Common = rgb(160, 200, 150),

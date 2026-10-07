@@ -447,6 +447,32 @@ describe("Buy buttons in view on a short phone screen", function()
 	end)
 end)
 
+describe("The crate panel's room on a phone", function()
+	it("drops the hint line so the crates get the room, but keeps real messages", function()
+		local p = screen(640, 302, true)
+		p.Config.Features.Crates = true
+		local CrateUI = p.rt:require(p.Client.CrateUI)
+		CrateUI.Mount(p.gui)
+		p.rt:advance(0.5)
+		p.player:SetAttribute("CratesRestricted", false)
+		CrateUI.Open()
+		p.rt:advance(0.2)
+		local panel = p.gui.Crates
+		local message = panel.Message
+		expect(message.Text).toBe(p.Config.Crates.Text.Hint)
+		expect(message.Visible).toBe(false)
+		expect(panel.Body.Position.Y.Offset).toBe(46) -- straight under the title row
+		-- A message that matters (here the region rule) shows, and the body makes room again.
+		p.player:SetAttribute("CratesRestricted", true)
+		p.rt:advance(0.2)
+		expect(message.Text).toBe(p.Config.Crates.Text.Restricted)
+		expect(message.Visible).toBe(true)
+		expect(panel.Body.Position.Y.Offset).toBeGreaterThan(46)
+		p.player:SetAttribute("CratesRestricted", false)
+		p.rt:advance(0.2)
+	end)
+end)
+
 describe("The owner panel on a phone", function()
 	it("gives admins an Admin button instead of F8, and it opens the panel", function()
 		local p = screen(749, 309, true)

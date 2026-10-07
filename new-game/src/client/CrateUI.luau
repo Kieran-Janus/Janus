@@ -346,6 +346,23 @@ function CrateUI.Mount(gui: ScreenGui)
 	local listView = view("List")
 	local previewView = view("Preview")
 	local openView = view("Opening")
+
+	-- Phones: while a crate opens, the hint line goes and the chest gets its room (a short
+	-- landscape phone has little height to spare).
+	if compact then
+		local function fitBody()
+			-- (also whenever the line is only the hint; messages that matter, like "You need X more
+			-- coins" or the region rule, still show)
+			local full = openView.Visible or message.Text == text.Hint or message.Text == ""
+			message.Visible = not full
+			local top = if full then 46 else 46 + messageHeight
+			body.Position = UDim2.fromOffset(12, top)
+			body.Size = UDim2.new(1, -24, 1, -(top + 10))
+		end
+		openView:GetPropertyChangedSignal("Visible"):Connect(fitBody)
+		message:GetPropertyChangedSignal("Text"):Connect(fitBody)
+		fitBody()
+	end
 	local resultsView = view("Results") -- quick open: every result on one page
 
 	local function setMessage(value: string, important: boolean?)
@@ -760,6 +777,20 @@ function CrateUI.Mount(gui: ScreenGui)
 		grid.CellPadding = UDim2.fromOffset(10, 10)
 		grid.SortOrder = Enum.SortOrder.LayoutOrder
 		grid.Parent = scroller
+		if compact then
+			-- Phones: a whole card (chest, name and price) fits the list's height, so nothing is cut
+			-- off below; the chest shrinks a little on the shortest screens.
+			local function fitCards()
+				local fit = panel:FindFirstChild("FitScale")
+				local scale = if fit and fit:IsA("UIScale") and fit.Scale > 0 then fit.Scale else 1
+				local room = scroller.AbsoluteSize.Y / scale - 8
+				if room > 0 then
+					grid.CellSize = UDim2.fromOffset(124, math.clamp(math.floor(room), 118, 168))
+				end
+			end
+			scroller:GetPropertyChangedSignal("AbsoluteSize"):Connect(fitCards)
+			fitCards()
+		end
 		local pad = Instance.new("UIPadding")
 		pad.PaddingTop = UDim.new(0, 4)
 		pad.PaddingLeft = UDim.new(0, 4)
@@ -1900,6 +1931,11 @@ function CrateUI.Mount(gui: ScreenGui)
 		halo.Position = UDim2.fromScale(0.5, 0.6)
 		halo.Size = UDim2.fromScale(0.4, 0.7)
 		halo.Parent = stage
+		-- (round on any screen: a wide phone stage would stretch it into a flat pill)
+		local haloShape = Instance.new("UIAspectRatioConstraint")
+		haloShape.AspectRatio = 1.3
+		haloShape.DominantAxis = Enum.DominantAxis.Height
+		haloShape.Parent = halo
 		local haloRound = Instance.new("UICorner")
 		haloRound.CornerRadius = UDim.new(0.5, 0)
 		haloRound.Parent = halo
@@ -2023,7 +2059,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		local camera = Instance.new("Camera")
 		camera.FieldOfView = 40
 		local focus = Vector3.new(0, size * 0.75, -size * 0.3)
-		local away = openingCfg.CameraDistance
+		local away = if compact then openingCfg.PhoneCameraDistance else openingCfg.CameraDistance
 		camera.CFrame =
 			CFrame.lookAt(focus + Vector3.new(0, size * away * 0.2, -size * away), focus)
 		camera.Parent = viewport
