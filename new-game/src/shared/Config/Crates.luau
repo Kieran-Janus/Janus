@@ -239,6 +239,29 @@ return {
 			Rare = rgb(185, 95, 255),
 		} :: { [string]: Color3 },
 		RainbowRarities = { Crazy = true } :: { [string]: boolean },
+		-- How the beam looks: a soft fan of light pouring up out of the chest (a few faint
+		-- overlapping shafts, brightest in the middle), slow rays turning behind it and a
+		-- quick white flash when the lid bursts. Sizes are fractions of the stage's height.
+		Beam = {
+			Height = 0.8, -- how tall the light reaches above the chest
+			Width = 0.13, -- how wide each shaft of light is
+			Shafts = 7, -- shafts in the fan (more = softer edges; phones: PhoneShafts)
+			PhoneShafts = 5,
+			Spread = 16, -- degrees the fan opens to each side (0 = a straight column)
+			ShaftTransparency = 0.72, -- how see-through one shaft is (they add up in the middle)
+			Sway = 3, -- degrees the shafts drift side to side
+			SwaySpeed = 1.6, -- how fast they drift
+			Shimmer = 0.35, -- how much the light flickers (0 = steady, 1 = a lot)
+			ShimmerSpeed = 7,
+			Rays = 6, -- straight rays turning slowly behind the chest (each makes two spokes)
+			RayLength = 1.5, -- how far the rays reach
+			RayWidth = 0.05,
+			RayTransparency = 0.8,
+			RaySpeed = 18, -- degrees a second the rays turn
+			HoldFade = 0.6, -- how much the light dims once the skin is on its pedestal (0-1)
+			FlashSeconds = 0.3, -- the white flash when the lid bursts (0 = no flash)
+			FlashTransparency = 0.25, -- how strong the flash starts (0 = solid white)
+		},
 		Confetti = 70, -- confetti pieces for a CRAZY (phones: PhoneConfetti)
 		PhoneConfetti = 25,
 		CoinPour = 14, -- coins pouring out for a duplicate (phones: PhoneCoinPour)

@@ -37,11 +37,6 @@ local function shop(animate: boolean)
 		}
 	end
 	local Items = rt:require("ReplicatedStorage.Shared.Items")
-	-- leaderstats up front, like the server makes them (ShopUI waits for them; the harness's
-	-- WaitForChild polling would otherwise keep RunService frames from running).
-	local player = rt.game:GetService("Players").LocalPlayer
-	local stats = rt:create("Folder", { Name = "leaderstats" }, player)
-	local coinsValue = rt:create("IntValue", { Name = "Coins", Value = server.Coins }, stats)
 	remotes.GetShopState.OnServerInvoke = function()
 		return copy()
 	end
@@ -59,7 +54,6 @@ local function shop(animate: boolean)
 				copy()
 		end
 		server.Coins -= price
-		coinsValue.Value = server.Coins
 		table.insert(server.Owned, id)
 		server.Equipped[item.Slot] = id
 		return true, "Bought " .. item.Name .. "!", copy()

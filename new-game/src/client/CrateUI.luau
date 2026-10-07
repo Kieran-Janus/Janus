@@ -1911,29 +1911,108 @@ function CrateUI.Mount(gui: ScreenGui)
 		})
 		haloSoft.Parent = halo
 
+		--[[
+			The beam (Config.Crates.Opening.Beam): light pouring up out of the chest. A clear
+			holder (its BackgroundColor3 is the beam colour) with a fan of faint shafts that
+			overlap brightest in the middle and fade out at the top, a glow at the chest's
+			mouth and slow rays turning behind it all. Every piece is made here, once; the
+			frame loop in `pose` only moves and fades them. Light is coloured by the frame's
+			background and tinted through its UIGradient (white, or the cycling rainbow).
+		]]
+		local beamCfg = openingCfg.Beam
+		local beamBase = UDim2.fromScale(0.5, 0.5) -- (the chest's mouth on the stage)
 		local beam = Instance.new("Frame")
 		beam.Name = "Beam"
 		beam.ZIndex = 2
 		beam.BorderSizePixel = 0
 		beam.BackgroundColor3 = beamColor
-		beam.AnchorPoint = Vector2.new(0.5, 1)
-		beam.Position = UDim2.fromScale(0.5, 0.5)
-		beam.Size = UDim2.fromScale(0.14, 0)
+		beam.BackgroundTransparency = 1
+		beam.Size = UDim2.fromScale(1, 1)
 		beam.Visible = false
 		beam:SetAttribute("Rarity", rarity)
 		beam:SetAttribute("Rainbow", rainbow)
 		beam.Parent = stage
-		local beamGradient = Instance.new("UIGradient")
-		beamGradient.Rotation = 90 -- (top to bottom: it fades out upwards)
-		beamGradient.Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 1),
-			NumberSequenceKeypoint.new(0.6, 0.35),
-			NumberSequenceKeypoint.new(1, 0.1),
-		})
-		beamGradient.Color = if rainbow
-			then rainbowAt(0)
-			else ColorSequence.new(Color3.new(1, 1, 1))
-		beamGradient.Parent = beam
+		local lightGradients: { UIGradient } = {}
+		local function light(
+			name: string,
+			parent: Instance,
+			rotation: number,
+			fade: { number }
+		): Frame
+			local frame = Instance.new("Frame")
+			frame.Name = name
+			frame.ZIndex = 2
+			frame.BorderSizePixel = 0
+			frame.BackgroundColor3 = beamColor
+			frame.AnchorPoint = Vector2.new(0.5, 0.5)
+			frame.SizeConstraint = Enum.SizeConstraint.RelativeYY -- (sizes are of the height)
+			frame.Parent = parent
+			local keys = {}
+			for i = 1, #fade, 2 do
+				table.insert(keys, NumberSequenceKeypoint.new(fade[i], fade[i + 1]))
+			end
+			local gradient = Instance.new("UIGradient")
+			gradient.Rotation = rotation
+			gradient.Transparency = NumberSequence.new(keys)
+			gradient.Color = if rainbow
+				then rainbowAt(0)
+				else ColorSequence.new(Color3.new(1, 1, 1))
+			gradient.Parent = frame
+			table.insert(lightGradients, gradient)
+			return frame
+		end
+		-- Rays turning behind the chest: thin bars through the middle, fading at both ends.
+		local rays = Instance.new("Frame")
+		rays.Name = "Rays"
+		rays.ZIndex = 2
+		rays.BackgroundTransparency = 1
+		rays.AnchorPoint = Vector2.new(0.5, 0.5)
+		rays.Position = beamBase
+		rays.SizeConstraint = Enum.SizeConstraint.RelativeYY
+		rays.Size = UDim2.fromScale(0, 0)
+		rays.Parent = beam
+		local rayFrames: { Frame } = {}
+		local rayCount = math.max(0, math.floor(beamCfg.Rays))
+		local rayLength = math.max(0.01, beamCfg.RayLength)
+		for i = 1, rayCount do
+			local ray = light("Ray", rays, 90, { 0, 1, 0.3, 0.55, 0.5, 0, 0.7, 0.55, 1, 1 })
+			ray.SizeConstraint = Enum.SizeConstraint.RelativeXY
+			ray.Position = UDim2.fromScale(0.5, 0.5)
+			ray.Size = UDim2.fromScale(beamCfg.RayWidth / rayLength, 1)
+			ray.Rotation = (i - 1) * 180 / rayCount
+			table.insert(rayFrames, ray)
+		end
+		-- The fan: each shaft is twice as tall as the light and turns about its middle (the
+		-- chest's mouth); its lower half is clear, its upper half fades out towards the top.
+		type Shaft = { Frame: Frame, Angle: number, Phase: number }
+		local shafts: { Shaft } = {}
+		local shaftCount =
+			math.max(1, math.floor(if compact then beamCfg.PhoneShafts else beamCfg.Shafts))
+		for i = 1, shaftCount do
+			local side = if shaftCount == 1 then 0 else (i - 1) / (shaftCount - 1) * 2 - 1
+			local frame =
+				light("Shaft", beam, 90, { 0, 1, 0.15, 0.8, 0.42, 0.1, 0.5, 0, 0.502, 1, 1, 1 })
+			frame.Position = beamBase
+			frame.Size = UDim2.fromScale(0, 0)
+			table.insert(shafts, { Frame = frame, Angle = side * beamCfg.Spread, Phase = i * 2.3 })
+		end
+		-- A soft glow where the light leaves the chest.
+		local mouth = light("Glow", beam, 0, { 0, 1, 0.5, 0.2, 1, 1 })
+		mouth.Position = beamBase
+		mouth.Size = UDim2.fromScale(0, 0)
+		local mouthRound = Instance.new("UICorner")
+		mouthRound.CornerRadius = UDim.new(0.5, 0)
+		mouthRound.Parent = mouth
+		-- The white flash as the lid bursts (in front of the chest).
+		local flash = Instance.new("Frame")
+		flash.Name = "BeamFlash"
+		flash.ZIndex = 4
+		flash.BorderSizePixel = 0
+		flash.BackgroundColor3 = Color3.new(1, 1, 1)
+		flash.BackgroundTransparency = 1
+		flash.Size = UDim2.fromScale(1, 1)
+		flash.Visible = false
+		flash.Parent = stage
 
 		local viewport = newViewport(stage)
 		viewport.Name = "ChestView"
@@ -2012,6 +2091,47 @@ function CrateUI.Mount(gui: ScreenGui)
 		local tBurst = drop + shake
 		local tFly = tBurst + burstTime
 		local tEnd = tFly + fly + hold
+
+		-- Moves and fades the beam's pieces (made above) for time `t`; nothing is created.
+		local function poseBeam(t: number)
+			local tb = t - tBurst
+			local grow = easeOut(math.clamp(tb / burstTime, 0, 1))
+			local dim = 1 - math.clamp((t - tFly) / fly, 0, 1) * math.clamp(beamCfg.HoldFade, 0, 1)
+			local shimmer = math.clamp(beamCfg.Shimmer, 0, 1)
+			local shaftOpacity = 1 - math.clamp(beamCfg.ShaftTransparency, 0, 1)
+			for _, shaft in shafts do
+				local flicker = 1
+					- shimmer * (0.5 + 0.5 * math.sin(tb * beamCfg.ShimmerSpeed + shaft.Phase))
+				local frame = shaft.Frame
+				frame.BackgroundTransparency = 1 - shaftOpacity * dim * flicker
+				frame.Rotation = shaft.Angle * (0.3 + 0.7 * grow)
+					+ beamCfg.Sway * math.sin(tb * beamCfg.SwaySpeed + shaft.Phase)
+				frame.Size =
+					UDim2.fromScale(beamCfg.Width * (0.5 + 0.5 * grow), beamCfg.Height * 2 * grow)
+			end
+			local rayOpacity = (1 - math.clamp(beamCfg.RayTransparency, 0, 1)) * dim
+			for _, ray in rayFrames do
+				ray.BackgroundTransparency = 1 - rayOpacity
+			end
+			rays.Size = UDim2.fromScale(rayLength * grow, rayLength * grow)
+			rays.Rotation = (tb * beamCfg.RaySpeed) % 360
+			local pulse = 1 - shimmer * 0.5 * (0.5 + 0.5 * math.sin(tb * beamCfg.ShimmerSpeed))
+			mouth.BackgroundTransparency = 1 - 0.75 * dim * pulse
+			mouth.Size = UDim2.fromScale(beamCfg.Width * 3.2 * grow, beamCfg.Width * 1.1 * grow)
+			local flashSeconds = math.max(0, beamCfg.FlashSeconds)
+			local f = if flashSeconds > 0 then tb / flashSeconds else 1
+			flash.Visible = f < 1
+			if f < 1 then
+				local start = math.clamp(beamCfg.FlashTransparency, 0, 1)
+				flash.BackgroundTransparency = start + (1 - start) * f
+			end
+			if rainbow then
+				local colors = rainbowAt(t * 0.6)
+				for _, gradient in lightGradients do
+					gradient.Color = colors
+				end
+			end
+		end
 
 		type Coin = { Frame: Frame, X: number, Y: number, VX: number, VY: number }
 		local coinBits: { Coin } = {}
@@ -2122,11 +2242,8 @@ function CrateUI.Mount(gui: ScreenGui)
 			end
 			if t >= tBurst then
 				burstOpen()
-				local u = math.clamp((t - tBurst) / burstTime, 0, 1)
-				beam.Size = UDim2.fromScale(0.12 + 0.06 * u, 0.75 * easeOut(u))
-				beam.BackgroundTransparency = math.clamp((t - tFly) / fly, 0, 1) * 0.9
+				poseBeam(t)
 				if rainbow then
-					beamGradient.Color = rainbowAt(t * 0.6)
 					ring.Color = Color3.fromHSV((t * 0.6) % 1, 0.7, 1)
 				end
 			end

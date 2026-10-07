@@ -14,10 +14,12 @@
 	that can be touched.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Tags = require(ReplicatedStorage.Shared.Tags)
 local Kit = require(script.Parent.Parent.Build.Kit)
 local MapService = require(script.Parent.MapService)
 local NoiseService = require(script.Parent.NoiseService)
@@ -121,6 +123,8 @@ local function spawnOne(map: MapService.LoadedMap)
 		nil,
 		{ Anchor = "Center" }
 	)
+	-- (players' screens find it by this tag to make it bob and pop: src/client/MapLife.luau)
+	CollectionService:AddTag(pumpkin, Tags.PumpkinPickup)
 	pumpkin.Parent = folder
 	active += 1
 end

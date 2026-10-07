@@ -528,6 +528,8 @@ local function disguise(r: Round, player: Player)
 	local floor = CFrame.new(floorAt) * yaw(root.CFrame)
 	local model, source = newPumpkin(r, floor, like)
 	model:SetAttribute("HiderUserId", player.UserId)
+	-- (screens wobble it now and then exactly like the decoys: src/client/MapLife.luau)
+	CollectionService:AddTag(model, Tags.HiderPumpkin)
 	-- (its width, for near misses: measured before it is welded on)
 	local width = model:GetAttribute("PumpkinWidth")
 	if typeof(width) ~= "number" then

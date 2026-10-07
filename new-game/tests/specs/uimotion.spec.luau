@@ -290,6 +290,19 @@ describe("PanelManager with motion", function()
 		settings.Visible = false
 		w.rt:advance(1)
 	end)
+
+	it("closes whatever is open when you're pulled into a round", function()
+		shop.Visible = true
+		w.rt:advance(1)
+		w.player:SetAttribute("InRound", true)
+		w.rt:flush()
+		expect(shop.Visible).toBe(false)
+		expect(PanelManager.Top()).toBeNil()
+		w.player:SetAttribute("InRound", nil) -- back in the lobby: nothing reopens
+		w.rt:flush()
+		expect(shop.Visible).toBe(false)
+		w.rt:advance(1)
+	end)
 end)
 
 describe("Hud coins", function()

@@ -56,6 +56,8 @@ local Tags = {
 	EasterEgg = "EasterEgg", -- attributes EggId, Coins
 	-- Round maps
 	HidingDecoy = "HidingDecoy", -- Hide & Seek: fake pumpkins hiders blend in with
+	HiderPumpkin = "HiderPumpkin", -- Hide & Seek: a hider's pumpkin (the server tags it in a round)
+	PumpkinPickup = "PumpkinPickup", -- King Hunt: a pumpkin to collect (PumpkinService tags it)
 	ScareTrigger = "ScareTrigger", -- ScareMaze: walking here sets off a scare (attribute Kind)
 	MazeExit = "MazeExit", -- ScareMaze: Survivors who reach it escape
 	HauntSpawn = "HauntSpawn", -- ScareMaze: where Haunters start

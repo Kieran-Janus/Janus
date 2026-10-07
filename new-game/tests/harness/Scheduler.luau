@@ -39,6 +39,10 @@ function Scheduler.new(onError: (message: string, traceback: string) -> ())
 	self.frameHook = nil :: ((dt: number) -> ())?
 	self.frameActive = nil :: (() -> boolean)?
 	self.resumes = 0
+	-- Index of the last frame that ran (frame n is at time n * frame). Frames are counted,
+	-- not worked out from `now`: a thread re-checking every frame (WaitForChild) wakes a hair
+	-- before each frame boundary, and rounding `now` there used to skip that frame for good.
+	self.lastFrame = 0
 	return self
 end
 
@@ -201,8 +205,13 @@ function Scheduler:advance(dt: number?)
 	while true do
 		local top = self.heap[1]
 		local frames = self.frameHook ~= nil and self.frameActive ~= nil and self.frameActive()
-		local nextFrame = (math.floor(self.now / self.frame + 1e-7) + 1) * self.frame
-		if frames and nextFrame <= target + 1e-9 and (not top or nextFrame <= top.time) then
+		if not frames then
+			-- Nothing listens: no backlog of frames builds up while idle.
+			self.lastFrame = math.max(self.lastFrame, math.floor(self.now / self.frame + 1e-7))
+		end
+		local nextFrame = (self.lastFrame + 1) * self.frame
+		if frames and nextFrame <= target + 1e-9 and (not top or nextFrame <= top.time + 1e-9) then
+			self.lastFrame += 1
 			self.now = math.max(self.now, nextFrame);
 			(self.frameHook :: any)(self.frame)
 		elseif top and top.time <= target then
@@ -223,6 +232,10 @@ function Scheduler:advance(dt: number?)
 		end
 	end
 	self.now = math.max(self.now, target)
+	if not (self.frameHook ~= nil and self.frameActive ~= nil and self.frameActive()) then
+		-- (so something connecting before the next advance doesn't get a burst of old frames)
+		self.lastFrame = math.max(self.lastFrame, math.floor(self.now / self.frame + 1e-7))
+	end
 end
 
 -- Number of threads waiting to run.

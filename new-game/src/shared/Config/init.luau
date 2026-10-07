@@ -11,6 +11,7 @@
 	  Parkour.luau, Minigames.luau, EasterEggs.luau, HideSeek.luau, ScareMaze.luau
 	  Rarity.luau      Common / Uncommon / Rare / CRAZY prices and colours
 	  Crates.luau      crates and their odds
+	  MapLife.luau     round maps come alive (bobbing pumpkins, fireflies, wobbling decoys)
 	  Menu.luau        the top-left menu tiles
 	  Maps/<Id>.luau   one file per round map (added to Maps.List below)
 	  Skins/           crate skins, one file per theme (added to Shop.Items below), and
@@ -77,6 +78,7 @@ local Config = {
 	Dances = require(script.Dances),
 	TowerParkour = require(script.TowerParkour),
 	Announce = require(script.Announce),
+	MapLife = require(script.MapLife),
 
 	Game = {
 		Name = "Pumpkin Panic", -- working title, see docs/DESIGN.md

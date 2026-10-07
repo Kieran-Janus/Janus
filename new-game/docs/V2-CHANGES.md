@@ -255,6 +255,7 @@ Something broken, or you just don't want it? Open `src/shared/Config/Features.lu
 | Robux crates only (coin crates stay) | line 26: `RobuxCrates = true,` |
 | CRAZY skins' animations (rainbow, orbiting pieces, pulsing glow) | line 27: `SkinEffects = true,` |
 | The old first-round tutorial (already off) | line 28: `Tutorial = false,` |
+| Round maps coming alive (bobbing pumpkins, fireflies, wobbling Hide & Seek pumpkins; only on screens) | line 29: `MapLife = true,` |
 
 Good to know:
 - A switched-off lobby area (parkour, Candy Rush, crates, Ready pad) is taken out of the running game. Your saved place still has it, so switching it back on brings it back.

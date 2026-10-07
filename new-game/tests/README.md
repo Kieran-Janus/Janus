@@ -59,6 +59,7 @@ an event handler, a Script), even if the test itself didn't notice.
 | `shopui.spec` | The shop's feel (`ShopJuice`, `Config.Shop.Juice`): a confirmed purchase pops the card, bursts sparkles (gone afterwards), rolls the coins to the exact total and turns the button into Unequip; a refused one wiggles the button and names the exact coins missing; equipping pops the checkmark and the "Wearing it!" toast; the next page shows the right items, popping in one after another; `Animate = false` is instant. |
 | `crateidle.spec` | The crate stand comes alive (`CrateIdle`): glow discs under the crates, only crates near the camera bob (a far one stays put and an out-of-range one goes back exactly), the lid peeks with light and sparkles and shuts exactly, a custom crate without a Lid only bobs, the Monster crate's pupils follow the nearest player inside their eye, walking close wakes a crate (wiggle, a label with name, real price and Odds opening `CrateUI.Open(id)`, hidden again when you leave), phones emit fewer sparkles, nothing happens with crates or Idle off; `HubAmbience` leaves stand crates alone (also with an old saved HubFloat tag) unless Idle is off. |
 | `lobbylife.spec` | The lobby comes alive (`LobbyLife`) with the whole hub built: the shopkeeper turns (yaw, within `MaxTurn`) to a nearby player and back, breathes, waves one arm on approach (a custom keeper without arms wiggles as one piece) and goes back exactly when the camera leaves; the Ready ring pulses faster with `ReadyCount` > 0; the READY sign hops when the count changes; floor signs shimmer within `TextFade` and are restored; the cauldron puffs; nothing moves far from the camera; switches off; bats fly by and nothing made collides, is queryable or touchable. |
+| `maplife.spec` | The round maps come alive (`MapLife`): with King Hunt's map and real `PumpkinService` pumpkins, a look-only copy bobs and spins (stem on the plain ball, glow light breathes) while the touch part stays exactly where the server put it (hidden only on this screen) and is put back when the camera leaves; touching still collects, then a sparkle burst and pop show where it was and clean up (no pops when the round ends); a custom `CollectPumpkin` works the same; fireflies drift near the camera on the map only, fewer on phones; on a real Hide & Seek round replicated to a client, a decoy and a hider's pumpkin wobble by the same angles, the real parts never move, and hiders are picked like decoys; nothing made collides, is queryable or touchable; switches off = nothing. |
 | `harness.spec` | Self-tests of the harness (geometry, raycasts, scheduler, signals, services). If these fail, don't trust the others. |
 
 ## Writing a spec
@@ -192,7 +193,8 @@ definitions file luau-lsp uses).
   local player).
 - **Events never fire by themselves**, except the ones the harness simulates: structural ones
   (`ChildAdded`, `Destroying`, `Changed`, `AttributeChanged`, CollectionService signals),
-  `RunService` per-frame events while time advances (only when something is connected),
+  `RunService` per-frame events while time advances (only when something is connected;
+  every frame fires, even while a task thread is polling a `WaitForChild` that never ends),
   `Tween.Completed`, `Humanoid` `HealthChanged`/`Died`/`MoveToFinished`, `BindableEvent`.
 - **No rendering, GUI layout, sound or terrain voxels.** GUI objects exist but sizes like
   `AbsoluteSize` read as zero; sounds are silent; Terrain methods are recorded no-ops.

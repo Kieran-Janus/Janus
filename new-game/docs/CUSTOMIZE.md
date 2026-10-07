@@ -66,6 +66,7 @@ Jump to: [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Mod
 | Photo Spot dances | `Config.Dances` (`src/shared/Config/Dances.luau`, see "Photo Spot dances" below) |
 | Glowing floor signs in front of each lobby area | `Config.Lobby.FloorSigns` (`src/shared/Config/Lobby.luau`) |
 | Lobby life: the shopkeeper breathes, turns and waves, the Ready pad pulses, floor signs shimmer, the cauldron bubbles, bats fly by (each with its own switch) | `Config.Lobby.Life` (`src/shared/Config/Lobby.luau`, client `src/client/LobbyLife.luau`) |
+| Map life: King Hunt pumpkins bob, spin, glow and pop with sparkles when collected; fireflies drift on the round map (a colour per map, fewer on phones); Hide & Seek decoys and hiders' pumpkins wobble now and then, exactly alike (each with its own switch; only on each player's screen, the real pumpkins never move) | `Config.MapLife` (`src/shared/Config/MapLife.luau`, client `src/client/MapLife.luau`), whole feature `Config.Features.MapLife` |
 | What in the lobby is solid | `Config.Lobby.Solid` (`src/shared/Config/Lobby.luau`, see "A solid lobby" below) |
 | Secret pumpkins (Easter eggs) | `src/shared/Config/EasterEggs.luau` |
 | Minigame celebrations (sparkles, "+1", confetti, fireworks, NEW BEST!) in Candy Rush, Web Scour, secret pumpkins and both parkour courses | one switch for all: `Config.Minigames.Effects.On` (`src/shared/Config/Minigames.luau`, also the phone share and shared sizes); each game's own `Effects` table (`CandyRush.luau`, `WebScour.luau`, `EasterEggs.luau`, `Parkour.luau`) |
@@ -380,7 +381,9 @@ Mystery crates give a random skin. Everything about them is in `src/shared/Confi
 - **Opening** (`Opening`): the chest drops in and bounces, shakes faster and faster
   (`ShakeSeconds`), then the lid bursts open with a beam in the colour of the rarity you really
   won (`BeamColors`; CRAZY is a rainbow) and the skin flies out onto a spinning pedestal before the
-  reveal card. CRAZY: a full-screen rainbow burst, confetti and `Sounds.CrazyBurst`. A duplicate:
+  reveal card. The beam is a soft fan of light pouring out of the chest with rays turning behind
+  it and a white flash at the burst: `Opening.Beam` (`Height`, `Width`, `Shafts`, `Spread`,
+  `Shimmer`, `Rays`, `RaySpeed`, `FlashSeconds`...). CRAZY: a full-screen rainbow burst, confetti and `Sounds.CrazyBurst`. A duplicate:
   coins pour out with "+X coins back". Space or a tap skips; Quick open shows everything at once.
   `Style = "Reel"` brings back the old spinning strip. `CameraDistance` = how big the chest looks.
 - **Your own crate model** still works everywhere: it bobs, sways and shakes, and its lid opens only

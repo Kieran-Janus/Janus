@@ -1259,6 +1259,34 @@ describe("CrateUI (client)", function()
 			expect(beam.BackgroundColor3).toBeNear(color)
 			expect(rainbow).toBe(false)
 			expect(beam:GetAttribute("Rarity")).toBe("Uncommon")
+			-- Light pouring out: a fan of shafts, a glow and turning rays, all that colour.
+			local beamCfg = Opening.Beam
+			local shafts, lights = {}, 0
+			for _, piece in beam:GetDescendants() do
+				if piece:IsA("Frame") and piece.Name ~= "Rays" then
+					lights += 1
+					expect(piece.BackgroundColor3).toBeNear(color)
+					expect(piece.BackgroundTransparency).toBeLessThan(1)
+					if piece.Name == "Shaft" then
+						table.insert(shafts, piece)
+					end
+				end
+			end
+			expect(#shafts == beamCfg.Shafts or #shafts == beamCfg.PhoneShafts).toBe(true)
+			expect(lights).toBe(#shafts + 1 + beamCfg.Rays) -- (+ the glow)
+			local angles = {}
+			for _, shaft in shafts do
+				table.insert(angles, shaft.Rotation)
+			end
+			table.sort(angles)
+			expect(angles[#angles] - angles[1]).toBeGreaterThan(beamCfg.Spread) -- a fan
+			local rays = beam.Rays
+			local rayTurn = rays.Rotation
+			local pieces = #beam:GetDescendants()
+			client:advance(0.1)
+			expect(rays.Rotation).never.toBeNear(rayTurn, 0.5) -- turning
+			expect(#beam:GetDescendants()).toBe(pieces) -- nothing made per frame
+			expect(stage.BeamFlash.Visible).toBe(false) -- the flash was brief
 			expect(stage:GetAttribute("HasLid")).toBe(true)
 			local lid = chest:FindFirstChild("Lid", true)
 			expect(math.abs(lid.CFrame.UpVector.Y)).toBeLessThan(0.9) -- swung open
@@ -1287,6 +1315,21 @@ describe("CrateUI (client)", function()
 			expect(beam.BackgroundColor3).toBeNear(color)
 			expect(beam:GetAttribute("Rainbow")).toBe(rainbow)
 			expect(rainbow).toBe(rarity == "Crazy")
+			-- The white flash right at the burst.
+			expect(panel.Body.Opening.Chest.BeamFlash.Visible).toBe(true)
+			for _, shaft in beam:GetChildren() do
+				if shaft.Name == "Shaft" then
+					expect(shaft.BackgroundColor3).toBeNear(color)
+					local tint = shaft:FindFirstChildOfClass("UIGradient").Color.Keypoints
+					if rainbow then
+						-- (a rainbow tint, cycling: not one colour)
+						expect(tint[1].Value).never.toBeNear(tint[3].Value)
+					else
+						local white = tint[1].Value
+						expect(white.R + white.G + white.B).toBeNear(3) -- (white: no tint)
+					end
+				end
+			end
 		end
 	end)
 
@@ -1308,6 +1351,38 @@ describe("CrateUI (client)", function()
 		client:advance(0.05)
 		expect(opening.Reveal.Visible).toBe(true)
 		expect(opening.Reveal.Card.ItemName.Text).toBe(skinOf("Common").Name)
+	end)
+
+	it("leaves no beam, rays or flash behind when skipped or closed mid-beam", function()
+		local opening = panel.Body.Opening
+		local function lightLeft(): boolean
+			for _, piece in opening.Chest:GetDescendants() do
+				if
+					piece.Name == "Beam"
+					or piece.Name == "BeamFlash"
+					or piece.Name == "Shaft"
+					or piece.Name == "Ray"
+				then
+					return true
+				end
+			end
+			return false
+		end
+		-- Skipped during the flash.
+		play(resultFor(skinOf("Rare"), { Rarity = "Rare" }))
+		client:advance(tBurst + 0.05)
+		expect(opening.Chest.BeamFlash.Visible).toBe(true)
+		client:fire(opening.Chest, "Activated")
+		client:advance(0.05)
+		expect(opening.Reveal.Visible).toBe(true)
+		expect(lightLeft()).toBe(false)
+		-- The panel closed while the beam shines.
+		play(resultFor(skinOf("Common"), { Rarity = "Common" }))
+		client:advance(tBurst + 0.2)
+		expect(opening.Chest.Beam.Visible).toBe(true)
+		panel.Visible = false
+		client:advance(0.1)
+		expect(lightLeft()).toBe(false)
 	end)
 
 	it("pours coins out for a duplicate, with the server's refund", function()

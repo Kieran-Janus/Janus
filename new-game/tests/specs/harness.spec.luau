@@ -320,6 +320,30 @@ describe("task scheduler", function()
 		expect(frames).toBe(60)
 	end)
 
+	it("keeps firing Heartbeat every frame while a WaitForChild is pending", function()
+		-- A task thread waiting for a child nobody makes re-checks once a frame; that must
+		-- not starve RunService frames (it used to: each re-check landed a hair before the
+		-- frame boundary and the frame was skipped).
+		local folder = Instance.new("Folder")
+		local found = nil
+		local waiter = task.spawn(function()
+			found = folder:WaitForChild("NeverMade", 3)
+		end)
+		local frames = 0
+		local connection = rt.game:GetService("RunService").Heartbeat:Connect(function()
+			frames += 1
+		end)
+		for _ = 1, 20 do
+			rt:advance(0.05) -- (odd steps, like the specs use)
+		end
+		connection:Disconnect()
+		expect(frames).toBeGreaterThanOrEqual(59)
+		expect(frames).toBeLessThanOrEqual(61)
+		rt:advance(3)
+		expect(found).toBeNil()
+		task.cancel(waiter)
+	end)
+
 	it("lets WaitForChild find children created by other tasks", function()
 		local folder = Instance.new("Folder")
 		task.delay(1, function()

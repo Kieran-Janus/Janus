@@ -252,6 +252,17 @@ function PanelManager.Mount(gui: ScreenGui)
 		end
 	end)
 	GuiService.MenuOpened:Connect(escape)
+
+	-- Pulled into a round: close the shop, crates or anything else open, so nothing covers the
+	-- start of the round.
+	local player = Players.LocalPlayer
+	if player then
+		player:GetAttributeChangedSignal("InRound"):Connect(function()
+			if player:GetAttribute("InRound") == true then
+				PanelManager.CloseAll()
+			end
+		end)
+	end
 end
 
 return PanelManager
