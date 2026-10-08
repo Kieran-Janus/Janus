@@ -165,6 +165,25 @@ No picture: they are hidden on purpose.
 - Every crate skin is also for sale directly in the Shop at its rarity price.
 - **Crates that feel alive**: every theme has its own cartoon chest (a carved pumpkin with a leafy lid, a candy box with a bow, a coffin with a ghost peeking out, a mossy tombstone chest, a furry monster chest whose googly eyes follow you, a starry moon chest; the other themes have their emblem on the front). On the stand they bob, peek their lids with a puff of sparkles, and wake up when you walk close (name, price, Odds). Opening: the chest drops in, shakes faster and faster, bursts open with a beam in the colour of the rarity you really won, and the skin lands on a spinning pedestal; CRAZY gets a rainbow burst and confetti, duplicates pour out coins. Cards in Menu > Crates spin, new themes have a NEW ribbon, and every card has an Odds button. Settings: `Config/Crates.luau` (`LookDefaults`, each crate's `Look`, `Idle`, `Opening`).
 
+### Skin Studio: change and animate skins
+No picture yet: it only shows in a Studio playtest. Step by step: [`docs/CUSTOMIZE.md` > Change and animate skins](CUSTOMIZE.md#change-and-animate-skins).
+- **Skin Studio** is a skin editor just for you: admins, in Studio playtests only. Players never see it. Press Play, then **Menu > 🎨 Skin Studio** (or **F8 > Skin Studio**). Pick any skin or press **New**, then change its colours, head piece, accents, glow, particles and CRAZY effects with colour pickers and sliders. Your own character wears it straight away, and **🎥 Turn** circles the camera round you.
+- **Skins can move.** Wings flap, tails wag, capes sway, head pieces spin, bob or float, colours fade, glows flicker and sparkles burst (a skin's `Animate`): Uncommon skins get 1 effect, Rare 3, CRAZY 6. Everyone sees the same movement at the same moment. Bubblegum Bat, Cotton Candy Cat, Moon Moth, Brew Mistress, Sir Gourdington, Zombie Overlord and every CRAZY skin already move.
+- **Walk styles** for Rare and CRAZY skins: Zombie, Mummy, Ghost, Robot, Bat, Sneaky, Bouncy or Proud, or your own uploaded walk, run and idle animations (a skin's `Motion`).
+- **Your own models can move too**: give a part in your custom head piece the attribute `Animate = "Spin"` (or Flap, Bob...). No code needed.
+- **Real Roblox catalog items** (hats, back items, classic clothes) in skins, only items made by Roblox, you or your group, and only ids you approve. **Switched off** until you've tried it.
+- **Saving**: press **Save** in Skin Studio, then type **`/save-skins`** in Claude Code **before you press Stop** (drafts only live in the playtest). Claude Code writes them into the theme files, runs the tests, commits and pushes. **Copy code** in the Save tab always works as a backup. You don't need Studio API access for any of this: leave it off (turning it on makes Studio use your real save and the public leaderboard).
+- **Turn it off**: `SkinStudio = false,` in `src/shared/Config/Features.luau` hides the editor. Skins you already saved stay in the game as normal skins. The moving pieces have their own switch (`SkinAnimations = false,`), and so do walk styles (`WalkStyles = false,`). Catalog items are already off (`SkinCatalog = false,`). See [Turn a feature off](#turn-a-feature-off).
+- **Needs a check in Studio** (built and tested offline only, with no Studio here):
+  1. Open Skin Studio from the Menu and from F8, change something in every tab, and check your character updates within half a second and keeps the skin after a respawn. Close it by accident (Escape, M, the Shop) and open it again: nothing lost.
+  2. Moving pieces on R15 and R6 avatars: smooth while walking, jumping and dancing at the Photo Spot, still attached after a respawn, and the same on both screens in a 2-player test (Test > Clients and Servers).
+  3. Every walk style on R15 and R6. Ghost, Bat and Bouncy inside the Tormented Tower and the ScareMaze: you don't bump the ceiling.
+  4. A CRAZY skin (Mega Gourd Supreme): the rainbow and pulsing glow look as before, with no flicker.
+  5. A Hide & Seek hider wearing an animated skin: nothing moves, sparkles or changes colour.
+  6. Shop and crate cards of animated skins move (PC), and a phone (Test > Device) stays smooth with several animated skins in view.
+  7. `/save-skins` with the Studio MCP: save two drafts, run it before Stop, see ✓ in Skin Studio, press Stop, and the skins are in the Shop next playtest. Try Copy code once too.
+  8. Catalog items, only once you switch them on: the steps are in [`docs/CUSTOMIZE.md` > Way 3](CUSTOMIZE.md#way-3-your-own-model-in-studio-and-catalog-items).
+
 ### Top-left Menu
 No picture yet: you'll see it the moment you press Play.
 - One orange **Menu** button in Roblox's own top bar, next to the Roblox and chat buttons (so the chat window can't cover it). On a keyboard, press **M**.
@@ -518,6 +537,7 @@ Shortcuts for testing by hand: press **F8** in a playtest (or the Admin button o
 - **Tower: teleport to start**, **Tower: teleport to checkpoint 1/2/3**, **Tower: reset my progress**
 - **Candy Rush: start solo test**, **Web Scour: start**, **Easter eggs: reset mine**, **Find every egg**
 - **Crates: open free Pumpkin Crate**, **Crates: open free CRAZY Crate** (Studio only: see the CRAZY celebration), **Crates: +100k coins**
+- **Skin Studio** (the skin editor; see [Skin Studio](#skin-studio-change-and-animate-skins) above)
 
 ---
 

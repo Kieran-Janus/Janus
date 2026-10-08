@@ -12,13 +12,15 @@ Test anything fast in a Studio playtest with **F8** (admin panel; phones get an 
 
 Every v2 feature has an on/off switch in `src/shared/Config/Features.luau`. New to v2? Start with [`docs/V2-CHANGES.md`](V2-CHANGES.md).
 
+Want to change a skin's colours, give it a new head piece, or make its wings flap and its walk spooky? See [Change and animate skins](#change-and-animate-skins) (three ways, step by step).
+
 Want every pumpkin (or lantern, tree, gravestone...) to be **your** model, everywhere at once? See [Swap every copy of something at once](#swap-every-copy-of-something-at-once).
 
 Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See [Editing the lobby and maps by hand](#editing-the-lobby-and-maps-by-hand).
 
 Too much movement, or a phone feels slow? Every animation switch is in one list: [Turn animations off or down](#turn-animations-off-or-down).
 
-Jump to: [Animations](#turn-animations-off-or-down) · [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Toolbox codes](#with-a-toolbox-code-one-line-no-dragging) · [Move one thing](#move-just-one-thing) · [Tags](#parts-that-do-something-tags)
+Jump to: [Animations](#turn-animations-off-or-down) · [Change and animate skins](#change-and-animate-skins) · [Skin Studio](#skin-studio) · [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Toolbox codes](#with-a-toolbox-code-one-line-no-dragging) · [Move one thing](#move-just-one-thing) · [Tags](#parts-that-do-something-tags)
 
 ---
 
@@ -55,7 +57,8 @@ Jump to: [Animations](#turn-animations-off-or-down) · [Skins](#crate-skins-add-
 | Hub terrain, forest, mansion, statue, fence, glowing paths | `Config.Hub.Polish` (same rebuild) |
 | NPC names, positions, dialogue | `Config.Npcs.List` |
 | Shop items (hats, trails, pets, classic skins) | `Config.Shop.Items` |
-| Crate skins (120, six themes) | `src/shared/Config/Skins/<Theme>.luau` (see "Crate skins" below) |
+| Crate skins (about 630, 30 themes) | `src/shared/Config/Skins/<Theme>.luau` (see "Crate skins" below) |
+| A skin's look, moving pieces and walk style | Skin Studio in a playtest, its theme file, or your own model: [Change and animate skins](#change-and-animate-skins) |
 | Prices by rarity (Common, Uncommon, Rare, CRAZY), duplicate refunds | `Config.Rarity` (`src/shared/Config/Rarity.luau`) |
 | VIP perks, VIP pass, coin packs | `Config.Monetization` (IDs from Creator Hub) |
 | Crates: prices, odds, Robux products, the crate stand, words | `Config.Crates` (`src/shared/Config/Crates.luau`, see "Crates" below) |
@@ -284,6 +287,257 @@ Or ask Claude Code: `/swap-prop Pumpkin` (it walks through all of this in Studio
 
 ---
 
+## Change and animate skins
+There are three ways to change how a skin looks and moves. They all end up in the same place: the skin's entry in its theme file, `src/shared/Config/Skins/<Theme>.luau`.
+
+| Way | Best for | You need |
+| --- | --- | --- |
+| [1. Skin Studio](#way-1-skin-studio-in-a-playtest) | Trying colours, head pieces and animations with buttons and sliders, and seeing them on your own character straight away | Studio and a playtest, then Claude Code (`/save-skins`) or copy and paste |
+| [2. Edit the theme file](#way-2-edit-the-theme-file-by-hand) | A quick change (one colour, one speed), or many skins at once | VS Code (Rojo syncs it to Studio) |
+| [3. Your own model, or catalog items](#way-3-your-own-model-in-studio-and-catalog-items) | A head piece you built (or got from the Toolbox) with parts that move, or real Roblox hats and clothes | Studio |
+
+Or just ask Claude Code: `/animate-skin Candy_BubblegumBat make the wings flap slowly`, or `/add-skin Candy Rare a bubblegum ghost`.
+
+**Rules for every way** (Skin Studio and the tests tell you when you break one):
+- **Never change a skin's `Id`** once it's in the game: it's saved in players' data. Change its `Name` instead.
+- Each rarity gets more: Common = colours, materials and accents; Uncommon = + a head piece and 1 animation; Rare = + glow, particles, 3 animations and a walk style; CRAZY = everything, + rainbow, orbiting pieces and 6 animations.
+- On a skin players already own, change the look and the name freely. Its rarity, crate and price change what players own and the Robux crate odds, so leave those alone unless you really mean it.
+- Spooky-cute, never gory: it's a kids' game.
+
+### Way 1: Skin Studio (in a playtest)
+Skin Studio is a skin editor for you (admins) in a Studio playtest. Players never see it. The full tour and troubleshooting are in [Skin Studio](#skin-studio) below.
+
+**Open it and pick a skin**
+
+1. Open the place in Studio, connect Rojo and press **Play**.
+2. Press **M** (or the orange **Menu** button) and click the **🎨 Skin Studio** tile. **F8 > Skin Studio** works too. The panel opens on the right, so you can still see your character.
+3. In the **Skins** tab, search for a name or Id, or pick a theme, a rarity, "Drafts" or "Animated". Click a skin to edit it. **New** starts a blank skin in the chosen theme. **Duplicate** copies the skin you're editing, which is the easiest way to start a new one.
+
+**Change how it looks (Look tab)**
+
+4. **Basics**: name, rarity, theme, crate and price. A new skin's Id follows its name. A skin already in the game keeps its Id, and its rarity, crate and price are locked 🔒.
+5. **Body**: click a colour to open the colour picker (24 swatches, red, green and blue sliders, or type a code like `#FF8214`). Pick materials (Neon, Foil, Glass...), see-through, and whether to hide the avatar's clothes.
+6. **Head piece** (Uncommon and up): pick one from the list, then its colours, its glow colour and (pumpkin heads only) its carved face.
+7. **Accent**: a second colour and material, and patterns (Belt, Stripes, Wings, Tail, Cape...). Click them in the order you want them.
+8. **Glow** and **Particles** (Rare and up): the light's colour, brightness and range, and the particle kind (Sparkles, Embers, Bubbles...) with its two colours.
+9. **CRAZY** (CRAZY skins only): rainbow, pulse, the pieces orbiting you and how many, and a special effect.
+
+Every row has a **?** button that explains it. Yellow lines are warnings (allowed, but the tests would complain). A red line at the top is an error: fix it, or press **↶ Undo**.
+
+**Make it move (Animate tab)**
+
+10. Press **+ Add animation**. Choose the **Effect** (what it does: Flap, Wag, Spin, Pulse...) and the **Target** (what it moves: Head, Wings, Tail, Cape, Glow...). Every effect is in [the table below](#every-animation-effect). A greyed-out target tells you why it can't be used: for example, the skin has no Wings pattern yet, or CRAZY already controls it.
+11. Set **Speed**, **Amount** and **Delay**, and the effect's own settings (Axis, Colours, Every, Count). ▲ and ▼ change the order, ✕ removes one. Uncommon skins get 1 animation, Rare 3, CRAZY 6.
+12. **Walk style** (Rare and CRAZY): pick Zombie, Mummy, Ghost, Robot, Bat, Sneaky, Bouncy or Proud ([table](#every-walk-style)). **▶ Use my own animations** takes the ids of walk, run and idle animations you uploaded.
+
+**See it on you**
+
+13. With **Wear on me** ticked (at the top of the panel), your character wears the skin a moment after every change, animations and walk style included. Walk, run and jump. Go to the Photo Spot and dance.
+14. **🎥 Turn** circles the camera round you so you see every side. Press it again to stop. The small preview at the top turns too.
+15. **↶ Undo**, **↷ Redo** and **Reset** (back to how the skin was when you opened it) are at the bottom. Closing the panel loses nothing: open it again and it's all still there.
+
+**Save it and put it in the game**
+
+16. Go to the **Save** tab and press **💾 Save**. You can also write a note for Claude Code first, for example "put this one in the Candy crate".
+    Saved skins (drafts) only live in this playtest. **They're gone when you press Stop.**
+17. In Claude Code, type **`/save-skins`** **before you press Stop**. Claude Code reads your drafts from the playtest through the Studio MCP and shows you a plan: which file, added or changed, the new rarity counts and any warnings. When you say yes, it writes them into the theme files, runs the tests, commits and pushes. Open Skin Studio again and those drafts show ✓.
+18. Press **Stop**. Next playtest they're normal skins in the Shop and in their crate.
+
+**No Studio MCP, or `/save-skins` didn't work? Use the Copy code box:**
+
+1. In the Save tab, press **Copy code**. A box shows the skin written as an entry for a theme file.
+2. Click in the box, press **Ctrl+A** then **Ctrl+C**.
+3. Paste it into Claude Code and say which theme file, for example "put this skin in the Candy theme file". Or paste it yourself: open `src/shared/Config/Skins/<Theme>.luau` and paste it at the end of its rarity's group (each group starts with a comment like `-- RARE`). To change a skin that's already there, replace its old entry, from its `{` to its `},`.
+4. Save the file, run the tests (`lune run tests/run`, or ask Claude Code) and commit.
+
+**Print for Claude** (Save tab) prints every saved draft to Output instead, for the older Studio MCP. When you press Stop, Studio prints them once more as a last chance. The classic skins and the Tormented Tower's skin can be tried in Skin Studio, but `/save-skins` doesn't write them: use Copy code.
+
+### Way 2: edit the theme file by hand
+Every crate skin is one entry in its theme file in `src/shared/Config/Skins/` (30 themes, one file each). The Tormented Tower's skin is in `src/shared/Config/TowerParkour.luau` > `Skin`.
+
+1. Open the theme file in VS Code, for example `src/shared/Config/Skins/Candy.luau`, and find the skin with **Ctrl+F** (search for its Id or name).
+2. Change what you want. The example below shows every setting a skin can have. Leave out what you don't need.
+3. Save the file. Rojo copies it into Studio. Press **Play**.
+4. See it: **F8 > Unlock all items**, then **Menu > Skins**, pick the theme and wear it. Or open it in Skin Studio and tick **Wear on me**.
+5. Run the tests: `lune run tests/run` (or ask Claude Code). They check the rarity rules, the animation limits, that every effect has something to move, and that no two skins look the same.
+6. Commit it (or ask Claude Code to).
+
+**A new skin:** copy a whole entry of the same rarity (from `{` to `},`), paste it at the end of that rarity's group, and give it a new `Id` that starts with the theme (`Candy_LollipopBat`). The tests count the skins of each rarity, so after adding one they report the new count: ask Claude Code to update it, or use `/add-skin`, which does it for you.
+
+**Every setting, in one example.** A Rare skin, because Rare can have nearly everything. The CRAZY extras and catalog items come after it.
+
+```lua
+{
+	Id = "Candy_LollipopBat", -- unique, starts with the theme. NEVER change it once it's in the game
+	Name = "Lollipop Bat", -- what players see (1 to 40 letters)
+	Rarity = "Rare", -- "Common", "Uncommon", "Rare" or "Crazy": sets its price and what it may have
+	-- Price = 300, -- optional: its own shop price instead of its rarity's price
+	-- CrateOnly = true, -- optional: only from crates, not sold in the Shop
+	-- Crate = "PumpkinCrate", -- optional: drops from a different crate than its theme's
+	Style = {
+		-- BODY (every rarity). Colours are rgb(red, green, blue), each 0 to 255.
+		BodyColor = rgb(255, 140, 200), -- the whole body
+		TorsoColor = rgb(230, 90, 170), -- one part, wins over BodyColor (also ArmsColor, LegsColor)
+		Material = M.SmoothPlastic, -- the whole body: M.Neon, M.Foil, M.Glass, M.Fabric, M.Ice...
+		ArmsMaterial = M.Foil, -- one part (also TorsoMaterial, LegsMaterial, HeadMaterial)
+		Transparency = 0, -- 0 = solid, 0.3 = see-through, 1 = invisible
+		HideClothes = true, -- the usual: hide the avatar's shirt and pants. false keeps them
+		Accent = { -- a second colour on the body
+			Color = rgb(120, 60, 160),
+			Material = M.Neon,
+			Pattern = { "Wings", "Belt" }, -- only Wings, Tail and Cape can move (full list: top of Pumpkin.luau)
+		},
+
+		-- HEAD PIECE (Uncommon and up; the list is at the top of Pumpkin.luau)
+		Head = "BatHead",
+		HeadColor = rgb(255, 140, 200), -- the head piece's main colour
+		HeadColor2 = rgb(255, 225, 240), -- its second colour (inner ears, hat, wrapper...)
+		GlowColor = rgb(120, 255, 200), -- its glowing bits (eyes, carved face, flame)
+		-- HeadColor3 = rgb(...), -- a third colour (only GentlemanGourd's hat band)
+		-- Face = "Happy", -- pumpkin heads only: Happy, Spooky, Surprised, Sleepy, Wink, Toothy
+
+		-- GLOW AND PARTICLES (Rare and up)
+		Glow = { Color = rgb(255, 120, 200), Brightness = 2, Range = 12 }, -- a light around you
+		Aura = { Kind = "Bubbles", Color = rgb(255, 180, 230), Color2 = rgb(255, 255, 255) },
+		-- Aura kinds: Sparkles, Embers, Bubbles, Hearts, Snow, Smoke, Stars (fades Color to Color2)
+
+		-- ANIMATIONS (Uncommon 1, Rare 3, CRAZY 6). Every effect: the table below.
+		Animate = {
+			{ Effect = "Flap", Target = "Wings", Speed = 0.8 }, -- the wings beat, a bit slower
+			{ Effect = "ColorCycle", Target = "Belt", Colors = { rgb(255, 110, 190), rgb(120, 255, 200) } },
+			{ Effect = "SparkleBurst", Every = 4, Count = 15 }, -- a puff of bubbles every 4 seconds
+		} :: { any }, -- keep this ending: it tells Studio's checker the effects differ in shape
+
+		-- WALK STYLE (Rare and CRAZY): Zombie, Mummy, Ghost, Robot, Bat, Sneaky, Bouncy, Proud
+		Motion = "Bat",
+	},
+},
+```
+
+Every effect line can also have (all optional): `Speed = 2` (twice as fast, 0.1 to 5), `Amount = 0.5` (half as big or strong, 0 to 3), `Delay = 1` (starts a second later, 0 to 10), `Axis = "X"` (which way it turns: X nods, Y turns, Z tilts), plus each effect's own settings in [the table](#every-animation-effect). Leave `Target` out and the effect uses its usual one.
+
+**CRAZY skins only** also have (and every CRAZY skin needs `Rainbow = true` and an `Orbit`):
+```lua
+		Crazy = {
+			Rainbow = true, -- a rainbow shimmer over you and rainbow accents
+			Pulse = true, -- the glow pulses
+			Orbit = "Candies", -- pieces flying round you: Pumpkins, Candies, Ghosts, Bones, Eyes, Stars, Bats
+			Count = 3, -- how many (1 to 8)
+			-- Effect = "DiscoInferno", -- a big special effect: Torment, BloodMoon, DiscoInferno, UfoBeam
+		},
+```
+CRAZY already controls the rainbow on the accents and the pulsing glow, so a CRAZY skin's `Animate` can't colour its accents (`Accents`, `All` or a pattern) and can't `Pulse` or `Flicker` its `Glow`. Use `Head` or `Body`, a `ColorCycle` on the `Glow`, or a moving effect instead. Each CRAZY skin has its own head piece that no other skin uses.
+
+**Your own walk, run and idle animations** instead of (or as well as) a walk style:
+```lua
+		Motion = { Walk = "rbxassetid://123", Run = "rbxassetid://456", Idle = "rbxassetid://789" },
+		Motion = { Preset = "Ghost", Idle = "rbxassetid://789" }, -- the Ghost walk style + your own idle
+```
+They must be uploaded by you (or your group, if the game belongs to a group) or made by Roblox; see [Walk styles](#walk-styles).
+
+**Catalog items** (real Roblox hats and clothes; do [Way 3](#way-3-your-own-model-in-studio-and-catalog-items) first: these ids are made up, and the tests refuse any id that isn't approved):
+```lua
+		HideClothes = false, -- only needed for Shirt, Pants and TShirt
+		Catalog = {
+			Accessories = { { Id = 1234567890, Type = "Hat" }, { Id = 2345678901, Type = "Back" } }, -- up to 4
+			Shirt = 3456789012, Pants = 4567890123, TShirt = 5678901234, -- classic clothes
+			ClassicFace = 6789012345, -- a flat face (only on a skin without a Head)
+		},
+```
+
+### Way 3: your own model in Studio, and catalog items
+
+**Your own head piece, with parts that move**
+
+A model can replace a skin's head piece, and its parts can move without any code: you mark them with **attributes** (small named values on a part).
+
+1. **Get or build the model** in Studio: Parts grouped into a Model, a Toolbox model, or a mesh (see [Builder mode](#builder-mode-give-a-character-your-own-look) for the ways to make one). It is resized so its biggest side is 2.4 studs (`Config.Custom.CosmeticSize`) and sits where the head is.
+2. **Name it exactly like the skin's Id**, for example `Candy_LollipopBat`, and drag it into `ReplicatedStorage > Custom > Cosmetics`.
+3. **Group each moving piece.** A wing made of three parts? Select them and press **Ctrl+G** to make them one Model. A single part can move on its own.
+4. **Set where it turns.** A Model turns round its pivot: select it, then **Model tab > Pivot > Edit Pivot** and drag the pivot to the joint (for a wing, where it meets the body). A single part turns round its own middle.
+5. **Mark it.** Select the part or Model. In **Properties > Attributes**, press **+**, type the name `Animate`, choose the type **string**, press Save, then type the effect name as its value, for example `Flap`.
+6. **Optional settings**, added the same way (the type matters: Studio's **+** starts on "string", so change it to **number** before you type a number):
+
+   | Attribute | Type | What it does |
+   | --- | --- | --- |
+   | `Animate` | string | The effect: `Spin`, `Bob`, `Float`, `Wobble`, `Flap`, `Wag`, `Breathe`, `Pulse`, `ColorCycle`, `Flicker` or `Shimmer` ([what they look like](#every-animation-effect)). Capital letters count. |
+   | `Speed` | number | 0.1 to 5. 2 = twice as fast. |
+   | `Amount` | number | 0 to 3. 0.5 = half as big. |
+   | `Delay` | number | 0 to 10 seconds later, so two pieces don't move together. |
+   | `Axis` | string | `X`, `Y` or `Z`: which way it turns (Spin, Wobble, Flap, Wag, Breathe). |
+   | `Reverse` | boolean | Tick it to spin the other way (Spin). |
+   | `Every` | number | Flicker: seconds between flickers (0.05 to 30). |
+   | `Color2` | Color3 | ColorCycle: fades between the part's own colour and this one. |
+
+7. **Press Play and wear the skin** (F8 > Unlock all items, Menu > Skins). Or open the skin in Skin Studio: its Animate tab lists anything wrong with your marks in yellow, and Output says it once too (`[Cosmetics] your model ...`). **One wrong value and that part doesn't move at all.**
+8. **Keep it.** Save the place (Ctrl+S). To keep it in git too, right-click the model > **Save to File...** and save it as `new-game/assets/Cosmetics/<SkinId>.rbxm`, then commit.
+
+Good to know: at most 6 moving groups per skin (`Config.SkinAnimate.MaxPivots`). Scripts inside custom models are always removed, so attributes are the only way to animate one. If the skin's own `Animate` moves its `Head`, your marked parts ride along on top. More detail: [Animate parts of your own model](#animate-parts-of-your-own-model).
+
+**Real Roblox catalog items (hats, hair, back items, classic clothes)**
+
+Crates are sold for Robux and this is a kids' game, so only items made by **Roblox, you or your group** are allowed, and only ids you have checked and approved. The whole feature is **off** until you've tried it.
+
+1. Open `src/shared/Config/SkinCatalog.luau`. Put your Roblox UserId in `AllowedCreators.UserIds` (and your group's id in `GroupIds`, if the game belongs to a group). Roblox's own items are already allowed.
+2. Find the item on the Roblox website. Its id is the number in its web address: `roblox.com/catalog/<number>/...`. Check it yourself: how it looks, and that it's kid-friendly.
+3. Add it to `ApprovedIds` in the same file, with a note: `[1234567890] = "Pumpkin Cap, Roblox, checked on 9 Oct 2026",`.
+4. Switch it on: `SkinCatalog = true,` in `src/shared/Config/Features.luau`.
+5. Add it to a skin:
+   - **In Skin Studio**: the **Catalog** tab, type the id, press **Look up**. It fills in the kind of item (Hat, Back...) and refuses items by anyone else. Save, then `/save-skins`.
+   - **By hand**: a `Catalog = { ... }` block in the skin's `Style` (see the example in [Way 2](#way-2-edit-the-theme-file-by-hand)). Shirts, pants and T-shirts need `HideClothes = false`.
+6. Test it in Studio: wear the skin. The item appears after a second or two, the skin's own pieces still move, and taking the skin off gives you back your own avatar exactly. Then try respawning, and a 2-player test.
+
+Bundles, body parts, body scales, layered (3D) clothing and animation packs are not allowed: they break the skin's pieces. Why, and what happens when an item won't load: [Catalog items in skins](#catalog-items-in-skins).
+
+### Every animation effect
+`Speed`, `Amount` and `Delay` can go on every effect (`Speed` = how fast, `Amount` = how big or strong, `Delay` = seconds later). The **bold** target is the one it uses when you leave `Target` out. "Every skin" numbers are in `src/shared/Config/SkinAnimate.luau` > `Presets`: change one there and every skin with that effect changes.
+
+| Effect | What it looks like | What it can move (Target) | Its own settings | Every skin (`Presets`) |
+| --- | --- | --- | --- | --- |
+| `Spin` | Turns round and round, like a spinning top | **`Head`**, `Wings`, `Tail`, `Cape`, `"Part:<name>"` | `Axis` (default `Y`), `Reverse = true` (the other way). `Amount` does nothing here: use `Speed` | `Seconds = 4` (one full turn) |
+| `Bob` | Bobs up and down | **`Head`**, `Wings`, `Tail`, `Cape`, `"Part:<name>"` | none | `Seconds = 1.2`, `Height = 0.15` studs |
+| `Float` | Floats up and sways gently, like under water | **`Head`**, `Wings`, `Tail`, `Cape`, `"Part:<name>"` | none | `Seconds = 3`, `Height = 0.35` studs, `Sway = 6` degrees |
+| `Wobble` | Tilts from side to side | **`Head`**, `Wings`, `Tail`, `Cape`, `"Part:<name>"` | `Axis` (default `Z`) | `Seconds = 1`, `Degrees = 8` |
+| `Flap` | Wings beat back and open again, like a bat | **`Wings`**, `"Part:<name>"` | `Axis` (default `Y`) | `Seconds = 0.6`, `Degrees = 35` |
+| `Wag` | Swings from side to side, like a happy tail | **`Tail`**, `"Part:<name>"` | `Axis` (default `Y`) | `Seconds = 0.5`, `Degrees = 25` |
+| `Breathe` | A slow, tiny lift and tilt, like a cape in a breeze | **`Cape`**, `Head`, `Wings`, `Tail`, `"Part:<name>"` | `Axis` (default `X`) | `Seconds = 3.5`, `Height = 0.05`, `Degrees = 3` |
+| `Pulse` | Glows brighter and dimmer, like a heartbeat | **`Glow`**, `Head`, `Accents`, a pattern (`"Belt"`...), `Body`, `All`, `"Part:<name>"` | none | `Seconds = 1.6`, `Low = 0.45` (the dimmest: 45%) |
+| `ColorCycle` | Fades through your colours in order, rippling across the pieces | **`Accents`**, `Glow`, `Head`, a pattern, `Body`, `All`, `"Part:<name>"` | `Colors = { rgb(...), rgb(...) }` (2 to 6 colours) | `SecondsPerColor = 1`, `Spread = 0.15` (how far each piece is behind the last) |
+| `Flicker` | Flickers like a candle flame | **`Glow`**, `Head`, `Accents`, a pattern, `Body`, `All`, `"Part:<name>"` | `Every = 0.08` (seconds between flickers, 0.05 to 30) | `Every = 0.08`, `Low = 0.3`, `Chance = 0.35` (how often it dims) |
+| `Shimmer` | A bright band of light sweeps up the pieces | **`Accents`**, `Head`, a pattern, `Body`, `All`, `"Part:<name>"` (not `Glow`) | none | `Seconds = 2`, `Width = 0.25`, `Strength = 0.6` |
+| `SparkleBurst` | A puff of the skin's own particles every few seconds | **`Aura`** only (the skin needs an `Aura`) | `Every = 3` (seconds between bursts, 0.5 to 30), `Count = 20` (particles, 1 to 50) | `Every = 3`, `Count = 20`, `MaxCount = 50` |
+
+For the colour effects (`Pulse`, `ColorCycle`, `Flicker`, `Shimmer`) `Amount` above 1 is the same as 1 (full strength); `Amount = 0.5` is half. For `SparkleBurst` it multiplies `Count`. What each target means: [Animated skins](#animated-skins).
+
+### Every walk style
+A walk style poses the arms, legs and head and blends with Roblox's own walking, on R15 and R6 avatars. A dance at the Photo Spot always wins. Its numbers are in `src/shared/Config/SkinMotion.luau` > `Presets` (degrees, studs, and `Seconds` for one step): change one there and every skin with that walk style changes.
+
+| `Motion =` | What it looks like | Its numbers (`Presets`) |
+| --- | --- | --- |
+| `"Zombie"` | Arms held out in front, head tilted, a slight lean, a slow shuffle | `ArmsForward = 85` (how high the arms are), `Lean = 8`, `HeadTilt = 12`, `Seconds = 1.1` |
+| `"Mummy"` | Stiff arms forward, a little lower, and short, stiff steps | `ArmsForward = 75`, `Step = 14` (how far the legs swing), `Lean = 4`, `Seconds = 1.3` |
+| `"Ghost"` | Floats above the ground and bobs, legs dangling, arms limp | `Height = 0.8` (studs up), `Bob = 0.25` studs, `Dangle = 18`, `Seconds = 2.4` |
+| `"Robot"` | Straight elbows and knees, swinging arms, the head turning in little ticks | `Swing = 28` (arms), `Step = 24` (legs), `HeadTurn = 20`, `Ticks = 4` (head stops per turn), `Seconds = 0.9` |
+| `"Bat"` | Arms out, flapping like wings (faster when moving), with a little hover | `ArmsOut = 70`, `Flap = 35`, `Hover = 0.3` studs, `Seconds = 0.35` (one flap while moving), `IdleSeconds = 0.8` (standing) |
+| `"Sneaky"` | A crouched tiptoe with arms held close | `Crouch = 0.35` studs lower, `Lean = 14`, `Knees = 35` (how bent), `Seconds = 0.9` |
+| `"Bouncy"` | An extra hop in every step | `Hop = 0.35` studs, `Seconds = 0.5` |
+| `"Proud"` | Chest out, chin up, a gentle sway | `ChestOut = 8`, `ChinUp = 12`, `Sway = 4`, `Seconds = 2` |
+
+Settings for all walk styles are at the top of the same file: `MaxCharacters` (12 closest characters get one; `PhoneMaxCharacters` 6), `MaxDistance` (100 studs), `RunSpeed` (above 20 studs a second an uploaded `Run` animation plays instead of `Walk`), `OwnRootShiftMax` (0.2: your own float or hop stays small so you don't bump ceilings; other players see the full float) and `AllowUploaded` (`false` ignores uploaded animation ids).
+
+### It doesn't move?
+| Check | Why |
+| --- | --- |
+| The skin really has the target | A `Flap` on `Wings` needs the Wings pattern in `Accent.Pattern`, a `SparkleBurst` needs an `Aura`, `Glow` effects need a `Glow`. Otherwise it does nothing (the tests and Skin Studio warn you). |
+| The rarity allows it | Common: no animations; Uncommon 1, Rare 3, CRAZY 6; walk styles Rare and CRAZY only (`Config.SkinAnimate.Rarity`). The tests fail with the reason. |
+| CRAZY isn't already doing it | A CRAZY skin's rainbow colours its accents and its pulse dims its glow, so `Animate` can't touch those. |
+| The switches are on | `SkinAnimations`, `WalkStyles` (and `SkinEffects` for CRAZY) in `src/shared/Config/Features.luau`. |
+| You're close enough | Other players' skins animate within 120 studs, the closest 8 (4 on phones): `src/shared/Config/SkinAnimate.luau`. Your own always does. |
+| It's not a Hide & Seek hider | Hiders never animate, sparkle or change colour, on purpose. |
+| Shop and crate previews | They move on PC only (`PreviewMotionOnPhones = false`), at most 4 at once. |
+
+---
+
 ## Skins, hats, pets and trails
 
 ### Change how an existing item looks
@@ -367,21 +621,7 @@ Style = {
 },
 ```
 
-**The effects:**
-| Effect | What it does | Works on |
-| --- | --- | --- |
-| `Spin` | turns round and round (`Reverse = true` the other way) | `Head`, `Wings`, `Tail`, `Cape`, `"Part:<name>"` |
-| `Bob` | bobs up and down | same |
-| `Float` | floats up and sways gently | same |
-| `Wobble` | tilts from side to side | same |
-| `Flap` | wings beat back and open again | `Wings`, `"Part:<name>"` |
-| `Wag` | swings side to side | `Tail`, `"Part:<name>"` |
-| `Breathe` | a slow tiny lift and tilt (capes) | `Head`, `Wings`, `Tail`, `Cape`, `"Part:<name>"` |
-| `Pulse` | glows brighter and dimmer | `Glow`, `Head`, `Accents`, a pattern (`"Belt"`...), `Body`, `All`, `"Part:<name>"` |
-| `ColorCycle` | fades through your colours: `Colors = { rgb(255, 120, 0), rgb(150, 60, 200) }` (2 to 6) | same |
-| `Flicker` | flickers like a candle (`Every = 0.1`: seconds between flickers) | same |
-| `Shimmer` | a bright band sweeps up the pieces | same, but not `Glow` |
-| `SparkleBurst` | a puff of the skin's own particles every few seconds (`Every = 4`, `Count = 20`) | `Aura` |
+**The effects** (what each looks like, what it can move and its settings) are in one table: [Every animation effect](#every-animation-effect).
 
 **The targets:** `Head` = the head piece (or your custom model), `Wings` / `Tail` / `Cape` = those accent patterns (the only ones that can move), any other pattern name (`"Belt"`, `"Stripes"`...) = that pattern's pieces, `Accents` = every accent piece, `All` = head piece + accents, `Body` = the avatar's own body parts, `Glow` = the light, `Aura` = the particles, `"Part:Crescent"` = the parts (or the Model) called `Crescent` inside the head piece. Leave `Target` out and each effect uses its usual one (Flap: Wings, Wag: Tail, Breathe: Cape, Pulse and Flicker: Glow, ColorCycle and Shimmer: Accents, SparkleBurst: Aura, the others: Head).
 
@@ -408,16 +648,7 @@ A skin can change how you walk: add `Motion` to its `Style` (Rare and CRAZY skin
 ```lua
 Motion = "Zombie",
 ```
-| Walk style | What it does |
-| --- | --- |
-| `Zombie` | arms held out in front, head tilted, a slow shuffle |
-| `Mummy` | stiff arms forward and short, stiff steps |
-| `Ghost` | floats above the ground and bobs, legs dangling |
-| `Robot` | straight arms and legs, the head turning in little ticks |
-| `Bat` | arms out flapping like wings, with a little hover |
-| `Sneaky` | a crouched tiptoe with arms held close |
-| `Bouncy` | an extra hop in every step |
-| `Proud` | chest out, chin up |
+Zombie, Mummy, Ghost, Robot, Bat, Sneaky, Bouncy or Proud: what each looks like and its numbers are in [Every walk style](#every-walk-style).
 
 Their numbers (how far the arms reach, how high the ghost floats...) are in `src/shared/Config/SkinMotion.luau` > `Presets`. They work on R15 and R6 avatars, blend with Roblox's own walking, and a dance at the Photo Spot always wins. Every screen poses the closest 12 characters (6 on phones). **Your own float or hop is kept small** (`OwnRootShiftMax`, 0.2 studs) so you don't bump ceilings in the Tower or the maze; other players see the full float.
 
@@ -473,7 +704,7 @@ A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
 ---
 
 ## Skin Studio
-Skin Studio is a skin editor for **you** (admins) in a Studio playtest: pick any skin or make a new one, change everything with colour pickers, sliders and dropdowns, and see it on your own character straight away (animations and walk styles too). Players never see it. Settings: `src/shared/Config/SkinStudio.luau` (on/off: `Config.Features.SkinStudio`).
+Skin Studio is a skin editor for **you** (admins) in a Studio playtest: pick any skin or make a new one, change everything with colour pickers, sliders and dropdowns, and see it on your own character straight away (animations and walk styles too). Players never see it. Settings: `src/shared/Config/SkinStudio.luau` (on/off: `Config.Features.SkinStudio`). New to it? Follow [Way 1](#way-1-skin-studio-in-a-playtest) step by step; this section is the full tour.
 
 **Open it:** press Play in Studio, then **Menu > Skin Studio** (the 🎨 tile) or **F8 > Skin Studio**. It sits on the right of the screen so you can see your character on the left. On a phone (Studio's device emulator, phone on its side) it's a column down the right half, with a small turning preview of the skin just left of it, and help and messages pop up in a bubble (tap it to close it); 🎥 Turn puts your character in the middle of the free part of the screen.
 
@@ -496,7 +727,7 @@ The footer has **Undo**, **Redo**, **Reset** (back to how the skin was when you 
 Saved drafts live in the playtest. They are gone when you press Stop, so:
 
 1. In Skin Studio, press **Save** on each skin you like (Save tab).
-2. In Claude Code, type **`/save-skins`** **before you press Stop**. Claude Code reads the drafts from the running playtest through the Studio MCP, shows you the plan (which file, added or changed, the new rarity counts, warnings), writes them into the theme files after you say yes, and runs the tests.
+2. In Claude Code, type **`/save-skins`** **before you press Stop**. Claude Code reads the drafts from the running playtest through the Studio MCP, shows you the plan (which file, added or changed, the new rarity counts, warnings), writes them into the theme files after you say yes, runs the tests, commits and pushes.
 3. When Claude Code has written them, it tells the playtest which drafts are now in the files: open Skin Studio again and they show ✓, and the "not in the game files yet" reminder stops counting them (without the built-in Studio MCP the reminder simply stays until you press Stop; that's fine).
 4. Press Stop. Rojo syncs the changed theme files into Studio; next playtest the skins are normal skins in the shop and crates. The drafts themselves are gone after Stop (unless `UseDataStore` is on, below), so there's no ✓ to see then.
 
@@ -916,7 +1147,7 @@ Moved to its own section: [Swap every copy of something at once](#swap-every-cop
 | `/verify-v2` | Studio test of every v2 feature (solo, 2 players, phones), then fixes, tests, commit and push |
 | `/verify` | Shorter playtest pass of the whole game, then fixes |
 | `/next-milestone` | Builds the next unfinished milestone in `docs/PROGRESS.md` |
-| `/add-skin` | New crate skin in a theme file, with its rarity and look |
+| `/add-skin` | New crate skin in a theme file, with its rarity and look: `/add-skin <theme> <rarity> <what it looks like>` (moving pieces and a walk style too, if you ask) |
 | `/animate-skin` | Makes a skin move: `/animate-skin <skin> <what should move>` (effects within its rarity's limit, a walk style for Rare and CRAZY), then tests, a catwalk picture when the preview tooling is there (the cloud session), and a Studio playtest |
 | `/add-crate` | New crate: its skins, price, odds, stand display and Robux product |
 | `/add-parkour-jump` | New jump (or stage) on the parkour course, checked against the jump limits |
@@ -933,6 +1164,6 @@ Moved to its own section: [Swap every copy of something at once](#swap-every-cop
 | `/new-event` | Limited-time event (double pumpkins, Blood Moon round, event cosmetics) |
 | `/tweak` | Balance or tune anything from a plain-English request |
 | `/polish-hub` | More detail and life in the lobby, within the phone budget |
-| `/save-skins` | Puts the skins you saved in Skin Studio into the theme files (run it before you press Stop) |
+| `/save-skins` | Puts the skins you saved in Skin Studio into the theme files through the Studio MCP, runs the tests, commits and pushes. Run it **before you press Stop** (`/save-skins Id,Id` saves only those) |
 
 Each command reads `CLAUDE.md`, keeps numbers in Config, playtests in Studio when it can, runs the offline tests (`lune run tests/run`) and commits.
