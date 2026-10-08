@@ -37,6 +37,8 @@ local ORDER = {
 	"AdminUI",
 	"SkinStudioUI", -- the skin editor (admins in Studio only: Menu > Skin Studio, F8)
 	"NameFinder", -- Studio only: F8 > "Name finder on/off" shows what anything is called
+	"KingStride", -- the Pumpkin King walks with long strides (his legs, on this screen only)
+	"PortraitEyes", -- haunted portraits' eyes follow you
 	"KingHeardUI",
 	"RoundJuiceUI",
 	"TutorialUI", -- does nothing while Config.Features.Tutorial is off
@@ -60,6 +62,7 @@ local ORDER = {
 	"VoteBoardUI",
 	"ZoneLighting",
 	"AnnounceUI", -- server-wide banners ("X conquered the Tormented Tower!")
+	"TextOverrides", -- your own words instead of the game's (Config.TextOverrides, Pumpkin Tools)
 }
 
 local gui = Instance.new("ScreenGui")

@@ -16,6 +16,7 @@ local function world(opts: { setup: ((w: World) -> ())? }?): World
 	local env = rt.env
 	local Config = rt:require("ReplicatedStorage.Shared.Config")
 	Config.Features.ReadyPad = true
+	Config.Lobby.FloorSigns.On = true -- (off in the game since 8 October; their shimmer is still tested)
 	local HubBuilder = rt:require("ServerScriptService.Server.Hub.HubBuilder")
 	local hub = HubBuilder.Build()
 	hub.Parent = rt.workspace
@@ -458,5 +459,17 @@ describe("LobbyLife", function()
 		w.rt:require(w.Client.LobbyLife).Stop()
 		expect(w.fx()).toBeNil()
 		expect(#w.rt.errors).toBe(0)
+	end)
+
+	it("takes the floor signs out of a saved lobby while they are switched off", function()
+		local w = world()
+		local HubBuilder = w.rt:require("ServerScriptService.Server.Hub.HubBuilder")
+		expect(#w.CS:GetTagged("FloorSign") > 0).toBe(true)
+		expect(HubBuilder.RemoveFloorSignsIfOff()).toBe(0) -- still on: kept
+		w.Config.Lobby.FloorSigns.On = false
+		expect(HubBuilder.RemoveFloorSignsIfOff() > 0).toBe(true)
+		for _, sign in w.CS:GetTagged("FloorSign") do
+			expect(sign:IsDescendantOf(w.rt.workspace)).toBe(false)
+		end
 	end)
 end)

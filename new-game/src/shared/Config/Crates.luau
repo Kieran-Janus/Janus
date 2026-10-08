@@ -93,6 +93,9 @@ return {
 	-- The chance of each rarity (percent) for every crate without its own Odds. Must add up
 	-- to 100. Rarity names are the ones in Config/Rarity.luau.
 	Odds = { Common = 73.48, Uncommon = 24, Rare = 2.5, Crazy = 0.02 } :: { [string]: number },
+	-- How a chance under 1% is shown on the crate panel ("<1%"; "" = the exact number, e.g.
+	-- "0.0001%"). Larger chances show with one decimal ("6.1%").
+	SmallOdds = "<1%",
 
 	RequestCooldown = 1, -- seconds between two crate opens by the same player
 	-- Open several at once: the buttons on a crate's page (each costs Count x Price, taken in one

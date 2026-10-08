@@ -11,6 +11,7 @@ Roblox game written in Luau, synced to Studio with Rojo. This project is indepen
 - `assets/` -> ReplicatedStorage.Custom (custom models: Characters, Cosmetics, Props); `maps/` -> ServerStorage.Maps (hand-edited round maps). Both ignoreUnknownInstances.
 - `Packages/` -> Wally packages (git-ignored)
 - `tools/ai-proxy/` -> Cloudflare Worker that proxies Claude for in-game NPCs
+- `tools/studio-plugin/` -> the Pumpkin Tools Studio plugin (click to change looks and words; `rojo build tools/studio-plugin --plugin PumpkinTools.rbxm`)
 - `prompts/` -> reusable prompts for building features
 
 ## Rules

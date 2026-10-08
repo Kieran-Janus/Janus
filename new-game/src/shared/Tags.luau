@@ -58,6 +58,8 @@ local Tags = {
 	HidingDecoy = "HidingDecoy", -- Hide & Seek: fake pumpkins hiders blend in with
 	HiderPumpkin = "HiderPumpkin", -- Hide & Seek: a hider's pumpkin (the server tags it in a round)
 	PumpkinPickup = "PumpkinPickup", -- King Hunt: a pumpkin to collect (PumpkinService tags it)
+	PortraitEyes = "PortraitEyes", -- a haunted portrait's canvas: players' screens move its eyes (client PortraitEyes)
+	KingStride = "KingStride", -- King Hunt: the part-built King (KingService tags it; client KingStride walks him)
 	ScareTrigger = "ScareTrigger", -- ScareMaze: walking here sets off a scare (attribute Kind)
 	MazeExit = "MazeExit", -- ScareMaze: Survivors who reach it escape
 	HauntSpawn = "HauntSpawn", -- ScareMaze: where Haunters start
@@ -67,6 +69,7 @@ local Tags = {
 	SeekerDoor = "SeekerDoor", -- Hide & Seek: the seeker hut's door, swings open when seekers are let out
 	-- Older tags (set by src/server/Build/Kit.luau)
 	HubFloat = "HubFloat", -- bobs up and down (client HubAmbience)
+	HubSway = "HubSway", -- rocks gently from side to side (client HubAmbience; attributes SwayAngle, SwaySeconds)
 	HubFlicker = "HubFlicker", -- light flickers (client HubAmbience)
 	HidingSpot = "HidingSpot", -- blocks the King's view while you stand in it
 	-- Cosmetics (set by src/shared/Cosmetics.luau)

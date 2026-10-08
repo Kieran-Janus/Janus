@@ -59,13 +59,13 @@ Words used on this page:
 - Everyone else stays in the lobby: shop, crates, parkour, minigames. They can watch the round with **Menu > Spectate** (or the "Watch the round" button).
 - After a round, everyone comes back to the lobby spawn. To play again, step on the pad again.
 
-### Three game modes and five maps
+### Three game modes and six maps
 The vote offers three random **playlists**. A playlist is one mode on one map. Only playlists that fit the number of ready players are offered.
 
 | Mode | How to play | Maps | Players |
 | --- | --- | --- | --- |
-| **King Hunt** (the original) | Grab pumpkins, stay quiet, don't get caught by the Pumpkin King (redesigned on 8 October: a ribbed pumpkin head with an angry glowing grin, a gold crown with gems, a robe down to the floor, a red cape and clawed vine hands reaching for you) | Haunted Pumpkin Patch, Spooky Mansion | 1+ |
-| **Pumpkin Hide & Seek** (new) | Hiders turn into pumpkins and hide among the decoys. Seekers count in a hut, then come out with **candy guns**. A candy that hits a hider tags them, and they join the seekers. Hiders giggle every 20 seconds and glow in the last 30 seconds, so they are fairly easy to find. | Pumpkin Farm, Hedge Maze | 2+ |
+| **King Hunt** (the original) | Grab pumpkins, stay quiet, don't get caught by the Pumpkin King (redesigned on 8 October: a ribbed pumpkin head with an angry glowing grin, a gold crown with gems, a coat, a red cape and clawed vine hands reaching for you; he walks towards you with long strides. One King only, getting a little faster every 30 seconds. Easy rounds last 3 minutes) | Haunted Pumpkin Patch, Spooky Mansion | 1+ |
+| **Pumpkin Hide & Seek** (new) | Hiders turn into pumpkins and hide among the decoys. Seekers count in a hut, then come out with **candy guns**. A candy that hits a hider tags them, and they join the seekers. Hiders giggle every 20 seconds and glow in the last 30 seconds, so they are fairly easy to find. | Pumpkin Farm, Hedge Maze, Midnight Market (small, new spots every round) | 2+ |
 | **ScareMaze** (new) | Survivors run through a cornfield maze to the green exit. Stand still for 3 seconds and you're OUT. Haunters press **BOO** to scare them. Scarecrows, zombies, bats and ghosts jump out of hidden traps. | ScareMaze | 2+ (Haunters from 3 players) |
 
 | King Hunt: Haunted Pumpkin Patch | King Hunt: Spooky Mansion |
@@ -92,11 +92,13 @@ Fair-play rules that were added after review:
 - A town square layout: the spawn in the south, the Ready circle in front of it, the cauldron in the middle, the crooked clock tower in the north.
 - Curving stone paths and signposts lead to every area that is switched on.
 - Every area has its own space (a **zone**), so decorations never block it.
-- A glowing sign lies on the ground in front of each area (READY? STEP IN!, PUMPKIN SHOP, MYSTERY CRATES, CANDY RUSH, WEB SCOUR, PARKOUR), readable from far away.
+- (Until 8 October a glowing sign lay on the ground in front of each area; they are switched off now: `Config.Lobby.FloorSigns.On`.)
 - The lobby is solid: trees, lampposts, benches, gravestones, crates, stalls, statues and big pumpkins can't be walked through, and nothing you stand on lets you fall through. Paths, area entrances and the Ready pad stay clear.
 - The Photo Spot has 10 spooky dances (Zombie Shuffle, Skeleton Rattle, Ghost Float, Pumpkin Head Spin, Monster Mash, Bat Flap, Scaredy Cat Shiver, Witchy Cackle, Mummy Wobble, Spooky Floss) that everyone can see. Walk or jump to stop.
 - Dusk lighting with a big moon, stars, clouds and soft haze (toned down a little on 8 October: less bright, less glow; the round maps too, except the already-dark ScareMaze).
 - The lobby is sorted into **folders** with readable names (one per area, plus `Plaza`, `Decor`...), and every single thing in them (one pumpkin, one bench, one parkour step) is its own Model. In Studio a click selects just that one thing, so you can move it without dragging the whole lobby along (see [Make it look like yours](#make-it-look-like-yours)).
+- The Pumpkin King statue by the clock tower is the new King himself (a little bigger than before), rocking slowly from side to side (`Config.Hub.Polish.KingStatue`: `Height`, `SwayAngle`, `SwaySeconds`). In a Locked lobby, replace it with `require(game.ServerScriptService.Server.Hub.HubExtras).RebuildStatue(workspace.Hub.Decor)` in the command bar.
+- No more glowing signs on the ground (`Config.Lobby.FloorSigns.On = false`); the wooden signposts stay.
 - The lobby comes alive: the shopkeeper breathes, turns to you and waves; the Ready ring pulses (faster when someone is ready) and its sign hops when the count changes; the floor signs shimmer; the cauldron bubbles; bats flap across the sky.
 
 More views: [from the top](screenshots/lobby-top.png).
@@ -157,7 +159,7 @@ No picture: they are hidden on purpose.
   - 30 themed crates (one per theme), 600 coins each (doubled).
   - 4 rarity crates: Common 100, Uncommon 400, Rare 800, CRAZY 80,000 coins (just under the shop price of their rarity).
 - **Odds** for every themed crate: Common 73.48%, Uncommon 24%, Rare 2.5%, CRAZY 0.02% (Rare and CRAZY are rarer than before). Skins of the same rarity share that chance equally.
-- **Odds preview**: before you open a crate, the panel shows every skin in it and its exact chance. Roblox requires this for paid random items.
+- **Odds preview**: before you open a crate, the panel shows every skin in it and its chance ("6.1%"; anything under 1% shows as "<1%", `SmallOdds` in `Config/Crates.luau`; set it to `""` to show the exact number, e.g. "0.0001%"). Roblox requires paid random items to show their odds, so if Roblox ever asks for exact numbers, set `SmallOdds = ""`.
 - **Open x1, x5 or x10**: the server rolls them all at once and takes the coins in one go. Each chest plays its opening (below); **Space**, a tap or **Skip** jumps to the result and then to the next crate. **Quick open** skips the strips and shows every result on one page, the best one highlighted. The server picks the skins before the animation starts, so they're yours even if you close the panel.
 - A skin you already own ALWAYS gives coins back ("Duplicate! +X coins back": 60, 250, 500 or 50,000 by rarity).
 - **Robux crates**: each crate can also be bought with Robux once you paste its product id into Config (see [Robux setup](#robux-setup)). Until then its Robux button says "Coming soon".
@@ -209,6 +211,19 @@ No picture yet: you'll see it the moment you press Play.
 - Scripts are removed, a Tool (a torch, a sword) becomes a plain model nobody can pick up, and lights inside Toolbox models stay off where the built thing had none, so the lobby stays inside its phone light budget.
 - A custom crate model is sized by its longest side, so a long coffin stays on its plinth.
 - Steps: [Make it look like yours](#make-it-look-like-yours) below.
+
+### Pumpkin Tools: click to change looks and words (8 October)
+- A Studio plugin (**Plugins > Pumpkin Tools**; install once with `rojo build tools/studio-plugin --plugin PumpkinTools.rbxm`, then restart Studio). Click anything, paste a Toolbox code: only that one or every copy changes. Or use **your own model** as the look (your own skin) for one thing, every copy, or the things in the rounds: the Pumpkin King, skeletons, bats, ghost cats, the shopkeeper, the pumpkins you collect or hide as, the King statue.
+- **Words**: click a sign and type new words, for that sign only or everywhere. In a playtest, **Pick text** and click any words on the screen. Your word changes show on every screen and sign (`src/client/TextOverrides.luau`, also `Config/TextOverrides.luau`).
+- Guide: [`tools/studio-plugin/README.md`](../tools/studio-plugin/README.md).
+
+### Fixes and polish (8 October)
+- **Spectating King Hunt looked blurry**: the map was only streamed around its middle, so far-off parts arrived as blurry low-detail versions. It now streams around the player (or King) you watch, and the lobby's soft far focus is off on the round maps.
+- **The Pumpkin King walks**: long strides with bending knees, a dip in each step and a lean when he chases you, drawn on each screen (`Config.King.Stride`). Always one King; he gets a little faster every 30 seconds (`Config.King.SpeedUp`). King Hunt on Easy lasts 3 minutes.
+- **Crate odds** read "6.1%", and anything under 1% reads "<1%" (`Config.Crates.SmallOdds`).
+- **Lighting** toned down a little (lobby and maps), the **floor signs** are gone, the **King statue** is the new King and sways.
+- **New Hide & Seek map: Midnight Market**: a small walled night market packed with stalls, crate stacks, barrels, sacks, hay and handcarts under strings of lanterns, with over 100 decoy pumpkins. The clutter, the decoys and the hider spawns move to new spots every round, so nobody can learn the hiding places (`Config/Maps/MidnightMarket.luau`: `Shuffle`, `Clutter`, `Decoys`). Seekers come out of the hut in the corner with their candy guns.
+- **Haunted portraits** in the Spooky Mansion: painted portraits in gold frames whose eyes follow you round the room (`Config.Maps.PortraitEyes`). To hang real pictures instead, put image codes in `Config/Maps/SpookyMansion.luau` > `Paintings.Images`.
 
 ### Safer servers
 - VIP can't be faked any more: the server asks Roblox whether you own the pass, instead of trusting a message from your computer.
@@ -387,8 +402,8 @@ Each feature has its own short settings file in `src/shared/Config/`. Every file
 | Ready circle's look and sign | `Config/init.luau` > `Hub.ReadyArea` | `PadSize`, `Banner` ("PLAY!"), `Sign.Title` |
 | Spectating | `Config/Lobby.luau` > `Spectate` | `NextKeys`, `PreviousKeys`, `ShowWatchButton` |
 | Modes and the vote | `Config/Modes.luau` | `VoteChoices` (3), each mode's `MinPlayers`, the `Playlists` list |
-| King Hunt round | `Config/init.luau` > `Round`, `Rewards`, `King` | `Round.Duration` (300 s), `Rewards.CoinsPerPumpkin` (5) |
-| The Pumpkin King's look | `Config/init.luau` > `King` | `HeadColor`, `CapeColor`, `BodyColor`, `FaceGlow`, `Embers` (sparks per second, 0 = none) |
+| King Hunt round | `Config/init.luau` > `Difficulty`, `Rewards`, `King` | each level's `RoundSeconds` (Easy 180 s = 3 min, Hard 300 s), `Rewards.CoinsPerPumpkin` (5), `King.SpeedUp` (one King that gets 0.75 faster every 30 s, at most +6) |
+| The Pumpkin King's look and walk | `Config/init.luau` > `King` | `HeadColor`, `CapeColor`, `BodyColor`, `FaceGlow`, `Embers` (sparks per second, 0 = none), `Stride` (his striding walk: `Swing`, `KneeBend`, `Sway`, `ChaseLean`; `On = false` = he glides) |
 | Hide & Seek | `Config/HideSeek.luau` | `HeadStart` (15 s), `Duration` (165 s), `SeekerRatio` (0.25), `GiggleInterval` (20 s), `GlowLastSeconds` (30), `Rewards` |
 | ScareMaze | `Config/ScareMaze.luau` | `Duration` (240 s), `StopSeconds` (3), `HaunterRatio` (0.2), `MinPlayersForHaunters` (3), `Boo.Cooldown` (8 s), `Rewards` |
 | A map's lighting, size, decorations | `Config/Maps/<MapId>.luau` | `Lighting`, `AmbientSound`, `Layout` |
@@ -548,7 +563,7 @@ Things that are not done, or need your eyes in Studio:
 - **Tested in Studio on 6 October** (`/verify-v2`): solo, 2 players (Clients and Servers), an iPhone-sized screen and an iPad (Test > Device). What was fixed is listed in `docs/PROGRESS.md`. The longer parkour was climbed start to finish in a Studio playtest (all 7 checkpoints, coins paid). The Tormented Tower was checked in Studio piece by piece (spinning bars, cogs and vanishing platforms moving, the last stage climbed, the skin and the announcement given); a full climb by hand is worth doing, it is meant to be very hard. Still worth doing yourself: a 3-player ScareMaze (real Haunters, an OUT Survivor turning into a Haunter, and the new BOO cooldown ring: none of these was seen in Studio with 3 players), a parkour climb with your own hands, and a live test with friends after publishing. The 7 October additions (animations, cartoon crates, phone Shop and crate panel, server fixes) are covered by offline tests; run `/verify-v2` once to see them in Studio.
 - **Lighting Technology** must be set to Future by hand once (see above).
 - **Sounds**: new features reuse sound ids that were already in the game (the hider giggle is a pitched-up bat squeak). Swap any you don't like in each feature's `Sounds` block.
-- **Art is still built from Parts**: the Pumpkin King (a detailed part-built body since 8 October, but it glides rather than walks), the round maps and the scare characters. Real models can replace them (see [Make it look like yours](#make-it-look-like-yours)).
+- **Art is still built from Parts**: the Pumpkin King (a detailed part-built body that strides since 8 October), the round maps and the scare characters. Real models can replace them (see [Make it look like yours](#make-it-look-like-yours)).
 - **A saved, Locked lobby keeps what it was built with.** Changing the parkour `Course`, the crate list, the Candy Rush stand or where an egg hides only shows after a rebuild (`Bake.Hub(true)`), or move the pieces by hand. Rewards, prices, timings and words always work straight away.
 - **Signposts** still point at a switched-off area until the lobby is rebuilt.
 - **ScareMaze with 2 players has no Haunters** (Haunters need 3+). The scares move on the server, so they may look a little choppy on slow connections.

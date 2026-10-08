@@ -1005,4 +1005,190 @@ function Swap.Egg(eggId: string, code: number | string): (number, string)
 	return rebuilt, message
 end
 
+-- A copy of your own model to use as a look: always one Model, with scripts, tools and hats
+-- taken out like a Toolbox download. nil and why when it has nothing to see.
+local function ownCopy(look: Instance): (Model?, string?)
+	local model: Model
+	if look:IsA("Model") then
+		model = look:Clone()
+	elseif look:IsA("BasePart") or look:IsA("Folder") then
+		model = Instance.new("Model")
+		model.Name = look.Name
+		look:Clone().Parent = model
+	else
+		return nil, ("%s isn't a model or a part."):format(look.Name)
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("LuaSourceContainer") or d:IsA("TouchTransmitter") then
+			d:Destroy()
+		end
+	end
+	if not model:FindFirstChildWhichIsA("BasePart", true) then
+		model:Destroy()
+		return nil, ("%s has nothing you can see in it (no parts)."):format(look.Name)
+	end
+	return model, nil
+end
+
+-- A Toolbox code, or your own model/part: the look as one clean Model (nil and why if not).
+local function lookOf(look: number | string | Instance): (Model?, string?, number)
+	if typeof(look) == "Instance" then
+		local model, problem = ownCopy(look)
+		return model, problem, 0
+	end
+	local id = assetId(look)
+	if not id then
+		return nil, "That isn't a Toolbox code: use the number from the model's page.", 0
+	end
+	local model, problem = Swap.LoadToolbox(id)
+	return model, problem, id
+end
+
+--[[
+	Your own model as the look of every copy of a prop (it goes in Custom.Props under that
+	name, then Swap.Props() runs):
+	  require(game.ServerScriptService.Server.Tools.Swap).UseModel("Pumpkin", workspace.MyPumpkin)
+	Build or edit the model anywhere in Workspace first; your original stays where it is.
+]]
+function Swap.UseModel(name: string, look: Instance): (number, string)
+	local model, problem = ownCopy(look)
+	if not model then
+		say(problem :: string)
+		return 0, problem :: string
+	end
+	undoable("Own model for " .. name, function()
+		storeCustom(name, model :: Model, 0)
+	end)
+	say(("%s is now Custom.Props.%s."):format(look.Name, name))
+	return Swap.Props()
+end
+
+--[[
+	Only the selected thing(s) get the look of your own model (like Swap.Selected with a Toolbox
+	code): Swap.SelectedModel(workspace.MyPumpkin)
+]]
+function Swap.SelectedModel(look: Instance, things: { Instance }?): (number, string)
+	local selected: { Instance } = things or {}
+	if not things then
+		pcall(function()
+			selected = game:GetService("Selection"):Get()
+		end)
+	end
+	local targets: { Model } = {}
+	local lines: { string } = {}
+	for _, thing in selected do
+		if thing ~= look and not thing:IsDescendantOf(look) then
+			local prop, why = selectedProp(thing)
+			if prop and not table.find(targets, prop) then
+				table.insert(targets, prop)
+			elseif why then
+				table.insert(lines, why)
+			end
+		end
+	end
+	if #targets == 0 then
+		local message = if #lines > 0
+			then table.concat(lines, " ")
+			else "Nothing is selected: click the thing you want to change in Studio first."
+		say(message)
+		return 0, message
+	end
+	local model, problem = ownCopy(look)
+	if not model then
+		say(problem :: string)
+		return 0, problem :: string
+	end
+	local changed = 0
+	undoable("Own model for the selection", function()
+		local stored: { [string]: boolean } = {}
+		for _, prop in targets do
+			local custom = ("%s_%s"):format(prop:GetAttribute("PropName") :: string, look.Name)
+			if not stored[custom] then
+				stored[custom] = true
+				storeCustom(custom, (model :: Model):Clone(), 0)
+			end
+			if swapOne(prop, custom) then
+				changed += 1
+			end
+		end
+	end)
+	model:Destroy()
+	local message = ("Gave %d selected thing(s) the look of %s; every other copy is unchanged. Save the place (Ctrl+S) to keep it."):format(
+		changed,
+		look.Name
+	)
+	say(message)
+	return changed, message
+end
+
+-- ReplicatedStorage.Custom.Characters (made if missing).
+local function customCharacters(): Instance
+	local custom = customProps().Parent :: Instance
+	local characters = custom:FindFirstChild("Characters")
+	if not characters then
+		characters = Instance.new("Folder")
+		characters.Name = "Characters"
+		characters.Parent = custom
+	end
+	return characters :: Instance
+end
+
+--[[
+	A character's look (the King, skeletons, bats, ghost cats, the shopkeeper: the names in
+	Config.Custom.Heights) from a Toolbox code or your own model:
+	  require(game.ServerScriptService.Server.Tools.Swap).Character("Bat", 12345678)
+	  require(game.ServerScriptService.Server.Tools.Swap).Character("SkeletonPatrol", workspace.MySkeleton)
+	It goes in Custom.Characters under that name (the old one moves to
+	ServerStorage.CustomBackups). The game uses it from the next round (the shopkeeper: the
+	next time the game starts). Delete it from Custom.Characters to get the built look back.
+]]
+function Swap.Character(name: string, look: number | string | Instance): (number, string)
+	if not Config.Custom.Heights[name] then
+		local names = {}
+		for known in Config.Custom.Heights do
+			table.insert(names, known)
+		end
+		table.sort(names)
+		local message = ("%s isn't a character. Use one of: %s."):format(
+			name,
+			table.concat(names, ", ")
+		)
+		say(message)
+		return 0, message
+	end
+	local model, problem, id = lookOf(look)
+	if not model then
+		say(problem :: string)
+		return 0, problem :: string
+	end
+	undoable("Look for " .. name, function()
+		local characters = customCharacters()
+		local existing = characters:FindFirstChild(name)
+		if existing then
+			local backups = ServerStorage:FindFirstChild(CUSTOM_BACKUPS)
+			if not backups then
+				backups = Instance.new("Folder")
+				backups.Name = CUSTOM_BACKUPS
+				backups.Parent = ServerStorage
+			end
+			local older = (backups :: Instance):FindFirstChild(name)
+			if older then
+				older:Destroy()
+			end
+			existing.Parent = backups
+		end
+		local m = model :: Model
+		m.Name = name
+		if id > 0 then
+			m:SetAttribute("ToolboxId", id)
+		end
+		m.Parent = characters
+	end)
+	local message = ("Custom.Characters.%s is your new look: press Play and it shows from the next round. Save the place (Ctrl+S) to keep it."):format(
+		name
+	)
+	say(message)
+	return 1, message
+end
+
 return Swap

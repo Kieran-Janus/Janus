@@ -66,8 +66,13 @@ describe("The tower in the lobby (Sections/TowerParkour)", function()
 		-- Even after the solid lobby pass (HubSolid), nothing of the built tower is in the way.
 		rt:require("ServerScriptService.Server.Hub.HubSolid").Apply(hub)
 		expect(Section.Fit(hub)).toBe(0)
-		-- The glowing sign at the door, and the lanterns inside.
-		expect(hub:FindFirstChild("TowerParkourFloorSign", true)).toBeTruthy()
+		-- The glowing floor sign at the door (only while floor signs are on), and the lanterns inside.
+		local floorSign = hub:FindFirstChild("TowerParkourFloorSign", true)
+		if rt:require("ReplicatedStorage.Shared.Config").Lobby.FloorSigns.On then
+			expect(floorSign).toBeTruthy()
+		else
+			expect(floorSign).toBeNil()
+		end
 		expect(#area.Lanterns:GetChildren()).toBe(#C.TowerParkour.Walls.Lights.Heights)
 		-- The start pad is on the tower's inside floor.
 		local start = CollectionService:GetTagged(Tags.TowerStart)[1]

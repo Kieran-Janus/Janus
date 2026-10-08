@@ -275,9 +275,20 @@ describe("Map builders", function()
 				)
 			)
 			noteSquashedBalls(model)
-			-- Seeded, so a second build is identical.
+			-- Seeded, so a second build is identical (a map that reshuffles every round, Layout.Shuffle,
+			-- is checked with the shuffle off).
+			local shuffle = type(def.Layout) == "table" and def.Layout.Shuffle
+			if shuffle then
+				def.Layout.Shuffle = false
+				model:Destroy()
+				model = builder.Build(def)
+				parts = #rt:parts(model)
+			end
 			local again = builder.Build(def)
 			expect(#rt:parts(again)).toBe(parts)
+			if shuffle then
+				def.Layout.Shuffle = true
+			end
 			model:Destroy()
 			again:Destroy()
 		end)

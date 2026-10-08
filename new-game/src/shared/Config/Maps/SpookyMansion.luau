@@ -91,6 +91,12 @@ return {
 		Wisps = { Rate = 5, Color = Color3.fromRGB(150, 220, 255) },
 		Mist = { Rate = 5, Color = Color3.fromRGB(170, 150, 210) },
 	},
+	-- The haunted portraits (src/server/Build/Portrait.luau): painted figures whose eyes follow
+	-- you. Put picture codes here to hang your own pictures instead, taking turns round the
+	-- house: Images = { "rbxassetid://123456789" }. It must be the IMAGE id: insert the decal
+	-- in Studio (Toolbox), select it and copy the number in its Texture property. The eyes only
+	-- move on the painted figures.
+	Paintings = { Images = {} :: { string } },
 	-- "HAUNTED AMBIENCE" (DistroKid, Creator Store); "" = none
 	AmbientSound = { SoundId = "rbxassetid://134980593475246", Volume = 0.3 },
 }

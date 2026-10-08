@@ -28,6 +28,12 @@ local function world(): any
 		HubBuilder = rt:require("ServerScriptService.Server.Hub.HubBuilder"),
 		MapService = rt:require("ServerScriptService.Server.Services.MapService"),
 	}
+	-- (a map that reshuffles every round would differ between two builds: keep it still here)
+	for _, def in w.Config.Maps.List do
+		if type(def.Layout) == "table" and def.Layout.Shuffle ~= nil then
+			def.Layout.Shuffle = false
+		end
+	end
 	-- How many Pumpkin steps and checkpoints the parkour course has (Config.Parkour.Course).
 	w.parkourPumpkins = 0
 	w.parkourCheckpoints = 0
@@ -1093,5 +1099,57 @@ describe("Swap tool (src/server/Tools/Swap.luau)", function()
 			end
 		end
 		expect(swapped).toBe(field)
+	end)
+end)
+
+describe("Swap with your own models (the Pumpkin Tools plugin uses these)", function()
+	it("uses your model for one thing, every copy, or a character", function()
+		local w = world()
+		local rt = w.rt
+		local Bake = rt:require("ServerScriptService.Server.Tools.Bake")
+		local Swap = rt:require("ServerScriptService.Server.Tools.Swap")
+		local hub = Bake.Hub()
+		Bake.Lock()
+		local mine = w.model("MyPumpkin")
+		mine.Parent = rt.workspace
+		-- (a script inside your model never comes along)
+		rt:create("Script", { Name = "Sneaky" }, mine)
+		local function pumpkins(): { any }
+			local list = {}
+			for _, m in w.props(hub) do
+				if m:GetAttribute("PropName") == "Pumpkin" then
+					table.insert(list, m)
+				end
+			end
+			return list
+		end
+		local before = pumpkins()
+		expect(Swap.SelectedModel(mine, { before[1] })).toBe(1)
+		local props = rt:find("ReplicatedStorage.Custom.Props")
+		local stored = props:FindFirstChild("Pumpkin_MyPumpkin")
+		expect(stored).toBeTruthy()
+		expect(stored:FindFirstChild("Sneaky", true)).toBeNil()
+		expect(mine.Parent).toBe(rt.workspace) -- your original stays
+
+		local all = Swap.UseModel("Pumpkin", mine)
+		expect(all).toBeGreaterThanOrEqual(#before - 1)
+		expect(props.Pumpkin).toBeTruthy()
+
+		-- Characters: a Toolbox code or your model, kept in Custom.Characters.
+		Swap.LoadToolbox = function(id: number)
+			return w.model("Download" .. id), nil
+		end
+		expect(Swap.Character("Bat", 123456)).toBe(1)
+		local characters = rt:find("ReplicatedStorage.Custom.Characters")
+		expect(characters.Bat:GetAttribute("ToolboxId")).toBe(123456)
+		expect(Swap.Character("SkeletonPatrol", mine)).toBe(1)
+		expect(characters.SkeletonPatrol:FindFirstChild("Sneaky", true)).toBeNil()
+		-- A second look for the same character keeps the first as a backup.
+		Swap.Character("Bat", 654321)
+		expect(w.ServerStorage.CustomBackups.Bat:GetAttribute("ToolboxId")).toBe(123456)
+		-- Unknown names are refused with the list of real ones.
+		local n, message = Swap.Character("Dragon", 1)
+		expect(n).toBe(0)
+		expect(message).toMatch("PumpkinKing")
 	end)
 end)

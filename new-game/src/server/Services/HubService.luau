@@ -340,6 +340,7 @@ local function prepare(hub: Instance)
 			end
 		end,
 		function()
+			HubBuilder.RemoveFloorSignsIfOff()
 			local off = HubBuilder.RemoveSwitchedOff(hub)
 			if #off > 0 then
 				print(

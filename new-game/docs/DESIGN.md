@@ -12,7 +12,7 @@ Different from the owner's other Halloween games (Survive Halloween, Nightmare T
 | --- | --- |
 | Audience | Kids of any age. Voice is a bonus: the game must be fully fun with voice off (voice only works for eligible players) |
 | Players | Up to 32 per server |
-| Round length | 5 minutes |
+| Round length | 3 minutes on Easy, 5 on Hard |
 | Win condition | Survive and collect items (pumpkins) |
 | Difficulty | Players vote Easy or Hard each round |
 | Monster | The Pumpkin King |

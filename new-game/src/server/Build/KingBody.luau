@@ -3,13 +3,16 @@
 	The Pumpkin King's placeholder body, built from parts (used when there is no custom
 	PumpkinKing model in ReplicatedStorage.Custom.Characters).
 
-	A long tattered robe down to the floor, a cape, gold shoulders, vine
+	A coat to the knees over two striding legs with pointy boots, a cape, gold shoulders, vine
 	arms reaching forward with claws, a ribbed pumpkin head with an angry glowing carved face,
 	a gold crown with gems on top, and embers rising off the head.
 
 	Colours, sizes, the face glow and the embers are in Config.King (BodyColor, HeadColor,
 	CrownColor, CapeColor, VineColor, FaceColor, GemColor, HeadSize, FaceGlow, Embers).
-	Everything is welded to the hidden HumanoidRootPart, which KingService moves.
+	Everything above the legs is welded to a hidden Pelvis, jointed (Motor6D "Waist") to the
+	HumanoidRootPart that KingService moves; the legs hang from the Pelvis on Hip and Knee
+	joints. Players' screens animate those joints (src/client/KingStride.luau): the server
+	never moves them.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -30,6 +33,7 @@ end
 type Builder = {
 	model: Model,
 	root: BasePart,
+	anchor: BasePart, -- what new parts are welded to (the Pelvis, or a shin for the boots)
 	-- y is measured from the floor; the King faces -Z.
 	part: (
 		self: Builder,
@@ -65,14 +69,14 @@ local function attach(b: Builder, p: BasePart, at: CFrame, decor: boolean?)
 		p.CanQuery = false
 	end
 	local w = Instance.new("WeldConstraint")
-	w.Part0 = b.root
+	w.Part0 = b.anchor
 	w.Part1 = p
 	w.Parent = p
 	p.Parent = b.model
 end
 
-local function newBuilder(model: Model, root: BasePart): Builder
-	local b = { model = model, root = root } :: any
+local function newBuilder(model: Model, root: BasePart, anchor: BasePart): Builder
+	local b = { model = model, root = root, anchor = anchor } :: any
 	function b.part(self: Builder, name, size, at, color, material, shape, decor)
 		local p = Instance.new("Part")
 		p.Name = name
@@ -102,16 +106,20 @@ local function upright(x: number, y: number, z: number): CFrame
 	return CFrame.new(x, y, z) * CFrame.Angles(0, 0, math.rad(90))
 end
 
-local function robe(b: Builder)
+-- How the legs are laid out (studs from the floor). LegLength = the hip's height.
+local HIP_Y, THIGH, SHIN, BOOT = 3.5, 1.65, 1.35, 0.5
+local LEG_X = 0.8 -- each leg's distance from the middle
+
+local function coat(b: Builder)
 	local cfg = Config.King
-	-- Thin tiers that widen smoothly towards the floor, so the robe flares like a gown.
-	local tiers, bottom, top = 8, 0.1, 4.1
+	-- A coat skirt flaring from the waist to the knees, so the legs show below it.
+	local tiers, bottom, top = 5, 2.3, 4.1
 	local step = (top - bottom) / tiers
 	for i = 1, tiers do
-		local t = (i - 1) / (tiers - 1) -- 0 at the floor, 1 at the waist
-		local width = 4.8 - 1.5 * t ^ 0.8
+		local t = (i - 1) / (tiers - 1) -- 0 at the hem, 1 at the waist
+		local width = 4.0 - 0.7 * t
 		b:part(
-			"Robe" .. i,
+			"Coat" .. i,
 			Vector3.new(step + 0.02, width, width),
 			upright(0, bottom + step * (i - 0.5), 0),
 			cfg.BodyColor,
@@ -122,22 +130,109 @@ local function robe(b: Builder)
 	-- Gold trim around the hem and down the front.
 	b:part(
 		"Hem",
-		Vector3.new(0.35, 4.9, 4.9),
-		upright(0, 0.35, 0),
+		Vector3.new(0.3, 4.1, 4.1),
+		upright(0, bottom + 0.1, 0),
 		cfg.CrownColor,
 		Enum.Material.Metal,
 		Enum.PartType.Cylinder,
 		true
 	)
 	b:part(
-		"RobeStripe",
+		"CoatStripe",
 		Vector3.new(0.45, top - bottom, 0.2),
-		CFrame.new(0, (top + bottom) / 2, -2.03) * CFrame.Angles(math.rad(10.5), 0, 0),
+		CFrame.new(0, (top + bottom) / 2, -1.88) * CFrame.Angles(math.rad(11), 0, 0),
 		cfg.CrownColor,
 		Enum.Material.Metal,
 		nil,
 		true
 	)
+end
+
+--[[
+	Two legs on joints (Motor6D) so players' screens can make him stride (client KingStride):
+	Pelvis -> LeftHip/RightHip -> thigh -> LeftKnee/RightKnee -> shin (+ a pointy boot).
+]]
+local function legs(b: Builder, pelvis: BasePart)
+	local cfg = Config.King
+	local trousers = darker(cfg.BodyColor, 0.35)
+	for side = -1, 1, 2 do
+		local name = if side < 0 then "Left" else "Right"
+		local function joint(
+			jointName: string,
+			part0: BasePart,
+			part1: BasePart,
+			c0: CFrame,
+			c1: CFrame
+		)
+			part1.CFrame = part0.CFrame * c0 * c1:Inverse()
+			local motor = Instance.new("Motor6D")
+			motor.Name = jointName
+			motor.Part0 = part0
+			motor.Part1 = part1
+			motor.C0 = c0
+			motor.C1 = c1
+			motor.Parent = part0
+		end
+		local function limb(limbName: string, size: Vector3, color: Color3): BasePart
+			local p = Instance.new("Part")
+			p.Name = limbName
+			p.Size = size
+			p.Color = color
+			p.Material = Enum.Material.Fabric
+			p.CanCollide = false
+			p.CanTouch = false
+			p.CanQuery = false
+			p.Massless = true
+			p.CastShadow = false
+			p.TopSurface = Enum.SurfaceType.Smooth
+			p.BottomSurface = Enum.SurfaceType.Smooth
+			p.Parent = b.model
+			return p
+		end
+		local thigh = limb(name .. "Thigh", Vector3.new(0.95, THIGH, 0.95), trousers)
+		joint(
+			name .. "Hip",
+			pelvis,
+			thigh,
+			CFrame.new(side * LEG_X, 0, 0),
+			CFrame.new(0, THIGH / 2, 0)
+		)
+		local shin = limb(name .. "Shin", Vector3.new(0.8, SHIN, 0.8), trousers)
+		joint(name .. "Knee", thigh, shin, CFrame.new(0, -THIGH / 2, 0), CFrame.new(0, SHIN / 2, 0))
+
+		-- The boot and its curled toe go along with the shin (welded to it).
+		local anchor = b.anchor
+		b.anchor = shin
+		local x = side * LEG_X
+		b:part(
+			"Boot",
+			Vector3.new(0.95, BOOT, 1.5),
+			CFrame.new(x, BOOT / 2, -0.25),
+			Color3.fromRGB(25, 18, 22),
+			Enum.Material.Leather,
+			nil,
+			true
+		)
+		b:part(
+			"Toe",
+			Vector3.new(0.5, 0.5, 0.5),
+			CFrame.new(x, BOOT * 0.7, -1.05) * CFrame.Angles(math.rad(45), 0, 0),
+			Color3.fromRGB(25, 18, 22),
+			Enum.Material.Leather,
+			nil,
+			true
+		)
+		b:part(
+			"Buckle",
+			Vector3.new(0.45, 0.3, 0.1),
+			CFrame.new(x, BOOT * 0.6, -1.0),
+			cfg.CrownColor,
+			Enum.Material.Metal,
+			nil,
+			true
+		)
+		b.anchor = anchor
+	end
 end
 
 local function torso(b: Builder)
@@ -201,15 +296,15 @@ local function torso(b: Builder)
 	-- Cape from the shoulders, flaring out behind.
 	b:part(
 		"Cape",
-		Vector3.new(4.4, 6.8, 0.2),
-		CFrame.new(0, 7, 1.15) * CFrame.Angles(math.rad(-16), 0, 0) * CFrame.new(0, -3.4, 0),
+		Vector3.new(4.4, 6, 0.2),
+		CFrame.new(0, 7, 1.15) * CFrame.Angles(math.rad(-16), 0, 0) * CFrame.new(0, -3, 0),
 		cfg.CapeColor,
 		Enum.Material.Fabric
 	)
 	b:part(
 		"CapeLining",
-		Vector3.new(4.0, 6.4, 0.1),
-		CFrame.new(0, 7, 1.0) * CFrame.Angles(math.rad(-16), 0, 0) * CFrame.new(0, -3.3, 0),
+		Vector3.new(4.0, 5.8, 0.1),
+		CFrame.new(0, 7, 1.0) * CFrame.Angles(math.rad(-16), 0, 0) * CFrame.new(0, -2.9, 0),
 		darker(cfg.BodyColor, 0.2),
 		Enum.Material.Fabric,
 		nil,
@@ -219,7 +314,7 @@ local function torso(b: Builder)
 	b:part(
 		"CapeTrim",
 		Vector3.new(4.5, 0.3, 0.25),
-		CFrame.new(0, 7, 1.15) * CFrame.Angles(math.rad(-16), 0, 0) * CFrame.new(0, -6.7, 0),
+		CFrame.new(0, 7, 1.15) * CFrame.Angles(math.rad(-16), 0, 0) * CFrame.new(0, -5.95, 0),
 		cfg.CrownColor,
 		Enum.Material.Metal,
 		nil,
@@ -242,13 +337,29 @@ local function arms(b: Builder)
 		)
 		-- Arms reach forward and a little out, like he's about to grab you.
 		local arm = shoulder * CFrame.Angles(math.rad(68), 0, math.rad(side * 8))
-		b:part(
+		local upper = b:part(
 			"Arm",
 			Vector3.new(0.95, 2.8, 0.95),
 			arm * CFrame.new(0, -1.4, 0),
 			cfg.BodyColor,
 			Enum.Material.Fabric
 		)
+		-- The arm hangs on a shoulder joint (LeftShoulder / RightShoulder) instead of a weld, so
+		-- players' screens can swing it as he walks and stretch it out when he chases you.
+		local pelvis = b.anchor
+		local weld = upper:FindFirstChildOfClass("WeldConstraint")
+		if weld then
+			weld:Destroy()
+		end
+		local motor = Instance.new("Motor6D")
+		motor.Name = if side < 0 then "LeftShoulder" else "RightShoulder"
+		motor.Part0 = pelvis
+		motor.Part1 = upper
+		motor.C0 = pelvis.CFrame:ToObjectSpace(upper.CFrame * CFrame.new(0, 1.4, 0))
+		motor.C1 = CFrame.new(0, 1.4, 0)
+		motor.Parent = pelvis
+		-- The cuff, hand and claws go along with the arm.
+		b.anchor = upper
 		b:part(
 			"Cuff",
 			Vector3.new(0.35, 1.25, 1.25),
@@ -283,6 +394,7 @@ local function arms(b: Builder)
 				true
 			)
 		end
+		b.anchor = pelvis
 	end
 end
 
@@ -486,8 +598,29 @@ function KingBody.Build(position: Vector3): (Model, Humanoid, BasePart)
 	root.Parent = model
 	model.PrimaryPart = root
 
-	local b = newBuilder(model, root)
-	robe(b)
+	-- The hidden Pelvis carries everything above the legs; its joint (Waist) lets players'
+	-- screens bob and sway him as he walks. LegLength tells them how long his strides are.
+	local pelvis = Instance.new("Part")
+	pelvis.Name = "Pelvis"
+	pelvis.Size = Vector3.new(1, 1, 1)
+	pelvis.Transparency = 1
+	pelvis.CanCollide = false
+	pelvis.CanTouch = false
+	pelvis.CanQuery = false
+	pelvis.Massless = true
+	local waist = Instance.new("Motor6D")
+	waist.Name = "Waist"
+	waist.Part0 = root
+	waist.Part1 = pelvis
+	waist.C0 = CFrame.new(0, HIP_Y - floorOffset(), 0)
+	pelvis.CFrame = root.CFrame * waist.C0
+	waist.Parent = root
+	pelvis.Parent = model
+	model:SetAttribute("LegLength", HIP_Y)
+
+	local b = newBuilder(model, root, pelvis)
+	legs(b, pelvis)
+	coat(b)
 	torso(b)
 	arms(b)
 	head(b)

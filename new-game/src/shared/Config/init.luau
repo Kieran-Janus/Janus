@@ -1,7 +1,8 @@
 --!strict
 --[[
 	THE tweak file. Every number, name, price and AI persona lives here.
-	Want a longer round? Change Round.Duration. Want a new NPC? Add to AI.Npcs.
+	Want a longer round? Change Difficulty.Levels.<Easy|Hard>.RoundSeconds. Want a new NPC? Add
+	to AI.Npcs.
 	Nothing else in the codebase should hardcode gameplay values.
 
 	The v2 settings each have their own short file in this folder (src/shared/Config/):
@@ -15,6 +16,7 @@
 	  ScreenMotion.luau  animations of the Hide & Seek, ScareMaze, ghost, spectate, rewards,
 	                   NPC dialogue, announcement and Voting Board screens
 	  Menu.luau        the top-left menu tiles
+	  TextOverrides.luau  change any words players see (signs, buttons, banners)
 	  Maps/<Id>.luau   one file per round map (added to Maps.List below)
 	  Skins/           crate skins, one file per theme (added to Shop.Items below), and
 	                   Skins/Settings.luau (Config.Skins: themes, glow, auras, CRAZY effects)
@@ -86,6 +88,7 @@ local Config = {
 	MapLife = require(script.MapLife),
 	ScreenMotion = require(script.ScreenMotion),
 	SkinStudio = require(script.SkinStudio),
+	TextOverrides = require(script.TextOverrides),
 
 	Game = {
 		Name = "Pumpkin Panic", -- working title, see docs/DESIGN.md
@@ -97,7 +100,8 @@ local Config = {
 	-- How many players a round needs: Config.Lobby.Ready.MinReady (Config/Lobby.luau).
 	Round = {
 		IntermissionSeconds = 5, -- after voting, while the map loads
-		Duration = 300, -- seconds of play per King Hunt round (other modes: their own file)
+		Duration = 300, -- seconds of play per King Hunt round, unless its difficulty has RoundSeconds
+		-- (Difficulty.Levels below: Easy 180 = 3 minutes). Other modes: their own file.
 		ResultsSeconds = 10, -- how long the results screen stays up
 		ResultsShowTop = 10, -- rows on the results screen
 		CancelledSeconds = 3, -- "Not enough players" shows this long when a round is called off
@@ -278,6 +282,10 @@ local Config = {
 		-- map (src/client/ZoneLighting.luau) so players in the hub keep the hub look.
 		LightingFadeSeconds = 1.5,
 		ZoneCheckSeconds = 0.25,
+		-- Haunted portraits on the maps (src/server/Build/Portrait.luau): their eyes follow the
+		-- camera (src/client/PortraitEyes.luau) within Range studs; Reach = how far the pupils move
+		-- (share of the eye, across and down). On = false: they stare straight ahead.
+		PortraitEyes = { On = true, Range = 70, Reach = Vector2.new(0.22, 0.14) },
 		-- Every map's settings are in their own file: src/shared/Config/Maps/<Id>.luau.
 		-- To add a map: copy one of those files, change its Id/Name/Builder, add it here and
 		-- add a playlist for it in Config/Modes.luau.
@@ -286,6 +294,7 @@ local Config = {
 			require(script.Maps.SpookyMansion) :: any, -- King Hunt
 			require(script.Maps.PumpkinFarm) :: any, -- Hide & Seek
 			require(script.Maps.HedgeMaze) :: any, -- Hide & Seek
+			require(script.Maps.MidnightMarket) :: any, -- Hide & Seek (small, shuffled every round)
 			require(script.Maps.ScareMaze) :: any, -- ScareMaze
 		} :: { any }, -- maps differ in shape (each Builder reads its own Layout)
 	},
@@ -296,6 +305,7 @@ local Config = {
 		Levels = {
 			Easy = {
 				Name = "Easy",
+				RoundSeconds = 180, -- how long a King Hunt round lasts (missing = Round.Duration)
 				PumpkinsAtStart = 25,
 				MaxPumpkins = 35, -- most pumpkins on the map at once
 				SpawnInterval = 2, -- seconds between new pumpkins
@@ -303,6 +313,7 @@ local Config = {
 			},
 			Hard = {
 				Name = "Hard",
+				RoundSeconds = 300,
 				PumpkinsAtStart = 12,
 				MaxPumpkins = 18,
 				SpawnInterval = 4,
@@ -335,20 +346,23 @@ local Config = {
 		-- Picked by the difficulty vote. Players walk at Player.WalkSpeed and sprint at SprintSpeed.
 		Difficulty = {
 			Easy = {
-				Count = 1,
+				Count = 1, -- how many Kings (kept at 1)
 				WalkSpeed = 12, -- while wandering or investigating a noise
 				ChaseSpeed = 18,
 				HearingRange = 90, -- studs; noise farther away is ignored
 				SightRange = 45, -- studs; needs a clear line of sight
 			},
 			Hard = {
-				Count = 2,
+				Count = 1, -- always one King (he speeds up instead: SpeedUp below)
 				WalkSpeed = 14,
 				ChaseSpeed = 21,
 				HearingRange = 130,
 				SightRange = 60,
 			},
 		},
+		-- He gets a little faster every Every seconds after he appears: Add to his walk and
+		-- chase speed each time, never more than Max in total (0 = he never speeds up).
+		SpeedUp = { Every = 30, Add = 0.75, Max = 6 },
 		SpawnDelay = 15, -- seconds of grace at round start before the King appears
 		MinSpawnDistance = 60, -- studs from every player when it spawns
 		CatchRange = 4.5, -- studs from the King's root to a player's root (touching also catches)
@@ -361,7 +375,7 @@ local Config = {
 		HipHeight = 3,
 		BodySize = Vector3.new(3, 4, 2), -- his eyes are BodySize.Y above his root (line of sight)
 		HeadSize = 4.5,
-		BodyColor = Color3.fromRGB(40, 25, 55), -- robe, sleeves and chest
+		BodyColor = Color3.fromRGB(40, 25, 55), -- coat, sleeves and chest (trousers a little darker)
 		HeadColor = Color3.fromRGB(255, 125, 15), -- the pumpkin
 		CrownColor = Color3.fromRGB(255, 210, 60), -- crown, shoulders, buckle and trims
 		CapeColor = Color3.fromRGB(125, 18, 36),
@@ -370,6 +384,23 @@ local Config = {
 		GemColor = Color3.fromRGB(235, 30, 70), -- the crown's gems
 		FaceGlow = { Brightness = 1.1, Range = 12 }, -- the light inside his head
 		Embers = 6, -- sparks rising off his head per second (0 = none)
+		-- His long striding walk, drawn on each player's screen (src/client/KingStride.luau): legs
+		-- swing Swing degrees each way, the lifted knee bends KneeBend degrees, his body dips as his
+		-- legs part and rolls Sway degrees side to side, and leans ChaseLean degrees forward while
+		-- chasing. Only Kings within Range studs of the camera are animated. On = false: he glides.
+		-- His arms swing ArmSwing degrees as he walks, hang ArmDrop degrees lower while he isn't
+		-- chasing, and twitch ArmTwitch degrees as he reaches for you.
+		Stride = {
+			On = true,
+			Swing = 34,
+			KneeBend = 65,
+			Sway = 5,
+			ChaseLean = 9,
+			ArmSwing = 14,
+			ArmDrop = 38,
+			ArmTwitch = 6,
+			Range = 250,
+		},
 		Path = {
 			AgentRadius = 2.5,
 			AgentHeight = 8,
@@ -713,9 +744,9 @@ local Config = {
 	]]
 	Hub = {
 		Name = "Spooky Town Square",
-		-- Bump this number (10 -> 11) whenever the hub code or these settings change in a way the
+		-- Bump this number (11 -> 12) whenever the hub code or these settings change in a way the
 		-- saved hub should pick up: a saved hub with a lower number is rebuilt on the next start.
-		BuildVersion = 10,
+		BuildVersion = 11,
 		Center = Vector3.new(0, 0, 0), -- top of the baseplate
 		Seed = 31, -- random variation in decorations (change it for a different scatter)
 		Radius = 105, -- cobblestone plaza (room for 32 players)
@@ -985,7 +1016,16 @@ local Config = {
 				Color = Color3.fromRGB(46, 34, 58),
 				RoofColor = Color3.fromRGB(70, 40, 92),
 			},
-			KingStatue = { Offset = Vector3.new(26, 0, -44), Height = 16 },
+			-- The Pumpkin King statue: Height scales it all (16 = the old size), FigureHeight is the
+			-- King on top (at Height 16), and he rocks SwayAngle degrees each way, once every
+			-- SwaySeconds (0 = still). Rebuild the hub (or Bake) to see a change.
+			KingStatue = {
+				Offset = Vector3.new(26, 0, -44),
+				Height = 19,
+				FigureHeight = 14,
+				SwayAngle = 6,
+				SwaySeconds = 3.2,
+			},
 			PumpkinPatch = { Offset = Vector3.new(74, 0, 34), Radius = 13, Pumpkins = 12 },
 			ExtraGraves = { Offset = Vector3.new(-84, 0, 62), Spread = 13, Count = 8 },
 			-- The iron fence round the plaza: posts with little pumpkins on top.

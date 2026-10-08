@@ -278,9 +278,24 @@ function CrateOdds.RarityIndex(rarity: string?): number
 	return table.find(Config.Rarity.Order, rarity or "") or 1
 end
 
+-- A chance (percent) as players see it: "6.1%", "24%", and anything under 1% as
+-- Config.Crates.SmallOdds ("<1%"). With SmallOdds = "" every digit that matters shows
+-- instead ("0.020%", "0.0001%"): CrateOdds.Exact.
 function CrateOdds.Format(percent: number): string
+	local small = Config.Crates.SmallOdds
+	if percent > 0 and percent < 1 and small ~= "" then
+		return small
+	end
+	if percent < 1 then
+		return CrateOdds.Exact(percent)
+	end
+	local shown = ("%.1f"):format(percent):gsub("%.0$", "")
+	return shown .. "%"
+end
+
+-- Every digit that matters: "6.123%", "0.020%", "0.0001%" (never "0.000%").
+function CrateOdds.Exact(percent: number): string
 	if percent > 0 and percent < 0.001 then
-		-- Tiny chances show every digit that matters: "0.0001%", never "0.000%".
 		local digits = ("%.6f"):format(percent):gsub("0+$", "")
 		return digits .. "%"
 	end

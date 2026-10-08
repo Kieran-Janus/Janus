@@ -107,7 +107,7 @@ describe("Playlists", function()
 		withFeatures({ KingHunt = true, HideSeek = true, ScareMaze = true }, function()
 			-- 1 player: King Hunt only; 2 players: everything.
 			expect(ids(Playlists.Available(1))).toBe("KingHuntPatch,KingHuntMansion")
-			expect(#Playlists.Available(2)).toBe(5)
+			expect(#Playlists.Available(2)).toBe(6)
 			for _ = 1, 20 do
 				local offer = Playlists.Offer(4, 3)
 				expect(#offer).toBe(3)
@@ -125,7 +125,7 @@ describe("Playlists", function()
 			-- offered; the round waits for 2 ready players instead.
 			expect(#Playlists.Offer(1, 3)).toBe(0)
 			expect(Playlists.FewestPlayers()).toBe(2)
-			expect(ids(Playlists.Offer(2, 3))).toBe("HideSeekFarm,HideSeekHedgeMaze")
+			expect(ids(Playlists.Offer(2, 3))).toBe("HideSeekFarm,HideSeekHedgeMaze,HideSeekMarket")
 		end)
 		withFeatures({ KingHunt = true, HideSeek = true, ScareMaze = true }, function()
 			expect(Playlists.FewestPlayers()).toBe(1)

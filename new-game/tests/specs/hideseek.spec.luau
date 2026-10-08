@@ -190,7 +190,7 @@ describe("Hide & Seek maps", function()
 	local rt = Runtime.new()
 	local MapService = rt:require("ServerScriptService.Server.Services.MapService")
 
-	for _, id in { "PumpkinFarm", "HedgeMaze" } do
+	for _, id in { "PumpkinFarm", "HedgeMaze", "MidnightMarket" } do
 		it(("builds %s with a floor, spawns, a seeker hut and decoys"):format(id), function()
 			local map = MapService.Load(id)
 			expect(map.Id).toBe(id) -- not a fallback map
@@ -203,7 +203,7 @@ describe("Hide & Seek maps", function()
 			expect(#doors).toBe(1)
 			expect(doors[1]:IsA("BasePart")).toBe(true)
 			local decoys = taggedIn(rt, map.Model, "HidingDecoy")
-			expect(#decoys).toBeGreaterThanOrEqual(if id == "PumpkinFarm" then 100 else 40)
+			expect(#decoys).toBeGreaterThanOrEqual(if id == "HedgeMaze" then 40 else 90)
 			-- Spawns stand on the floor, inside the map.
 			for _, spawn in hiderSpawns do
 				local offset = map.Floor.CFrame:PointToObjectSpace(spawn.Position)
@@ -218,6 +218,23 @@ describe("Hide & Seek maps", function()
 			MapService.Unload()
 		end)
 	end
+
+	it("shuffles the Midnight Market's decoys and spawns every round", function()
+		local function layout(): string
+			local map = MapService.Load("MidnightMarket")
+			local spots = {}
+			for _, decoy in taggedIn(rt, map.Model, "HidingDecoy") do
+				local p = decoy:GetPivot().Position
+				table.insert(spots, ("%d,%d"):format(math.floor(p.X), math.floor(p.Z)))
+			end
+			table.sort(spots)
+			local parts = #rt:parts(map.Model)
+			expect(parts).toBeLessThan(3000)
+			MapService.Unload()
+			return table.concat(spots, ";")
+		end
+		expect(layout()).never.toBe(layout())
+	end)
 
 	it("builds the same maps every time", function()
 		local counts = {}

@@ -96,6 +96,13 @@ return {
 			MinPlayers = 2,
 		},
 		{
+			Id = "HideSeekMarket",
+			Mode = "HideSeek",
+			Map = "MidnightMarket",
+			Name = "Hide & Seek: Midnight Market",
+			MinPlayers = 2,
+		},
+		{
 			Id = "ScareMaze",
 			Mode = "ScareMaze",
 			Map = "ScareMaze",

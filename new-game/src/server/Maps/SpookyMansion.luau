@@ -21,6 +21,7 @@
 
 local Kit = require(script.Parent.Parent.Build.Kit)
 local MapBase = require(script.Parent.MapBase)
+local Portrait = require(script.Parent.Parent.Build.Portrait)
 
 local SpookyMansion = {}
 
@@ -33,6 +34,16 @@ type Room = {
 
 local function c(room: Room, x: number, y: number, z: number): CFrame
 	return CFrame.new(room.Center + Vector3.new(x, y, z))
+end
+
+-- A haunted portrait (Build/Portrait): the n-th one takes the n-th kind, or the n-th of the
+-- map's own pictures (Config: Paintings.Images) when it has any.
+local function portrait(ctx: MapBase.Ctx, cf: CFrame, size: Vector2, n: number, parent: Instance)
+	local colors = ctx.Def.Colors
+	local images: { string } = (ctx.Def.Paintings and ctx.Def.Paintings.Images) or {}
+	local image = if #images > 0 then images[(n - 1) % #images + 1] else nil
+	local kind = Portrait.Kinds[(n - 1) % #Portrait.Kinds + 1]
+	Portrait.Build(cf, size, kind, { Frame = colors.Gold, Eyes = colors.Slime }, parent, image)
 end
 
 local function chandelier(room: Room, height: number)
@@ -176,7 +187,8 @@ end
 
 function Rooms.Gallery(room: Room)
 	local colors = room.Ctx.Def.Colors
-	-- Portraits hang high on all four walls (above the doorways) with glowing eyes.
+	-- Portraits hang high on all four walls (above the doorways); their eyes follow you.
+	local n = 0
 	for _, side in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
 		for _, along in { -14, 0, 14 } do
 			local x = side[1] * 27.6 + (if side[1] == 0 then along else 0)
@@ -185,29 +197,8 @@ function Rooms.Gallery(room: Room)
 				room.Center + Vector3.new(x, 14, z),
 				room.Center + Vector3.new(0, 14, 0)
 			)
-			Kit.decor({
-				Name = "Frame",
-				Size = Vector3.new(6, 4.4, 0.3),
-				CFrame = cf,
-				Color = colors.Gold,
-				Material = Enum.Material.Metal,
-			}, room.Model)
-			Kit.decor({
-				Name = "Painting",
-				Size = Vector3.new(5.2, 3.6, 0.2),
-				CFrame = cf * CFrame.new(0, 0, -0.1),
-				Color = colors.RugAlt:Lerp(colors.Trim, 0.5),
-			}, room.Model)
-			for _, ex in { -0.7, 0.7 } do
-				Kit.decor({
-					Name = "Eye",
-					Shape = Enum.PartType.Ball,
-					Size = Vector3.new(0.4, 0.4, 0.4),
-					CFrame = cf * CFrame.new(ex, 0.4, -0.25),
-					Color = colors.Slime,
-					Material = Enum.Material.Neon,
-				}, room.Model)
-			end
+			n += 1
+			portrait(room.Ctx, cf, Vector2.new(4.8, 6), n, room.Model)
 		end
 	end
 	-- Suits of armour.
@@ -620,37 +611,18 @@ local function buildSegment(
 			}, parent)
 		end
 		if y0 == 0 and length >= 12 then
-			local portrait = Kit.model("Portrait", parent)
-			local tints = { colors.Curtain, colors.RugAlt, colors.Plant, colors.Trim }
-			local tint = tints[(math.floor(math.abs(mid) + math.abs(fixed)) % #tints) + 1]
-			Kit.decor({
-				Name = "Frame",
-				Size = slab(0.4, 5.6, 4.4),
-				CFrame = CFrame.new(along(0, 8.5)),
-				Color = colors.Gold,
-				Material = Enum.Material.Wood,
-			}, portrait)
-			Kit.decor({
-				Name = "Canvas",
-				Size = slab(0.6, 4.6, 3.4),
-				CFrame = CFrame.new(along(0, 8.5)),
-				Color = tint,
-				Material = Enum.Material.Fabric,
-			}, portrait)
+			-- A haunted portrait on each face, whose eyes follow you (Build/Portrait).
+			local pick = math.floor(math.abs(mid) + math.abs(fixed))
 			for _, face in { -1, 1 } do
-				for _, eye in { -0.6, 0.6 } do
-					local normal = (t / 2 + 0.35) * face
-					Kit.decor({
-						Name = "Eye",
-						Shape = Enum.PartType.Ball,
-						Size = Vector3.new(0.45, 0.45, 0.45),
-						Position = if vertical
-							then MapBase.at(ctx, fixed + normal, mid + eye, 9.2)
-							else MapBase.at(ctx, mid + eye, fixed + normal, 9.2),
-						Color = colors.Slime,
-						Material = Enum.Material.Neon,
-					}, portrait)
-				end
+				local normal = if vertical then Vector3.new(face, 0, 0) else Vector3.new(0, 0, face)
+				local at = along(0, 8.5) + normal * (t / 2 + 0.3)
+				portrait(
+					ctx,
+					CFrame.lookAt(at, at + normal),
+					Vector2.new(4.4, 5.6),
+					pick + face,
+					parent
+				)
 			end
 		end
 		-- Dark skirting board along the bottom.

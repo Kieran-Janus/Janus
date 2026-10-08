@@ -127,15 +127,19 @@ describe("Config.Crates and CrateOdds", function()
 		expect(seen).toEqual({ Common = 12, Uncommon = 5, Rare = 2, Crazy = 1 })
 		local chances = CrateOdds.Chances(pumpkin)
 		expect(chances[1].Rarity).toBe("Crazy") -- highest rarity first
-		expect(CrateOdds.Format(chances[1].Chance)).toBe("0.020%")
+		expect(CrateOdds.Exact(chances[1].Chance)).toBe("0.020%")
+		expect(CrateOdds.Format(chances[1].Chance)).toBe("<1%") -- under 1%: Config.Crates.SmallOdds
 		for _, c in chances do
 			local expected = Config.Crates.Odds[c.Rarity] / seen[c.Rarity]
 			expect(c.Chance).toBeNear(expected, 1e-9)
 		end
-		expect(CrateOdds.Format(73.48 / 12)).toBe("6.123%")
-		expect(CrateOdds.Format(24 / 5)).toBe("4.800%")
-		expect(CrateOdds.Format(0.0001)).toBe("0.0001%") -- tiny chances show every digit
-		expect(CrateOdds.Format(0.00025)).toBe("0.00025%")
+		expect(CrateOdds.Exact(73.48 / 12)).toBe("6.123%")
+		expect(CrateOdds.Format(73.48 / 12)).toBe("6.1%")
+		expect(CrateOdds.Format(24)).toBe("24%")
+		expect(CrateOdds.Format(0.5)).toBe("<1%")
+		expect(CrateOdds.Exact(24 / 5)).toBe("4.800%")
+		expect(CrateOdds.Exact(0.0001)).toBe("0.0001%") -- tiny chances show every digit
+		expect(CrateOdds.Exact(0.00025)).toBe("0.00025%")
 	end)
 
 	it(
@@ -197,7 +201,8 @@ describe("Config.Crates and CrateOdds", function()
 				end
 				expect(found).toBeTruthy()
 				expect(found.Chance).toBe(0.0001)
-				expect(CrateOdds.Format(found.Chance)).toBe("0.0001%")
+				expect(CrateOdds.Exact(found.Chance)).toBe("0.0001%")
+				expect(CrateOdds.Format(found.Chance)).toBe("<1%")
 				expect(total).toBeNear(100, 1e-9)
 				-- Shown first, above the Rares.
 				expect(CrateOdds.Chances(crate)[1].Item).toBe(item)
@@ -993,7 +998,8 @@ describe("CrateUI (client)", function()
 			count += 1
 		end
 		expect(count).toBe(20)
-		expect(preview.Items:FindFirstChild("Pumpkin_PumpkinSpice").Chance.Text).toBe("6.123%")
+		expect(preview.Items:FindFirstChild("Pumpkin_PumpkinSpice").Chance.Text).toBe("6.1%")
+		expect(preview.Items:FindFirstChild("Pumpkin_MegaGourdSupreme").Chance.Text).toBe("<1%")
 		expect(preview.Side.Buy.Visible).toBe(true)
 		expect(preview.Side.Buy.OpenCoins.Text).toMatch("600")
 		expect(preview.Side.Buy.OpenCoins5.Text).toMatch("3,000")
@@ -1021,7 +1027,7 @@ describe("CrateUI (client)", function()
 		expect(preview.Side.Extras.QuickOpen.Text).toMatch(CConfig.Crates.Text.QuickOpen)
 		-- A one-in-a-million skin shows its exact chance.
 		CrateUI.Open("VampireCastleCrate")
-		expect(panel.Body.Preview.Items.VampireCastle_NightLordSupreme.Chance.Text).toBe("0.0001%")
+		expect(panel.Body.Preview.Items.VampireCastle_NightLordSupreme.Chance.Text).toBe("<1%")
 		CrateUI.Open("PumpkinCrate")
 	end)
 

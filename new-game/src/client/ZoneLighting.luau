@@ -64,6 +64,12 @@ local function apply(profile: any, seconds: number)
 	tween(Lighting:FindFirstChild("HubAtmosphere"), profile.Atmosphere, seconds)
 	tween(Lighting:FindFirstChild("HubColorCorrection"), profile.ColorCorrection, seconds)
 	tween(Lighting:FindFirstChild("HubBloom"), profile.Bloom, seconds)
+	-- The lobby's soft far focus is only for the lobby: round maps (and spectating) stay sharp.
+	local dof = Lighting:FindFirstChild("HubDepthOfField")
+	if dof and dof:IsA("DepthOfFieldEffect") then
+		local hubDof = Config.Hub.Lighting.DepthOfField
+		dof.Enabled = profile == Config.Hub.Lighting and hubDof.Enabled
+	end
 end
 
 function ZoneLighting.Mount()

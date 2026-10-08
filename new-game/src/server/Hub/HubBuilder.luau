@@ -37,6 +37,7 @@
 	HubBuilder.RepairSection(hub, name) -> Instance?  a section's Repair(), else its Build()
 	HubBuilder.ApplyLighting(), ApplyMusic(hub), ApplyCustomNpcs(hub), DisableDefaultSpawn()
 	HubBuilder.FindHubs(), RemoveLoosePieces(keep), PieceAttribute
+	HubBuilder.RemoveFloorSignsIfOff() -> number       removes the floor signs while they are off
 	HubBuilder.RemoveSwitchedOff(hub) -> { string }   empties the lobby areas whose
 	                                   Config.Features switch is off (running game only)
 ]]
@@ -1741,6 +1742,24 @@ function HubBuilder.RemoveSwitchedOff(hub: Instance): { string }
 		end
 	end
 	return removed
+end
+
+--[[
+	With Config.Lobby.FloorSigns.On = false, takes the glowing floor signs (tag FloorSign) out
+	of the running game, also from a saved or Locked hub. Returns how many it removed.
+]]
+function HubBuilder.RemoveFloorSignsIfOff(): number
+	if Config.Lobby.FloorSigns.On then
+		return 0
+	end
+	local count = 0
+	for _, sign in CollectionService:GetTagged(Tags.FloorSign) do
+		if sign:IsDescendantOf(workspace) then
+			sign:Destroy()
+			count += 1
+		end
+	end
+	return count
 end
 
 -- Building -----------------------------------------------------------------------------------

@@ -4,6 +4,9 @@
 	  "HubFloat" Models bob up and down (attributes BobHeight, Phase). The crates on the
 	             crate stand are left alone while Config.Crates.Idle is on: CrateIdle.luau
 	             animates them (a lobby saved before that still has the HubFloat tag on them).
+	  "HubSway"  Models rock gently from side to side about their pivot (their feet), with a
+	             little bob as they lean (attributes SwayAngle degrees, SwaySeconds per rock):
+	             the Pumpkin King statue
 	  "HubFlicker" PointLights flicker like candles
 	Anything tagged later (the hub may be built after this client starts) is picked up too.
 	Cheap on phones (Config.Performance): only things near the camera animate (looked for a
@@ -19,7 +22,7 @@ local Tags = require(ReplicatedStorage.Shared.Tags)
 local FramePace = require(script.Parent.FramePace)
 local Layout = require(script.Parent.Layout)
 
-type Float = { Base: CFrame?, Bob: number, Phase: number }
+type Float = { Base: CFrame?, Bob: number, Phase: number, Sway: number?, SwaySeconds: number? }
 type Flicker = { Brightness: number, Seed: number }
 
 local HubAmbience = {}
@@ -65,6 +68,18 @@ function HubAmbience.Mount()
 			Phase = (instance:GetAttribute("Phase") or 0) :: number,
 		}
 	end
+	local function addSway(instance: Instance)
+		if not instance:IsA("Model") then
+			return
+		end
+		floats[instance] = {
+			Base = nil,
+			Bob = 0,
+			Phase = (instance:GetAttribute("Phase") or 0) :: number,
+			Sway = math.rad((instance:GetAttribute("SwayAngle") or 6) :: number),
+			SwaySeconds = math.max((instance:GetAttribute("SwaySeconds") or 3) :: number, 0.2),
+		}
+	end
 	local function addFlicker(instance: Instance)
 		if instance:IsA("PointLight") then
 			flickers[instance] =
@@ -74,11 +89,18 @@ function HubAmbience.Mount()
 	for _, instance in CollectionService:GetTagged("HubFloat") do
 		addFloat(instance)
 	end
+	for _, instance in CollectionService:GetTagged(Tags.HubSway) do
+		addSway(instance)
+	end
 	for _, instance in CollectionService:GetTagged("HubFlicker") do
 		addFlicker(instance)
 	end
 	CollectionService:GetInstanceAddedSignal("HubFloat"):Connect(addFloat)
 	CollectionService:GetInstanceAddedSignal("HubFlicker"):Connect(addFlicker)
+	CollectionService:GetInstanceAddedSignal(Tags.HubSway):Connect(addSway)
+	CollectionService:GetInstanceRemovedSignal(Tags.HubSway):Connect(function(instance)
+		floats[instance :: Model] = nil
+	end)
 	CollectionService:GetInstanceRemovedSignal("HubFloat"):Connect(function(instance)
 		floats[instance :: Model] = nil
 	end)
@@ -108,7 +130,8 @@ function HubAmbience.Mount()
 			end
 			local base = f.Base
 			if not base then
-				if not m.PrimaryPart then
+				-- (a swaying model's pivot is its WorldPivot: it needs no PrimaryPart)
+				if not m.PrimaryPart and not f.Sway then
 					continue
 				end
 				base = m:GetPivot()
@@ -156,6 +179,15 @@ function HubAmbience.Mount()
 				continue
 			end
 			local base = f.Base :: CFrame
+			local sway = f.Sway
+			if sway then
+				-- Rock about the feet (the pivot), easing in and out at each side, with a tiny
+				-- dip as he passes upright, like a heavy statue shifting its weight.
+				local swing = math.sin(t * 2 * math.pi / (f.SwaySeconds or 3) + f.Phase)
+				local dip = -0.15 * (1 - math.abs(swing))
+				m:PivotTo(base * CFrame.new(0, dip, 0) * CFrame.Angles(0, 0, swing * sway))
+				continue
+			end
 			-- World-space bob: many models (candles) are built from rotated cylinders, so a
 			-- local offset would slide them sideways instead of up and down.
 			m:PivotTo(CFrame.new(0, math.sin(t * 1.5 + f.Phase) * f.Bob, 0) * base)

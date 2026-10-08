@@ -906,7 +906,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 	end
 
-	-- The rarity totals, e.g. "CRAZY 0.1%  Rare 5%  Uncommon 24.9%  Common 70%".
+	-- The rarity totals, e.g. "CRAZY <1%  Rare 2.5%  Uncommon 24%  Common 73.5%".
 	local function oddsLine(crate: CrateOdds.Crate): string
 		local odds = CrateOdds.RarityOdds(crate)
 		local parts = {}
@@ -915,9 +915,7 @@ function CrateUI.Mount(gui: ScreenGui)
 			local share = odds[rarity]
 			if share then
 				local level = rarityLevel(rarity)
-				local shown = if share > 0 and share < 0.001
-					then CrateOdds.Format(share):gsub("%%$", "")
-					else ("%.3f"):format(share):gsub("0+$", ""):gsub("%.$", "")
+				local shown = CrateOdds.Format(share):gsub("%%$", "")
 				table.insert(
 					parts,
 					('<font color="#%s">%s %s%%</font>'):format(hex(level.Color), level.Name, shown)

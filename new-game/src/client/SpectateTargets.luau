@@ -20,8 +20,8 @@
 	SpectateTargets.RestoreCamera()                 camera back on your own character
 	SpectateTargets.StopGlide()                     stop a glide now (something else wants the camera)
 	SpectateTargets.Gliding() -> boolean
-	SpectateTargets.StreamMap(on)                   ask the server to stream the round map to
-	                                                you while watching from the lobby
+	SpectateTargets.StreamMap(on)                   ask the server to stream the round map (around
+	                                                whoever Follow watches) to you while watching from the lobby
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -253,7 +253,10 @@ local function aim(humanoid: Humanoid)
 end
 
 -- Points the camera at the target (cheap to call every frame; only changes it when needed).
+local watch: (Instance?) -> ()
+
 function SpectateTargets.Follow(target: Instance?)
+	watch(target)
 	local humanoid = subjectOf(target)
 	if humanoid then
 		aim(humanoid)
@@ -284,15 +287,30 @@ function SpectateTargets.Gliding(): boolean
 end
 
 -- The server creates SpectateFocus in GhostService.Start; fetched in the background so a
--- slow server start never holds anything up.
+-- slow server start never holds anything up. While streaming is on, the server streams the
+-- map around the player (or King) being watched, so what you see arrives in full detail (with
+-- only the map's middle streamed, everything near a far-off survivor looked blurry).
 local focusRemote: RemoteEvent? = nil
 local fetching = false
 local wanted = false
+local watched: Instance? = nil -- the target the server streams around
+local sentWatched: Instance? = nil
+local lastSent = 0
+
+local function send()
+	local remote = focusRemote
+	if not remote then
+		return
+	end
+	lastSent = os.clock()
+	sentWatched = watched
+	remote:FireServer(wanted, if wanted then watched else nil)
+end
 
 function SpectateTargets.StreamMap(on: boolean)
 	wanted = on
 	if focusRemote then
-		focusRemote:FireServer(on)
+		send()
 		return
 	end
 	if fetching then
@@ -300,10 +318,22 @@ function SpectateTargets.StreamMap(on: boolean)
 	end
 	fetching = true
 	task.spawn(function()
-		local remote = Remotes.Event("SpectateFocus")
-		focusRemote = remote
-		remote:FireServer(wanted)
+		focusRemote = Remotes.Event("SpectateFocus")
+		send()
 	end)
+end
+
+-- Tells the server who is being watched (from Follow; sent at most twice a second).
+function watch(target: Instance?)
+	watched = target
+	if
+		wanted
+		and focusRemote
+		and sentWatched ~= target
+		and os.clock() - lastSent >= Config.Performance.SpectateFocusCooldown + 0.1
+	then
+		send()
+	end
 end
 
 return SpectateTargets

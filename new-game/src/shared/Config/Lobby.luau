@@ -57,7 +57,7 @@ return {
 	-- (Changing words, colours or sizes here shows after the hub is rebuilt: F8 > Rebuild hub
 	-- or Bake.Hub(); a sign only shows while its Feature is on.)
 	FloorSigns = {
-		On = true, -- false = no floor signs
+		On = false, -- true = glowing signs on the ground in front of each area (off since 8 October)
 		Size = Vector3.new(24, 0.2, 7), -- width, thickness, depth of each pad (studs)
 		Gap = 2, -- studs between the area's edge and its sign
 		PadColor = Color3.fromRGB(24, 16, 34), -- the dark pad under the words

@@ -1,8 +1,9 @@
 --!strict
 --[[
 	KING HUNT (the classic mode): grab pumpkins, stay quiet, don't get caught by the Pumpkin King.
-	On/off: Config.Features.KingHunt. Settings: Config.Round.Duration, Config.Difficulty,
-	Config.Pumpkins, Config.King, Config.Monsters, Config.Rewards.
+	On/off: Config.Features.KingHunt. Settings: Config.Difficulty (each level's RoundSeconds is the
+	round length, else Config.Round.Duration), Config.Pumpkins, Config.King, Config.Monsters,
+	Config.Rewards.
 
 	Everyone starts on the map's spawns. Pumpkins appear (PumpkinService), the King comes after
 	Config.King.SpawnDelay (KingService) and minions roam (MinionService). Caught or dead
@@ -113,7 +114,8 @@ function KingHunt.Run(ctx: Types.RoundContext): Types.RoundResult
 	end)
 	MinionService.Begin(map, difficultyId, isAlive)
 	-- Ends at 0:00, or early once every participant is caught.
-	ctx.Countdown("Playing", Config.Round.Duration, function()
+	local seconds = Config.Difficulty.Levels[difficultyId].RoundSeconds or Config.Round.Duration
+	ctx.Countdown("Playing", seconds, function()
 		return next(alive) == nil
 	end)
 	KingService.Stop()

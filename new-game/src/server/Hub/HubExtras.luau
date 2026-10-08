@@ -16,9 +16,12 @@
 	shapes.
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Tags = require(ReplicatedStorage.Shared.Tags)
+local KingBody = require(script.Parent.Parent.Build.KingBody)
 local Kit = require(script.Parent.Parent.Build.Kit)
 local Props = require(script.Parent.Parent.Build.Props)
 local HubLayout = require(script.Parent.HubLayout)
@@ -225,14 +228,50 @@ local function buildMansion(parent: Instance)
 	)
 end
 
+-- The Pumpkin King's body (Build/KingBody) as a still statue: no Humanoid, joints or root,
+-- every part anchored where it stands, scaled to `height` studs, its pivot at its feet.
+local function kingFigure(feet: CFrame, height: number, parent: Instance): Model
+	local body = KingBody.Build(Vector3.zero)
+	local figure = Instance.new("Model")
+	figure.Name = "KingFigure"
+	for _, d in body:GetDescendants() do
+		if d:IsA("Humanoid") or d:IsA("JointInstance") or d:IsA("WeldConstraint") then
+			d:Destroy()
+		end
+	end
+	local floorY = -(Config.King.HipHeight + 1) -- the body stands on this (its root at 0)
+	for _, child in body:GetChildren() do
+		if child.Name == "HumanoidRootPart" or child.Name == "Pelvis" then
+			continue
+		end
+		if child:IsA("BasePart") then
+			-- Built walk-through like every lobby decoration (HubSolid makes the big pieces
+			-- solid when the game starts).
+			child.Anchored = true
+			child.CanCollide = false
+			child.CanQuery = false
+			child.CanTouch = false
+			-- (the body is built facing -Z at the origin: move it onto the pedestal)
+			child.CFrame = feet * CFrame.new(0, -floorY, 0) * child.CFrame
+		end
+		child.Parent = figure
+	end
+	body:Destroy()
+	figure.WorldPivot = feet
+	local natural = 11.6 -- the body's height (studs) at HeadSize 4.5
+	figure:ScaleTo(height / natural)
+	figure.Parent = parent
+	return figure
+end
+
 local function buildStatue(parent: Instance)
 	local s = cfg.KingStatue
-	local k = s.Height / 16 -- everything below is drawn for a 16-stud statue
+	local k = s.Height / 16 -- the pedestal is drawn for a 16-stud statue
 	local base = facingCenter(at(s.Offset + Vector3.new(0, 1, 0)))
 	if blocked(base.Position, 3) then
 		return
 	end
-	Kit.prop("KingStatue", base, parent, 18 * k, function()
+	local statue = Kit.prop("KingStatue", base, parent, 18 * k, function()
 		local folder = Kit.model("KingStatue", parent)
 		part({
 			Name = "Pedestal",
@@ -252,66 +291,21 @@ local function buildStatue(parent: Instance)
 			PaletteShade = 0.1,
 			Material = Enum.Material.Slate,
 		}, folder)
-		part({
-			Name = "Robe",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(5.6 * k, 9 * k, 4.2 * k),
-			CFrame = base * CFrame.new(0, 7 * k, 0),
-			PaletteRole = "Purple",
-			PaletteShade = 0.3,
-			Material = Enum.Material.Slate,
-		}, folder)
-		decor({
-			Name = "Cape",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(6.4 * k, 9.4 * k, 3 * k),
-			CFrame = base * CFrame.new(0, 6.8 * k, 1 * k),
-			PaletteRole = "Purple",
-			PaletteShade = 0.5,
-			Material = Enum.Material.Fabric,
-		}, folder)
-		for _, side in { -1, 1 } do
-			decor({
-				Name = "Arm",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.new(1.5 * k, 4.6 * k, 1.5 * k),
-				CFrame = base
-					* CFrame.new(side * 3 * k, 8 * k, -0.4 * k)
-					* CFrame.Angles(math.rad(-20), 0, math.rad(side * 28)),
-				PaletteRole = "Purple",
-				PaletteShade = 0.3,
-				Material = Enum.Material.Slate,
-			}, folder)
-		end
-		local headCf = base * CFrame.new(0, 13.6 * k, 0)
-		local headSize = Vector3.new(6.6, 5.4, 6.6) * k
-		local head, ovals =
-			Kit.pumpkinBody(headCf, headSize, 4, { PaletteRole = "Orange" }, folder, hubCfg.Palette)
-		head.Name = "Head"
-		Kit.carvedFace(headCf, headSize, color("Glow"), folder, { Ovals = ovals })
-		Kit.light(head, color("Orange"), 26 * k, 1.4, true):SetAttribute("PaletteRole", "Orange")
-		decor({
-			Name = "Crown",
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(1.5 * k, 3.6 * k, 3.6 * k),
-			CFrame = Kit.upright(base * CFrame.new(0, 16.8 * k, 0)),
-			PaletteRole = "Gold",
-			Material = Enum.Material.Metal,
-		}, folder)
-		for i = 1, 5 do
-			local a = i / 5 * math.pi * 2
-			decor({
-				Name = "CrownPoint",
-				Shape = Enum.PartType.Ball,
-				Size = Vector3.one * 0.75 * k,
-				CFrame = base * CFrame.new(math.cos(a) * 1.5 * k, 17.9 * k, math.sin(a) * 1.5 * k),
-				PaletteRole = "Gold",
-				Material = Enum.Material.Neon,
-			}, folder)
-		end
-		Props.Cobweb(paint, base * CFrame.new(3.6 * k, 4.4 * k, -2 * k), 3 * k, folder)
+		-- The King himself, just like the one that hunts you, swaying from side to side on
+		-- players' screens (tag HubSway: client HubAmbience).
+		local figure = kingFigure(base * CFrame.new(0, 3.3 * k, 0), s.FigureHeight * k, folder)
+		CollectionService:AddTag(figure, Tags.HubSway)
+		figure:SetAttribute("SwayAngle", s.SwayAngle)
+		figure:SetAttribute("SwaySeconds", s.SwaySeconds)
+		Props.Cobweb(paint, base * CFrame.new(3.6 * k, 2.2 * k, -3.2 * k), 2.4 * k, folder)
 		return folder
 	end)
+	-- A custom statue (Custom > Props > KingStatue) sways as a whole.
+	if not statue:FindFirstChild("KingFigure") then
+		CollectionService:AddTag(statue, Tags.HubSway)
+		statue:SetAttribute("SwayAngle", s.SwayAngle)
+		statue:SetAttribute("SwaySeconds", s.SwaySeconds)
+	end
 end
 
 -- A scarecrow with a jack-o'-lantern head, standing on cf (prop "Scarecrow").
@@ -582,6 +576,19 @@ local function buildPaths(parent: Instance)
 			carry = d - length
 		end
 	end
+end
+
+--[[
+	Replaces the King statue in a saved (or Locked) hub with a fresh one built from the code,
+	keeping everything else. Command bar, edit mode:
+	  require(game.ServerScriptService.Server.Hub.HubExtras).RebuildStatue(workspace.Hub.Decor)
+]]
+function HubExtras.RebuildStatue(decorModel: Instance)
+	local old = decorModel:FindFirstChild("KingStatue")
+	if old then
+		old:Destroy()
+	end
+	buildStatue(decorModel)
 end
 
 -- Builds all the extras into `decor` (Workspace.Hub.Decor) and the Terrain around it.

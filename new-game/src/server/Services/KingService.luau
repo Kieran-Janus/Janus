@@ -15,6 +15,7 @@
 	Config.Custom.RigAnimations) or any plain model (it glides, welded to a hidden root).
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local PathfindingService = game:GetService("PathfindingService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,6 +25,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local KingBody = require(script.Parent.Parent.Build.KingBody)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Tags = require(ReplicatedStorage.Shared.Tags)
 local MapService = require(script.Parent.MapService)
 local NoiseService = require(script.Parent.NoiseService)
 local SfxService = require(script.Parent.SfxService)
@@ -41,6 +43,7 @@ type King = {
 	Humanoid: Humanoid,
 	Root: BasePart,
 	Thread: thread?,
+	Spawned: number, -- os.clock() when he appeared (for Config.King.SpeedUp)
 }
 
 local KingService = {}
@@ -179,6 +182,7 @@ local function buildCustomKing(model: Model, position: Vector3): King
 		Humanoid = humanoid :: Humanoid,
 		Root = root :: BasePart,
 		Thread = nil,
+		Spawned = os.clock(),
 	}
 end
 
@@ -188,8 +192,10 @@ local function buildKing(position: Vector3): King
 		return buildCustomKing(custom, position)
 	end
 	local model, humanoid, root = KingBody.Build(position)
+	-- Players' screens make this body stride (client KingStride); a custom model does its own.
+	CollectionService:AddTag(model, Tags.KingStride)
 	setCollisionGroup(model)
-	return { Model = model, Humanoid = humanoid, Root = root, Thread = nil }
+	return { Model = model, Humanoid = humanoid, Root = root, Thread = nil, Spawned = os.clock() }
 end
 
 local function rootOf(player: Player): BasePart?
@@ -299,6 +305,17 @@ local function walkTo(king: King, goal: Vector3, budget: number): boolean
 	return true
 end
 
+-- Extra speed from Config.King.SpeedUp `seconds` after he appeared: a little more every Every
+-- seconds, never more than Max.
+function KingService.ExtraSpeed(seconds: number): number
+	local cfg = Config.King.SpeedUp
+	if cfg.Every <= 0 then
+		return 0
+	end
+	local steps = math.floor(math.max(seconds, 0) / cfg.Every)
+	return math.min(steps * cfg.Add, cfg.Max)
+end
+
 local function think(
 	king: King,
 	level: Level,
@@ -331,11 +348,13 @@ local function think(
 
 		if chase then
 			king.Humanoid.WalkSpeed = level.ChaseSpeed
+				+ KingService.ExtraSpeed(os.clock() - king.Spawned)
 			king.Model:SetAttribute("Mode", "Chase")
 			walkTo(king, chase.Position, cfg.RepathSeconds)
 		else
 			-- 2. Investigate the loudest noise, 3. or wander.
 			king.Humanoid.WalkSpeed = level.WalkSpeed
+				+ KingService.ExtraSpeed(os.clock() - king.Spawned)
 			local noise = NoiseService.Loudest(king.Root.Position, level.HearingRange)
 			local goal: Vector3? = if noise then noise.Position else nil
 			if noise and noise.Player and isTarget(noise.Player) then

@@ -20,7 +20,7 @@ Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See 
 
 Too much movement, or a phone feels slow? Every animation switch is in one list: [Turn animations off or down](#turn-animations-off-or-down).
 
-Jump to: [Animations](#turn-animations-off-or-down) · [Change and animate skins](#change-and-animate-skins) · [Skin Studio](#skin-studio) · [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Toolbox codes](#with-a-toolbox-code-one-line-no-dragging) · [Move one thing](#move-just-one-thing) · [Tags](#parts-that-do-something-tags)
+Jump to: [Pumpkin Tools](#pumpkin-tools-click-anything-to-change-its-look-or-its-words) · [Animations](#turn-animations-off-or-down) · [Change and animate skins](#change-and-animate-skins) · [Skin Studio](#skin-studio) · [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Toolbox codes](#with-a-toolbox-code-one-line-no-dragging) · [Move one thing](#move-just-one-thing) · [Tags](#parts-that-do-something-tags)
 
 ---
 
@@ -29,14 +29,16 @@ Jump to: [Animations](#turn-animations-off-or-down) · [Change and animate skins
 | I want to change... | Edit |
 | --- | --- |
 | Game name on the HUD | `Config.Game.Name` (the Roblox page name is set in Creator Hub) |
-| Round length, intermission, results time | `Config.Round` |
+| Any words players see (signs, buttons, banners) | the Pumpkin Tools plugin (Words), or `Config.TextOverrides.Pairs` (`src/shared/Config/TextOverrides.luau`) |
+| Intermission, results time (and the default round length) | `Config.Round` |
 | Results screen timings, text, colours, motion (row pops, shine, "You got X coins!"; `Animate = false` = no motion) | `Config.Results` |
 | 3-2-1 countdown, "GO!", "RUN!", heartbeat warning, +1 pop-ups, last-30-seconds, survivors-left (`Animate = false` = no motion) | `Config.Juice` |
 | Vote panel text and motion (cards popping in, count ticks, winner pop; `Animate = false` = no motion) | `Config.Voting` |
 | Coins per pumpkin, survivor bonus | `Config.Rewards` |
 | Easy/Hard pumpkins, reward multiplier | `Config.Difficulty.Levels` |
-| King speed, hearing, sight, how many Kings | `Config.King.Difficulty` |
-| The Pumpkin King's look (robe, cape, pumpkin, crown, face glow, embers) | `Config.King` (`BodyColor`, `HeadColor`, `CapeColor`, `CrownColor`, `VineColor`, `FaceColor`, `GemColor`, `HeadSize`, `FaceGlow`, `Embers`); built in `src/server/Build/KingBody.luau`. A custom `PumpkinKing` model replaces it (below) |
+| King speed, hearing, sight | `Config.King.Difficulty` (always one King); how much faster he gets: `Config.King.SpeedUp` |
+| King Hunt round length | `RoundSeconds` in `Config.Difficulty.Levels.Easy` and `.Hard` (Easy 180 = 3 minutes, Hard 300) |
+| The Pumpkin King's look and walk (coat, cape, pumpkin, crown, face glow, embers, strides) | `Config.King` (`Stride`, `BodyColor`, `HeadColor`, `CapeColor`, `CrownColor`, `VineColor`, `FaceColor`, `GemColor`, `HeadSize`, `FaceGlow`, `Embers`); built in `src/server/Build/KingBody.luau`. A custom `PumpkinKing` model replaces it (below) |
 | How loud sprinting/shouting/talking is to the King | `Config.King.Noise`, `Config.Voice.Noise` |
 | Skeletons, bats, ghost cats (count, speed, damage, messages) | `Config.Monsters` |
 | Player walk/sprint speed | `Config.Player` |
@@ -76,7 +78,7 @@ Jump to: [Animations](#turn-animations-off-or-down) · [Change and animate skins
 | Tormented Tower (the hard climb inside the clock tower) | `Config.TowerParkour` (`src/shared/Config/TowerParkour.luau`) |
 | Server-wide announcement banners | `Config.Announce` (`src/shared/Config/Announce.luau`) |
 | Photo Spot dances | `Config.Dances` (`src/shared/Config/Dances.luau`, see "Photo Spot dances" below) |
-| Glowing floor signs in front of each lobby area | `Config.Lobby.FloorSigns` (`src/shared/Config/Lobby.luau`) |
+| Glowing floor signs in front of each lobby area (off since 8 October: `On = true` brings them back) | `Config.Lobby.FloorSigns` (`src/shared/Config/Lobby.luau`) |
 | Lobby life: the shopkeeper breathes, turns and waves, the Ready pad pulses, floor signs shimmer, the cauldron bubbles, bats fly by (each with its own switch) | `Config.Lobby.Life` (`src/shared/Config/Lobby.luau`, client `src/client/LobbyLife.luau`) |
 | Map life: King Hunt pumpkins bob, spin, glow and pop with sparkles when collected; fireflies drift on the round map (a colour per map, fewer on phones); Hide & Seek decoys and hiders' pumpkins wobble now and then, exactly alike (each with its own switch; only on each player's screen, the real pumpkins never move) | `Config.MapLife` (`src/shared/Config/MapLife.luau`, client `src/client/MapLife.luau`), whole feature `Config.Features.MapLife` |
 | What in the lobby is solid | `Config.Lobby.Solid` (`src/shared/Config/Lobby.luau`, see "A solid lobby" below) |
@@ -118,6 +120,21 @@ Every animation in the game is only a look on each player's own screen. Buttons,
 | Floating candles and flickering lights, and how often the lobby, map and crate animations look for something nearby | (no off switch) | `Config.Performance`: `AmbienceDistance`, `FlickerHz`, `IdleScanHz` and their `Phone...` versions |
 
 Phones already get less: shorter ranges, fewer sparkles, no turning Shop previews. While nothing near the camera is moving, these animations do almost no work (`Config.Performance.IdleScanHz`), and a panel's animation only runs while it is open.
+
+---
+
+## Pumpkin Tools: click anything to change its look or its words
+
+The easiest way to change things: a panel in Studio. Install it once (from the `new-game` folder): `rojo build tools/studio-plugin --plugin PumpkinTools.rbxm`, then restart Studio. Click **Plugins > Pumpkin Tools**. Full guide: [`tools/studio-plugin/README.md`](../tools/studio-plugin/README.md).
+
+- **A new look from the Toolbox:** click the thing in the game view, paste the Toolbox code (right-click a Toolbox model > Copy Asset ID), then **Only the selected one(s)** or **Every <name>**.
+- **Your own model (your own skin):** build or edit a model, select it, **Remember the selected model as my look**, then click what it replaces and **Give the selected one(s) my look** or **Give every copy my look**.
+- **Things in the rounds** (no need to find them): the Pumpkin King, skeletons, bats, ghost cats, the shopkeeper, King Hunt pumpkins, Hide & Seek pumpkins and the King statue, each with **Toolbox code** and **My look**.
+- **Words:** click a sign and type new words (**Only here** or **Everywhere**). For words on screens, press Play, then **Pick text** and click the words. Or type any of the game's words and your own under **Change any words**. They are kept in the place (`ReplicatedStorage > TextOverrides`); the same can be written in `src/shared/Config/TextOverrides.luau` (`Pairs`), which is in git.
+
+Save the place (Ctrl+S) afterwards. Ctrl+Z undoes a look change.
+
+The names of the things in the rounds, for the command bar: characters `PumpkinKing`, `SkeletonPatrol`, `Bat`, `GhostCat`, `PumpkinVendor` (`require(game.ServerScriptService.Server.Tools.Swap).Character("Bat", 12345678)`, or a model instead of the code); pickups and props `CollectPumpkin`, `HidingPumpkin`, `KingStatue` (`Swap.Toolbox("CollectPumpkin", 12345678)`, or `Swap.UseModel("CollectPumpkin", workspace.MyPumpkin)`). How many there are and how fast they go: `Config.Monsters` (skeletons, bats, cats) and `Config.King`.
 
 ---
 
@@ -244,6 +261,8 @@ Sizes are studs tall (each copy is scaled to its own size, so this is just a gui
 | `Crate`, `Barrel` | a wooden crate, a barrel | lobby | 1.6-3 |
 | `Signpost` | a signpost (yours has no arrow words) | lobby | 7-13.5 |
 | `Wheelbarrow`, `HarvestCart`, `Well`, `Tractor`, `RockingChair` | farm things | Pumpkin Farm | 3-9 |
+| `MarketStall`, `Sack`, `Handcart`, `PumpkinPyramid` | the market stalls, grain sacks, handcarts and the pumpkin pyramid | Midnight Market | 3-8.5 |
+| `Portrait` | the haunted portraits whose eyes follow you (look only) | Spooky Mansion | 5.6-6 |
 | `Fountain` | the fountain | Hedge Maze | 9 |
 | `ClockTower`, `KingStatue` | the big lobby centrepieces (the clock tower is hollow: the Tormented Tower climbs inside, see below) | lobby | 81.5, 18 |
 | `VendorStall` | the Pumpkin Shop stall (the shopkeeper is `PumpkinVendor` in `Custom > Characters`) | lobby | 21 |
@@ -768,7 +787,7 @@ Mystery crates give a random skin. Everything about them is in `src/shared/Confi
   have its own `Odds`. Rare and CRAZY were made rarer in the big skin update.
 - **ONE IN A MILLION**: a skin with its own `Odds` (in its theme file: `Odds = 0.0001`) has exactly
   that chance (0.0001% = 1 open in a million) and the rest of the crate shares the other 99.9999%;
-  the preview shows "0.0001%". These skins (`OneInAMillion = true`: Night Lord Supreme in Vampire
+  the preview shows "<1%" (or "0.0001%" with `Config.Crates.SmallOdds = ""`). These skins (`OneInAMillion = true`: Night Lord Supreme in Vampire
   Castle, Disco Demon in Monster Disco, Star Voyager in Alien Abduction) are never in the CRAZY Crate.
   Anyone unboxing a CRAZY skin is announced to the whole server (an extra-big banner for these),
   words in `Text.AnnounceCrazy` / `Text.AnnounceMillion`, switch: `AnnounceCrazy`; it waits `AnnounceDelay` seconds (4.5) so the winner sees their own reveal first.
@@ -873,6 +892,10 @@ Both are Studio-only (never in a live game). Settings: `Config.Admin.Tools`.
 
 **Around every map** (`src/server/Maps/MapScenery.luau`): the ground carries on past the walls, with dark hills and bare trees on the horizon and glowing posts along the wall tops. It is decoration only (walk-through, outside the play area). Change it per map with a `Scenery` block in the map's settings file, e.g. `Scenery = { Trees = 12, Hills = 14, PostSpacing = 34, Glow = Color3.fromRGB(255, 160, 60) }` (also `Ground`, `Hill`, `Tree`, `Post`, `Reach`, `WallPosts = false`), or `Scenery = false` for none.
 
+**Midnight Market** (Hide & Seek, `src/shared/Config/Maps/MidnightMarket.luau`): a small market whose clutter, decoy pumpkins and hider spawns move to new spots every round (`Layout.Shuffle = false` keeps one layout). More or fewer things: `Stalls`, `Clutter`, `Decoys`, `LanternStrings`.
+
+**Haunted portraits** (Spooky Mansion): painted portraits whose eyes follow you (`Config.Maps.PortraitEyes`: `On`, `Range`, `Reach`). To hang real pictures, put image codes in `Paintings.Images` in `src/shared/Config/Maps/SpookyMansion.luau`, e.g. `Images = { "rbxassetid://123456789" }`. It must be the image id, not the decal id: insert the decal from the Toolbox in Studio, select it and copy the number from its **Texture** property (or send Claude Code the decal codes).
+
 ### Use your own map
 Each map is built from code in `src/server/Maps/` until you give it a hand-made version. To use your own:
 1. Build the map as one Model. It needs:
@@ -966,7 +989,7 @@ At the Photo Spot ("Strike a pose") a bar of spooky, silly dances opens: Zombie 
 ---
 
 ## Floor signs
-A flat pad on the ground in front of each lobby area with big glowing words: READY? STEP IN!, PUMPKIN SHOP, MYSTERY CRATES, CANDY RUSH, WEB SCOUR, PARKOUR. Settings: `Config.Lobby.FloorSigns` (`src/shared/Config/Lobby.luau`).
+**Switched off since 8 October** (`On = false`: they are taken out of the running game, even from a saved or Locked lobby; the wooden signposts stay). Set `On = true` to bring them back. A flat pad on the ground in front of each lobby area with big glowing words: READY? STEP IN!, PUMPKIN SHOP, MYSTERY CRATES, CANDY RUSH, WEB SCOUR, PARKOUR. Settings: `Config.Lobby.FloorSigns` (`src/shared/Config/Lobby.luau`).
 - **Words and colours:** each area's line in `Signs` (`Text`, `Color`). Size, glow, font and the pad colour are at the top of the block.
 - **Where:** by default a sign lies in front of its area (`Side = "Front"`, `Gap` studs out). Give it its own spot with `Offset` (studs from the middle of the lobby) and `LookAt` (where its words face), and its own `Width`.
 - **In Studio:** each pad is its own part named `<Area>FloorSign` (for example `ShopFloorSign`), tagged `FloorSign` with the attribute `Zone`. Move, turn or resize it freely in a baked lobby. A switched-off area's sign is taken out of the running game.

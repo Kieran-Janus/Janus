@@ -10,9 +10,10 @@
 
 	Player attributes the client reads: InRound, Out, GhostMode, GhostChat, HauntReadyAt
 	Client -> server: SetGhostMode(mode) event, Haunt() function -> number of Kings affected,
-	  SpectateFocus(on: boolean) event: someone watching the round from the lobby (a ghost in
-	  Spectate mode, or a lobby player using Spectate) gets the map streamed to them
-	  (Player.ReplicationFocus = the map's Floor) until they stop or the round ends.
+	  SpectateFocus(on: boolean, watched: Player | King model?) event: someone watching the round
+	  from the lobby (a ghost in Spectate mode, or a lobby player using Spectate) gets the map
+	  streamed to them around whoever they watch (Player.ReplicationFocus = that player's or
+	  King's root, else the map's Floor) until they stop or the round ends.
 
 	Collision groups: ghosts don't collide with players, other ghosts or the King.
 ]]
@@ -120,7 +121,32 @@ end
 -- (in the round and not out) can't move their streaming away from themselves.
 local lastFocus: { [Player]: number } = {}
 
-local function onSpectateFocus(player: Player, on: unknown)
+-- Where to stream the map around for a spectator: the watched player's (or King's) root
+-- when it is really in this round's map, else the map's Floor.
+local function focusPart(map: MapService.LoadedMap, target: unknown): BasePart
+	if typeof(target) == "Instance" then
+		if target:IsA("Player") then
+			local character = target.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			if
+				target:GetAttribute("InRound") == true
+				and target:GetAttribute("Out") ~= true
+				and root
+				and root:IsA("BasePart")
+			then
+				return root
+			end
+		elseif target:IsA("Model") and target:IsDescendantOf(map.Model) then
+			local root = target.PrimaryPart
+			if root then
+				return root
+			end
+		end
+	end
+	return map.Floor
+end
+
+local function onSpectateFocus(player: Player, on: unknown, target: unknown)
 	if typeof(on) ~= "boolean" then
 		return
 	end
@@ -136,7 +162,7 @@ local function onSpectateFocus(player: Player, on: unknown)
 	local playing = player:GetAttribute("InRound") == true and player:GetAttribute("Out") ~= true
 	local map = roundMap
 	if map and not playing and map.Floor.Parent then
-		player.ReplicationFocus = map.Floor
+		player.ReplicationFocus = focusPart(map, target)
 	end
 end
 
