@@ -11,6 +11,8 @@
 	  BuyItem(itemId) -> (ok, message, State)
 	  EquipItem(slot, itemId or "") -> State
 	Server -> client: ShopState(State) whenever it changes for another reason (VIP, packs).
+	Skin Studio (admins in Studio): ShopService.SetSkinOverride(player, item?) wears a draft
+	skin instead of the equipped one; ShopService.SkinOverride(player) reads it.
 ]]
 
 local Players = game:GetService("Players")
@@ -34,6 +36,7 @@ local ShopService = {}
 
 local lastRequest: { [Player]: number } = {}
 local lastState: { [Player]: { At: number, State: State } } = {}
+local skinOverrides: { [Player]: any } = {} -- Skin Studio drafts being worn (SetSkinOverride)
 local shopState: RemoteEvent
 
 local function isVip(player: Player): boolean
@@ -73,6 +76,17 @@ function ShopService.Push(player: Player)
 	shopState:FireClient(player, ShopService.State(player))
 end
 
+-- Skin Studio: wear `item` in the Skin slot instead of the equipped skin (no ownership check:
+-- SkinStudioService only calls this for admins; the save never changes). nil = back to normal.
+-- Dress (and so every respawn) uses it until it is cleared or the player leaves.
+function ShopService.SetSkinOverride(player: Player, item: any?)
+	skinOverrides[player] = item
+end
+
+function ShopService.SkinOverride(player: Player): any?
+	return skinOverrides[player]
+end
+
 -- Puts every equipped (and still allowed) cosmetic on the player's character.
 -- Not while they hide as a pumpkin in Hide & Seek (src/server/Modes/HideSeek.luau): changing
 -- clothes would make their invisible body show again. What they equip is still saved; the
@@ -87,6 +101,11 @@ function ShopService.Dress(player: Player)
 		return
 	end
 	for _, slot in Config.Shop.Slots do
+		local override = if slot == "Skin" then skinOverrides[player] else nil
+		if override then
+			Cosmetics.Wear(character, override)
+			continue
+		end
 		local item = Cosmetics.Find(data.Equipped[slot])
 		if item and item.Slot == slot and canUse(player, item, data) then
 			Cosmetics.Wear(character, item)
@@ -206,6 +225,7 @@ function ShopService.Start()
 	Players.PlayerRemoving:Connect(function(player)
 		lastRequest[player] = nil
 		lastState[player] = nil
+		skinOverrides[player] = nil
 	end)
 end
 
