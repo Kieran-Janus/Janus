@@ -267,6 +267,12 @@ return {
 			Glow = { Color = rgb(120, 255, 140), Brightness = 2.2, Range = 14 },
 			Aura = { Kind = "Bubbles", Color = rgb(140, 255, 160) },
 			Crazy = { Rainbow = true, Pulse = true, Orbit = "Eyes", Count = 3 },
+			Animate = {
+				{ Effect = "Breathe", Target = "Head", Speed = 1.5, Amount = 3 },
+				{ Effect = "Wobble", Target = "Head", Speed = 0.8, Axis = "X" },
+				{ Effect = "SparkleBurst", Every = 3.5, Count = 12 },
+			} :: { any }, -- (effects differ in shape)
+			Motion = "Zombie",
 		},
 	},
 } :: { any }

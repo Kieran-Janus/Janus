@@ -13,6 +13,11 @@
 	Cosmetics.TakeOff(character, slot)
 	Cosmetics.HasLook(name) -> boolean     is there a builder called `name` (Style.Kind / Head)
 	Cosmetics.Patterns                     the accent patterns a skin's Accent can use
+	Cosmetics.MovingPatterns               the patterns whose pieces can move (Wings, Tail, Cape)
+	Cosmetics.BodyParts(character) -> { BasePart }   the body parts a skin paints, in a fixed
+	                                       order (never HumanoidRootPart)
+	Cosmetics.OnSkinChanged(fn) -> disconnect   server: fn(character, item?) runs after a skin
+	                                       goes on (item) or is taken off on its own (nil)
 
 	Hats are built with y = 0 at the top of the head; pets around their own centre; skin head
 	pieces (src/shared/HeadPieces.luau) around the centre of the head.
@@ -29,9 +34,25 @@
 	  Head      a head piece (HeadPieces) that replaces your head
 	  Glow      a light around you;  Aura  particles around you (Config.Skins.Auras)
 	  Crazy     animated effects drawn by each player's own screen (src/client/SkinFx.luau)
+	  Animate   pieces that move or change colour (src/shared/SkinAnimate.luau), drawn by
+	            each player's own screen (src/client/SkinAnim.luau)
+	  Motion    a walk style (src/shared/SkinMotion.luau): the character attributes
+	            SkinMotion / SkinMotionIds, posed by src/client/SkinWalk.luau
+	  Catalog   real Roblox catalog accessories and clothes (src/shared/SkinCatalog.luau), put
+	            on by src/server/Services/SkinCatalogService.luau when OnSkinChanged fires.
+	            They are marked SkinCatalog = true, so a head piece never hides them.
 	Everything a skin changes on the avatar is remembered in attributes ("Skin_*") and put
 	back by TakeOff; everything it adds lives in the character's Cosmetic_Skin model, which
-	TakeOff deletes. A CRAZY skin's model has the tag Tags.SkinFx so SkinFx can find it.
+	TakeOff deletes. A CRAZY skin's model has the tag Tags.SkinFx so SkinFx can find it; a
+	skin with Animate effects has Tags.SkinAnim.
+	Every piece a skin adds has the attributes SkinPart ("Head" for the head piece or custom
+	model, the pattern's name for accent pieces, "Aura" for the glow and aura holder) and
+	SkinIndex (build order), so effects find pieces by attribute, never by name. Pieces an
+	effect moves hang on an invisible AnimPivot part (attribute AnimGroup) joined to the body
+	by a Motor6D named SkinMotor, which every screen turns. Shop previews put them in a
+	Model named AnimGroup instead.
+	A Skin Studio draft (an item not in the catalogue) gets the attribute LiveStyle on its
+	model (its Crazy and Animate as JSON); item.ModelId (drafts) names its custom model.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -40,6 +61,8 @@ local Config = require(script.Parent.Config)
 local CustomAssets = require(script.Parent.CustomAssets)
 local HeadPieces = require(script.Parent.HeadPieces)
 local Items = require(script.Parent.Items)
+local SkinAnimate = require(script.Parent.SkinAnimate)
+local SkinMotion = require(script.Parent.SkinMotion)
 local Tags = require(script.Parent.Tags)
 
 local Cosmetics = {}
@@ -493,6 +516,12 @@ local GROUPS: { [string]: { string } } = {
 
 local PAD = 0.1 -- bands are this much wider and deeper than the body part they wrap (studs)
 
+-- The moving groups of one skin (Style.Animate motion effects and custom-model marks).
+type Rig = {
+	Moving: { [string]: boolean }, -- AnimGroup names an effect moves ("Head", "WingL", "Tail"...)
+	Pivots: number, -- pivots (or preview groups) made so far, at most Config.SkinAnimate.MaxPivots
+}
+
 -- Where a skin's extra pieces go and how they're attached.
 type Dress = {
 	Body: Model, -- the character, or the preview stand-in
@@ -502,6 +531,11 @@ type Dress = {
 	Material: Enum.Material,
 	Rainbow: boolean, -- CRAZY: accents start in rainbow colours and SkinFx cycles them
 	Count: number,
+	Index: number, -- the last SkinIndex given out
+	Pattern: string?, -- the accent pattern being built (its pieces' SkinPart)
+	Rig: Rig?, -- the skin's moving groups (nil: nothing moves, every piece welds to the body)
+	Group: BasePart?, -- wearing: the pivot the current pattern's pieces weld to
+	GroupModel: Model?, -- preview: the AnimGroup model the current pattern's pieces go in
 }
 
 -- A new piece on body part `on` at `offset` (in that part's space). Plain pieces (the aura
@@ -518,7 +552,11 @@ local function add(
 		props.Color = props.Color or ctx.Color
 		props.Material = props.Material or ctx.Material
 	end
-	local p = part(ctx.Into, props)
+	local p = part(ctx.GroupModel or ctx.Into, props)
+	-- What it is and when it was built (effects find pieces by these, never by name).
+	p:SetAttribute("SkinPart", if plain then "Aura" else ctx.Pattern or "Accent")
+	ctx.Index += 1
+	p:SetAttribute("SkinIndex", ctx.Index)
 	if ctx.Rainbow and not plain then
 		ctx.Count += 1
 		p.Color = Color3.fromHSV((ctx.Count * 0.137) % 1, 0.7, 1)
@@ -526,12 +564,96 @@ local function add(
 	end
 	if ctx.Weld then
 		local weld = Instance.new("WeldConstraint")
-		weld.Part0 = on
+		weld.Part0 = ctx.Group or on
 		weld.Part1 = p
 		weld.Parent = p
 		p.Anchored = false
 	end
 	return p
+end
+
+-- Moving groups -------------------------------------------------------------------------------
+
+-- An invisible pivot the pieces of a moving group weld to, joined to `on` by a Motor6D
+-- (SkinMotor) at `offset`: every screen turns that joint (src/client/SkinAnim.luau). nil once
+-- the skin has Config.SkinAnimate.MaxPivots of them (the group then stays still).
+local function newPivot(
+	rig: Rig,
+	into: Instance,
+	name: string,
+	on: BasePart,
+	offset: CFrame,
+	side: number?
+): BasePart?
+	if rig.Pivots >= Config.SkinAnimate.MaxPivots then
+		return nil
+	end
+	rig.Pivots += 1
+	local pivot = part(into :: Model, {
+		Name = "AnimPivot",
+		Size = Vector3.one * 0.2,
+		Transparency = 1,
+		CFrame = on.CFrame * offset,
+	})
+	pivot.Anchored = false
+	pivot:SetAttribute("AnimGroup", name)
+	if side then
+		pivot:SetAttribute("AnimSide", side)
+	end
+	local motor = Instance.new("Motor6D")
+	motor.Name = "SkinMotor"
+	motor.Part0 = on
+	motor.Part1 = pivot
+	motor.C0 = offset
+	motor.C1 = CFrame.identity
+	motor.Parent = pivot
+	return pivot
+end
+
+-- Previews (nothing is welded there): a Model named AnimGroup holding the group's pieces,
+-- with an anchored AnimPivot as its PrimaryPart. SkinAnim moves the whole Model.
+local function newGroupModel(
+	rig: Rig,
+	into: Instance,
+	name: string,
+	at: CFrame,
+	side: number?
+): Model?
+	if rig.Pivots >= Config.SkinAnimate.MaxPivots then
+		return nil
+	end
+	rig.Pivots += 1
+	local g = Instance.new("Model")
+	g.Name = "AnimGroup"
+	g:SetAttribute("AnimGroup", name)
+	if side then
+		g:SetAttribute("AnimSide", side)
+	end
+	g.PrimaryPart = part(g, {
+		Name = "AnimPivot",
+		Size = Vector3.one * 0.2,
+		Transparency = 1,
+		CFrame = at,
+	})
+	g.Parent = into
+	return g
+end
+
+-- Starts a group of pattern pieces on `on` at `offset` (Wings, Tail and Cape call it before
+-- adding their pieces). Only when an effect moves that group; otherwise the pieces weld to
+-- the body as always.
+local function startGroup(ctx: Dress, name: string, on: BasePart, offset: CFrame, side: number?)
+	ctx.Group = nil
+	ctx.GroupModel = nil
+	local rig = ctx.Rig
+	if not rig or not rig.Moving[name] then
+		return
+	end
+	if ctx.Weld then
+		ctx.Group = newPivot(rig, ctx.Into, name, on, offset, side)
+	else
+		ctx.GroupModel = newGroupModel(rig, ctx.Into, name, on.CFrame * offset, side)
+	end
 end
 
 local function limbParts(body: Model, limb: string): { BasePart }
@@ -788,6 +910,7 @@ function patterns.Cape(ctx: Dress)
 	local width = top.Size.X * 0.95
 	local hang = CFrame.new(0, top.Size.Y / 2 - 0.05, top.Size.Z / 2 + 0.06)
 		* CFrame.Angles(math.rad(-7), 0, 0)
+	startGroup(ctx, "Cape", top, CFrame.new(0, top.Size.Y / 2 - 0.05, top.Size.Z / 2 + 0.06))
 	add(
 		ctx,
 		top,
@@ -814,6 +937,7 @@ function patterns.Wings(ctx: Dress)
 	for _, side in { -1, 1 } do
 		local root = CFrame.new(side * 0.3, top.Size.Y * 0.3, top.Size.Z / 2 + 0.12)
 			* CFrame.Angles(0, math.rad(side * -20), 0)
+		startGroup(ctx, if side < 0 then "WingL" else "WingR", top, root, side)
 		local bone = root * CFrame.Angles(0, 0, math.rad(side * 22))
 		add(ctx, top, {
 			Name = "WingBone",
@@ -840,6 +964,7 @@ function patterns.Tail(ctx: Dress)
 	if not base then
 		return
 	end
+	startGroup(ctx, "Tail", base, CFrame.new(0, -base.Size.Y / 2 + 0.15, base.Size.Z / 2 + 0.12))
 	for i = 0, 5 do
 		local s = 0.42 - i * 0.04
 		add(ctx, base, {
@@ -966,7 +1091,11 @@ local function addAccents(ctx: Dress, style: any)
 	for _, name in patternList(accent) do
 		local make = patterns[name]
 		if make then
+			ctx.Pattern = name
 			make(ctx)
+			ctx.Pattern = nil
+			ctx.Group = nil
+			ctx.GroupModel = nil
 		else
 			warn("[Cosmetics] unknown accent pattern " .. tostring(name))
 		end
@@ -988,6 +1117,11 @@ local function newDress(body: Model, into: Model, style: any, weld: boolean): Dr
 		Material = material,
 		Rainbow = crazy.Rainbow == true,
 		Count = 0,
+		Index = 0,
+		Pattern = nil,
+		Rig = nil,
+		Group = nil,
+		GroupModel = nil,
 	}
 end
 
@@ -1088,6 +1222,12 @@ local function paintBody(body: Model, style: any, keep: boolean): boolean
 	return recoloured
 end
 
+-- The custom model's name: a Skin Studio draft is worn under its own Id with ModelId = the
+-- skin it was made from.
+local function modelIdOf(item: any): string
+	return if type(item.ModelId) == "string" then item.ModelId else item.Id
+end
+
 -- Does this skin add anything to the character besides colours?
 local function hasExtras(item: any): boolean
 	local style = item.Style
@@ -1096,7 +1236,280 @@ local function hasExtras(item: any): boolean
 		or style.Glow ~= nil
 		or style.Aura ~= nil
 		or style.Crazy ~= nil
-		or CustomAssets.Has("Cosmetics", item.Id)
+		or (style.Animate ~= nil and Config.Features.SkinAnimations)
+		or CustomAssets.Has("Cosmetics", modelIdOf(item))
+end
+
+Cosmetics.MovingPatterns = SkinAnimate.MovingPatterns
+
+-- The body parts a skin paints, in one fixed order (R15 names, then R6), so every screen
+-- numbers them the same way (colour effects ripple across them in this order).
+local BODY_ORDER = {
+	"Head",
+	"UpperTorso",
+	"LowerTorso",
+	"Torso",
+	"LeftUpperArm",
+	"LeftLowerArm",
+	"LeftHand",
+	"RightUpperArm",
+	"RightLowerArm",
+	"RightHand",
+	"Left Arm",
+	"Right Arm",
+	"LeftUpperLeg",
+	"LeftLowerLeg",
+	"LeftFoot",
+	"RightUpperLeg",
+	"RightLowerLeg",
+	"RightFoot",
+	"Left Leg",
+	"Right Leg",
+}
+
+function Cosmetics.BodyParts(character: Model): { BasePart }
+	local list = {}
+	for _, name in BODY_ORDER do
+		local p = character:FindFirstChild(name)
+		if p and p:IsA("BasePart") then
+			table.insert(list, p)
+		end
+	end
+	return list
+end
+
+-- Which groups the skin's motion effects move ("Wings" moves both wings).
+local function movingGroups(effects: { SkinAnimate.Effect }?): { [string]: boolean }
+	local moving: { [string]: boolean } = {}
+	if not effects then
+		return moving
+	end
+	for _, effect in effects do
+		if SkinAnimate.IsMotion(effect.Effect) then
+			if effect.Target == "Wings" then
+				moving.WingL = true
+				moving.WingR = true
+			else
+				moving[effect.Target] = true
+			end
+		end
+	end
+	return moving
+end
+
+-- Marks every part and Model of a head piece (or custom model) SkinPart = "Head" with its
+-- SkinIndex in build order. Returns the last index given.
+local function markHead(m: Model): number
+	local index = 0
+	for _, d in m:GetDescendants() do
+		if d:IsA("BasePart") or d:IsA("Model") then
+			index += 1
+			d:SetAttribute("SkinPart", "Head")
+			d:SetAttribute("SkinIndex", index)
+		end
+	end
+	return index
+end
+
+-- Parts and Models of a custom model with a moving Animate attribute (docs/CUSTOMIZE.md,
+-- "Animate parts of your own model"), in SkinIndex order. Colour marks need no group: every
+-- screen reads them from the part itself.
+local function motionMarks(m: Model): { Instance }
+	local list: { Instance } = {}
+	for _, d in m:GetDescendants() do
+		if d:IsA("BasePart") or d:IsA("Model") then
+			local effect = SkinAnimate.FromAttributes(d)
+			if effect and SkinAnimate.IsMotion(effect.Effect) then
+				table.insert(list, d)
+			end
+		end
+	end
+	return list
+end
+
+-- Does the custom model have any part with an Animate attribute (moving or colour)?
+local function hasMarks(m: Model): boolean
+	for _, d in m:GetDescendants() do
+		if (d:IsA("BasePart") or d:IsA("Model")) and SkinAnimate.FromAttributes(d) then
+			return true
+		end
+	end
+	return false
+end
+
+local MARK_KEYS = { "Animate", "Speed", "Amount", "Delay", "Every", "Axis", "Reverse", "Color2" }
+
+-- The middle of the parts' bounding box (world space).
+local function boxCentre(parts: { BasePart }): Vector3
+	local lo = { math.huge, math.huge, math.huge }
+	local hi = { -math.huge, -math.huge, -math.huge }
+	for _, p in parts do
+		local half = p.Size / 2
+		for _, sx in { -1, 1 } do
+			for _, sy in { -1, 1 } do
+				for _, sz in { -1, 1 } do
+					local w = p.CFrame:PointToWorldSpace(
+						Vector3.new(sx * half.X, sy * half.Y, sz * half.Z)
+					)
+					lo = { math.min(lo[1], w.X), math.min(lo[2], w.Y), math.min(lo[3], w.Z) }
+					hi = { math.max(hi[1], w.X), math.max(hi[2], w.Y), math.max(hi[3], w.Z) }
+				end
+			end
+		end
+	end
+	return Vector3.new((lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2, (lo[3] + hi[3]) / 2)
+end
+
+-- What a Part:<Name> target means inside head piece `m`: every BasePart called `name`, or
+-- else the first Model called `name`.
+local function namedPieces(m: Model, name: string): { Instance }
+	local list: { Instance } = {}
+	for _, d in m:GetDescendants() do
+		if d:IsA("BasePart") and d.Name == name and d:GetAttribute("SkinPart") == "Head" then
+			table.insert(list, d)
+		end
+	end
+	if #list == 0 then
+		for _, d in m:GetDescendants() do
+			if d:IsA("Model") and d.Name == name and d:GetAttribute("SkinPart") == "Head" then
+				return { d :: Instance }
+			end
+		end
+	end
+	return list
+end
+
+-- The moving groups inside head piece `m` (already placed on `head`): custom-model marks
+-- claim their parts first, then Part:<Name> groups, then the Head group takes the rest.
+-- Part: and custom groups hang on the Head group when it moves, so they move with it.
+-- Wearing (`weld`): pivots, and every part welded to its group's pivot or to the head.
+-- Preview: AnimGroup models (Part: and custom ones inside the Head one).
+local function rigHead(rig: Rig, m: Model, head: BasePart, weld: boolean)
+	local claimed: { [BasePart]: boolean } = {}
+	local function free(thing: Instance): { BasePart }
+		local list = {}
+		local function consider(d: Instance)
+			if d:IsA("BasePart") and not claimed[d] and d:GetAttribute("SkinPart") == "Head" then
+				table.insert(list, d)
+			end
+		end
+		consider(thing)
+		for _, d in thing:GetDescendants() do
+			consider(d)
+		end
+		return list
+	end
+	local function claim(list: { BasePart }, to: BasePart?)
+		for _, p in list do
+			claimed[p] = true
+			if to then
+				local w = Instance.new("WeldConstraint")
+				w.Part0 = to
+				w.Part1 = p
+				w.Parent = p
+				p.Anchored = false
+			end
+		end
+	end
+	local headPivot: BasePart? = nil
+	local headModel: Model? = nil
+	if rig.Moving.Head then
+		if weld then
+			headPivot = newPivot(rig, m, "Head", head, CFrame.identity)
+		else
+			headModel = newGroupModel(rig, m, "Head", head.CFrame)
+		end
+	end
+	local parent: BasePart = headPivot or head
+	local into: Instance = headModel or m
+	-- One group: `things` (parts or Models) turning round `at`.
+	local function make(name: string, things: { Instance }, at: CFrame, marks: Instance?)
+		local members = {}
+		for _, thing in things do
+			for _, p in free(thing) do
+				table.insert(members, p)
+			end
+		end
+		if #members == 0 then
+			return
+		end
+		local holder: Instance?
+		if weld then
+			holder = newPivot(rig, m, name, parent, (parent.CFrame:ToObjectSpace(at)))
+		else
+			holder = newGroupModel(rig, into, name, at)
+		end
+		if not holder then
+			return
+		end
+		if marks then
+			for _, key in MARK_KEYS do
+				holder:SetAttribute(key, marks:GetAttribute(key))
+			end
+		end
+		if weld then
+			claim(members, holder :: BasePart)
+		else
+			claim(members, nil)
+			for _, thing in things do
+				thing.Parent = holder
+			end
+		end
+	end
+	for n, mark in motionMarks(m) do
+		local at = if mark:IsA("Model") then mark:GetPivot() else (mark :: BasePart).CFrame
+		make("Custom:" .. n, { mark }, at, mark)
+	end
+	local partGroups = {}
+	for name in rig.Moving do
+		if string.sub(name, 1, 5) == "Part:" then
+			table.insert(partGroups, name)
+		end
+	end
+	table.sort(partGroups)
+	for _, name in partGroups do
+		local things = namedPieces(m, string.sub(name, 6))
+		if #things == 1 and things[1]:IsA("Model") then
+			make(name, things, (things[1] :: Model):GetPivot())
+		elseif #things > 0 then
+			local parts = {}
+			for _, thing in things do
+				table.insert(parts, thing :: BasePart)
+			end
+			make(name, things, CFrame.new(boxCentre(parts)) * parent.CFrame.Rotation)
+		end
+	end
+	-- Everything else goes with the head (or the Head group).
+	if weld then
+		claim(free(m), parent)
+	elseif headModel then
+		local holder: Model = headModel
+		for _, child: Instance in m:GetChildren() do
+			if child ~= holder and (child:IsA("BasePart") or child:IsA("Model")) then
+				(child :: Instance).Parent = holder
+			end
+		end
+	end
+end
+
+-- A skin's Animate effects (checked; nil when animations are switched off).
+local function effectsOf(style: any): { SkinAnimate.Effect }?
+	if not Config.Features.SkinAnimations then
+		return nil
+	end
+	return (SkinAnimate.Normalize(style.Animate, style))
+end
+
+-- The moving groups of a skin, or nil when nothing moves (the skin is built as before).
+local function newRig(effects: { SkinAnimate.Effect }?, headPiece: Model?): Rig?
+	if not Config.Features.SkinAnimations then
+		return nil
+	end
+	local moving = movingGroups(effects)
+	if next(moving) == nil and not (headPiece and #motionMarks(headPiece) > 0) then
+		return nil
+	end
+	return { Moving = moving, Pivots = 0 }
 end
 
 -- Previews ---------------------------------------------------------------------------------------
@@ -1235,7 +1648,7 @@ local function previewExtras(into: Model, style: any, rainbowOn: boolean)
 	if glow then
 		local c = if typeof(glow.Color) == "Color3" then glow.Color else Color3.new(1, 1, 1)
 		for i, d in { 5.6, 3.9 } do
-			part(into, {
+			local halo = part(into, {
 				Name = "GlowHalo",
 				Shape = Enum.PartType.Cylinder,
 				Size = Vector3.new(0.05, d, d),
@@ -1244,6 +1657,7 @@ local function previewExtras(into: Model, style: any, rainbowOn: boolean)
 				Material = Enum.Material.Neon,
 				Transparency = if i == 1 then 0.85 else 0.72,
 			})
+			halo:SetAttribute("SkinPart", "Glow") -- (a Glow effect pulses it in the preview)
 		end
 	end
 	if aura then
@@ -1279,21 +1693,37 @@ end
 -- A stand-in avatar wearing the skin, for the shop and crate previews.
 local function skinPreview(item: any): Model
 	local style = item.Style
+	local effects = effectsOf(style)
 	local m = standIn(not style.HideClothes)
+	-- What it is (SkinFx.AnimatePreview / SkinAnim read these), before it's shown anywhere.
+	m:SetAttribute("ItemId", item.Id)
+	if Config.Features.SkinAnimations and Items.Get(item.Id) == nil then
+		m:SetAttribute("LiveStyle", (SkinAnimate.EncodeLive(style)))
+	end
 	paintBody(m, style, false)
 	local head = m:FindFirstChild("Head") :: BasePart
-	if style.Head or CustomAssets.Has("Cosmetics", item.Id) then
+	local rig: Rig? = nil
+	local index = 0
+	if style.Head or CustomAssets.Has("Cosmetics", modelIdOf(item)) then
 		head.Transparency = 1
 		local piece = Cosmetics.Build(item)
 		piece:PivotTo(head.CFrame)
+		index = markHead(piece)
+		rig = newRig(effects, piece)
+		if rig then
+			rigHead(rig, piece, head, false)
+		end
 		piece.Parent = m
 	else
 		standInFace(m, head)
+		rig = newRig(effects, nil)
 	end
 	local extras = Instance.new("Model")
 	extras.Name = "Extras"
 	extras.Parent = m
 	local ctx = newDress(m, extras, style, false)
+	ctx.Index = index
+	ctx.Rig = rig
 	addAccents(ctx, style)
 	previewExtras(extras, style, ctx.Rainbow)
 	return m
@@ -1358,7 +1788,7 @@ local function buildCustom(item: any, m: Model): Model
 end
 
 function Cosmetics.Build(item: any): Model
-	local custom = CustomAssets.Clone("Cosmetics", item.Id)
+	local custom = CustomAssets.Clone("Cosmetics", modelIdOf(item))
 	if custom then
 		return buildCustom(item, custom)
 	end
@@ -1422,6 +1852,8 @@ local function weldAll(m: Model, to: BasePart)
 end
 
 local STASH = "SkinStash"
+-- A character has at most one of each of these.
+local ONE_ONLY = { BodyColors = true, Shirt = true, Pants = true, ShirtGraphic = true }
 
 remember = function(instance: Instance, property: string, value: any)
 	local key = "Skin_" .. property
@@ -1461,11 +1893,19 @@ local function restoreSkin(character: Model)
 	local stash = character:FindFirstChild(STASH)
 	if stash then
 		for _, child in stash:GetChildren() do
-			child.Parent = character
+			if ONE_ONLY[child.ClassName] and character:FindFirstChildOfClass(child.ClassName) then
+				-- Something newer took its place while it was put away (a catalog item's apply
+				-- makes a new BodyColors or Shirt): the newer one wins, no doubles.
+				child:Destroy()
+			else
+				child.Parent = character
+			end
 		end
 		stash:Destroy()
 	end
 	character:SetAttribute("HatLift", nil)
+	character:SetAttribute("SkinMotion", nil)
+	character:SetAttribute("SkinMotionIds", nil)
 end
 
 local function stashIn(character: Model): Folder
@@ -1479,11 +1919,12 @@ local function stashIn(character: Model): Folder
 	return folder
 end
 
--- Accessories (hair, hats from the avatar) attached to the head.
+-- Accessories (hair, hats from the avatar) attached to the head. Not the skin's own catalog
+-- items (SkinCatalog = true): the skin asked for those, so they stay visible.
 local function headAccessories(character: Model, head: BasePart): { BasePart }
 	local list = {}
 	for _, child in character:GetChildren() do
-		if child:IsA("Accessory") then
+		if child:IsA("Accessory") and child:GetAttribute("SkinCatalog") ~= true then
 			local handle = child:FindFirstChild("Handle")
 			if handle and handle:IsA("BasePart") then
 				for _, j in handle:GetChildren() do
@@ -1526,11 +1967,26 @@ local function wearSkin(character: Model, item: any, head: BasePart, root: BaseP
 			end
 		end
 	end
+	if Config.Features.WalkStyles then
+		-- A walk style: every screen poses characters with these (src/client/SkinWalk.luau).
+		local motion = SkinMotion.Normalize(style.Motion)
+		if motion then
+			character:SetAttribute("SkinMotion", motion.Preset)
+			character:SetAttribute(
+				"SkinMotionIds",
+				if Config.SkinMotion.AllowUploaded then SkinMotion.IdsText(motion) else nil
+			)
+		end
+	end
 	if not hasExtras(item) then
 		return true
 	end
+	local effects = effectsOf(style)
 	local m: Model
-	if style.Head or CustomAssets.Has("Cosmetics", item.Id) then
+	local rig: Rig? = nil
+	local index = 0
+	local marked = false -- a custom model with Animate attributes
+	if style.Head or CustomAssets.Has("Cosmetics", modelIdOf(item)) then
 		remember(head, "Transparency", head.Transparency)
 		head.Transparency = 1
 		for _, d in head:GetChildren() do
@@ -1545,7 +2001,14 @@ local function wearSkin(character: Model, item: any, head: BasePart, root: BaseP
 		end
 		m = Cosmetics.Build(item)
 		m:PivotTo(head.CFrame)
-		weldAll(m, head)
+		index = markHead(m)
+		marked = Config.Features.SkinAnimations and hasMarks(m)
+		rig = newRig(effects, m)
+		if rig then
+			rigHead(rig, m, head, true)
+		else
+			weldAll(m, head)
+		end
 		-- Hats go on top of the head piece.
 		local box, size = m:GetBoundingBox()
 		local lift = (box.Position.Y + size.Y / 2) - (head.Position.Y + head.Size.Y / 2)
@@ -1554,22 +2017,87 @@ local function wearSkin(character: Model, item: any, head: BasePart, root: BaseP
 		m = Instance.new("Model")
 		m.Name = "Cosmetic_Skin"
 		m:SetAttribute("ItemId", item.Id)
+		rig = newRig(effects, nil)
 	end
 	-- Accents, glow and aura go in the same model, so TakeOff removes them with it.
 	local ctx = newDress(character, m, style, true)
+	ctx.Index = index
+	ctx.Rig = rig
 	addAccents(ctx, style)
 	addGlowAndAura(ctx, root, style)
-	m.Parent = character
+	-- Attributes first, then tags, then into the character: SkinFx and SkinAnim read the
+	-- attributes once, when the tag appears on their screen.
+	if Config.Features.SkinAnimations and Items.Get(item.Id) == nil then
+		-- a Skin Studio draft: screens can't look it up in the catalogue
+		m:SetAttribute("LiveStyle", (SkinAnimate.EncodeLive(style)))
+	end
 	if type(style.Crazy) == "table" then
 		-- src/client/SkinFx.luau animates it on every player's screen.
 		CollectionService:AddTag(m, Tags.SkinFx)
 	end
+	if (effects and #effects > 0) or marked then
+		-- src/client/SkinAnim.luau moves and colours its pieces on every player's screen.
+		CollectionService:AddTag(m, Tags.SkinAnim)
+	end
+	m.Parent = character
 	return true
 end
 
-function Cosmetics.TakeOff(character: Model, slot: string)
+-- The pivot of a moving head piece (a hat rides on it), or nil.
+local function headPivot(character: Model): BasePart?
+	local skin = character:FindFirstChild("Cosmetic_Skin")
+	if skin then
+		for _, child in skin:GetChildren() do
+			if child:IsA("BasePart") and child:GetAttribute("AnimGroup") == "Head" then
+				return child
+			end
+		end
+	end
+	return nil
+end
+
+-- Server listeners told when a character's skin changes (SkinCatalogService).
+local skinListeners: { (Model, any?) -> () } = {}
+
+function Cosmetics.OnSkinChanged(fn: (Model, any?) -> ()): () -> ()
+	table.insert(skinListeners, fn)
+	return function()
+		local i = table.find(skinListeners, fn)
+		if i then
+			table.remove(skinListeners, i)
+		end
+	end
+end
+
+local function skinChanged(character: Model, item: any?)
+	for _, fn in table.clone(skinListeners) do
+		local ok, err = pcall(function(): any
+			fn(character, item)
+			return nil
+		end)
+		if not ok then
+			warn("[Cosmetics] an OnSkinChanged listener failed: " .. tostring(err))
+		end
+	end
+end
+
+local function takeOff(character: Model, slot: string)
 	if slot == "Skin" then
 		restoreSkin(character)
+		-- A hat welded to the moving head piece goes back onto the head before the head piece
+		-- goes, so it never falls off.
+		local skin = character:FindFirstChild("Cosmetic_Skin")
+		local head = character:FindFirstChild("Head")
+		if skin and head and head:IsA("BasePart") then
+			for _, d in character:GetDescendants() do
+				if d:IsA("WeldConstraint") and not d:IsDescendantOf(skin) then
+					local on: BasePart? = d.Part0
+					if on and on:IsDescendantOf(skin) then
+						d.Part0 = head
+					end
+				end
+			end
+		end
 	end
 	for _, child in character:GetChildren() do
 		if child.Name == "Cosmetic_" .. slot then
@@ -1587,6 +2115,13 @@ function Cosmetics.TakeOff(character: Model, slot: string)
 	end
 end
 
+function Cosmetics.TakeOff(character: Model, slot: string)
+	takeOff(character, slot)
+	if slot == "Skin" then
+		skinChanged(character, nil)
+	end
+end
+
 -- Puts `item` on `character` (server). Returns false if the character isn't ready.
 function Cosmetics.Wear(character: Model, item: any): boolean
 	local head = character:FindFirstChild("Head") :: BasePart?
@@ -1594,9 +2129,11 @@ function Cosmetics.Wear(character: Model, item: any): boolean
 	if not head or not root then
 		return false
 	end
-	Cosmetics.TakeOff(character, item.Slot)
+	takeOff(character, item.Slot)
 	if item.Slot == "Skin" then
-		return wearSkin(character, item, head, root)
+		local worn = wearSkin(character, item, head, root)
+		skinChanged(character, item)
+		return worn
 	end
 	if item.Slot == "Trail" then
 		local a0 = Instance.new("Attachment")
@@ -1624,7 +2161,8 @@ function Cosmetics.Wear(character: Model, item: any): boolean
 		local lift = character:GetAttribute("HatLift")
 		local extra = if typeof(lift) == "number" then lift else 0
 		m:PivotTo(head.CFrame * CFrame.new(0, head.Size.Y / 2 + extra, 0))
-		weldAll(m, head)
+		-- on a moving head piece (Float, Bob, Spin...) the hat moves with it
+		weldAll(m, headPivot(character) or head)
 	else
 		m:PivotTo(root.CFrame * CFrame.new(Config.Shop.PetOffset))
 		weldAll(m, root)

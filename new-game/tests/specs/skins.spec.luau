@@ -18,6 +18,9 @@ local Items = rt:require("ReplicatedStorage.Shared.Items")
 local Cosmetics = rt:require("ReplicatedStorage.Shared.Cosmetics")
 local HeadPieces = rt:require("ReplicatedStorage.Shared.HeadPieces")
 local Tags = rt:require("ReplicatedStorage.Shared.Tags")
+local SkinAnimate = rt:require("ReplicatedStorage.Shared.SkinAnimate")
+local SkinMotion = rt:require("ReplicatedStorage.Shared.SkinMotion")
+local SkinCatalog = rt:require("ReplicatedStorage.Shared.SkinCatalog")
 local CollectionService = rt.game:GetService("CollectionService")
 
 local THEMES = { "Pumpkin", "Candy", "Spooky", "Graveyard", "Monster", "Moonlight" }
@@ -49,6 +52,9 @@ local STYLE_KEYS = {
 	Glow = "table",
 	Aura = "table",
 	Crazy = "table",
+	Animate = "table", -- moving pieces and colour effects (src/shared/SkinAnimate.luau)
+	Motion = { "string", "table" }, -- a walk style (src/shared/SkinMotion.luau)
+	Catalog = "table", -- Roblox catalog items (src/shared/SkinCatalog.luau)
 }
 
 local function crateSkins(): { any }
@@ -220,7 +226,16 @@ describe("Skin catalogue", function()
 				expect(item.Slot).toBe("Skin")
 				expect(item.Crate).toBe(item.Theme .. "Crate")
 				expect(item.Style.Kind).toBe("Skin")
-				expect(item.Style.HideClothes).toBe(true)
+				-- (a skin with a catalog Shirt, Pants or TShirt keeps clothes on to show them)
+				local catalog = SkinCatalog.Normalize(item.Style.Catalog)
+				if
+					not (
+						catalog
+						and (catalog.Shirt ~= nil or catalog.Pants ~= nil or catalog.TShirt ~= nil)
+					)
+				then
+					expect(item.Style.HideClothes).toBe(true)
+				end
 				expect(item.Price).toBeNil()
 				expect(Items.Price(item)).toBe(Config.Rarity.Levels[item.Rarity].Price)
 				expect(Items.CanBuyDirect(item)).toBe(true)
@@ -247,8 +262,15 @@ describe("Skin styles", function()
 				if not want then
 					error(("%s: unknown Style key %s (typo?)"):format(item.Id, key))
 				end
-				if typeof(value) ~= want then
-					error(("%s: Style.%s should be a %s"):format(item.Id, key, want))
+				local wants = if type(want) == "table" then want else { want }
+				if not table.find(wants, typeof(value)) then
+					error(
+						("%s: Style.%s should be a %s"):format(
+							item.Id,
+							key,
+							table.concat(wants, " or ")
+						)
+					)
 				end
 				local isMaterial = want ~= "EnumItem"
 					or pcall(function()
@@ -260,6 +282,39 @@ describe("Skin styles", function()
 			end
 		end
 	end)
+
+	it(
+		"gives every skin valid animations, walk styles and catalog items (no errors, no warnings)",
+		function()
+			for _, item in skins() do
+				local style = item.Style
+				local _, errors, warnings = SkinAnimate.Normalize(style.Animate, style)
+				local _, motionErrors = SkinMotion.Normalize(style.Motion)
+				local _, catalogErrors, catalogWarnings =
+					SkinCatalog.Normalize(style.Catalog, style)
+				for _, list in { errors, warnings, motionErrors, catalogErrors, catalogWarnings } do
+					if #list > 0 then
+						error(("%s: %s"):format(item.Id, table.concat(list, "; ")))
+					end
+				end
+			end
+			-- Crates are sold for Robux: every catalog id in the game files (any item, crate or
+			-- not) must be one Kieran checked and listed in Config.SkinCatalog.ApprovedIds.
+			for _, item in Config.Shop.Items do
+				local style = item.Style
+				for _, id in SkinCatalog.Ids(if type(style) == "table" then style.Catalog else nil) do
+					if not SkinCatalog.Approved(id) then
+						error(
+							("%s: catalog id %d isn't in Config.SkinCatalog.ApprovedIds"):format(
+								item.Id,
+								id
+							)
+						)
+					end
+				end
+			end
+		end
+	)
 
 	it("points every Head, Face, Accent, Aura and Orbit at something that exists", function()
 		for _, item in skins() do
@@ -397,6 +452,8 @@ local function snapshot(character: any): { [string]: any }
 	table.sort(children)
 	shot.Children = table.concat(children, ",")
 	shot.HatLift = tostring(character:GetAttribute("HatLift"))
+	shot.SkinMotion = tostring(character:GetAttribute("SkinMotion"))
+	shot.SkinMotionIds = tostring(character:GetAttribute("SkinMotionIds"))
 	return shot
 end
 
@@ -500,15 +557,35 @@ describe("Wearing skins", function()
 		if style.Head or style.Accent or style.Glow or style.Aura or style.Crazy then
 			expect(model).toBeInstanceOf("Model")
 			expect(model:GetAttribute("ItemId")).toBe(item.Id)
-			-- everything is welded on and nothing collides
+			-- everything is joined on and nothing collides: each piece is welded to a body part
+			-- or to a moving group's AnimPivot, and each AnimPivot's SkinMotor joins it to a body
+			-- part or another pivot, so the chain always ends at a body part
+			local function joinedTo(d: any): any
+				if d:GetAttribute("AnimGroup") ~= nil then
+					local motor = d:FindFirstChild("SkinMotor")
+					expect(motor).toBeInstanceOf("Motor6D")
+					expect(motor.Part1).toBe(d)
+					return motor.Part0
+				end
+				local weld = d:FindFirstChildOfClass("WeldConstraint")
+				expect(weld).toBeTruthy()
+				local to = weld.Part0
+				if to:IsDescendantOf(model) then
+					expect(to:GetAttribute("AnimGroup")).toBeA("string") -- only pivots, in the model
+				end
+				return to
+			end
 			for _, d in model:GetDescendants() do
 				if d:IsA("BasePart") then
 					expect(d.Anchored).toBe(false)
 					expect(d.CanCollide).toBe(false)
-					local weld = d:FindFirstChildOfClass("WeldConstraint")
-					expect(weld).toBeTruthy()
-					expect(weld.Part0:IsDescendantOf(character)).toBe(true)
-					expect(weld.Part0:IsDescendantOf(model)).toBe(false)
+					local at, steps = d, 0
+					while at:IsDescendantOf(model) do
+						at = joinedTo(at)
+						steps += 1
+						expect(steps).toBeLessThan(5)
+					end
+					expect(at:IsDescendantOf(character)).toBe(true)
 				end
 			end
 		end
@@ -529,12 +606,8 @@ describe("Wearing skins", function()
 		end
 		if style.Accent then
 			local accents = 0
-			for _, d in model:GetChildren() do
-				if
-					d:IsA("BasePart")
-					and d.Name ~= "SkinAura"
-					and d:FindFirstChildOfClass("WeldConstraint").Part0.Name ~= "Head"
-				then
+			for _, d in model:GetDescendants() do
+				if d:IsA("BasePart") and Cosmetics.HasPattern(d:GetAttribute("SkinPart")) then
 					accents += 1
 				end
 			end

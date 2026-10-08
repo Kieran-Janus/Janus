@@ -245,6 +245,17 @@ return {
 			Glow = { Color = rgb(180, 200, 255), Brightness = 2.2, Range = 14 },
 			Aura = { Kind = "Sparkles", Color = rgb(200, 220, 255) },
 			Crazy = { Rainbow = true, Pulse = true, Orbit = "Ghosts", Count = 4 },
+			Animate = {
+				{ Effect = "Float", Target = "Head", Speed = 0.8 },
+				{ Effect = "Spin", Target = "Part:Halo", Speed = 0.6 },
+				{ Effect = "Breathe", Target = "Cape", Amount = 2 },
+				{
+					Effect = "ColorCycle",
+					Target = "Glow",
+					Colors = { rgb(180, 200, 255), rgb(230, 160, 255) },
+				},
+			} :: { any }, -- (effects differ in shape)
+			Motion = "Ghost",
 		},
 	},
 } :: { any }

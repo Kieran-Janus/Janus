@@ -13,9 +13,13 @@
 
 	SkinFx.Start()                    starts watching (ShopUI.Mount calls it; safe to call twice)
 	SkinFx.AnimatePreview(model) -> stop
-	                                  cycles the rainbow parts of a shop or crate preview while
-	                                  its ViewportFrame is on screen; call stop() (or destroy
+	                                  animates a shop, crate or Skin Studio preview while its
+	                                  ViewportFrame is on screen: its Style.Animate effects
+	                                  (src/client/SkinAnim.luau, first, even with SkinEffects
+	                                  off) and the CRAZY rainbow parts; call stop() (or destroy
 	                                  the model) when done
+	A Skin Studio draft isn't in the catalogue: its Crazy comes from the model's LiveStyle
+	attribute (SkinAnimate.StyleOf).
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -26,8 +30,9 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local HeadPieces = require(ReplicatedStorage.Shared.HeadPieces)
-local Items = require(ReplicatedStorage.Shared.Items)
+local SkinAnimate = require(ReplicatedStorage.Shared.SkinAnimate)
 local Tags = require(ReplicatedStorage.Shared.Tags)
+local SkinAnim = require(script.Parent.SkinAnim)
 local SkinEffects = require(script.Parent.SkinEffects)
 
 local SkinFx = {}
@@ -175,8 +180,9 @@ local function onTagged(instance: Instance)
 	if not instance:IsA("Model") or entries[instance] then
 		return
 	end
-	local item = Items.Get(instance:GetAttribute("ItemId"))
-	local crazy = item and item.Style and item.Style.Crazy
+	-- the catalogue item's Style, or a Skin Studio draft's LiveStyle
+	local style = SkinAnimate.StyleOf(instance)
+	local crazy = style and style.Crazy
 	if type(crazy) ~= "table" then
 		return
 	end
@@ -341,17 +347,20 @@ function SkinFx.Start()
 end
 
 function SkinFx.AnimatePreview(model: Model): () -> ()
+	-- Style.Animate first: it has its own switch (Config.Features.SkinAnimations).
+	local stopAnim = SkinAnim.AnimatePreview(model)
 	if not Config.Features.SkinEffects then
-		return function() end
+		return stopAnim
 	end
 	local parts = rainbowParts(model)
 	if #parts == 0 then
-		return function() end
+		return stopAnim
 	end
 	previews[model] = parts
 	ensureLoop()
 	return function()
 		previews[model] = nil
+		stopAnim()
 	end
 end
 

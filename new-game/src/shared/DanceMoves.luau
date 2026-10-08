@@ -16,6 +16,8 @@
 	        are turned)
 	DanceMoves.Clear(joints)
 	        puts every joint back to rest (the normal animations take over again)
+	DanceMoves.Local(joint, turn) -> CFrame
+	        one joint's Transform for a turn in the body's directions (what Apply sets)
 
 	Signs, for writing a new dance: LeftShoulder rz(-90) raises the left arm out to the side,
 	RightShoulder rz(90) the right one; Shoulder rx(90) raises an arm forward; Hip rx(30)
@@ -301,6 +303,13 @@ function DanceMoves.Apply(joints: { [string]: Joint }, pose: Pose)
 		local c0 = seat(joint).Rotation
 		joint.Transform = c0:Inverse() * turn * c0
 	end
+end
+
+-- One joint's Transform for `turn` (given in the body's directions), the same conversion as
+-- Apply (walk styles use it: src/client/SkinWalk.luau).
+function DanceMoves.Local(joint: Joint, turn: CFrame): CFrame
+	local c0 = seat(joint).Rotation
+	return c0:Inverse() * turn * c0
 end
 
 function DanceMoves.Clear(joints: { [string]: Joint })

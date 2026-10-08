@@ -271,6 +271,10 @@ return {
 			GlowColor = rgb(100, 40, 140),
 			Glow = { Color = rgb(100, 40, 140), Brightness = 1.8 },
 			Aura = { Kind = "Bubbles", Color = rgb(100, 40, 140), Color2 = rgb(240, 90, 200) },
+			Animate = {
+				{ Effect = "Wag", Target = "Tail", Speed = 0.7 },
+				{ Effect = "Breathe", Target = "Cape" },
+			} :: { any }, -- (effects differ in shape)
 		},
 	},
 	{
