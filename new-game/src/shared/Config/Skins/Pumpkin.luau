@@ -59,6 +59,11 @@
 	  Rare and up, a walk style:
 	    Motion = "Zombie"   Zombie, Mummy, Ghost, Robot, Bat, Sneaky, Bouncy or Proud, or your
 	                  own animations: Motion = { Walk = "rbxassetid://123", Idle = "..." }
+	  Real Roblox catalog items (only while Config.Features.SkinCatalog is on; every id must be
+	  made by Roblox, you or your group and listed in Config.SkinCatalog.ApprovedIds):
+	    Catalog = { Accessories = { { Id = 1234567890, Type = "Hat" } }, Shirt = 1234567891 }
+	                  Types: Hat, Hair, FaceAccessory, Neck, Shoulder, Front, Back, Waist.
+	                  Also Pants, TShirt (clothes need HideClothes = false) and ClassicFace.
 	How each rarity should look: Common = colours, materials and an accent; Uncommon = + a
 	head piece; Rare = + glow and particles; CRAZY = everything + rainbow + orbiting pieces.
 ]]

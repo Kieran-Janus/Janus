@@ -20,6 +20,7 @@ local HeadPieces = rt:require("ReplicatedStorage.Shared.HeadPieces")
 local Tags = rt:require("ReplicatedStorage.Shared.Tags")
 local SkinAnimate = rt:require("ReplicatedStorage.Shared.SkinAnimate")
 local SkinMotion = rt:require("ReplicatedStorage.Shared.SkinMotion")
+local SkinCatalog = rt:require("ReplicatedStorage.Shared.SkinCatalog")
 local CollectionService = rt.game:GetService("CollectionService")
 
 local THEMES = { "Pumpkin", "Candy", "Spooky", "Graveyard", "Monster", "Moonlight" }
@@ -53,6 +54,7 @@ local STYLE_KEYS = {
 	Crazy = "table",
 	Animate = "table", -- moving pieces and colour effects (src/shared/SkinAnimate.luau)
 	Motion = { "string", "table" }, -- a walk style (src/shared/SkinMotion.luau)
+	Catalog = "table", -- Roblox catalog items (src/shared/SkinCatalog.luau)
 }
 
 local function crateSkins(): { any }
@@ -224,7 +226,16 @@ describe("Skin catalogue", function()
 				expect(item.Slot).toBe("Skin")
 				expect(item.Crate).toBe(item.Theme .. "Crate")
 				expect(item.Style.Kind).toBe("Skin")
-				expect(item.Style.HideClothes).toBe(true)
+				-- (a skin with a catalog Shirt, Pants or TShirt keeps clothes on to show them)
+				local catalog = SkinCatalog.Normalize(item.Style.Catalog)
+				if
+					not (
+						catalog
+						and (catalog.Shirt ~= nil or catalog.Pants ~= nil or catalog.TShirt ~= nil)
+					)
+				then
+					expect(item.Style.HideClothes).toBe(true)
+				end
 				expect(item.Price).toBeNil()
 				expect(Items.Price(item)).toBe(Config.Rarity.Levels[item.Rarity].Price)
 				expect(Items.CanBuyDirect(item)).toBe(true)
@@ -272,18 +283,38 @@ describe("Skin styles", function()
 		end
 	end)
 
-	it("gives every skin valid animations and walk styles (no errors, no warnings)", function()
-		for _, item in skins() do
-			local style = item.Style
-			local _, errors, warnings = SkinAnimate.Normalize(style.Animate, style)
-			local _, motionErrors = SkinMotion.Normalize(style.Motion)
-			for _, list in { errors, warnings, motionErrors } do
-				if #list > 0 then
-					error(("%s: %s"):format(item.Id, table.concat(list, "; ")))
+	it(
+		"gives every skin valid animations, walk styles and catalog items (no errors, no warnings)",
+		function()
+			for _, item in skins() do
+				local style = item.Style
+				local _, errors, warnings = SkinAnimate.Normalize(style.Animate, style)
+				local _, motionErrors = SkinMotion.Normalize(style.Motion)
+				local _, catalogErrors, catalogWarnings =
+					SkinCatalog.Normalize(style.Catalog, style)
+				for _, list in { errors, warnings, motionErrors, catalogErrors, catalogWarnings } do
+					if #list > 0 then
+						error(("%s: %s"):format(item.Id, table.concat(list, "; ")))
+					end
+				end
+			end
+			-- Crates are sold for Robux: every catalog id in the game files (any item, crate or
+			-- not) must be one Kieran checked and listed in Config.SkinCatalog.ApprovedIds.
+			for _, item in Config.Shop.Items do
+				local style = item.Style
+				for _, id in SkinCatalog.Ids(if type(style) == "table" then style.Catalog else nil) do
+					if not SkinCatalog.Approved(id) then
+						error(
+							("%s: catalog id %d isn't in Config.SkinCatalog.ApprovedIds"):format(
+								item.Id,
+								id
+							)
+						)
+					end
 				end
 			end
 		end
-	end)
+	)
 
 	it("points every Head, Face, Accent, Aura and Orbit at something that exists", function()
 		for _, item in skins() do

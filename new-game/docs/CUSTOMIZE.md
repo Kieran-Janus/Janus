@@ -432,6 +432,41 @@ Motion = { Preset = "Ghost", Idle = "rbxassetid://789" }, -- or both: the ghost 
 
 Switch walk styles off with `Config.Features.WalkStyles = false`, and animated skins with `Config.Features.SkinAnimations = false` (skins then look exactly as before, just still). Or ask Claude Code: `/animate-skin Candy_BubblegumBat make the wings flap slowly and the glow pulse`.
 
+### Catalog items in skins
+A skin can also put real Roblox catalog items on you: a hat, hair, glasses or a mask, a back item, a classic shirt, pants or T-shirt, or a classic face. The server adds them to your own avatar (`src/server/Services/SkinCatalogService.luau`) and Roblox shows them to everyone. Shop and crate cards show small pictures of them along the bottom of the preview (a 3D preview can't load catalog items).
+
+**It's switched off** (`Config.Features.SkinCatalog = false`) until you've tried it in Studio.
+
+```lua
+Style = {
+	...
+	HideClothes = false, -- only needed for Shirt / Pants / TShirt (a costume hides your clothes)
+	Catalog = {
+		Accessories = { { Id = 1234567890, Type = "Hat" }, { Id = 2345678901, Type = "Back" } }, -- up to 4
+		Shirt = 3456789012, Pants = 4567890123, TShirt = 5678901234, -- classic clothes
+		ClassicFace = 6789012345, -- a flat face (only on a skin without a Head piece)
+	},
+},
+```
+These numbers are made up: an item's id is the number in its catalog web address (`roblox.com/catalog/<number>/...`). `Type` is one of `Hat`, `Hair`, `FaceAccessory` (glasses, masks), `Neck`, `Shoulder`, `Front`, `Back` or `Waist`; Skin Studio's **Look up** button fills it in for you. A wrong value is left out (the tests and Skin Studio say what's wrong).
+
+**Only items made by Roblox, by you or by your group, and only ids you have approved.** Crates are sold for Robux and this is a kids' game, so other people's catalog items never go inside paid boxes:
+1. The item must be made by Roblox, by you or by your group. Put your UserId in `AllowedCreators.UserIds` and your group's id in `AllowedCreators.GroupIds` (`src/shared/Config/SkinCatalog.luau`). Skin Studio's Look up refuses anyone else's items and says why.
+2. Check the item yourself (how it looks, that it's kid-friendly) and add its id to `ApprovedIds` with a note: `[1234567890] = "Pumpkin Cap, Roblox, checked on 9 Oct 2026",`. The tests fail for any skin that uses an id that isn't listed. Claude Code only adds an id there when you say yes **and** it was made by Roblox, you or your group.
+3. `ShowBuyButtons` stays `false`, so cards never show "Buy" buttons.
+
+**What isn't allowed, and why:** bundles and body parts (they swap your body's parts, which breaks the skin's welded pieces and head piece), body scales (the welded pieces end up in the wrong place), layered 3D clothing (R15 only, it pokes through the skin and ignores `HideClothes`), and animation packs (use a walk style, `Motion`, instead).
+
+**If an item won't load** (deleted, moderated, or Roblox is slow), you simply see the skin without it, and it isn't tried again until you change skin. In Studio, Output says `[SkinCatalog] catalog item 123 didn't load...` once. The character's attribute `SkinCatalogStatus` says `Loading`, `On` or `Failed: <why>`.
+
+**Head pieces:** a skin's head piece hides your own hair and hats, but not the skin's catalog items, so a catalog `Hat` sits on your real head, inside or on top of the head piece. Check how it looks. Back items, clothes, and skins without a head piece are the easy cases.
+
+**Switch it on and test it in Studio:**
+1. Set `SkinCatalog = true` in `src/shared/Config/Features.luau`.
+2. Give a test skin an approved id (or use Skin Studio's Catalog tab), press Play and wear it.
+3. Check: the item appears after a second or two; the skin's pieces are still there and still move; take the skin off and your own avatar comes back exactly (one set of clothes, your own colours); reset (respawn) and it comes back; a wrong id shows the skin without it and Output explains.
+4. Try it with two players (Test > Clients and Servers), and as a Hide & Seek hider (nothing shows while you hide).
+
 ### Trails
 A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
 
