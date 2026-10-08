@@ -109,6 +109,8 @@ Every animation in the game is only a look on each player's own screen. Buttons,
 | The crate stand (crates bob, sway, peek their lids, wake up when you walk close) | `Config.Crates.Idle.On = false` (`src/shared/Config/Crates.luau`; the crates then just float gently by `Stand.Bob`, `0` = still) | `Idle.Range`, `Idle.PhoneRange`, `Idle.PhoneSparkleShare`, `LookDefaults.PeekEvery = 0` (no lid peeks) |
 | Crate openings (chest drop, shake, light beam, pedestal) | Players can tick **Quick open** on the crate page (`QuickOpen.Default = true` starts it ticked), or `Opening.Style = "Reel"` for the old spinning strip | `Opening.ShakeSeconds`, `Opening.Beam` (`PhoneShafts`, `FlashSeconds = 0` = no flash), `PhoneConfetti`, `PhoneCoinPour`; crate cards: `Cards.SpinSpeed = 0`, `Cards.Halo = false` |
 | CRAZY skins' rainbow, orbiting pieces and glow | `Config.Features.SkinEffects = false` | `Effects.MaxAnimated` in `src/shared/Config/Skins/Settings.luau` |
+| Skin pieces that move or change colour (flapping wings, wagging tails, colour fades, sparkle bursts: a skin's `Animate`) | `Config.Features.SkinAnimations = false` | `MaxCharacters` / `PhoneMaxCharacters`, `MaxDistance`, `MaxColorWrites` in `src/shared/Config/SkinAnimate.luau` |
+| Walk styles (Zombie, Ghost, Robot... a skin's `Motion`) | `Config.Features.WalkStyles = false` | `MaxCharacters` / `PhoneMaxCharacters`, `MaxDistance` in `src/shared/Config/SkinMotion.luau` |
 | Floating candles and flickering lights, and how often the lobby, map and crate animations look for something nearby | (no off switch) | `Config.Performance`: `AmbienceDistance`, `FlickerHz`, `IdleScanHz` and their `Phone...` versions |
 
 Phones already get less: shorter ranges, fewer sparkles, no turning Shop previews. While nothing near the camera is moving, these animations do almost no work (`Config.Performance.IdleScanHz`), and a panel's animation only runs while it is open.
@@ -346,6 +348,89 @@ The crate skins (about 630 with the classic ones) live in `src/shared/Config/Ski
 - **New theme:** copy a theme file, rename it and every `Id` in it, then add a line to `Themes` in `Skins/Settings.luau` (its `Id` is the file name, `Crate` is the crate it drops from). Add that crate too (see "Crates").
 - CRAZY animations can be switched off with `Config.Features.SkinEffects = false`; their speed and how many players animate at once are in `Skins/Settings.luau` > `Effects`.
 - Or ask Claude Code: `/add-skin a Candy skin made of bubble gum, Rare`.
+
+### Animated skins
+Skin pieces can move and change colour: wings flap, tails wag, capes sway, head pieces spin, bob or float, colours fade, glows flicker and sparkles burst. Everyone in the server sees the same movement at the same moment. Each player's own screen draws it (`src/client/SkinAnim.luau`), so it costs no network and phones stay fast.
+
+Add an `Animate` list to a skin's `Style` (in its theme file in `src/shared/Config/Skins/`):
+```lua
+Style = {
+	...
+	Accent = { Color = rgb(200, 80, 160), Pattern = { "Wings", "Tail" } },
+	Head = "BatHead",
+	Glow = { Color = rgb(255, 120, 200) },
+	Animate = {
+		{ Effect = "Flap", Target = "Wings" },             -- the wings beat
+		{ Effect = "Wag", Target = "Tail", Speed = 1.5 },  -- the tail wags, a bit faster
+		{ Effect = "Pulse", Target = "Glow" },             -- the light pulses
+	} :: { any }, -- (tells Studio's checker the effects may look different from each other)
+},
+```
+
+**The effects:**
+| Effect | What it does | Works on |
+| --- | --- | --- |
+| `Spin` | turns round and round (`Reverse = true` the other way) | `Head`, `Wings`, `Tail`, `Cape`, `"Part:<name>"` |
+| `Bob` | bobs up and down | same |
+| `Float` | floats up and sways gently | same |
+| `Wobble` | tilts from side to side | same |
+| `Flap` | wings beat back and open again | `Wings`, `"Part:<name>"` |
+| `Wag` | swings side to side | `Tail`, `"Part:<name>"` |
+| `Breathe` | a slow tiny lift and tilt (capes) | `Head`, `Wings`, `Tail`, `Cape`, `"Part:<name>"` |
+| `Pulse` | glows brighter and dimmer | `Glow`, `Head`, `Accents`, a pattern (`"Belt"`...), `Body`, `All`, `"Part:<name>"` |
+| `ColorCycle` | fades through your colours: `Colors = { rgb(255, 120, 0), rgb(150, 60, 200) }` (2 to 6) | same |
+| `Flicker` | flickers like a candle (`Every = 0.1`: seconds between flickers) | same |
+| `Shimmer` | a bright band sweeps up the pieces | same, but not `Glow` |
+| `SparkleBurst` | a puff of the skin's own particles every few seconds (`Every = 4`, `Count = 20`) | `Aura` |
+
+**The targets:** `Head` = the head piece (or your custom model), `Wings` / `Tail` / `Cape` = those accent patterns (the only ones that can move), any other pattern name (`"Belt"`, `"Stripes"`...) = that pattern's pieces, `Accents` = every accent piece, `All` = head piece + accents, `Body` = the avatar's own body parts, `Glow` = the light, `Aura` = the particles, `"Part:Crescent"` = the parts (or the Model) called `Crescent` inside the head piece. Leave `Target` out and each effect uses its usual one (Flap: Wings, Wag: Tail, Breathe: Cape, Pulse and Flicker: Glow, ColorCycle and Shimmer: Accents, SparkleBurst: Aura, the others: Head).
+
+**Make it faster, bigger or later** (all optional): `Speed = 2` (twice as fast, 0.1 to 5), `Amount = 0.5` (half as big or strong, 0 to 3), `Delay = 1` (starts a second later, so two effects don't move together), `Axis = "X"` (which way it turns: X nods, Y turns, Z tilts). To change an effect for every skin at once, change its numbers in `src/shared/Config/SkinAnimate.luau` > `Presets` (for example `Flap.Degrees`).
+
+**CRAZY already owns the rainbow and the glow pulse.** A CRAZY skin's `Crazy.Rainbow` colours its accents and `Crazy.Pulse` pulses its glow every frame, so `Animate` can't colour the accents (`Accents`, `All` or a pattern) or `Pulse` / `Flicker` the `Glow` of a skin that has them. Use `Target = "Head"` or `"Body"`, a `ColorCycle` on the `Glow` (that changes its colour, not its brightness), or any moving effect instead. The tests (and Skin Studio) tell you in plain English if you try.
+
+**How many:** Common skins don't animate, Uncommon get 1 effect, Rare 3, CRAZY 6 (`Config.SkinAnimate.Rarity`). The tests check every skin. These skins show it off: Bubblegum Bat, Cotton Candy Cat, Moon Moth, Brew Mistress, Sir Gourdington, Zombie Overlord and every CRAZY skin.
+
+**Hide & Seek:** a hider never animates, sparkles or changes colour, so nothing gives them away.
+
+### Animate parts of your own model
+A custom model for a skin (`ReplicatedStorage > Custom > Cosmetics`, named after the skin's Id; see "Builder mode") can move too, without any code:
+1. Select a part, or a Model grouping several parts, inside your model.
+2. Properties > Attributes > **+**: add `Animate` (type string) and type an effect name: `Spin`, `Bob`, `Float`, `Wobble`, `Flap`, `Wag`, `Breathe`, `Pulse`, `ColorCycle`, `Flicker` or `Shimmer`.
+3. Optional, the same way: `Speed`, `Amount`, `Delay`, `Every` (numbers), `Axis` (string `X`, `Y` or `Z`), `Reverse` (boolean), `Color2` (Color3: `ColorCycle` fades between the part's own colour and this one).
+4. A Model turns round its pivot: set it with the **Pivot** tool (Model tab > Pivot > Edit Pivot). A single part turns round its own middle.
+5. Press Play and wear the skin. To keep it in git, right-click the model > **Save to File...** as `assets/Cosmetics/<SkinId>.rbxm`.
+
+A wrong value is simply ignored (Skin Studio shows a warning). At most 6 moving groups per skin (`Config.SkinAnimate.MaxPivots`). Scripts inside custom models are still removed, so attributes are the way to animate one. If the skin's own `Animate` moves its `Head`, your moving parts ride along on it.
+
+### Walk styles
+A skin can change how you walk: add `Motion` to its `Style` (Rare and CRAZY skins only):
+```lua
+Motion = "Zombie",
+```
+| Walk style | What it does |
+| --- | --- |
+| `Zombie` | arms held out in front, head tilted, a slow shuffle |
+| `Mummy` | stiff arms forward and short, stiff steps |
+| `Ghost` | floats above the ground and bobs, legs dangling |
+| `Robot` | straight arms and legs, the head turning in little ticks |
+| `Bat` | arms out flapping like wings, with a little hover |
+| `Sneaky` | a crouched tiptoe with arms held close |
+| `Bouncy` | an extra hop in every step |
+| `Proud` | chest out, chin up |
+
+Their numbers (how far the arms reach, how high the ghost floats...) are in `src/shared/Config/SkinMotion.luau` > `Presets`. They work on R15 and R6 avatars, blend with Roblox's own walking, and a dance at the Photo Spot always wins. Every screen poses the closest 12 characters (6 on phones). **Your own float or hop is kept small** (`OwnRootShiftMax`, 0.2 studs) so you don't bump ceilings in the Tower or the maze; other players see the full float.
+
+**Your own animations:** upload walk, run and idle animations (Avatar > Animation Editor > Publish), then:
+```lua
+Motion = { Walk = "rbxassetid://123", Run = "rbxassetid://456", Idle = "rbxassetid://789" },
+Motion = { Preset = "Ghost", Idle = "rbxassetid://789" }, -- or both: the ghost poses + your idle
+```
+- They must be **owned by the game's owner** (you, or your group if the game belongs to a group), or be Roblox's own. Roblox won't play anyone else's. In Studio a warning in Output says `[SkinWalk] animation 123 didn't load: is it owned by the game's owner?` and your normal walk stays.
+- They play on R15 avatars only (R6 avatars get just the `Preset`). Run plays above `RunSpeed`, Walk while moving, Idle when standing; in the air Roblox's own jump and fall show.
+- `AllowUploaded = false` in `Config.SkinMotion` ignores all uploaded ids.
+
+Switch walk styles off with `Config.Features.WalkStyles = false`, and animated skins with `Config.Features.SkinAnimations = false` (skins then look exactly as before, just still). Or ask Claude Code: `/animate-skin Candy_BubblegumBat make the wings flap slowly and the glow pulse`.
 
 ### Trails
 A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
@@ -794,6 +879,7 @@ Moved to its own section: [Swap every copy of something at once](#swap-every-cop
 | `/verify` | Shorter playtest pass of the whole game, then fixes |
 | `/next-milestone` | Builds the next unfinished milestone in `docs/PROGRESS.md` |
 | `/add-skin` | New crate skin in a theme file, with its rarity and look |
+| `/animate-skin` | Makes a skin move: `/animate-skin <skin> <what should move>` (effects within its rarity's limit, a walk style for Rare and CRAZY), then tests and a catwalk picture |
 | `/add-crate` | New crate: its skins, price, odds, stand display and Robux product |
 | `/add-parkour-jump` | New jump (or stage) on the parkour course, checked against the jump limits |
 | `/add-secret-pumpkin` | New hidden Easter egg with coins and a riddle |

@@ -380,6 +380,8 @@ local function snapshot(character: any): { [string]: any }
 	table.sort(children)
 	shot.Children = table.concat(children, ",")
 	shot.HatLift = tostring(character:GetAttribute("HatLift"))
+	shot.SkinMotion = tostring(character:GetAttribute("SkinMotion"))
+	shot.SkinMotionIds = tostring(character:GetAttribute("SkinMotionIds"))
 	return shot
 end
 
@@ -483,15 +485,35 @@ describe("Wearing skins", function()
 		if style.Head or style.Accent or style.Glow or style.Aura or style.Crazy then
 			expect(model).toBeInstanceOf("Model")
 			expect(model:GetAttribute("ItemId")).toBe(item.Id)
-			-- everything is welded on and nothing collides
+			-- everything is joined on and nothing collides: each piece is welded to a body part
+			-- or to a moving group's AnimPivot, and each AnimPivot's SkinMotor joins it to a body
+			-- part or another pivot, so the chain always ends at a body part
+			local function joinedTo(d: any): any
+				if d:GetAttribute("AnimGroup") ~= nil then
+					local motor = d:FindFirstChild("SkinMotor")
+					expect(motor).toBeInstanceOf("Motor6D")
+					expect(motor.Part1).toBe(d)
+					return motor.Part0
+				end
+				local weld = d:FindFirstChildOfClass("WeldConstraint")
+				expect(weld).toBeTruthy()
+				local to = weld.Part0
+				if to:IsDescendantOf(model) then
+					expect(to:GetAttribute("AnimGroup")).toBeA("string") -- only pivots, in the model
+				end
+				return to
+			end
 			for _, d in model:GetDescendants() do
 				if d:IsA("BasePart") then
 					expect(d.Anchored).toBe(false)
 					expect(d.CanCollide).toBe(false)
-					local weld = d:FindFirstChildOfClass("WeldConstraint")
-					expect(weld).toBeTruthy()
-					expect(weld.Part0:IsDescendantOf(character)).toBe(true)
-					expect(weld.Part0:IsDescendantOf(model)).toBe(false)
+					local at, steps = d, 0
+					while at:IsDescendantOf(model) do
+						at = joinedTo(at)
+						steps += 1
+						expect(steps).toBeLessThan(5)
+					end
+					expect(at:IsDescendantOf(character)).toBe(true)
 				end
 			end
 		end
@@ -512,12 +534,8 @@ describe("Wearing skins", function()
 		end
 		if style.Accent then
 			local accents = 0
-			for _, d in model:GetChildren() do
-				if
-					d:IsA("BasePart")
-					and d.Name ~= "SkinAura"
-					and d:FindFirstChildOfClass("WeldConstraint").Part0.Name ~= "Head"
-				then
+			for _, d in model:GetDescendants() do
+				if d:IsA("BasePart") and Cosmetics.HasPattern(d:GetAttribute("SkinPart")) then
 					accents += 1
 				end
 			end

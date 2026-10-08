@@ -207,6 +207,12 @@ return {
 				Color2 = Color3.fromRGB(20, 10, 30),
 			},
 			Crazy = { Pulse = true, Orbit = "Bones", Count = 3, Effect = "Torment" },
+			-- (no Crazy.Rainbow, so its red stitches and bones may flicker: Config/SkinAnimate.luau)
+			Animate = {
+				{ Effect = "Wobble", Target = "Head", Speed = 0.4, Amount = 1.5 },
+				{ Effect = "Flicker", Target = "Accents", Every = 0.12 },
+			} :: { any }, -- (effects differ in shape)
+			Motion = "Ghost",
 		},
 	},
 

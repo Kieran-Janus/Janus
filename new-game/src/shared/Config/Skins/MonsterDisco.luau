@@ -315,6 +315,19 @@ return {
 				Count = 5,
 				Effect = "DiscoInferno",
 			},
+			Animate = {
+				{ Effect = "Wobble", Target = "Cape", Speed = 2, Amount = 1.5 },
+				{ Effect = "Bob", Target = "Head", Speed = 2 },
+				{ Effect = "Spin", Target = "Part:MirrorTile" },
+				{
+					Effect = "ColorCycle",
+					Target = "Glow",
+					Speed = 2,
+					Colors = { rgb(255, 120, 255), rgb(120, 255, 255), rgb(255, 255, 120) },
+				},
+				{ Effect = "SparkleBurst", Every = 2, Count = 15 },
+			} :: { any }, -- (effects differ in shape)
+			Motion = "Proud",
 		},
 	},
 } :: { any }

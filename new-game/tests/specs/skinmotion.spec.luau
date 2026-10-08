@@ -150,3 +150,465 @@ describe("SkinMotion: presets and checking", function()
 		local _ = DanceMoves
 	end)
 end)
+
+-- Server: the character attributes ---------------------------------------------------------------
+
+describe("Walk styles on the server (Cosmetics)", function()
+	it(
+		"sets SkinMotion / SkinMotionIds when a skin goes on and clears them when it comes off",
+		function()
+			local Cosmetics = rt:require("ReplicatedStorage.Shared.Cosmetics")
+			local player = rt:addPlayer({ Name = "Strider" })
+			local character = player.Character
+			local item = {
+				Id = "Test_Strider",
+				Slot = "Skin",
+				Rarity = "Rare",
+				Style = {
+					Kind = "Skin",
+					BodyColor = rt.env.Color3.new(1, 0, 0),
+					Motion = { Preset = "Zombie", Run = 99 },
+				},
+			}
+			Cosmetics.Wear(character, item)
+			expect(character:GetAttribute("SkinMotion")).toBe("Zombie")
+			expect(character:GetAttribute("SkinMotionIds")).toBe("Run=99")
+			-- another skin without a walk style clears them
+			Cosmetics.Wear(
+				character,
+				rt:require("ReplicatedStorage.Shared.Items").Get("Pumpkin_PumpkinSpice")
+			)
+			expect(character:GetAttribute("SkinMotion")).toBeNil()
+			Cosmetics.Wear(character, item)
+			Cosmetics.TakeOff(character, "Skin")
+			expect(character:GetAttribute("SkinMotion")).toBeNil()
+			expect(character:GetAttribute("SkinMotionIds")).toBeNil()
+		end
+	)
+end)
+
+-- Client (src/client/SkinWalk.luau) -----------------------------------------------------------------
+
+local Dom = require("../harness/Dom")
+local CFrame = rt.env.CFrame
+
+type Client = { rt: any, env: any, Config: any, SkinWalk: any, gui: any, me: any }
+
+local function client(opts: { phone: boolean?, mount: boolean?, studio: boolean? }?): Client
+	local o = opts or {}
+	local c = Runtime.new({ client = true, studio = o.studio })
+	local cenv = c.env
+	local player = c.game:GetService("Players").LocalPlayer
+	local gui = c:create("ScreenGui", { Name = "GameUI" }, player:WaitForChild("PlayerGui"))
+	local Client = c:find("StarterPlayer.StarterPlayerScripts.Client")
+	if o.phone then
+		gui:SetAttribute("ForceTouch", true)
+		Dom.rawSet(gui, "AbsoluteSize", cenv.Vector2.new(640, 302))
+	end
+	c:require(Client.Layout).Mount(gui)
+	c.workspace.CurrentCamera.CFrame =
+		cenv.CFrame.lookAt(cenv.Vector3.new(0, 5, -30), cenv.Vector3.new(0, 3, 0))
+	local SkinWalk = c:require(Client.SkinWalk)
+	if o.mount ~= false then
+		SkinWalk.Mount(gui)
+	end
+	return {
+		rt = c,
+		env = cenv,
+		Config = c:require("ReplicatedStorage.Shared.Config"),
+		SkinWalk = SkinWalk,
+		gui = gui,
+		me = player,
+	}
+end
+
+local R15_JOINTS = {
+	Root = { "LowerTorso", "Root" },
+	Waist = { "UpperTorso", "Waist" },
+	Neck = { "Head", "Neck" },
+	LeftShoulder = { "LeftUpperArm", "LeftShoulder" },
+	RightShoulder = { "RightUpperArm", "RightShoulder" },
+	LeftElbow = { "LeftLowerArm", "LeftElbow" },
+	RightElbow = { "RightLowerArm", "RightElbow" },
+	LeftHip = { "LeftUpperLeg", "LeftHip" },
+	RightHip = { "RightUpperLeg", "RightHip" },
+	LeftKnee = { "LeftLowerLeg", "LeftKnee" },
+	RightKnee = { "RightLowerLeg", "RightKnee" },
+}
+
+-- A rig with a root, a Humanoid + Animator and the Motor6Ds DanceMoves knows (R6 C0s turned
+-- like Roblox's), standing at (x, 3, z), for `player` (a new one when nil).
+local function rigFor(
+	c: Client,
+	name: string,
+	kind: string,
+	x: number,
+	z: number,
+	player: any?
+): (any, any)
+	local CF, V3 = c.env.CFrame, c.env.Vector3
+	local m = c.rt:create("Model", { Name = name })
+	local root = c.rt:create(
+		"Part",
+		{ Name = "HumanoidRootPart", Size = V3.new(2, 2, 1), CFrame = CF.new(x, 3, z) },
+		m
+	)
+	m.PrimaryPart = root
+	local humanoid = c.rt:create("Humanoid", {}, m)
+	humanoid.RigType = if kind == "R6"
+		then c.env.Enum.HumanoidRigType.R6
+		else c.env.Enum.HumanoidRigType.R15
+	c.rt:create("Animator", {}, humanoid)
+	local function motor(partName: string, jointName: string, c0: any)
+		local p = m:FindFirstChild(partName)
+			or c.rt:create("Part", { Name = partName, Size = V3.one, CFrame = CF.new(x, 3, z) }, m)
+		c.rt:create("Motor6D", { Name = jointName, C0 = c0 }, p)
+	end
+	if kind == "R6" then
+		motor("HumanoidRootPart", "RootJoint", CF.new(0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0))
+		motor("Torso", "Neck", CF.new(0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 1, 0))
+		motor("Torso", "Left Shoulder", CF.new(-1, 0.5, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0))
+		motor("Torso", "Right Shoulder", CF.new(1, 0.5, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0))
+		motor("Torso", "Left Hip", CF.new(-1, -1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0))
+		motor("Torso", "Right Hip", CF.new(1, -1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0))
+	else
+		for _, w in R15_JOINTS do
+			motor(w[1], w[2], CF.new(0, 0.5, 0))
+		end
+	end
+	local p = player or c.rt:addPlayer({ Name = name .. "Player", character = false })
+	m.Parent = c.rt.workspace
+	p.Character = m
+	return p, m
+end
+
+local function joint(m: any, name: string): any
+	local where = R15_JOINTS[name]
+	return m[where[1]][where[2]]
+end
+
+local function anyPosed(m: any): boolean
+	for _, d in m:GetDescendants() do
+		if d:IsA("Motor6D") and d.Transform ~= CFrame.identity then
+			return true
+		end
+	end
+	return false
+end
+
+-- Animator.EvaluationThrottled for the tests: a runtime's `throttled` (true / false), or a
+-- "not a valid member" error like older Roblox clients (and the harness) give when unset.
+-- Animator:LoadAnimation also keeps the tracks it makes in the runtime's `loadedTracks`.
+-- Humanoid:GetState can be made to fail for other players' characters (`getStateTrap`).
+local LuneEnum = require("@lune/roblox").Enum
+Dom.define("Animator", {
+	EvaluationThrottled = {
+		get = function(_, d)
+			local value = d.world.throttled
+			if value == nil then
+				error("EvaluationThrottled is not a valid member of Animator")
+			end
+			return value
+		end,
+	},
+	LoadAnimation = function(self, animation)
+		local d = Dom.data(self)
+		local track = Dom.new(d.world, "AnimationTrack", true)
+		Dom.rawSet(track, "Animation", animation)
+		local log = d.world.loadedTracks
+		if log then
+			table.insert(log, track)
+		end
+		return track
+	end,
+})
+Dom.define("Humanoid", {
+	GetState = function(self)
+		local d = Dom.data(self)
+		local trap = d.world.getStateTrap
+		if trap then
+			trap(self)
+		end
+		return d.props.__State
+			or (
+				if (d.props.Health or Dom.get(self, "MaxHealth")) <= 0
+					then LuneEnum.HumanoidStateType.Dead
+					else LuneEnum.HumanoidStateType.Running
+			)
+	end,
+})
+
+describe("SkinWalk (client)", function()
+	it("does nothing with the feature off, and never waits", function()
+		local c = client({ mount = false })
+		c.Config.Features.WalkStyles = false
+		c.SkinWalk.Mount(c.gui)
+		local _, m = rigFor(c, "Off", "R15", 0, 10)
+		m:SetAttribute("SkinMotion", "Zombie")
+		c.rt:advance(1)
+		expect(anyPosed(m)).toBe(false)
+		expect(c.rt.listening.PreSimulation or 0).toBe(0)
+		expect(c.SkinWalk.Active()).toBe(0)
+	end)
+
+	it("poses R15 and R6 characters with every walk style, and lets go when it ends", function()
+		local c = client()
+		c.Config.SkinMotion.MaxCharacters = 20 -- (every rig here at once)
+		for i, name in SkinMotion.Names do
+			for _, kind in { "R15", "R6" } do
+				local _, m = rigFor(c, name .. kind, kind, (i % 4) * 4 - 6, 10 + i)
+				m:SetAttribute("SkinMotion", name)
+			end
+		end
+		c.rt:advance(1)
+		for _, d in c.rt.workspace:GetChildren() do
+			if d:GetAttribute("SkinMotion") then
+				if not anyPosed(d) then
+					error(d.Name .. " isn't posed")
+				end
+				for _, j in d:GetDescendants() do
+					if j:IsA("Motor6D") then
+						expect(finite(j.Transform)).toBe(true)
+					end
+				end
+				d:SetAttribute("SkinMotion", nil)
+			end
+		end
+		c.rt:advance(1)
+		for _, d in c.rt.workspace:GetChildren() do
+			if
+				d:IsA("Model")
+				and d:FindFirstChildOfClass("Humanoid")
+				and d.Name ~= "LocalPlayer"
+			then
+				expect(anyPosed(d)).toBe(false)
+			end
+		end
+		expect(c.rt.listening.PreSimulation or 0).toBe(0) -- nothing left to do: no frame loop
+	end)
+
+	it("adds on top of Roblox's walk without building up, every frame", function()
+		-- `throttled`: nil = this Roblox can't say (the fallback guess), else EvaluationThrottled
+		local function proud(throttled: boolean?): (any, any, (number) -> any)
+			local c = client()
+			c.rt.throttled = throttled
+			local _, m = rigFor(c, "Proud", "R15", 0, 10)
+			m:SetAttribute("SkinMotion", "Proud") -- every joint in Add mode
+			local waist = joint(m, "Waist")
+			local DanceMovesC = c.rt:require("ReplicatedStorage.Shared.DanceMoves")
+			local SkinMotionC = c.rt:require("ReplicatedStorage.Shared.SkinMotion")
+			local function pose(): any
+				local t = c.rt.workspace:GetServerTimeNow()
+				return DanceMovesC.Local(waist, SkinMotionC.Pose("Proud", t, 0).Waist.Turn)
+			end
+			return c, waist, pose
+		end
+		-- The fallback guess. 1: nobody else writes the joint: it holds exactly the pose.
+		local c, waist, pose = proud(nil)
+		c.rt:advance(1) -- (faded in)
+		for _ = 1, 30 do
+			c.rt:advance(1 / 60)
+		end
+		expect(waist.Transform).toBeNear(pose(), 1e-4)
+		-- 2: "Roblox's walk" writes a new pose every frame: ours goes on top of it
+		local walk = CFrame.Angles(0.3, 0, 0)
+		for _ = 1, 10 do
+			waist.Transform = walk
+			c.rt:advance(1 / 60)
+			expect(waist.Transform).toBeNear(walk * pose(), 1e-4)
+		end
+		-- EvaluationThrottled readable: false = the joint holds Roblox's fresh pose this frame
+		c, waist, pose = proud(false)
+		c.rt:advance(1)
+		for _ = 1, 10 do
+			waist.Transform = walk
+			c.rt:advance(1 / 60)
+			expect(waist.Transform).toBeNear(walk * pose(), 1e-4)
+		end
+		-- true = Roblox skipped this frame: the base stays last frame's, whatever the joint holds
+		c.rt.throttled = true
+		for _ = 1, 5 do
+			waist.Transform = CFrame.Angles(-1, 0, 0)
+			c.rt:advance(1 / 60)
+			expect(waist.Transform).toBeNear(walk * pose(), 1e-4)
+		end
+	end)
+
+	it("writes every frame far away too, and Set mode replaces the walk", function()
+		local c = client()
+		local cfg = c.Config.SkinMotion
+		local _, m = rigFor(c, "FarZombie", "R15", 0, cfg.HalfRateDistance + 15)
+		m:SetAttribute("SkinMotion", "Zombie")
+		c.rt:advance(1)
+		local shoulder = joint(m, "RightShoulder")
+		local DanceMovesC = c.rt:require("ReplicatedStorage.Shared.DanceMoves")
+		local SkinMotionC = c.rt:require("ReplicatedStorage.Shared.SkinMotion")
+		for _ = 1, 10 do
+			shoulder.Transform = CFrame.Angles(-1, 0, 0) -- Roblox's arm swing
+			c.rt:advance(1 / 60)
+			expect(shoulder.Transform ~= CFrame.Angles(-1, 0, 0)).toBe(true)
+			-- Set: the arm is where the zombie pose puts it (maths at half rate: last or this frame)
+			local t = c.rt.workspace:GetServerTimeNow()
+			local now =
+				DanceMovesC.Local(shoulder, SkinMotionC.Pose("Zombie", t, 0).RightShoulder.Turn)
+			local before = DanceMovesC.Local(
+				shoulder,
+				SkinMotionC.Pose("Zombie", t - 1 / 60, 0).RightShoulder.Turn
+			)
+			local gap = math.min(
+				(shoulder.Transform.LookVector - now.LookVector).Magnitude,
+				(shoulder.Transform.LookVector - before.LookVector).Magnitude
+			)
+			expect(gap).toBeLessThan(1e-4)
+		end
+	end)
+
+	it("skips dancers, hiders, the seated, the dead and characters out of budget", function()
+		for _, onPhone in { false, true } do
+			local c = client({ phone = onPhone })
+			local cfg = c.Config.SkinMotion
+			local rigs = {}
+			for i = 1, 14 do
+				local p, m = rigFor(c, "Walker" .. i, "R15", 0, 4 + i * 4)
+				m:SetAttribute("SkinMotion", "Robot")
+				table.insert(rigs, { Player = p, Model = m })
+			end
+			c.rt:advance(1)
+			local limit = if onPhone then cfg.PhoneMaxCharacters else cfg.MaxCharacters
+			expect(c.SkinWalk.Active()).toBe(limit)
+			for i, r in rigs do
+				expect(anyPosed(r.Model)).toBe(i <= limit)
+			end
+			-- the closest four stop for their own reasons; the next ones take their places
+			rigs[1].Model:SetAttribute("Dance", "ZombieShuffle")
+			rigs[2].Player:SetAttribute("HideSeekRole", "Hider")
+			rigs[3].Model:FindFirstChildOfClass("Humanoid").Sit = true
+			rigs[4].Model:FindFirstChildOfClass("Humanoid").Health = 0
+			c.rt:flush()
+			expect(anyPosed(rigs[2].Model)).toBe(false) -- a hider stops at once
+			c.rt:advance(1)
+			for i = 1, 4 do
+				if i ~= 1 then -- (the dance itself would move the dancer's joints)
+					expect(anyPosed(rigs[i].Model)).toBe(false)
+				end
+			end
+			expect(c.SkinWalk.Active()).toBe(math.min(limit, #rigs - 4))
+		end
+	end)
+
+	it(
+		"never asks other players' Humanoids for their state, and fades them out in the air",
+		function()
+			local c = client()
+			local _, m = rigFor(c, "Jumper", "R15", 0, 10)
+			local mine = c.me.Character
+			c.rt.getStateTrap = function(humanoid)
+				if not humanoid:IsDescendantOf(mine) then
+					error("GetState called for another player's character")
+				end
+			end
+			m:SetAttribute("SkinMotion", "Zombie")
+			c.rt:advance(1)
+			expect(anyPosed(m)).toBe(true)
+			m.HumanoidRootPart.AssemblyLinearVelocity = c.env.Vector3.new(0, 40, 0) -- jumping
+			c.rt:advance(c.Config.SkinMotion.FadeSeconds + 0.1)
+			expect(anyPosed(m)).toBe(false)
+			m.HumanoidRootPart.AssemblyLinearVelocity = c.env.Vector3.zero -- landed
+			c.rt:advance(c.Config.SkinMotion.FadeSeconds + 0.1)
+			expect(anyPosed(m)).toBe(true)
+			c.rt.getStateTrap = nil
+			expect(#c.rt.errors).toBe(0)
+		end
+	)
+
+	it("keeps your own float and hop under OwnRootShiftMax (others see the full float)", function()
+		local c = client()
+		local cfg = c.Config.SkinMotion
+		local old = c.me.Character
+		local _, mine = rigFor(c, "Me", "R15", 0, 0, c.me)
+		old:Destroy()
+		local _, other = rigFor(c, "Ghosty", "R15", 3, 10)
+		mine:SetAttribute("SkinMotion", "Ghost")
+		other:SetAttribute("SkinMotion", "Ghost")
+		local mostMine, mostOther = 0, 0
+		for _ = 1, 120 do
+			c.rt:advance(1 / 30)
+			mostMine = math.max(mostMine, joint(mine, "Root").Transform.Position.Magnitude)
+			mostOther = math.max(mostOther, joint(other, "Root").Transform.Position.Magnitude)
+		end
+		expect(mostMine).toBeLessThanOrEqual(cfg.OwnRootShiftMax + 1e-6)
+		expect(mostOther).toBeGreaterThan(cfg.Presets.Ghost.Height * 0.8)
+	end)
+
+	it("plays your own uploaded walk, run and idle, and stops them when it should", function()
+		local c = client({ studio = true })
+		local cfg = c.Config.SkinMotion
+		c.rt.loadedTracks = {}
+		local _, mine = rigFor(c, "MyRig", "R15", 0, 0, c.me)
+		local root = mine.HumanoidRootPart
+		mine:SetAttribute("SkinMotionIds", "Walk=11;Run=22;Idle=33")
+		c.rt:advance(0.2)
+		local tracks = {}
+		for _, track in c.rt.loadedTracks do
+			Dom.rawSet(track, "Length", 1) -- (loaded)
+			tracks[string.match(track.Animation.AnimationId, "%d+")] = track
+		end
+		expect(tracks["11"] and tracks["22"] and tracks["33"]).toBeTruthy()
+		expect(tracks["11"].Priority).toBe(c.env.Enum.AnimationPriority.Movement)
+		expect(tracks["11"].Looped).toBe(true)
+		local function playing(): string
+			local list = {}
+			for id, track in tracks do
+				if track.IsPlaying then
+					table.insert(list, id)
+				end
+			end
+			table.sort(list)
+			return table.concat(list, ",")
+		end
+		c.rt:advance(0.1)
+		expect(playing()).toBe("33") -- standing still: idle
+		root.AssemblyLinearVelocity = c.env.Vector3.new(10, 0, 0)
+		c.rt:advance(0.1)
+		expect(playing()).toBe("11") -- walking
+		root.AssemblyLinearVelocity = c.env.Vector3.new(0, 0, cfg.RunSpeed + 5)
+		c.rt:advance(0.1)
+		expect(playing()).toBe("22") -- running
+		mine:FindFirstChildOfClass("Humanoid"):ChangeState(c.env.Enum.HumanoidStateType.Freefall)
+		c.rt:advance(0.1)
+		expect(playing()).toBe("") -- in the air: Roblox's own fall shows
+		mine:FindFirstChildOfClass("Humanoid"):ChangeState(c.env.Enum.HumanoidStateType.Running)
+		c.rt:advance(0.1)
+		expect(playing()).toBe("22")
+		-- becoming a hider stops them at once, and they don't start again while hiding
+		c.me:SetAttribute("HideSeekRole", "Hider")
+		c.rt:flush()
+		expect(playing()).toBe("")
+		local loads = #c.rt.loadedTracks
+		c.rt:advance(1)
+		expect(#c.rt.loadedTracks).toBe(loads)
+		c.me:SetAttribute("HideSeekRole", nil)
+		c.rt:advance(0.5)
+		expect(#c.rt.loadedTracks).toBe(loads + 3) -- loaded again
+		-- the skin comes off: everything stops
+		local again = c.rt.loadedTracks
+		mine:SetAttribute("SkinMotionIds", nil)
+		c.rt:advance(0.2)
+		for i = loads + 1, #again do
+			expect(again[i].IsPlaying).toBe(false)
+		end
+		-- an animation that never loads (not the owner's) is skipped, with one warning in Studio
+		mine:SetAttribute("SkinMotionIds", "Walk=44")
+		c.rt:advance(cfg.LoadCheckSeconds + 0.5)
+		local warnings = 0
+		for _, w in c.rt.warnings do
+			if string.find(w, "animation 44 didn't load", 1, true) then
+				warnings += 1
+			end
+		end
+		expect(warnings).toBe(1)
+		root.AssemblyLinearVelocity = c.env.Vector3.new(10, 0, 0)
+		c.rt:advance(0.2)
+		expect(c.rt.loadedTracks[#c.rt.loadedTracks].IsPlaying).toBe(false)
+	end)
+end)

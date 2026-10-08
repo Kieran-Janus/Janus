@@ -250,6 +250,10 @@ return {
 			GlowColor = rgb(110, 80, 50),
 			Glow = { Color = rgb(110, 80, 50), Brightness = 1.6 },
 			Aura = { Kind = "Smoke", Color = rgb(110, 80, 50), Color2 = rgb(120, 120, 110) },
+			Animate = {
+				{ Effect = "Flap", Target = "Wings", Speed = 0.7, Amount = 0.8 },
+			} :: { any }, -- (effects differ in shape)
+			Motion = "Zombie",
 		},
 	},
 	{

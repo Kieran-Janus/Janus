@@ -318,6 +318,12 @@ return {
 				Count = 5,
 				Effect = "BloodMoon",
 			},
+			Animate = {
+				{ Effect = "Wobble", Target = "Cape", Speed = 0.6, Amount = 0.8 },
+				{ Effect = "Breathe", Target = "Head", Amount = 1.5 },
+				{ Effect = "SparkleBurst", Every = 5, Count = 25 },
+			} :: { any }, -- (effects differ in shape)
+			Motion = "Bat",
 		},
 	},
 } :: { any }

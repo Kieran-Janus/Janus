@@ -27,6 +27,8 @@ local ORDER = {
 	"GhostUI",
 	"NpcDialogUI",
 	"Dances", -- Photo Spot dances on every character
+	"SkinAnim", -- skin pieces that move or change colour (Style.Animate) on every character
+	"SkinWalk", -- walk styles (Style.Motion: Zombie, Ghost...) on every character
 	"MinionFeedback",
 	"ShopUI",
 	"VipUI",

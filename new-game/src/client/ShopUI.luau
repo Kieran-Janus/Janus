@@ -649,13 +649,16 @@ function ShopUI.Mount(gui: ScreenGui)
 		table.insert(spins, spin)
 		local tag = rarityTag(item, frame)
 		local stop = function() end
+		if item.Slot == "Skin" or info.Rainbow then
+			-- moving pieces (Style.Animate) and CRAZY rainbow parts, while the card is in view
+			stop = SkinFx.AnimatePreview(model)
+		end
 		if info.Rainbow then
 			border.Color = Color3.new(1, 1, 1)
 			local gradient = Instance.new("UIGradient")
 			gradient.Color = rainbowSequence()
 			gradient.Parent = border
 			table.insert(shimmers, { Stroke = gradient, Tag = tag, Border = border })
-			stop = SkinFx.AnimatePreview(model)
 		elseif Items.Rarity(item) == "Rare" then
 			local gradient = Instance.new("UIGradient")
 			gradient.Name = "Shine"
