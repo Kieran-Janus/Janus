@@ -12,7 +12,8 @@
 	body dips when his legs are apart and rises over the planted foot (so the feet stay on the
 	floor), rolls a little side to side, and leans forward while chasing (attribute Mode). The
 	strides are as long as his legs allow (attribute LegLength), so faster = quicker steps,
-	never sliding feet. His arms swing against his legs, hanging low while he wanders and
+	never sliding feet. When he starts a chase he roars: rears back, throws his arms up and his
+	head spits a burst of embers. His arms swing against his legs, hanging low while he wanders and
 	stretched out with twitching claws while he chases. Standing still eases back to standing
 	straight.
 	Nothing runs per frame while no King is on the map.
@@ -31,6 +32,8 @@ type Walker = {
 	Phase: number,
 	Amount: number, -- 0 standing .. 1 full strides (eased)
 	Lean: number, -- eased chase lean, 0..1
+	Chasing: boolean, -- (to notice the moment he starts a chase)
+	RoarUntil: number, -- os.clock() when his roar (rearing back) ends
 }
 
 local walkers: { [Model]: Walker } = {}
@@ -89,6 +92,17 @@ function KingStride.CycleLength(legLength: number): number
 	return 4 * legLength * math.sin(math.rad(Config.King.Stride.Swing))
 end
 
+-- How far into his roar he is (0 = not roaring, 1 = reared right back), from the seconds of
+-- roar left: up quickly, then back down.
+function KingStride.Roar(remaining: number): number
+	local total = Config.King.Stride.RoarSeconds
+	if remaining <= 0 or total <= 0 then
+		return 0
+	end
+	local p = 1 - math.clamp(remaining / total, 0, 1)
+	return math.sin(p * math.pi)
+end
+
 local function step(dt: number)
 	local cfg = Config.King.Stride
 	local camera = workspace.CurrentCamera
@@ -113,8 +127,18 @@ local function step(dt: number)
 		walker.Phase = (walker.Phase + dt * speed / KingStride.CycleLength(legLength) * 2 * math.pi)
 			% (2 * math.pi)
 
+		-- The moment he starts a chase he rears back and his head spits embers (the roar).
+		if chasing and not walker.Chasing then
+			walker.RoarUntil = os.clock() + cfg.RoarSeconds
+			local embers = model:FindFirstChild("Embers", true)
+			if embers and embers:IsA("ParticleEmitter") and cfg.RoarEmbers > 0 then
+				embers:Emit(cfg.RoarEmbers)
+			end
+		end
+		walker.Chasing = chasing
 		local pose = KingStride.Pose(walker.Phase, walker.Amount, legLength)
-		local lean = math.rad(cfg.ChaseLean) * walker.Lean
+		local roar = KingStride.Roar(walker.RoarUntil - os.clock())
+		local lean = math.rad(cfg.ChaseLean) * walker.Lean - math.rad(cfg.RoarDegrees) * roar
 		-- Rotations about X: positive swings a leg forward (towards -Z, where he faces).
 		setTransform(
 			model,
@@ -127,7 +151,7 @@ local function step(dt: number)
 		setTransform(model, "RightKnee", CFrame.Angles(-pose.RightKnee, 0, 0))
 		-- Arms: lowered and swinging while he wanders, stretched out with twitching claws
 		-- while he chases you.
-		local lowered = -math.rad(cfg.ArmDrop) * (1 - walker.Lean)
+		local lowered = -math.rad(cfg.ArmDrop) * (1 - walker.Lean) + math.rad(cfg.RoarArms) * roar
 		local twitch = math.rad(cfg.ArmTwitch) * walker.Lean * math.sin(os.clock() * 13)
 		setTransform(model, "LeftShoulder", CFrame.Angles(lowered + pose.LeftArm + twitch, 0, 0))
 		setTransform(model, "RightShoulder", CFrame.Angles(lowered + pose.RightArm - twitch, 0, 0))
@@ -146,7 +170,14 @@ end
 
 local function add(instance: Instance)
 	if instance:IsA("Model") and not walkers[instance] then
-		walkers[instance] = { Model = instance, Phase = 0, Amount = 0, Lean = 0 }
+		walkers[instance] = {
+			Model = instance,
+			Phase = 0,
+			Amount = 0,
+			Lean = 0,
+			Chasing = false,
+			RoarUntil = 0,
+		}
 		refresh()
 	end
 end

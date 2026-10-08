@@ -399,6 +399,12 @@ local Config = {
 			ArmSwing = 14,
 			ArmDrop = 38,
 			ArmTwitch = 6,
+			-- His roar when he starts chasing you: he rears back RoarDegrees, throws his arms up
+			-- RoarArms degrees and bursts RoarEmbers sparks, over RoarSeconds.
+			RoarSeconds = 0.7,
+			RoarDegrees = 16,
+			RoarArms = 50,
+			RoarEmbers = 25,
 			Range = 250,
 		},
 		Path = {

@@ -219,7 +219,7 @@ No picture yet: you'll see it the moment you press Play.
 
 ### Fixes and polish (8 October)
 - **Spectating King Hunt looked blurry**: the map was only streamed around its middle, so far-off parts arrived as blurry low-detail versions. It now streams around the player (or King) you watch, and the lobby's soft far focus is off on the round maps.
-- **The Pumpkin King walks**: long strides with bending knees, a dip in each step and a lean when he chases you, drawn on each screen (`Config.King.Stride`). Always one King; he gets a little faster every 30 seconds (`Config.King.SpeedUp`). King Hunt on Easy lasts 3 minutes.
+- **The Pumpkin King walks**: long strides with bending knees, swinging arms, a dip in each step, a roar (rearing back, arms up, a burst of embers) the moment he spots you, and a lean with reaching claws while he chases you, drawn on each screen (`Config.King.Stride`). Always one King; he gets a little faster every 30 seconds (`Config.King.SpeedUp`). King Hunt on Easy lasts 3 minutes.
 - **Crate odds** read "6.1%", and anything under 1% reads "<1%" (`Config.Crates.SmallOdds`).
 - **Lighting** toned down a little (lobby and maps), the **floor signs** are gone, the **King statue** is the new King and sways.
 - **New Hide & Seek map: Midnight Market**: a small walled night market packed with stalls, crate stacks, barrels, sacks, hay and handcarts under strings of lanterns, with over 100 decoy pumpkins. The clutter, the decoys and the hider spawns move to new spots every round, so nobody can learn the hiding places (`Config/Maps/MidnightMarket.luau`: `Shuffle`, `Clutter`, `Decoys`). Seekers come out of the hut in the corner with their candy guns.

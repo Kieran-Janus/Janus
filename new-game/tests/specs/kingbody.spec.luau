@@ -171,6 +171,11 @@ describe("The Pumpkin King's walk and pace", function()
 		expect(still.LeftHip).toBe(0)
 		expect(still.Drop).toBe(0)
 		expect(KingStride.CycleLength(legLength) > 6).toBe(true)
+		-- His roar: rears back fully half way through, and not at all before or after.
+		local total = w.Config.King.Stride.RoarSeconds
+		expect(KingStride.Roar(0)).toBe(0)
+		expect(KingStride.Roar(total / 2)).toBeNear(1, 1e-6)
+		expect(KingStride.Roar(total) < 0.01).toBe(true)
 	end)
 
 	it("is one King on every difficulty, a little faster every 30 seconds, up to a cap", function()
@@ -219,5 +224,33 @@ describe("The King statue in the lobby", function()
 		local feet = figure:GetPivot().Position.Y
 		expect(top - feet > 12).toBe(true)
 		expect(figure:FindFirstChild("Head")).toBeTruthy()
+	end)
+end)
+
+describe("The Pumpkin King's roar on screen (client KingStride)", function()
+	it("rears back and throws his arms up the moment he starts chasing", function()
+		local rt = Runtime.new({ client = true })
+		local KingBody = rt:require("ServerScriptService.Server.Build.KingBody")
+		local model = KingBody.Build(rt.env.Vector3.new(0, 4, 0))
+		model.PrimaryPart.Anchored = true
+		model.Parent = rt.workspace
+		rt.game:GetService("CollectionService"):AddTag(model, "KingStride")
+		local KingStride = rt:require("StarterPlayer.StarterPlayerScripts.Client.KingStride")
+		KingStride.Mount(nil)
+		rt:advance(0.2)
+		local waist = model:FindFirstChild("Waist", true)
+		local shoulder = model:FindFirstChild("LeftShoulder", true)
+		local calmShoulder = select(1, shoulder.Transform:ToEulerAnglesXYZ())
+		model:SetAttribute("Mode", "Chase")
+		local Config = rt:require("ReplicatedStorage.Shared.Config")
+		rt:advance(Config.King.Stride.RoarSeconds / 2)
+		-- Reared back: the waist pitches backwards (positive X), the arms go up.
+		local pitch = select(1, waist.Transform:ToEulerAnglesXYZ())
+		expect(pitch > 0.05).toBe(true)
+		expect(select(1, shoulder.Transform:ToEulerAnglesXYZ()) > calmShoulder + 0.3).toBe(true)
+		rt:advance(2)
+		-- Then he leans forward into the chase.
+		expect(select(1, waist.Transform:ToEulerAnglesXYZ()) < 0).toBe(true)
+		expect(#rt.errors).toBe(0)
 	end)
 end)
