@@ -12,7 +12,7 @@ The `/next-milestone` command reads this file. Update the Status column when a m
 | M6 | Shop, pumpkin currency, saving, VIP pass and products | blocked | create gamepass/product IDs in Creator Hub |
 | V1 | Verify the overnight cloud work in Studio (run `/verify`): skins tab, custom models, codes, daily streak, invite, F8 admin panel, anti-teleport pumpkins | done | 2-player test (see notes) |
 | M7 | UI polish, thumbnails and icon, security audit, playtest | in progress | upload thumbnails, friends playtest |
-| V2 | v2 update: Ready pad, 3 modes and 5 maps, lobby redesign, parkour, Candy Rush, Web Scour, secret pumpkins, rarity prices, about 630 skins and 34 crates, top-left Menu, witch/Boo Guide/tutorial removed, Pumpkin Vendor fix (see `docs/V2-CHANGES.md`) | in progress: Studio checks passed 6 Oct (solo, 2 players, phone, tablet) and 8 Oct (7 Oct additions, 3-player ScareMaze); phone look at the 7 Oct animations to do | yes: Robux ids, friends test |
+| V2 | v2 update: Ready pad, 3 modes and 5 maps, lobby redesign, parkour, Candy Rush, Web Scour, secret pumpkins, rarity prices, about 630 skins and 34 crates, top-left Menu, witch/Boo Guide/tutorial removed, Pumpkin Vendor fix (see `docs/V2-CHANGES.md`) | in progress: Studio checks passed 6 Oct (solo, 2 players, phone, tablet) and 8 Oct (7 Oct additions, 3-player ScareMaze); phone look at the 7 Oct animations to do | yes: publish, a live test purchase, friends test |
 | Launch | Set the experience public on 20 October | todo | yes: only the owner does this |
 
 Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a note below).
@@ -110,7 +110,7 @@ All of this is in git and passes the offline tests (`lune run tests/run`). Guide
 - New store thumbnails and icon from renders of the real game, in the repo's top-level `thumbnails/output/pumpkin-panic-v2/` folder (outside `new-game`; `thumbnails/README.md` says where each goes on Creator Hub).
 
 **Still needs Kieran:**
-1. **Robux products:** done 8 Oct through Open Cloud: the 3 coin packs (Pumpkin Pouch, Cart, Mountain) and all 34 crates are on sale, ids in Config. Still to do: the **VIP pass** (the API key needs the Game Passes permission), then a test purchase in a live server. Then M6 can be `done`.
+1. **Robux products:** done 8 Oct through Open Cloud: the VIP pass (249), the 3 coin packs (Pumpkin Pouch, Cart, Mountain) and all 34 crates are on sale, ids in Config, prices checked in Studio. Still to do: one test purchase in a live server (after publishing). Then M6 can be `done`.
 2. **Publish** the place (File > Publish to Roblox) and buy one cheap product in a live server.
 3. **A friends test** on the published game (voice, ghost modes, Candy Rush races, crates on real phones).
 4. ~~ScareMaze with 3 players~~ done 8 Oct (below).

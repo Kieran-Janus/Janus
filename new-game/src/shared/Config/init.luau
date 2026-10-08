@@ -1434,7 +1434,7 @@ local Config = {
 	-- and pastes them here; with an ID of 0 the shop shows "Coming soon" and nothing prompts.
 	-- Step by step: docs/V2-CHANGES.md > "Robux setup". Crate ids go in Config/Crates.luau.
 	Monetization = {
-		VipGamePassId = 0,
+		VipGamePassId = 2018384338,
 		VipName = "VIP",
 		VipSuggestedRobux = 249, -- for reference only; the real price is set in Creator Hub
 		-- The paid gameplay edge (docs/DESIGN.md): kept modest so free players aren't left behind.
