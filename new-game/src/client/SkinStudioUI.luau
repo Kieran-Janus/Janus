@@ -491,9 +491,7 @@ local function updateChecks()
 	end
 	local err = errorLabel
 	if err then
-		err.Text = if #checks.Errors > 0
-			then "✕ " .. table.concat(checks.Errors, "\n✕ ")
-			else ""
+		err.Text = if #checks.Errors > 0 then "X " .. table.concat(checks.Errors, "\nX ") else ""
 		err.Visible = #checks.Errors > 0
 	end
 end
@@ -744,7 +742,7 @@ local function entries(): { Entry }
 				Name = item.Name,
 				Theme = item.Theme,
 				Rarity = item.Rarity,
-				Icons = "✎ " .. iconsFor(item) .. " (not saved)",
+				Icons = "Draft " .. iconsFor(item) .. " (not saved)",
 				Item = item,
 			})
 		end
@@ -759,7 +757,7 @@ local function entries(): { Entry }
 			Name = summary.Name,
 			Theme = summary.Theme,
 			Rarity = summary.Rarity,
-			Icons = "✎" .. (if summary.InGameFiles then " ✓" else ""),
+			Icons = "Draft" .. (if summary.InGameFiles then " ✓" else ""),
 			Item = state and state:Peek(),
 		})
 	end
@@ -917,7 +915,7 @@ local function popover(title: string, build: (body: Frame, close: () -> ()) -> (
 	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	titleLabel.Position = UDim2.fromOffset(12, 4)
 	titleLabel.Size = UDim2.new(1, -(row() + 24), 0, row())
-	local close = makeButton(pop, "✕", Color3.fromRGB(140, 40, 40))
+	local close = makeButton(pop, "X", Color3.fromRGB(140, 40, 40))
 	close.Name = "Close"
 	close.AnchorPoint = Vector2.new(1, 0)
 	close.Position = UDim2.new(1, -6, 0, 4)
@@ -1681,7 +1679,7 @@ local function renderSave(content: ScrollingFrame)
 		local draftLine = line(content, "Draft_" .. summary.DraftId, 20 + i)
 		local open = makeButton(
 			draftLine,
-			("✎ %s (%s)%s"):format(
+			("Draft: %s (%s)%s"):format(
 				summary.Name,
 				summary.SkinId,
 				if summary.InGameFiles then " ✓ " .. text().InGameFiles else ""
@@ -1883,7 +1881,7 @@ local function build(gui: ScreenGui): Ui
 	-- header: the preview, the skin's name, what you wear (PC), Wear on me, close
 	local header = plain("Header", panel)
 	header.Size = UDim2.new(1, 0, 0, math.max(headerHeight, topHeight))
-	local close = squareButton("✕", header)
+	local close = squareButton("X", header)
 	close.Name = "Close"
 	close.BackgroundColor3 = Color3.fromRGB(140, 40, 40)
 	close.AnchorPoint = Vector2.new(1, 0)
@@ -2011,9 +2009,9 @@ local function build(gui: ScreenGui): Ui
 		b.TextTruncate = Enum.TextTruncate.AtEnd
 		return b
 	end
-	local undo = footerButton("↶ Undo", 1)
+	local undo = footerButton("Undo", 1)
 	undo.Name = "Undo"
-	local redo = footerButton("↷ Redo", 2)
+	local redo = footerButton("Redo", 2)
 	redo.Name = "Redo"
 	local reset = footerButton("Reset", 3)
 	reset.Name = "Reset"

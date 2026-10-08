@@ -322,19 +322,19 @@ Skin Studio is a skin editor for you (admins) in a Studio playtest. Players neve
 8. **Glow** and **Particles** (Rare and up): the light's colour, brightness and range, and the particle kind (Sparkles, Embers, Bubbles...) with its two colours.
 9. **CRAZY** (CRAZY skins only): rainbow, pulse, the pieces orbiting you and how many, and a special effect.
 
-Every row has a **?** button that explains it. Yellow lines are warnings (allowed, but the tests would complain). A red line at the top is an error: fix it, or press **↶ Undo**.
+Every row has a **?** button that explains it. Yellow lines are warnings (allowed, but the tests would complain). A red line at the top is an error: fix it, or press **Undo**.
 
 **Make it move (Animate tab)**
 
 10. Press **+ Add animation**. Choose the **Effect** (what it does: Flap, Wag, Spin, Pulse...) and the **Target** (what it moves: Head, Wings, Tail, Cape, Glow...). Every effect is in [the table below](#every-animation-effect). A greyed-out target tells you why it can't be used: for example, the skin has no Wings pattern yet, or CRAZY already controls it.
-11. Set **Speed**, **Amount** and **Delay**, and the effect's own settings (Axis, Colours, Every, Count). ▲ and ▼ change the order, ✕ removes one. Uncommon skins get 1 animation, Rare 3, CRAZY 6.
+11. Set **Speed**, **Amount** and **Delay**, and the effect's own settings (Axis, Colours, Every, Count). ▲ and ▼ change the order, X removes one. Uncommon skins get 1 animation, Rare 3, CRAZY 6.
 12. **Walk style** (Rare and CRAZY): pick Zombie, Mummy, Ghost, Robot, Bat, Sneaky, Bouncy or Proud ([table](#every-walk-style)). **▶ Use my own animations** takes the ids of walk, run and idle animations you uploaded.
 
 **See it on you**
 
 13. With **Wear on me** ticked (at the top of the panel), your character wears the skin a moment after every change, animations and walk style included. Walk, run and jump. Go to the Photo Spot and dance.
 14. **🎥 Turn** circles the camera round you so you see every side. Press it again to stop. The small preview at the top turns too.
-15. **↶ Undo**, **↷ Redo** and **Reset** (back to how the skin was when you opened it) are at the bottom. Closing the panel loses nothing: open it again and it's all still there.
+15. **Undo**, **Redo** and **Reset** (back to how the skin was when you opened it) are at the bottom. Closing the panel loses nothing: open it again and it's all still there.
 
 **Save it and put it in the game**
 
@@ -753,7 +753,7 @@ Only if you still want drafts kept after Stop: turn on API access (knowing the a
 | "Animation didn't load" (Output, `[SkinWalk]`) | An uploaded walk/run/idle animation must be owned by you (or your group, if the game is a group game) or made by Roblox. A slow download isn't a failure: the game waits up to `LoadGiveUpSeconds` (30, `Config.SkinMotion`) before giving one up. |
 | "Not an allowed creator" | That catalog item isn't made by Roblox, you or your group (`Config.SkinCatalog.AllowedCreators`). |
 | "This skin's rarity is locked" | Players already own this skin: press "Unlock rarity, crate and price" only if you really mean to change it. |
-| A red ✕ line in the Look tab | Something can't be used (for example a pattern that doesn't exist). Fix it or press Undo. |
+| A red X line in the Look tab | Something can't be used (for example a pattern that doesn't exist). Fix it or press Undo. |
 
 ---
 

@@ -479,6 +479,17 @@ local function r6Character(name: string): any
 	for _, className in { "BodyColors", "Shirt", "Pants" } do
 		rt:create(className, {}, m)
 	end
+	-- Like Roblox: taking BodyColors out of an R6 character repaints every body part on the spot
+	-- (so a skin must put it away before painting, or its colours are lost).
+	m.ChildRemoved:Connect(function(child)
+		if child:IsA("BodyColors") then
+			for _, part in m:GetChildren() do
+				if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+					part.Color = skin
+				end
+			end
+		end
+	end)
 	rt:create("Humanoid", {}, m)
 	m.PrimaryPart = root
 	return m

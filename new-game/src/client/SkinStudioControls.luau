@@ -1127,7 +1127,7 @@ function Controls.Effects(parent: Instance, ctx: Context): Control
 			pad.PaddingLeft = UDim.new(0, 4)
 			pad.PaddingRight = UDim.new(0, 4)
 			pad.Parent = card
-			-- title line: number, ✕ ▲ ▼
+			-- title line: number, X ▲ ▼
 			local title = Instance.new("Frame")
 			title.Name = "Title"
 			title.BackgroundTransparency = 1
@@ -1136,18 +1136,18 @@ function Controls.Effects(parent: Instance, ctx: Context): Control
 			hlist(title)
 			local l = label(title, ("Animation %d"):format(i), ctx, Theme.Selected)
 			l.Size = UDim2.new(1, -3 * (ctx.Row + 4), 1, 0)
-			for order, action in { "▲", "▼", "✕" } do
+			for order, action in { "▲", "▼", "X" } do
 				local b = button(
 					title,
 					action,
 					ctx,
-					if action == "✕" then Color3.fromRGB(140, 40, 40) else OFF
+					if action == "X" then Color3.fromRGB(140, 40, 40) else OFF
 				)
-				b.Name = ({ ["▲"] = "MoveUp", ["▼"] = "MoveDown", ["✕"] = "RemoveEffect" })[action]
+				b.Name = ({ ["▲"] = "MoveUp", ["▼"] = "MoveDown", ["X"] = "RemoveEffect" })[action]
 				b.LayoutOrder = 10 + order
 				b.Activated:Connect(function()
 					local now = list()
-					if action == "✕" then
+					if action == "X" then
 						table.remove(now, i)
 					elseif action == "▲" and i > 1 then
 						now[i], now[i - 1] = now[i - 1], now[i]
@@ -1528,7 +1528,7 @@ function Controls.Catalog(parent: Instance, ctx: Context): Control
 			end
 			local l = label(line, words, ctx)
 			l.Size = UDim2.new(1, -(ctx.Row * 2 + 16), 1, 0)
-			local remove = button(line, "✕", ctx, Color3.fromRGB(140, 40, 40))
+			local remove = button(line, "X", ctx, Color3.fromRGB(140, 40, 40))
 			remove.Name = "RemoveItem"
 			remove.Activated:Connect(function()
 				local now = catalog()

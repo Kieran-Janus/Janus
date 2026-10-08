@@ -1963,14 +1963,22 @@ end
 
 local function wearSkin(character: Model, item: any, head: BasePart, root: BasePart): boolean
 	local style = item.Style
-	if paintBody(character, style, true) then
-		-- BodyColors would paint the avatar's own colours back.
+	-- BodyColors would paint the avatar's own colours back, so it goes first: on R6, taking it
+	-- out repaints every body part on the spot, which would undo the skin's colours.
+	local recolours = false
+	for _, key in { "BodyColor", "TorsoColor", "ArmsColor", "LegsColor", "HeadColor" } do
+		if typeof(style[key]) == "Color3" then
+			recolours = true
+		end
+	end
+	if recolours then
 		for _, child in character:GetChildren() do
 			if child:IsA("BodyColors") then
 				child.Parent = stashIn(character)
 			end
 		end
 	end
+	paintBody(character, style, true)
 	if style.HideClothes then
 		for _, child in character:GetChildren() do
 			if child:IsA("Clothing") or child:IsA("ShirtGraphic") then
