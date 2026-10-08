@@ -194,9 +194,11 @@ end
 	deps    { Schema = SkinSchema, Export = SkinExport, Config = Config, Items = Items,
 	          Decode = function(text) -> table (JSON), ReadTheme = function(themeId) -> text? }
 	options { Only = { [Id] = true }? }
-	Returns { Damaged = string?, Refused = { { Id, Why } }, Warnings = { string },
+	Returns { Damaged = string?, Refused = { { Id, Why, Note? } }, Warnings = { string },
 	          Economy = { string }, Files = { [themeId] = { Before, After, CountsBefore,
-	          CountsAfter, Changes = { { Id, Action } } } } }
+	          CountsAfter, Changes = { { Id, Action, Note?, Sum } } } } }
+	Note is the draft's "note for Claude Code" from Skin Studio's Save tab; Sum is the draft's
+	checksum, for SkinExport.MarkWritten once the files are written.
 ]]
 function SkinFile.Plan(pages: { any }, deps: any, options: any?): any
 	local plan = { Damaged = nil, Refused = {}, Warnings = {}, Economy = {}, Files = {} }
@@ -221,17 +223,18 @@ function SkinFile.Plan(pages: { any }, deps: any, options: any?): any
 				)
 				return plan
 			end
-			table.insert(drafts, entry.Text)
+			table.insert(drafts, { Text = entry.Text, Sum = entry.Sum })
 		end
 	end
+	local notes: { [string]: string } = {} -- skin Id -> the draft's note
 	local function refuse(id: any, why: string)
-		table.insert(plan.Refused, { Id = tostring(id), Why = why })
+		table.insert(plan.Refused, { Id = tostring(id), Why = why, Note = notes[tostring(id)] })
 	end
 	-- 2. decode and check each draft (the Luau is always made again from the checked data)
 	local accepted = {}
 	local seen: { [string]: number } = {}
-	for _, text in drafts do
-		local ok, record = pcall(deps.Decode, text)
+	for _, draft in drafts do
+		local ok, record = pcall(deps.Decode, draft.Text)
 		if not ok or type(record) ~= "table" or record.Deleted then
 			continue
 		end
@@ -240,12 +243,15 @@ function SkinFile.Plan(pages: { any }, deps: any, options: any?): any
 		if only and not only[tostring(id)] then
 			continue
 		end
+		if type(record.Note) == "string" and record.Note ~= "" then
+			notes[tostring(id)] = record.Note
+		end
 		if not item then
 			refuse(id, table.concat(errors, "; "))
 			continue
 		end
 		seen[item.Id] = (seen[item.Id] or 0) + 1
-		table.insert(accepted, { Record = record, Item = item })
+		table.insert(accepted, { Record = record, Item = item, Sum = draft.Sum })
 	end
 	local approved = if type(Config.SkinCatalog) == "table"
 		then Config.SkinCatalog.ApprovedIds or {}
@@ -363,7 +369,7 @@ function SkinFile.Plan(pages: { any }, deps: any, options: any?): any
 		for _, text in warnings do
 			table.insert(plan.Warnings, item.Id .. ": " .. text)
 		end
-		table.insert(ready, { Item = item, Existing = existing ~= nil })
+		table.insert(ready, { Item = item, Existing = existing ~= nil, Sum = draft.Sum })
 	end
 	-- 3. edit each theme file
 	for _, draft in ready do
@@ -390,10 +396,20 @@ function SkinFile.Plan(pages: { any }, deps: any, options: any?): any
 		local newText, problem
 		if SkinFile.Find(file.After, draft.Item.Id) then
 			newText, problem = SkinFile.Replace(file.After, draft.Item.Id, code)
-			table.insert(file.Changes, { Id = draft.Item.Id, Action = "replaced" })
+			table.insert(file.Changes, {
+				Id = draft.Item.Id,
+				Action = "replaced",
+				Note = notes[draft.Item.Id],
+				Sum = draft.Sum,
+			})
 		else
 			newText, problem = SkinFile.Insert(file.After, draft.Item.Rarity, code)
-			table.insert(file.Changes, { Id = draft.Item.Id, Action = "added" })
+			table.insert(file.Changes, {
+				Id = draft.Item.Id,
+				Action = "added",
+				Note = notes[draft.Item.Id],
+				Sum = draft.Sum,
+			})
 		end
 		if not newText then
 			table.remove(file.Changes)

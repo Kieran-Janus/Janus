@@ -190,7 +190,7 @@ A part, or a Model grouping several parts, anywhere inside `ReplicatedStorage.Cu
   - The server builds one pivot per marked Part or Model with a **motion** effect. It copies the attributes onto the `AnimPivot` (`AnimGroup = "Custom:<n>"`, `n` in `SkinIndex` order) so clients read them there. The pivot chains to the Head pivot when the head piece moves (3.4).
   - A **colour** mark needs no pivot: the client reads it from the marked part itself (it has `SkinPart = "Head"`).
   - The rest of the model is welded to the head as today.
-- **Validation:** values go through `SkinAnimate.Normalize`. Bad values are ignored, and only Skin Studio (6.9) shows a warning.
+- **Validation:** values go through the same checks as `SkinAnimate.Normalize` (`SkinAnimate.CheckAttributes`). Names are exact (`Spin`, not `spin`) and numbers must be Number attributes in range. **One bad value drops that part's whole mark** (it doesn't move), never a script error. `SkinAnimate.ModelProblems(model)` says why in plain words: Skin Studio's Animate tab shows them as warnings, and in Studio the server warns once per problem when the skin is worn (`[Cosmetics] your model <Id>: ...`).
 - **Limits:**
   - These effects don't count toward rarity limits (it's Kieran's own model).
   - They do count toward `MaxPivots` and the 120-part budget.
@@ -397,7 +397,7 @@ SkinWalk.Active() -> number
 
   - **Replication:** Roblox replicates your Animator's tracks to everyone.
   - **Stopping:** stop and destroy all of them when the attribute clears, the character changes, you start a dance, or **your `HideSeekRole` becomes `"Hider"`** (watch the attribute; never start them while you are a hider).
-  - **Load check:** after `LoadCheckSeconds`, a track with `Length == 0` counts as not loaded. It is skipped, and in Studio there is one `warn`: `[SkinWalk] animation 123 didn't load: is it owned by the game's owner?`.
+  - **Load check:** `Length` stays 0 until Roblox has downloaded an animation, so a slow download (a phone joining) is waited for, never mistaken for a failure. The tracks are also preloaded with `ContentProvider:PreloadAsync`; a track is skipped only when Roblox reports `AssetFetchStatus.Failure` for it, or when it still has `Length == 0` after `LoadGiveUpSeconds` (30). Then a missing Run falls back to the Walk, and in Studio there is one `warn`: `[SkinWalk] animation 123 didn't load: is it owned by the game's owner?`.
 
 ### 4.4 `Config.SkinMotion` (`src/shared/Config/SkinMotion.luau`, builder A)
 ```lua
@@ -409,7 +409,7 @@ return {
 	WalkThreshold = 0.5, RunSpeed = 20, -- studs/s
 	AirSpeed = 10, -- studs/s up or down: other players' walk style fades out (jumping, falling, climbing)
 	OwnRootShiftMax = 0.2, -- studs: your own character never floats or hops higher than this (ceilings)
-	LoadCheckSeconds = 3,
+	LoadGiveUpSeconds = 30, -- a still-unloaded uploaded animation is skipped after this (a failed one at once)
 	Presets = { Zombie = { ArmsForward = 85, Lean = 8, HeadTilt = 12, Seconds = 1.1 }, Ghost = { Height = 0.8, Bob = 0.25, Seconds = 2.4 }, ... },
 }
 ```
@@ -599,10 +599,12 @@ The panel **docks to the right edge** so your real character stays visible on th
 └────────────────────────────────────────────┘
 ```
 - **Phone** (`Layout.IsPhone()`, checked in Studio's device emulator):
-  - a bottom sheet, full width and `PhoneHeightScale` (0.55) of the screen high
+  - `IsPhone` means a short touch screen, so the phone is on its side. The default camera keeps your character in the **middle** of the screen, so a bottom sheet would hide it. Instead the panel is a **column down the right**, full height, `PhoneWidthScale` (0.5) of the screen wide (`PhoneMinWidth` 340 to `PhoneMaxWidth` 460): at most half your character is behind it
+  - the small turning preview (`PhonePreviewSize`) sits just **left of the panel**, `PhonePreviewTop` down (below the round info), so the whole skin is always in view; 🎥 Turn turns the camera sideways so your character stands in the middle of the free part of the screen
   - it does **not** call `Layout.Fit` (which can shrink a panel to 0.3 scale and break the 44 px rule); it is sized from the screen instead
-  - the same tabs; the header preview is hidden (your real character is above the sheet)
-  - every control at least 44 px tall on screen; slider buttons step by ±1 and ±10
+  - rows: name + Wear on me + ✕, then the tabs, the content, and a footer that is just the buttons (`PhoneFooterHeight` 48): room for two whole controls on a 667x339 screen
+  - every message (each **?** help, errors, confirmations) pops up whole in a wrapped **bubble** above the footer for `StatusSeconds` (tap to close); the drafts reminder sits at the top of the Save tab and in the toast on closing
+  - every control at least 44 px tall on screen; slider buttons step by ±1 and ±10, and a finger must move `DragDeadZone` px **sideways** before a slider moves (moving up or down first scrolls the list; it holds still while a slider is dragged)
 - **Tabs:**
 
   | Tab | Contents |
@@ -740,7 +742,7 @@ function ShopService.SetSkinOverride(player: Player, item: any?)
 function ShopService.SkinOverride(player: Player): any?
 ```
 - In `Dress`: for slot `"Skin"`, if there is an override, `Cosmetics.Wear(character, override)` and skip the saved skin.
-- `PlayerRemoving` clears it.
+- `PlayerRemoving` clears it, and so does choosing a skin yourself: `BuyItem` of a skin and `EquipItem` for the `"Skin"` slot (Shop, Menu > Skins, a crate's Equip) clear the override before `Dress`, so what you chose is what you wear. `Hello` then answers `Wearing = nil`. The draft is worn on the server, so everyone in the server sees it.
 - The hider early-return stays first.
 
 ### 6.8 Saving to the game files
@@ -756,8 +758,8 @@ function ShopService.SkinOverride(player: Player): any?
       - **a. Built-in MCP:** `get_studio_state`. If a playtest is running, `execute_luau` with `datamodel_type = "Server"`: `return require(game:GetService("ServerScriptService").Server.Tools.SkinExport).Count()`, then the same with `.Json(<page>)` for each page. If stopped: the same calls with `datamodel_type = "Edit"` (they read the DataStore, which only has drafts if `UseDataStore` was on and API access is enabled). If there's nothing there, ask Kieran to press Play, open Skin Studio and Save again, or to look in Output for the Stop print-out (step 2b).
       - **b. Older MCP, or as a fallback:** ask Kieran to press **Print for Claude** in the Save tab (or check that Output still shows the print-out made when he pressed Stop), then call `get_console_output` and take every page between `Config.SkinStudio.ExportMarkers`.
    3. Write each page, exactly as received, to `tests/out/skin-drafts/page-<n>.json` (git-ignored).
-   4. Run `lune run tests/save-skins -- tests/out/skin-drafts --dry-run` and show Kieran the plan: which file, added or replaced, warnings, economy changes, unapproved catalog ids, and the new rarity counts.
-   5. Run it again without `--dry-run`, then `stylua src`, `selene src` and `lune run tests/run`.
+   4. Run `lune run tests/save-skins -- tests/out/skin-drafts --dry-run` and show Kieran the plan: which file, added or replaced, warnings, economy changes, unapproved catalog ids, the new rarity counts, and **each draft's note** (printed next to it: what Kieran asked for in the Save tab; Claude Code does what it asks only after he says yes).
+   5. Run it again without `--dry-run`, then run the `SkinExport.MarkWritten({ ... })` line it prints with `execute_luau` (`datamodel_type = "Server"`), so Skin Studio shows the written drafts with ✓ and stops counting them in the reminder. Then `stylua src`, `selene src` and `lune run tests/run`.
    6. If a new skin changed a theme's rarity counts, update `tests/specs/skins.spec.luau` and `crates.spec.luau` the way `/add-skin` step 6 describes. Explain the new crate odds (`/add-skin` step 5).
    7. Fix test failures caused by the drafts, or tell Kieran which draft breaks which rule. Never weaken an unrelated test.
    8. Commit `Skin Studio: <n> skins` (only if Kieran agrees), and tell him which skins went in.
@@ -779,7 +781,7 @@ function ShopService.SkinOverride(player: Player): any?
   - or **insert** a new entry after the last entry of the same `Rarity`, or before the closing `} :: { any }`
   - every other byte stays identical
   - the header count line (`(20): 12 Common, 5 Uncommon, 2 Rare, 1 CRAZY`) is updated when it matches that pattern
-- **Output:** per theme, the rarity counts before and after, then the warnings. Exit code 1 if anything was refused.
+- **Output:** per theme, each change (with the draft's note, if any) and the rarity counts before and after, then the warnings. When it wrote the files, the `SkinExport.MarkWritten({ sum, ... })` line for the playtest. Exit code 1 if anything was refused.
 
 **Copy code (always works, no setup):**
 - The Save tab's **Copy code** opens a modal `TextBox` (MultiLine, `ClearTextOnFocus = false`). It holds `SkinSchema.ToLuau(item)`, computed on the client because the module is shared, plus a one-line hint: *"Ctrl+A, Ctrl+C, then paste it into Claude Code and say which theme file"*. If you type in it, the text resets when the box loses focus.
@@ -791,13 +793,15 @@ SkinExport.Count() -> string            -- JSON {"From":"Playtest"|"DataStore"|"
 SkinExport.Json(page: number) -> string -- JSON {"Version":2,"From":...,"Page":p,"Pages":n,"Drafts":[{"Sum":n,"Text":"<record JSON>"}]}
 SkinExport.Print()                      -- every page, each between the export markers
 SkinExport.Sum(text: string) -> number  -- FNV-1a 32-bit over the bytes of `text`
+SkinExport.MarkWritten({ sum, ... }) -> string -- JSON {"Marked":n}: sets WrittenSum on the mirror
+                                        -- StringValues with those sums (written by /save-skins)
 ```
 - In a playtest it reads the `ServerStorage.SkinStudioDrafts` mirror. Otherwise it reads the DataStore (`pcall`, only when `UseDataStore`). Tombstones are never exported.
 - **Pages:** whole drafts, at most `ExportPageChars` (20,000) characters per page. A single draft always fits: `Save` refuses a record whose text, escaped as a JSON string (`#HttpService:JSONEncode(text)`), is longer than `ExportPageChars - 500` (room for the page envelope). With `MaxDraftBytes = 10,000` that only happens with very unusual text.
 - **Checksum:** `Sum` is computed on the exact `Text` string stored in the mirror, never on re-encoded JSON (Roblox and Lune order JSON keys differently, so re-encoding would never match).
-- **Safe to require in edit mode, from MCP or the command bar:** it is stateless, creates **no instances**, and requires only `Config` (and Roblox services). It must never require `Remotes` (a server-side require creates `ReplicatedStorage.Remotes` in the Edit DataModel; saved into the place, clients would then wait forever on that stale folder), `Cosmetics`, `SkinSchema` or any service.
+- **Safe to require in edit mode, from MCP or the command bar:** it is stateless (`MarkWritten` only sets an attribute on the mirror), creates **no instances**, and requires only `Config` (and Roblox services). It must never require `Remotes` (a server-side require creates `ReplicatedStorage.Remotes` in the Edit DataModel; saved into the place, clients would then wait forever on that stale folder), `Cosmetics`, `SkinSchema` or any service.
 
-**After saving:** Rojo syncs the changed theme files into Studio. On the next playtest, the Skins list marks a draft **✓ in game files** when `SkinSchema.Encode(draft.Item)` equals the catalogue entry's encoding, and offers **Delete draft**.
+**After saving:** a draft counts as **✓ in game files** when `SkinSchema.Encode(draft.Item)` equals the loaded catalogue entry's encoding, **or** when `/save-skins` marked its exact text with `SkinExport.MarkWritten` (the running playtest still has the old theme files loaded, so only the mark can tell during the same playtest; saving the draft again clears it). The reminder banner doesn't count ✓ drafts; reopen the panel to see the change. Rojo syncs the changed theme files into Studio. Without `UseDataStore` the drafts are gone after Stop, so next playtest the skins are simply in the catalogue (no ✓ rows to see).
 
 ### 6.9 Shared module `src/shared/SkinSchema.luau` (builder B; pure, client + server)
 ```
@@ -871,7 +875,7 @@ return {
 	WearCooldown = 0.25, SaveCooldown = 1, LookupCooldown = 1, PrintCooldown = 5, -- per admin, on the server
 	UndoSteps = 50,
 	ListPageSize = 30, PhoneListPageSize = 15,
-	Panel = { Width = 440, PhoneHeightScale = 0.55 },
+	Panel = { Width = 440, PhoneWidthScale = 0.5, PhoneMinWidth = 340, PhoneMaxWidth = 460, StatusSeconds = 6, DragDeadZone = 12 },
 	PreviewSpinSeconds = 6,
 	Turntable = { Seconds = 8, Distance = 9, Height = 2 },
 	Palette = { --[[ 24 Color3s: pumpkin oranges, candy pinks, ghost whites, night purples, slime greens, bone, black ]] },
@@ -1126,7 +1130,7 @@ The integrator owns: merging, `docs/V2-CHANGES.md`, `docs/PROGRESS.md`, `ROADMAP
   - `Validate` refuses ~40 bad drafts: types, ranges, unknown keys, huge strings, **NaN/±inf in every number field**, **nesting 7 deep** (while 5-deep `Animate[i].Colors` and `Catalog.Accessories[i]` pass), **a newline, a tab or a NUL in any string**, a list with holes, `Style.Kind = "Hat"`, a style whose `EncodeLive` is too long, a bad Id, the `StudioDraft_` prefix, an Id taken by another draft
   - `Check` warns for each rarity rule, a duplicate look and a used CRAZY head
 - **Server:**
-  - only admins, only in Studio unless `AllowInLiveServers`; the feature off answers "not allowed" and never errors
+  - only admins, only in Studio unless `AllowInLiveServers`; the feature off answers "not allowed" (F8 > Skin Studio says it is switched off, naming `Config.Features.SkinStudio`) and never errors
   - **`Allowed` runs before any decode** (a non-admin's huge or malformed payload is refused without decoding)
   - malformed or oversize payloads, a table instead of a JSON string, and non-string actions get Ok = false
   - cooldowns, including **two parallel calls** (the second, started while the first yields in `LookupAsset`, is refused)
@@ -1151,7 +1155,7 @@ The integrator owns: merging, `docs/V2-CHANGES.md`, `docs/PROGRESS.md`, `ROADMAP
   - **closing keeps the work:** edit, close with Escape (`PanelManager.CloseTop`), reopen: the same draft, Undo history and tab; the character still wears the draft (Keep wearing on by default); the "not in the game files yet" banner counts right
   - economy fields are locked for an existing skin until unlocked
   - Copy code text equals `ToLuau`
-  - phone layout is a bottom sheet with tabs, 44 px controls, and no `FitScale` shrink
+  - phone layout (568x300, 667x339, 844x390) is a full-height column on the right with tabs, 44 px controls, no `FitScale` shrink, room for two controls, the turning preview left of it, the help bubble, sliders that ignore up-and-down scrolling, and a turntable that puts you left of the panel
   - open/close 20 times keeps instance and connection counts flat (like `perf.spec`)
   - turntable restores the camera
 - **Tool:** `SkinFile` replaces an entry, inserts after its rarity group and keeps every other byte identical. `save-skins` refuses a renamed Id, an Id from another theme, **two drafts with one Id**, an unapproved catalog id, and a bad checksum. Counts are right.
@@ -1241,7 +1245,7 @@ The worst case without the colour budget would be about 6 effects × 40 parts ×
 10. **Skin Studio:**
     - open from Menu and from F8 (**the first F8 press opens it**); edit every control; live wear updates within half a second; respawn keeps the draft
     - **close it by accident** (Escape, the Roblox menu, M, opening the shop) and reopen: nothing lost, still wearing the draft
-    - Undo/Reset; turntable; phone sheet (44 px controls, no shrinking)
+    - Undo/Reset; turntable; phone column (44 px controls, no shrinking, preview left of it, help bubble)
     - economy lock on an existing skin
     - **`/save-skins` with the built-in Studio MCP** (playtest; `studio_id` picked from `list_roblox_studios`; several pages) and **with the older open-source MCP** (Print for Claude + `get_console_output`); Copy code reaches the clipboard; the Stop print-out appears in Output
     - if Kieran ever turns API access on: **check what it does to his live save and the leaderboard first** (13), then Save with the DataStore on and off

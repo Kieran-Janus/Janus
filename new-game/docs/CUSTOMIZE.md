@@ -401,7 +401,7 @@ A custom model for a skin (`ReplicatedStorage > Custom > Cosmetics`, named after
 4. A Model turns round its pivot: set it with the **Pivot** tool (Model tab > Pivot > Edit Pivot). A single part turns round its own middle.
 5. Press Play and wear the skin. To keep it in git, right-click the model > **Save to File...** as `assets/Cosmetics/<SkinId>.rbxm`.
 
-A wrong value is simply ignored (Skin Studio shows a warning). At most 6 moving groups per skin (`Config.SkinAnimate.MaxPivots`). Scripts inside custom models are still removed, so attributes are the way to animate one. If the skin's own `Animate` moves its `Head`, your moving parts ride along on it.
+Names and types must be exact: `Spin`, not `spin` (capital letters count), and `Speed`, `Amount`, `Delay` and `Every` must be **number** attributes inside their ranges (Studio's **+** starts on "string": change the type before you type the number; `Speed` is 0.1 to 5). **One wrong value and that part doesn't move at all.** Skin Studio's Animate tab lists what's wrong with your model's marks (yellow lines), and in a Studio playtest Output says it once when you wear the skin (`[Cosmetics] your model ...`). At most 6 moving groups per skin (`Config.SkinAnimate.MaxPivots`). Scripts inside custom models are still removed, so attributes are the way to animate one. If the skin's own `Animate` moves its `Head`, your moving parts ride along on it.
 
 ### Walk styles
 A skin can change how you walk: add `Motion` to its `Style` (Rare and CRAZY skins only):
@@ -426,7 +426,7 @@ Their numbers (how far the arms reach, how high the ghost floats...) are in `src
 Motion = { Walk = "rbxassetid://123", Run = "rbxassetid://456", Idle = "rbxassetid://789" },
 Motion = { Preset = "Ghost", Idle = "rbxassetid://789" }, -- or both: the ghost poses + your idle
 ```
-- They must be **owned by the game's owner** (you, or your group if the game belongs to a group), or be Roblox's own. Roblox won't play anyone else's. In Studio a warning in Output says `[SkinWalk] animation 123 didn't load: is it owned by the game's owner?` and your normal walk stays.
+- They must be **owned by the game's owner** (you, or your group if the game belongs to a group), or be Roblox's own. Roblox won't play anyone else's. In Studio a warning in Output says `[SkinWalk] animation 123 didn't load: is it owned by the game's owner?` and your normal walk stays. A slow download (a phone joining the game) is waited for, up to `LoadGiveUpSeconds` (30) in `Config.SkinMotion`.
 - They play on R15 avatars only (R6 avatars get just the `Preset`). Run plays above `RunSpeed`, Walk while moving, Idle when standing; in the air Roblox's own jump and fall show.
 - `AllowUploaded = false` in `Config.SkinMotion` ignores all uploaded ids.
 
@@ -475,20 +475,20 @@ A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
 ## Skin Studio
 Skin Studio is a skin editor for **you** (admins) in a Studio playtest: pick any skin or make a new one, change everything with colour pickers, sliders and dropdowns, and see it on your own character straight away (animations and walk styles too). Players never see it. Settings: `src/shared/Config/SkinStudio.luau` (on/off: `Config.Features.SkinStudio`).
 
-**Open it:** press Play in Studio, then **Menu > Skin Studio** (the 🎨 tile) or **F8 > Skin Studio**. It sits on the right of the screen so you can see your character on the left (on a phone it's a sheet along the bottom).
+**Open it:** press Play in Studio, then **Menu > Skin Studio** (the 🎨 tile) or **F8 > Skin Studio**. It sits on the right of the screen so you can see your character on the left. On a phone (Studio's device emulator, phone on its side) it's a column down the right half, with a small turning preview of the skin just left of it, and help and messages pop up in a bubble (tap it to close it); 🎥 Turn puts your character in the middle of the free part of the screen.
 
 **The tabs:**
 | Tab | What's there |
 | --- | --- |
 | Skins | Search names and Ids, pick a theme, a rarity, "Drafts" (your saved drafts) or "Animated". Tap a skin to edit it. **New** starts a blank skin in the chosen theme, **Duplicate** copies the one you're editing. ✎ = a draft, ✓ = already in the game files, 🎞 animated, 🚶 walk style, 🛍 catalog items. |
-| Look | Name, Id, theme, rarity, crate and price; body colours and materials; the head piece; the accent (colour, material, patterns: tap them in order); glow; particles; CRAZY. Every row has a **?** that explains it. Yellow lines under a section are warnings (allowed, but the tests would complain); red lines at the top are errors (it can't be worn or saved until fixed). |
+| Look | Name, Id, theme, rarity, crate and price; body colours and materials; the head piece; the accent (colour, material, patterns: tap them in order); glow; particles; CRAZY. Every row has a **?** that explains it (on a phone the explanation pops up in a bubble). Yellow lines under a section are warnings (allowed, but the tests would complain); red lines at the top are errors (it can't be worn or saved until fixed). |
 | Animate | Animations (+ Add animation: effect, what it moves, speed, amount...) and the walk style. Targets CRAZY already drives are greyed out with the reason. |
 | Catalog | Real Roblox catalog items: type an id and press **Look up**. Only items made by Roblox, you or your group are allowed (put your UserId or group id in `AllowedCreators` in `src/shared/Config/SkinCatalog.luau` first). They only show in game once `Config.Features.SkinCatalog` is on. |
-| Save | **Save**, **Copy code**, **Print for Claude**, your drafts (open or delete them), a note for Claude Code and "Keep wearing after closing". |
+| Save | **Save**, **Copy code**, **Print for Claude**, your drafts (open or delete them), a note for Claude Code (`/save-skins` shows it next to the skin, and Claude Code asks you before doing what it says) and "Keep wearing after closing". |
 
 The footer has **Undo**, **Redo**, **Reset** (back to how the skin was when you opened it) and **🎥 Turn**: the camera circles your character so you can see every side (press it again, or close the panel, to get your camera back).
 
-**Wearing:** with **Wear on me** ticked, your character wears the skin a moment after each change, and again after you respawn. Your save never changes (you don't own it; only you see it as a test). **Closing the panel loses nothing** (Escape, the Roblox menu, opening the shop...): open it again and your skin, its Undo history and the tab are still there, and you keep wearing it (untick "Keep wearing after closing" in the Save tab to go back to your own skin when you close).
+**Wearing:** with **Wear on me** ticked, your character wears the skin a moment after each change, and again after you respawn. Your save never changes (you don't own the draft). Other players in the same server see the skin on you while you wear it (in a 2-player test too). Choosing a skin yourself (**Menu > Skins**, the Shop, or **Equip** after opening a crate) takes the draft off, so you wear what you chose; edit the draft or tick **Wear on me** again to put it back on. **Closing the panel loses nothing** (Escape, the Roblox menu, opening the shop...): open it again and your skin, its Undo history and the tab are still there, and you keep wearing it (untick "Keep wearing after closing" in the Save tab to go back to your own skin when you close).
 
 **Skins players already own** keep their Id and theme, and their rarity, crate and price are locked 🔒: players own them and the Robux crate odds depend on them. "Unlock rarity, crate and price" asks first, and `/save-skins` warns about any such change.
 
@@ -497,7 +497,8 @@ Saved drafts live in the playtest. They are gone when you press Stop, so:
 
 1. In Skin Studio, press **Save** on each skin you like (Save tab).
 2. In Claude Code, type **`/save-skins`** **before you press Stop**. Claude Code reads the drafts from the running playtest through the Studio MCP, shows you the plan (which file, added or changed, the new rarity counts, warnings), writes them into the theme files after you say yes, and runs the tests.
-3. Press Stop. Rojo syncs the changed theme files into Studio; next playtest the skins are in the shop and crates (and marked ✓ in Skin Studio).
+3. When Claude Code has written them, it tells the playtest which drafts are now in the files: open Skin Studio again and they show ✓, and the "not in the game files yet" reminder stops counting them (without the built-in Studio MCP the reminder simply stays until you press Stop; that's fine).
+4. Press Stop. Rojo syncs the changed theme files into Studio; next playtest the skins are normal skins in the shop and crates. The drafts themselves are gone after Stop (unless `UseDataStore` is on, below), so there's no ✓ to see then.
 
 Two backups that always work:
 - **Print for Claude** (Save tab) prints every saved draft to Output. Claude Code reads it with `get_console_output` (the older MCP), or you copy it into Claude Code. When you press Stop, Studio prints them once more as a last chance.
@@ -515,8 +516,10 @@ Only if you still want drafts kept after Stop: turn on API access (knowing the a
 | --- | --- |
 | "Saved for this playtest. Run /save-skins..." | Normal: the draft is saved until you press Stop. Run `/save-skins` now. |
 | "Not allowed" | Skin Studio only works for admins in Studio (`Config.Admin`, `Config.SkinStudio.AllowInLiveServers`), with `Config.Features.SkinStudio` on. |
+| "Skin Studio is switched off" (F8) | Set `SkinStudio = true` in `src/shared/Config/Features.luau`. |
+| "N drafts are not in the game files yet" after `/save-skins` | Open Skin Studio again: drafts `/save-skins` wrote show ✓ and aren't counted. If Claude Code couldn't tell the playtest (no built-in Studio MCP), the reminder stays until Stop: your skins are still saved in the files. |
 | "Slow down!" | Too many clicks at once; it tries again by itself for wearing. Wait a second for Save. |
-| "Animation didn't load" (Output, `[SkinWalk]`) | An uploaded walk/run/idle animation must be owned by you (or your group, if the game is a group game) or made by Roblox. |
+| "Animation didn't load" (Output, `[SkinWalk]`) | An uploaded walk/run/idle animation must be owned by you (or your group, if the game is a group game) or made by Roblox. A slow download isn't a failure: the game waits up to `LoadGiveUpSeconds` (30, `Config.SkinMotion`) before giving one up. |
 | "Not an allowed creator" | That catalog item isn't made by Roblox, you or your group (`Config.SkinCatalog.AllowedCreators`). |
 | "This skin's rarity is locked" | Players already own this skin: press "Unlock rarity, crate and price" only if you really mean to change it. |
 | A red ✕ line in the Look tab | Something can't be used (for example a pattern that doesn't exist). Fix it or press Undo. |
@@ -914,7 +917,7 @@ Moved to its own section: [Swap every copy of something at once](#swap-every-cop
 | `/verify` | Shorter playtest pass of the whole game, then fixes |
 | `/next-milestone` | Builds the next unfinished milestone in `docs/PROGRESS.md` |
 | `/add-skin` | New crate skin in a theme file, with its rarity and look |
-| `/animate-skin` | Makes a skin move: `/animate-skin <skin> <what should move>` (effects within its rarity's limit, a walk style for Rare and CRAZY), then tests and a catwalk picture |
+| `/animate-skin` | Makes a skin move: `/animate-skin <skin> <what should move>` (effects within its rarity's limit, a walk style for Rare and CRAZY), then tests, a catwalk picture when the preview tooling is there (the cloud session), and a Studio playtest |
 | `/add-crate` | New crate: its skins, price, odds, stand display and Robux product |
 | `/add-parkour-jump` | New jump (or stage) on the parkour course, checked against the jump limits |
 | `/add-secret-pumpkin` | New hidden Easter egg with coins and a riddle |

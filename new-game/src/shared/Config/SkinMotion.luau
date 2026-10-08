@@ -31,7 +31,9 @@ return {
 	RunSpeed = 20, -- studs/s: faster than this plays your Run animation
 	AirSpeed = 10, -- studs/s up or down: other players' walk style fades out (jumping, falling, climbing)
 	OwnRootShiftMax = 0.2, -- studs: your own character never floats or hops higher than this (ceilings)
-	LoadCheckSeconds = 3, -- an uploaded animation that hasn't loaded by then is skipped
+	-- An uploaded animation still not loaded after this many seconds is skipped (one Roblox says
+	-- failed, e.g. not owned by the game's owner, is skipped at once). Slow phones need time.
+	LoadGiveUpSeconds = 30,
 
 	-- Each walk style's numbers (degrees, studs, seconds for one step cycle).
 	Presets = {

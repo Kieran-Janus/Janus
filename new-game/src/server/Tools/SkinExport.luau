@@ -9,6 +9,10 @@
 	SkinExport.Print() -> number            prints every page to Output between
 	                                        Config.SkinStudio.ExportMarkers; returns the page count
 	SkinExport.Sum(text) -> number          a checksum (FNV-1a, 32 bit) of `text`
+	SkinExport.MarkWritten({ sum, ... }) -> string   JSON {"Marked":n}: after /save-skins wrote
+	                                        these drafts (by Sum) into the theme files, marks
+	                                        them in the playtest (attribute WrittenSum), so Skin
+	                                        Studio shows them with a tick and stops reminding you
 
 	Where the drafts come from: during a playtest, the server's ServerStorage.SkinStudioDrafts
 	(one StringValue per draft, made by SkinStudioService). Otherwise, the DataStore copy (only
@@ -146,6 +150,32 @@ function SkinExport.Json(page: number): string
 		Pages = #pages,
 		Drafts = pages[index] or {},
 	})
+end
+
+function SkinExport.MarkWritten(sums: { number }): string
+	local wanted: { [number]: boolean } = {}
+	if type(sums) == "table" then
+		for _, sum in sums do
+			if type(sum) == "number" then
+				wanted[sum] = true
+			end
+		end
+	end
+	local marked = 0
+	local mirror = ServerStorage:FindFirstChild(MIRROR)
+	if mirror then
+		for _, child in mirror:GetChildren() do
+			if child:IsA("StringValue") then
+				local sum = SkinExport.Sum(child.Value)
+				if wanted[sum] then
+					-- (saving the draft again changes its text, and so its Sum: not marked any more)
+					child:SetAttribute("WrittenSum", sum)
+					marked += 1
+				end
+			end
+		end
+	end
+	return HttpService:JSONEncode({ Marked = marked })
 end
 
 function SkinExport.Print(): number

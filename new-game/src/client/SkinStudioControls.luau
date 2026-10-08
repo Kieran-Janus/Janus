@@ -227,7 +227,7 @@ local function numberLine(parent: Instance, spec: NumberSpec, ctx: Context): (Fr
 	bar.Text = ""
 	bar.AutoButtonColor = false
 	bar.BackgroundColor3 = Color3.fromRGB(35, 32, 48)
-	-- (on phones the whole row height can be dragged: an easy target for a finger)
+	-- (on phones the whole row height can be dragged sideways: an easy target for a finger)
 	bar.Size = UDim2.new(1, -reserve, 0, if ctx.Phone then ctx.Row else math.floor(ctx.Row * 0.6))
 	bar.LayoutOrder = 10
 	bar.Parent = line
@@ -289,9 +289,13 @@ local function numberLine(parent: Instance, spec: NumberSpec, ctx: Context): (Fr
 		refresh()
 	end)
 
-	-- Dragging the bar: one Undo step for the whole drag.
+	-- Dragging the bar: one Undo step for the whole drag. A mouse sets the value at once. A
+	-- finger that lands on the bar may only be scrolling the list, so nothing changes until it
+	-- has moved DragDeadZone pixels more sideways than up or down (a drag), or lifts again
+	-- without moving (a tap). Moving up or down first leaves the number alone.
 	local moving: RBXScriptConnection? = nil
 	local ending: RBXScriptConnection? = nil
+	local began = false
 	local function fromX(x: number)
 		local width = bar.AbsoluteSize.X
 		if width <= 0 then
@@ -309,28 +313,57 @@ local function numberLine(parent: Instance, spec: NumberSpec, ctx: Context): (Fr
 		if ending then
 			ending:Disconnect()
 			ending = nil
+		end
+		if began then
+			began = false
 			ctx.Dragging(false)
 			ctx.Commit()
 		end
 	end
+	local function begin()
+		began = true
+		ctx.Begin()
+		ctx.Dragging(true)
+	end
 	bar.InputBegan:Connect(function(input: InputObject)
 		local kind = input.UserInputType
-		if kind ~= Enum.UserInputType.MouseButton1 and kind ~= Enum.UserInputType.Touch then
+		local touch = kind == Enum.UserInputType.Touch
+		if kind ~= Enum.UserInputType.MouseButton1 and not touch then
 			return
 		end
 		stop()
-		ctx.Begin()
-		ctx.Dragging(true)
-		fromX(input.Position.X)
+		local start = input.Position
+		if not touch then
+			begin()
+			fromX(start.X)
+		end
 		moving = UserInputService.InputChanged:Connect(function(changed: InputObject)
 			local t = changed.UserInputType
-			if t == Enum.UserInputType.MouseMovement or t == Enum.UserInputType.Touch then
-				fromX(changed.Position.X)
+			if t ~= Enum.UserInputType.MouseMovement and t ~= Enum.UserInputType.Touch then
+				return
 			end
+			if not began then
+				local dx = math.abs(changed.Position.X - start.X)
+				local dy = math.abs(changed.Position.Y - start.Y)
+				if math.max(dx, dy) < Config.SkinStudio.Panel.DragDeadZone then
+					return -- (not sure yet)
+				end
+				if dy >= dx then
+					stop() -- up or down: the finger is scrolling the list
+					return
+				end
+				begin()
+			end
+			fromX(changed.Position.X)
 		end)
 		ending = UserInputService.InputEnded:Connect(function(ended: InputObject)
 			local t = ended.UserInputType
 			if t == Enum.UserInputType.MouseButton1 or t == Enum.UserInputType.Touch then
+				if touch and not began then
+					-- a tap (the finger hardly moved): jump to that spot, one Undo step
+					begin()
+					fromX(start.X)
+				end
 				stop()
 			end
 		end)

@@ -341,3 +341,24 @@ describe("Config.Lobby", function()
 		T.note(#names, "zones")
 	end)
 end)
+
+describe("docs/V2-CHANGES.md", function()
+	it("lists every feature switch in 'Turn a feature off', by name (no line numbers)", function()
+		local fs = require("@lune/fs")
+		local path = if fs.isFile("docs/V2-CHANGES.md")
+			then "docs/V2-CHANGES.md"
+			else "new-game/docs/V2-CHANGES.md"
+		local text = fs.readFile(path)
+		local start = string.find(text, "## Turn a feature off", 1, true)
+		assert(start, "docs/V2-CHANGES.md has no section 'Turn a feature off'")
+		local stop = string.find(text, "\n## ", start + 1, true) or #text
+		local section = string.sub(text, start, stop)
+		for name, on in Config.Features do
+			local line = ("| `%s = %s,` |"):format(name, tostring(on))
+			if not string.find(section, line, 1, true) then
+				error(("V2-CHANGES 'Turn a feature off' has no row ending %s"):format(line))
+			end
+		end
+		expect(string.find(section, "| line %d")).toBeNil()
+	end)
+end)

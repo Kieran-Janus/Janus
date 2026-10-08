@@ -543,6 +543,35 @@ describe("SkinAnimate: drafts and rarity", function()
 		expect(SkinAnimate.FromAttributes(glow)).toBeNil()
 		local _ = typeof
 	end)
+
+	it("says in plain words why a custom model's mark does nothing", function()
+		local model = rt:create("Model", { Name = "Bat" })
+		local good = rt:create("Part", { Name = "Body" }, model)
+		good:SetAttribute("Animate", "Bob")
+		local wing = rt:create("Part", { Name = "Wing" }, model)
+		local _, none = SkinAnimate.CheckAttributes(wing)
+		expect(#none).toBe(0) -- no Animate: nothing to say
+		wing:SetAttribute("Animate", "spin") -- capital letters count
+		local effect, problems = SkinAnimate.CheckAttributes(wing)
+		expect(effect).toBeNil()
+		expect(problems[1]).toMatch('^Wing: Animate = "spin" isn\'t an effect')
+		expect(problems[1]).toMatch("capital letters count: Spin")
+		wing:SetAttribute("Animate", "Spin")
+		wing:SetAttribute("Speed", "2") -- Studio's Add Attribute starts on "string"
+		_, problems = SkinAnimate.CheckAttributes(wing)
+		expect(problems[1]).toMatch("Speed should be a number")
+		expect(problems[1]).toMatch("not a string")
+		expect(problems[1]).toMatch("doesn't move at all")
+		wing:SetAttribute("Speed", 6) -- over the 5 maximum
+		_, problems = SkinAnimate.CheckAttributes(wing)
+		expect(problems[1]).toMatch("^Wing: Spin: Speed should be between")
+		local all = SkinAnimate.ModelProblems(model)
+		expect(#all).toBe(1) -- (the Body is fine)
+		expect(all[1]).toBe(problems[1])
+		wing:SetAttribute("Speed", 2)
+		expect(#SkinAnimate.ModelProblems(model)).toBe(0)
+		expect(SkinAnimate.FromAttributes(wing).Speed).toBe(2)
+	end)
 end)
 
 -- Server build (src/shared/Cosmetics.luau) ----------------------------------------------------------

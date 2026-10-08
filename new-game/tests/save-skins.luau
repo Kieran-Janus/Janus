@@ -12,6 +12,9 @@
 	checked data (never copied from the page). Refused: drafts with errors, Classic and Tower
 	skins, an Id that changed or is used elsewhere, two drafts with one Id, catalog ids not in
 	Config.SkinCatalog.ApprovedIds. Exit code 1 when anything was refused.
+	Each draft's note (Skin Studio's Save tab, "a note for Claude Code") is printed next to it.
+	After writing, it prints the SkinExport.MarkWritten line that tells the running playtest
+	which drafts are now in the files (Skin Studio then shows them with a tick).
 	The edits themselves are in tests/tools/SkinFile.luau.
 ]]
 
@@ -117,7 +120,17 @@ if plan.Damaged then
 end
 
 print(if dryRun then "Plan (dry run, nothing written):" else "Saving:")
+-- A note is Kieran's own text: shown as it is, on one line, for Claude Code to raise with him.
+local function noteText(note: string?): string
+	if type(note) ~= "string" or note == "" then
+		return ""
+	end
+	local quoted = string.gsub(string.format("%q", note), "\\\n", " ")
+	return "   note: " .. quoted
+end
+
 local themes = {}
+local written: { number } = {}
 for theme in plan.Files do
 	table.insert(themes, theme)
 end
@@ -126,7 +139,8 @@ for _, theme in themes do
 	local file = plan.Files[theme]
 	print(("\n%s.luau"):format(theme))
 	for _, change in file.Changes do
-		print(("  %s %s"):format(change.Action, change.Id))
+		print(("  %s %s%s"):format(change.Action, change.Id, noteText(change.Note)))
+		table.insert(written, change.Sum)
 	end
 	print("  before: " .. SkinFile.CountsText(file.CountsBefore))
 	print("  after:  " .. SkinFile.CountsText(file.CountsAfter))
@@ -153,8 +167,25 @@ end
 if #plan.Refused > 0 then
 	print("\nRefused:")
 	for _, refused in plan.Refused do
-		print(("  %s: %s"):format(refused.Id, refused.Why))
+		print(("  %s: %s%s"):format(refused.Id, refused.Why, noteText(refused.Note)))
 	end
+end
+if not dryRun and #written > 0 then
+	local sums = {}
+	for _, sum in written do
+		table.insert(sums, string.format("%d", sum))
+	end
+	print(
+		"\nTell the playtest these drafts are in the files now (Skin Studio shows them with a tick"
+	)
+	print('and stops reminding you): Studio MCP execute_luau, datamodel_type "Server":')
+	print(
+		('  return require(game:GetService("ServerScriptService").Server.Tools.SkinExport).MarkWritten({ %s })'):format(
+			table.concat(sums, ", ")
+		)
+	)
+end
+if #plan.Refused > 0 then
 	process.exit(1)
 end
 process.exit(0)

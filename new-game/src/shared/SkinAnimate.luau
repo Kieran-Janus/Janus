@@ -34,6 +34,9 @@
 	SkinAnimate.FromAttributes(instance) -> Effect?
 	                                         a custom-model part's Animate / Speed / Amount /
 	                                         Delay / Every / Axis / Reverse / Color2 attributes
+	SkinAnimate.CheckAttributes(instance) -> (Effect?, { string })   the same, and what's wrong
+	SkinAnimate.ModelProblems(model) -> { string }   every wrong Animate mark in a custom model
+	                                         (Skin Studio shows them; the server warns in Studio)
 	SkinAnimate.Forbidden(effect, target, style?) -> string?   why CRAZY owns this target, or nil
 	SkinAnimate.TargetsIn(style, partNames?, effect?) -> { string }
 	                                         the targets this style really has (for an effect:
@@ -645,13 +648,38 @@ function SkinAnimate.Normalize(list: any, style: any?): ({ Effect }?, { string }
 end
 
 -- A custom model's animated part (Kieran sets these attributes in Studio). nil when it has
--- none or a value is wrong (wrong values are ignored, never a script error).
+-- none or a value is wrong: then the part doesn't animate at all (never a script error), and
+-- the second value says why in plain words.
 local ATTRIBUTES = { "Speed", "Amount", "Delay", "Every", "Axis", "Reverse" }
-function SkinAnimate.FromAttributes(instance: Instance): Effect?
+function SkinAnimate.CheckAttributes(instance: Instance): (Effect?, { string })
 	local name = instance:GetAttribute("Animate")
+	if name == nil then
+		return nil, {}
+	end
+	local where = instance.Name
 	local info = SkinAnimate.Info(name)
 	if not info then
-		return nil
+		local names = {}
+		for _, effect in SkinAnimate.Effects do
+			table.insert(names, effect.Name)
+		end
+		local hint = ""
+		if type(name) == "string" then
+			for _, effect in SkinAnimate.Effects do
+				if string.lower(effect.Name) == string.lower(name) then
+					hint = (" (capital letters count: %s)"):format(effect.Name)
+				end
+			end
+		end
+		return nil,
+			{
+				("%s: Animate = %s isn't an effect%s. Use one of: %s"):format(
+					where,
+					if type(name) == "string" then '"' .. name .. '"' else tostring(name),
+					hint,
+					table.concat(names, ", ")
+				),
+			}
 	end
 	local keys: { [string]: boolean } = {}
 	for _, param in info.Params do
@@ -667,8 +695,35 @@ function SkinAnimate.FromAttributes(instance: Instance): Effect?
 	if keys.Colors and typeof(color2) == "Color3" then
 		raw.Colors = { color2 } -- from the part's own colour to Color2 (see Tint)
 	end
-	local effect = checkEntry(raw, 1, nil, true)
-	return effect
+	local effect, errors = checkEntry(raw, 1, nil, true)
+	local problems: { string } = {}
+	for _, text in errors do
+		-- ("Animate 1: Spin: Speed should be a number" -> "Wing: Spin: Speed should be a number")
+		local message = string.gsub(text, "^Animate %d+: ", "")
+		if string.find(message, "should be a number", 1, true) then
+			message ..= " (a number attribute, not a string)"
+		end
+		table.insert(problems, ("%s: %s, so it doesn't move at all"):format(where, message))
+	end
+	return effect, problems
+end
+
+function SkinAnimate.FromAttributes(instance: Instance): Effect?
+	return (SkinAnimate.CheckAttributes(instance))
+end
+
+-- Every wrong Animate mark on the parts and Models in a custom model (the model itself too).
+function SkinAnimate.ModelProblems(model: Instance): { string }
+	local out: { string } = {}
+	local list = model:GetDescendants()
+	table.insert(list, 1, model)
+	for _, d in list do
+		if (d:IsA("BasePart") or d:IsA("Model")) and d:GetAttribute("Animate") ~= nil then
+			local _, problems = SkinAnimate.CheckAttributes(d)
+			table.move(problems, 1, #problems, #out + 1, out)
+		end
+	end
+	return out
 end
 
 -- The targets `style` really has (Skin Studio's dropdown). With `effect`, only the ones that

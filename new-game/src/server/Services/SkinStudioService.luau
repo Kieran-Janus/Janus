@@ -105,6 +105,17 @@ local function inGameFiles(record: any): boolean
 	return SkinSchema.Same(record.Item, SkinSchema.Encode(catalogue))
 end
 
+-- Did /save-skins write this exact draft into the theme files (SkinExport.MarkWritten)? The
+-- running game still has the old theme files loaded, so inGameFiles can't tell before the next
+-- playtest. (The checksum is only worked out for drafts that were marked.)
+local function written(record: any): boolean
+	local folder = ServerStorage:FindFirstChild(MIRROR)
+	local value = folder and folder:FindFirstChild(record.DraftId)
+	local mark = value and value:GetAttribute("WrittenSum")
+	local stored = texts[record.DraftId]
+	return type(mark) == "number" and stored ~= nil and SkinExport.Sum(stored) == mark
+end
+
 local function summary(record: any): any
 	local item = record.Item
 	return {
@@ -116,7 +127,7 @@ local function summary(record: any): any
 		Source = record.Source,
 		Updated = record.Updated,
 		Note = record.Note,
-		InGameFiles = inGameFiles(record),
+		InGameFiles = inGameFiles(record) or written(record),
 	}
 end
 
@@ -392,7 +403,8 @@ handlers.Hello = function(player: Player, _payload: any): Reply
 		DataStore = storeStatus,
 		StoreProblem = storeProblem,
 		Drafts = list,
-		Wearing = wearing[player],
+		-- (equipping a skin in the shop takes the draft off without telling us)
+		Wearing = if ShopService.SkinOverride(player) then wearing[player] else nil,
 	})
 end
 
@@ -667,6 +679,9 @@ function SkinStudioService.Start()
 	Remotes.Function("SkinStudio").OnServerInvoke = onInvoke
 	-- 2. The F8 button: opens the panel through a player attribute (no remote needed).
 	AdminService.Register("SkinStudio", "Skin Studio", function(player, _data)
+		if not Config.Features.SkinStudio then
+			return text().SwitchedOff -- (says which switch, so you know where to look)
+		end
 		if not SkinStudioService.Allowed(player) then
 			return text().NotAllowed
 		end

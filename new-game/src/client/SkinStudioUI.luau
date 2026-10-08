@@ -4,8 +4,9 @@
 	on/off: Config.Features.SkinStudio). Open it from Menu > Skin Studio or F8 > Skin Studio.
 	Only admins see it (the server re-checks every action: SkinStudioService).
 
-	The panel sits on the right (a sheet along the bottom on phones) so you can see your own
-	character, who wears what you edit. Tabs:
+	The panel sits on the right so you can see your own character, who wears what you edit (on
+	a phone, always on its side here, it is a column down the right half and a small turning
+	preview left of it shows the whole skin; help and messages pop up in a bubble). Tabs:
 	  Skins    find a skin (search, theme, rarity, drafts, animated), New, Duplicate
 	  Look     name, rarity, colours, materials, head piece, accents, glow, particles, CRAZY
 	  Animate  animations (Style.Animate) and the walk style (Style.Motion)
@@ -33,6 +34,7 @@ local Workspace = game:GetService("Workspace")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
 local Items = require(ReplicatedStorage.Shared.Items)
 local SkinAnimate = require(ReplicatedStorage.Shared.SkinAnimate)
 local SkinSchema = require(ReplicatedStorage.Shared.SkinSchema)
@@ -62,6 +64,7 @@ type Entry = {
 type Ui = {
 	Panel: Frame,
 	Phone: boolean,
+	Width: number, -- the panel's width (UI units)
 	Top: number, -- where the content (and a popover) starts
 	Name: TextLabel,
 	Wearing: TextLabel?,
@@ -72,6 +75,7 @@ type Ui = {
 	Content: ScrollingFrame,
 	Status: TextLabel,
 	Banner: TextLabel,
+	Bubble: TextButton?, -- phones: the whole message, wrapped
 	Undo: TextButton,
 	Redo: TextButton,
 	Reset: TextButton,
@@ -253,6 +257,26 @@ local function themeName(id: any): string
 	return tostring(id)
 end
 
+-- Phones: the whole message in a wrapped bubble above the footer, for StatusSeconds.
+local bubbleToken = 0
+local function showBubble(message: string, kind: string)
+	local current = ui
+	local bubble = current and current.Bubble
+	if not (current and bubble) or message == "" or not current.Panel.Visible then
+		return
+	end
+	bubble.Text = message
+	bubble.TextColor3 = COLORS[kind] or COLORS.Info
+	bubble.Visible = true
+	bubbleToken += 1
+	local token = bubbleToken
+	task.delay(Config.SkinStudio.Panel.StatusSeconds, function()
+		if token == bubbleToken then
+			bubble.Visible = false
+		end
+	end)
+end
+
 setStatus = function(message: string, kind: string?)
 	status.Text = message
 	status.Kind = kind or "Info"
@@ -260,6 +284,7 @@ setStatus = function(message: string, kind: string?)
 	if current then
 		current.Status.Text = message
 		current.Status.TextColor3 = COLORS[status.Kind] or COLORS.Info
+		showBubble(message, status.Kind)
 	end
 end
 
@@ -425,6 +450,18 @@ local function schedulePreview()
 	end)
 end
 
+-- What's wrong with the Animate marks on the skin's own custom model (Custom.Cosmetics), if
+-- it has one: a wrong mark stops that part moving at all.
+local function modelProblems(item: any): { string }
+	local id = if type(item.ModelId) == "string" then item.ModelId else item.Id
+	local model = if type(id) == "string" then CustomAssets.Find("Cosmetics", id) else nil
+	if not model then
+		return {}
+	end
+	local ok, problems = pcall(SkinAnimate.ModelProblems, model)
+	return if ok then problems else {}
+end
+
 -- The warnings under each section (SkinSchema.CheckSections), a moment after a change.
 local function updateChecks()
 	local state = editing
@@ -440,6 +477,11 @@ local function updateChecks()
 				checks.Sections[problem.Section] = list
 				table.insert(list, problem.Text)
 			end
+		end
+		for _, problem in modelProblems(item) do
+			local list = checks.Sections.Animate or {}
+			checks.Sections.Animate = list
+			table.insert(list, problem)
 		end
 	end
 	for section, labelObject in warningLabels do
@@ -492,6 +534,23 @@ local function stopTurntable()
 	updateFooter()
 end
 
+-- On a phone the panel covers the right part of the screen, so the turntable turns the camera
+-- a little to the right: you stand in the middle of the free part on the left.
+local function sideTurn(camera: Camera): number
+	local current = ui
+	if not (current and current.Phone and current.Panel.Visible) then
+		return 0
+	end
+	local screen = Layout.Screen()
+	local view = camera.ViewportSize
+	if screen.X <= 0 or view.X <= 0 or view.Y <= 0 then
+		return 0
+	end
+	local covered = math.clamp(current.Width / screen.X, 0, 0.8)
+	local halfWidth = math.tan(math.rad(camera.FieldOfView) / 2) * view.X / view.Y
+	return math.atan(covered * halfWidth)
+end
+
 local function startTurntable()
 	local player = Players.LocalPlayer
 	local character = player and player.Character
@@ -518,7 +577,7 @@ local function startTurntable()
 			local center = rootPart.Position
 			local eye = center
 				+ Vector3.new(math.sin(a) * cfg.Distance, cfg.Height, math.cos(a) * cfg.Distance)
-			camera.CFrame = CFrame.lookAt(eye, center)
+			camera.CFrame = CFrame.lookAt(eye, center) * CFrame.Angles(0, -sideTurn(camera), 0)
 		end
 	)
 	table.insert(turntable.Conns, (humanoid :: Humanoid).Died:Connect(stopTurntable))
@@ -839,7 +898,7 @@ local function popover(title: string, build: (body: Frame, close: () -> ()) -> (
 		return
 	end
 	closePopover()
-	-- on a PC it leaves the preview in view; on a phone it uses the whole sheet
+	-- on a PC it leaves the preview in view; on a phone it uses the whole column
 	local top = if current.Phone then 0 else Config.SkinStudio.Panel.HeaderHeight
 	local pop = Instance.new("Frame")
 	pop.Name = "Popover"
@@ -994,6 +1053,9 @@ context = function(): Controls.Context
 		end,
 		Dragging = function(on: boolean)
 			dragging = on
+			if current then
+				current.Content.ScrollingEnabled = not on -- (the list holds still while you drag)
+			end
 			if not on then
 				refreshAll()
 			end
@@ -1425,7 +1487,8 @@ local function refreshDrafts()
 		drafts = reply.Data.Drafts or {}
 		storeStatus = reply.Data.DataStore or "Off"
 		storeProblem = reply.Data.StoreProblem
-		wearingName = reply.Data.Wearing or wearingName
+		-- (nil after you chose a skin in the shop: that takes the draft off)
+		wearingName = if type(reply.Data.Wearing) == "string" then reply.Data.Wearing else nil
 	else
 		setStatus(reply.Message, "Warn")
 	end
@@ -1547,6 +1610,11 @@ local function renderSave(content: ScrollingFrame)
 		2,
 		if storeStatus == "Failed" then COLORS.Warn else nil
 	)
+	-- (phones have no footer line for the drafts reminder: it goes here)
+	local reminder = bannerText()
+	if ctx.Phone and reminder ~= "" then
+		note(content, reminder, 2, COLORS.Warn).Name = "Reminder"
+	end
 	if state then
 		local item = state:Peek()
 		note(
@@ -1757,8 +1825,6 @@ local onHidden: () -> ()
 local function build(gui: ScreenGui): Ui
 	local cfg = Config.SkinStudio.Panel
 	local phone = Layout.IsPhone()
-	-- phones on their side: one row on top (tabs, name, close) and one at the bottom
-	local wide = phone and Layout.Screen().X >= cfg.PhoneWideWidth
 	local rowHeight = if phone then cfg.PhoneRowHeight else cfg.RowHeight
 	local size = math.max(Config.UI.MinTextSize, if phone then 16 else 14)
 	local panel = Theme.panel(gui)
@@ -1766,14 +1832,20 @@ local function build(gui: ScreenGui): Ui
 	panel.ZIndex = 12
 	panel.BackgroundTransparency = 0.05
 	panel.Visible = false
+	local panelWidth = cfg.Width
 	if phone then
-		-- a sheet along the bottom (no Layout.Fit: controls stay 44 px)
-		panel.AnchorPoint = Vector2.new(0.5, 1)
-		panel.Position = UDim2.new(0.5, 0, 1, 0)
-		panel.Size = UDim2.new(1, 0, cfg.PhoneHeightScale, 0)
-		local least = Instance.new("UISizeConstraint")
-		least.MinSize = Vector2.new(0, cfg.PhoneMinHeight)
-		least.Parent = panel
+		-- A phone here is on its side (a short screen): a column down the right, full height.
+		-- Your character stands in the middle of the screen, so at most half of it is behind
+		-- the panel, and the turning preview left of the panel shows all of it. No Layout.Fit
+		-- (it would shrink the 44 px controls).
+		panelWidth = math.clamp(
+			math.floor(Layout.Screen().X * cfg.PhoneWidthScale),
+			cfg.PhoneMinWidth,
+			cfg.PhoneMaxWidth
+		)
+		panel.AnchorPoint = Vector2.new(1, 0)
+		panel.Position = UDim2.new(1, 0, 0, 0)
+		panel.Size = UDim2.new(0, panelWidth, 1, 0)
 	else
 		-- docked to the right edge, so your character stays in view on the left
 		panel.AnchorPoint = Vector2.new(1, 0)
@@ -1798,29 +1870,27 @@ local function build(gui: ScreenGui): Ui
 	end
 
 	-- Heights of the three bands (header + tabs on top, the footer at the bottom).
+	-- (phones: every pixel of height counts, so the gaps are small)
 	local headerHeight, tabTop, footerHeight
-	if not phone then
-		headerHeight, tabTop, footerHeight = cfg.HeaderHeight, cfg.HeaderHeight, cfg.FooterHeight
-	elseif wide then
-		headerHeight, tabTop, footerHeight = 0, 6, rowHeight + 8
+	if phone then
+		headerHeight, tabTop, footerHeight = rowHeight + 6, rowHeight + 6, cfg.PhoneFooterHeight
 	else
-		headerHeight, tabTop, footerHeight = rowHeight + 8, rowHeight + 8, cfg.PhoneFooterHeight
+		headerHeight, tabTop, footerHeight = cfg.HeaderHeight, cfg.HeaderHeight, cfg.FooterHeight
 	end
 	local tabHeight = if phone then rowHeight else cfg.TabHeight
-	local topHeight = tabTop + tabHeight + 6
+	local topHeight = tabTop + tabHeight + (if phone then 4 else 6)
 
-	-- header: the preview (PC), the skin's name, what you wear, Wear on me, close
+	-- header: the preview, the skin's name, what you wear (PC), Wear on me, close
 	local header = plain("Header", panel)
 	header.Size = UDim2.new(1, 0, 0, math.max(headerHeight, topHeight))
 	local close = squareButton("✕", header)
 	close.Name = "Close"
 	close.BackgroundColor3 = Color3.fromRGB(140, 40, 40)
 	close.AnchorPoint = Vector2.new(1, 0)
-	close.Position = UDim2.new(1, -6, 0, if wide then tabTop else 6)
+	close.Position = UDim2.new(1, -6, 0, if phone then 4 else 6)
 	close.Activated:Connect(function()
 		panel.Visible = false
 	end)
-	local viewport: ViewportFrame? = nil
 	local name = Theme.label("Pick a skin", size + 2, header)
 	name.Name = "SkinName"
 	name.TextXAlignment = Enum.TextXAlignment.Left
@@ -1828,18 +1898,17 @@ local function build(gui: ScreenGui): Ui
 	local wearing: TextLabel? = nil
 	local wearToggle = squareButton("", header)
 	wearToggle.Name = "WearOnMe"
+	local viewport = Instance.new("ViewportFrame")
+	viewport.Name = "Preview"
+	viewport.BackgroundColor3 = Color3.fromRGB(35, 30, 48)
+	viewport.Ambient = Color3.fromRGB(200, 190, 210)
+	viewport.LightColor = Color3.new(1, 1, 1)
+	viewport.LightDirection = Vector3.new(-1, -1, -1)
+	Theme.round(viewport, 8)
 	if not phone then
-		local v = Instance.new("ViewportFrame")
-		v.Name = "Preview"
-		v.BackgroundColor3 = Color3.fromRGB(35, 30, 48)
-		v.Ambient = Color3.fromRGB(200, 190, 210)
-		v.LightColor = Color3.new(1, 1, 1)
-		v.LightDirection = Vector3.new(-1, -1, -1)
-		v.Position = UDim2.fromOffset(10, 10)
-		v.Size = UDim2.fromOffset(cfg.PreviewSize, cfg.PreviewSize)
-		v.Parent = header
-		Theme.round(v, 8)
-		viewport = v
+		viewport.Position = UDim2.fromOffset(10, 10)
+		viewport.Size = UDim2.fromOffset(cfg.PreviewSize, cfg.PreviewSize)
+		viewport.Parent = header
 		local left = cfg.PreviewSize + 20
 		name.Position = UDim2.fromOffset(left, 6)
 		name.Size = UDim2.new(1, -(left + rowHeight + 16), 0, rowHeight)
@@ -1853,16 +1922,18 @@ local function build(gui: ScreenGui): Ui
 		wearing = w
 		wearToggle.Position = UDim2.fromOffset(left, 10 + rowHeight * 2)
 		wearToggle.Size = UDim2.new(1, -(left + 10), 0, rowHeight)
-	elseif wide then
-		-- (the name sits right of the tabs; Wear on me goes in the bottom row)
-		local tabsWidth = #TABS * (cfg.PhoneTabWidth + 4)
-		name.Position = UDim2.fromOffset(tabsWidth + 14, tabTop)
-		name.Size = UDim2.new(1, -(tabsWidth + rowHeight + 30), 0, rowHeight)
 	else
-		name.Position = UDim2.fromOffset(10, 6)
+		-- the preview sits just left of the panel, below the round info at the top (the
+		-- panel doesn't clip its children)
+		viewport.AnchorPoint = Vector2.new(1, 0)
+		viewport.Position = UDim2.new(0, -8, 0, cfg.PhonePreviewTop)
+		viewport.Size = UDim2.fromOffset(cfg.PhonePreviewSize, cfg.PhonePreviewSize)
+		viewport.BackgroundTransparency = 0.25
+		viewport.Parent = panel
+		name.Position = UDim2.fromOffset(10, 4)
 		name.Size = UDim2.new(1, -(rowHeight + 170), 0, rowHeight)
 		wearToggle.AnchorPoint = Vector2.new(1, 0)
-		wearToggle.Position = UDim2.new(1, -(rowHeight + 12), 0, 6)
+		wearToggle.Position = UDim2.new(1, -(rowHeight + 12), 0, 4)
 		wearToggle.Size = UDim2.new(0, 150, 0, rowHeight)
 	end
 	wearToggle.Activated:Connect(function()
@@ -1885,19 +1956,17 @@ local function build(gui: ScreenGui): Ui
 	-- tabs
 	local tabBar = plain("Tabs", panel)
 	tabBar.Position = UDim2.fromOffset(6, tabTop)
-	tabBar.Size = if wide
-		then UDim2.new(0, #TABS * (cfg.PhoneTabWidth + 4), 0, tabHeight)
-		else UDim2.new(1, -12, 0, tabHeight)
+	tabBar.Size = UDim2.new(1, -12, 0, tabHeight)
 	hlist(tabBar, 4)
 	local tabs: { [string]: TextButton } = {}
 	for i, tabName in TABS do
 		local b = Theme.button(tabName, tabBar)
 		b.Name = "Tab_" .. tabName
-		b.TextSize = size
+		-- (a phone's column is narrow: a little smaller, so "Animate" fits)
+		b.TextSize = if phone then math.max(Config.UI.MinTextSize, size - 2) else size
+		b.TextTruncate = Enum.TextTruncate.AtEnd
 		b.LayoutOrder = i
-		b.Size = if wide
-			then UDim2.new(0, cfg.PhoneTabWidth, 0, tabHeight)
-			else UDim2.new(1 / #TABS, -4, 0, tabHeight)
+		b.Size = UDim2.new(1 / #TABS, -4, 0, tabHeight)
 		b.Activated:Connect(function()
 			SkinStudioUI.ShowTab(tabName)
 		end)
@@ -1912,7 +1981,9 @@ local function build(gui: ScreenGui): Ui
 	content.Position = UDim2.fromOffset(8, topHeight)
 	content.Size = UDim2.new(1, -16, 1, -(topHeight + footerHeight + 6))
 	content.ScrollBarThickness = if phone then 10 else 6
-	content.ScrollingDirection = Enum.ScrollingDirection.Y -- sideways drags are for the sliders
+	-- Up and down only. A slider takes a drag only once it has moved more sideways than up
+	-- or down (SkinStudioControls), and scrolling stops while one is dragged.
+	content.ScrollingDirection = Enum.ScrollingDirection.Y
 	content.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	content.CanvasSize = UDim2.new()
 	content.Parent = panel
@@ -1930,18 +2001,13 @@ local function build(gui: ScreenGui): Ui
 	footer.Position = UDim2.new(0, 6, 1, -4)
 	footer.Size = UDim2.new(1, -12, 0, footerHeight)
 	local buttons = plain("Buttons", footer)
-	local buttonWidth = if wide then cfg.PhoneTabWidth else nil
-	buttons.Size = if wide
-		then UDim2.new(0, 5 * (cfg.PhoneTabWidth + 4) + 60, 0, rowHeight)
-		else UDim2.new(1, 0, 0, rowHeight)
+	buttons.Size = UDim2.new(1, 0, 0, rowHeight)
 	hlist(buttons, 4)
 	local function footerButton(label: string, order: number): TextButton
 		local b = Theme.button(label, buttons)
 		b.TextSize = size
 		b.LayoutOrder = order
-		b.Size = if buttonWidth
-			then UDim2.new(0, buttonWidth, 0, rowHeight)
-			else UDim2.new(0.25, -4, 0, rowHeight)
+		b.Size = UDim2.new(0.25, -4, 0, rowHeight)
 		b.TextTruncate = Enum.TextTruncate.AtEnd
 		return b
 	end
@@ -1953,11 +2019,6 @@ local function build(gui: ScreenGui): Ui
 	reset.Name = "Reset"
 	local turn = footerButton("🎥 Turn", 4)
 	turn.Name = "Turntable"
-	if wide then
-		wearToggle.Parent = buttons
-		wearToggle.LayoutOrder = 5
-		wearToggle.Size = UDim2.new(0, cfg.PhoneTabWidth + 60, 0, rowHeight)
-	end
 	undo.Activated:Connect(function()
 		local state = currentKey and states[currentKey]
 		if state then
@@ -1993,18 +2054,45 @@ local function build(gui: ScreenGui): Ui
 	banner.TextXAlignment = Enum.TextXAlignment.Left
 	banner.TextWrapped = true
 	banner.TextColor3 = COLORS.Warn
-	if wide then
-		-- right of the buttons: one line each (the full banner shows on closing)
-		local left = 5 * (cfg.PhoneTabWidth + 4) + 64
-		local half = math.floor(rowHeight / 2)
-		statusLabel.TextWrapped = false
-		statusLabel.TextTruncate = Enum.TextTruncate.AtEnd
-		statusLabel.Position = UDim2.fromOffset(left, 0)
-		statusLabel.Size = UDim2.new(1, -left, 0, half)
-		banner.TextWrapped = false
-		banner.TextTruncate = Enum.TextTruncate.AtEnd
-		banner.Position = UDim2.fromOffset(left, half)
-		banner.Size = UDim2.new(1, -left, 0, half)
+	local bubble: TextButton? = nil
+	if phone then
+		-- Phones keep the height for the controls: the footer is just the buttons. Messages
+		-- (every "?" help, errors, confirmations) pop up whole in a wrapped bubble above it;
+		-- the drafts reminder is at the top of the Save tab and shows again on closing.
+		statusLabel.Visible = false
+		banner.Visible = false
+		-- The bubble: tap it to close it; it goes by itself after StatusSeconds.
+		local b = Instance.new("TextButton")
+		b.Name = "StatusBubble"
+		b.AutoButtonColor = false
+		b.Font = Theme.Font
+		b.TextSize = size - 1
+		b.TextWrapped = true
+		b.TextXAlignment = Enum.TextXAlignment.Left
+		b.BackgroundColor3 = Color3.fromRGB(28, 24, 40)
+		b.AnchorPoint = Vector2.new(0, 1)
+		b.Position = UDim2.new(0, 8, 1, -(footerHeight + 8))
+		b.Size = UDim2.new(1, -16, 0, rowHeight)
+		b.AutomaticSize = Enum.AutomaticSize.Y
+		b.ZIndex = 30
+		b.Visible = false
+		b.Parent = panel
+		Theme.round(b, 8)
+		local pad = Instance.new("UIPadding")
+		pad.PaddingLeft = UDim.new(0, 10)
+		pad.PaddingRight = UDim.new(0, 10)
+		pad.PaddingTop = UDim.new(0, 6)
+		pad.PaddingBottom = UDim.new(0, 6)
+		pad.Parent = b
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = Theme.Selected
+		stroke.Thickness = 2
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Parent = b
+		b.Activated:Connect(function()
+			b.Visible = false
+		end)
+		bubble = b
 	else
 		local rest = footerHeight - rowHeight - 2
 		local statusHeight = math.floor(rest * 0.4)
@@ -2024,6 +2112,7 @@ local function build(gui: ScreenGui): Ui
 	return {
 		Panel = panel,
 		Phone = phone,
+		Width = panelWidth,
 		Top = topHeight,
 		Name = name,
 		Wearing = wearing,
@@ -2034,6 +2123,7 @@ local function build(gui: ScreenGui): Ui
 		Content = content,
 		Status = statusLabel,
 		Banner = banner,
+		Bubble = bubble,
 		Undo = undo,
 		Redo = redo,
 		Reset = reset,
@@ -2073,6 +2163,11 @@ onHidden = function()
 	stopTurntable()
 	clearPreview()
 	closePopover()
+	bubbleToken += 1
+	local bubble = ui and ui.Bubble
+	if bubble then
+		bubble.Visible = false
+	end
 	toast(bannerText())
 	if not keepWearing and wearingName then
 		wearToken += 1

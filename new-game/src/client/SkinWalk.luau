@@ -12,7 +12,9 @@
 	  Uploaded ids      only your own screen plays them, on your own character (walk, run or
 	                    idle by your speed); Roblox shows them to everyone. They must belong to
 	                    the game's owner (or Roblox), or Roblox won't play them: in Studio a
-	                    warning says so and your normal walk stays.
+	                    warning says so and your normal walk stays. A slow download (a phone
+	                    joining) is waited for: one is only given up when Roblox says it
+	                    failed, or after Config.SkinMotion.LoadGiveUpSeconds.
 	Only the closest Config.SkinMotion.MaxCharacters characters (fewer on phones, yours first)
 	get a walk style. A character that is dancing (the dance wins), sitting, dead, a Hide &
 	Seek hider or off screen gets none, and in the air it fades out. Your own float or hop is
@@ -23,6 +25,7 @@
 	SkinWalk.Active() -> number   characters with a walk style posed right now
 ]]
 
+local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -59,15 +62,25 @@ local nextPick = 0
 local frame = 0
 local wanted = false -- someone has a walk style (or your own animations)
 
--- Your own uploaded animations.
+-- Your own uploaded animations ("Walk", "Run", "Idle").
 type Own = {
 	Character: Model?,
 	Text: string?,
 	Tracks: { [string]: AnimationTrack },
+	Loading: { [string]: boolean }, -- not loaded yet (Length is still 0)
+	Failed: { [string]: boolean }, -- Roblox said it can't load them (ContentProvider)
 	LoadedAt: number,
-	Checked: boolean,
+	Load: number, -- counts the loads, so a late answer about an old one is ignored
 }
-local own: Own = { Character = nil, Text = nil, Tracks = {}, LoadedAt = 0, Checked = false }
+local own: Own = {
+	Character = nil,
+	Text = nil,
+	Tracks = {},
+	Loading = {},
+	Failed = {},
+	LoadedAt = 0,
+	Load = 0,
+}
 local warned: { [string]: boolean } = {}
 
 local function settings()
@@ -363,9 +376,58 @@ local function stopOwn()
 		track:Destroy()
 	end
 	own.Tracks = {}
+	own.Loading = {}
+	own.Failed = {}
 	own.Text = nil
 	own.Character = nil
-	own.Checked = false
+	own.Load += 1
+end
+
+-- Asks Roblox to download the animations and notes the ones it says failed (not owned by the
+-- game's owner, deleted...). In its own thread: PreloadAsync waits for the downloads.
+local function preload(animations: { [string]: Animation })
+	local load = own.Load
+	local list: { Instance } = {}
+	for _, animation in animations do
+		table.insert(list, animation)
+	end
+	if #list == 0 then
+		return
+	end
+	local function answer(contentId: string, status: Enum.AssetFetchStatus)
+		if own.Load ~= load or status ~= Enum.AssetFetchStatus.Failure then
+			return
+		end
+		local digits = string.match(contentId, "%d+")
+		for key, animation in animations do
+			if digits and string.match(animation.AnimationId, "%d+") == digits then
+				own.Failed[key] = true
+			end
+		end
+	end
+	task.spawn(function()
+		pcall(function()
+			ContentProvider:PreloadAsync(list, answer)
+		end)
+	end)
+end
+
+-- Drops one of your animations that won't load (a missing Run falls back to the Walk), with
+-- one warning in Studio.
+local function dropOwn(key: string, track: AnimationTrack)
+	local id = track.Animation and track.Animation.AnimationId or "?"
+	if RunService:IsStudio() and not warned[id] then
+		warned[id] = true
+		warn(
+			("[SkinWalk] animation %s didn't load: is it owned by the game's owner?"):format(
+				string.match(id, "%d+") or id
+			)
+		)
+	end
+	track:Stop(0)
+	track:Destroy()
+	own.Tracks[key] = nil
+	own.Loading[key] = nil
 end
 
 -- Humanoid states where Roblox's own jump / fall / climb / swim / sit animations show.
@@ -409,6 +471,7 @@ local function stepOwn()
 			return
 		end
 		local ids = SkinMotion.ParseIds(text) :: { [string]: string }
+		local animations: { [string]: Animation } = {}
 		for _, key in { "Walk", "Run", "Idle" } do
 			local id = ids[key]
 			if not id then
@@ -423,26 +486,24 @@ local function stepOwn()
 				track.Priority = Enum.AnimationPriority.Movement
 				track.Looped = true
 				own.Tracks[key] = track
+				own.Loading[key] = true
+				animations[key] = animation
 			end
 		end
+		preload(animations)
 	end
-	-- An animation that hasn't loaded by now (not owned by the game's owner?) is skipped.
-	if not own.Checked and os.clock() - own.LoadedAt >= cfg.LoadCheckSeconds then
-		own.Checked = true
-		for key, track in own.Tracks do
-			if track.Length <= 0 then
-				local id = track.Animation and track.Animation.AnimationId or "?"
-				if RunService:IsStudio() and not warned[id] then
-					warned[id] = true
-					warn(
-						("[SkinWalk] animation %s didn't load: is it owned by the game's owner?"):format(
-							string.match(id, "%d+") or id
-						)
-					)
-				end
-				track:Stop(0)
-				track:Destroy()
-				own.Tracks[key] = nil
+	-- Roblox downloads animations in the background and Length stays 0 until one has loaded,
+	-- so a slow download (a phone joining) is waited for. Only an animation Roblox says failed
+	-- (not owned by the game's owner?), or one still not loaded after LoadGiveUpSeconds, is
+	-- dropped.
+	if next(own.Loading) then
+		local waited = os.clock() - own.LoadedAt
+		for key in own.Loading do
+			local track = own.Tracks[key]
+			if not track or track.Length > 0 then
+				own.Loading[key] = nil -- loaded
+			elseif own.Failed[key] or waited >= cfg.LoadGiveUpSeconds then
+				dropOwn(key, track)
 			end
 		end
 	end

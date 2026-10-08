@@ -886,6 +886,68 @@ describe("SkinStudioService", function()
 		player:SetAttribute("HideSeekRole", nil)
 	end)
 
+	it("takes the draft off when you choose a skin in the shop, Menu > Skins or a crate", function()
+		rest(w)
+		local data = w.Data.Get(player)
+		data.Owned.Zombie = true
+		data.Owned.Pumpkin_BlazeJack = true
+		data.Equipped.Skin = "Zombie"
+		local item = itemOf(w, "Pumpkin_SirGourdington")
+		item.Name = "Sir Testington"
+		expect(invoke(w, player, "Wear", payload(w, item)).Ok).toBe(true)
+		expect(w.Shop.SkinOverride(player)).toBeTruthy()
+		-- another slot (a hat) keeps the draft on
+		local equip = w.rt:find("ReplicatedStorage.Remotes.EquipItem")
+		w.rt:advance(1)
+		w.rt:invokeServer(equip, player, "Hat", "")
+		expect(w.Shop.SkinOverride(player)).toBeTruthy()
+		-- choosing a skin (the shop, Menu > Skins and a crate's Equip all use EquipItem)
+		w.rt:advance(1)
+		local state = w.rt:invokeServer(equip, player, "Skin", "Pumpkin_BlazeJack")
+		expect(state.Equipped.Skin).toBe("Pumpkin_BlazeJack")
+		expect(w.Shop.SkinOverride(player)).toBeNil()
+		local model = player.Character:FindFirstChild("Cosmetic_Skin")
+		expect(model and model:GetAttribute("ItemId")).toBe("Pumpkin_BlazeJack")
+		rest(w)
+		expect(invoke(w, player, "Hello").Data.Wearing).toBeNil() -- the panel knows too
+		-- and still off after respawning
+		w.rt:spawnCharacter(player)
+		w.rt:advance(1)
+		local again = player.Character:FindFirstChild("Cosmetic_Skin")
+		expect(again and again:GetAttribute("ItemId")).toBe("Pumpkin_BlazeJack")
+		data.Equipped.Skin = "Zombie"
+		rest(w)
+	end)
+
+	it("warns once in Studio about a wrong Animate mark on your own model", function()
+		rest(w)
+		local custom = w.rt:create("Model", { Name = "Pumpkin_BlazeJack" })
+		local body = w.rt:create("Part", { Name = "Body", Size = env.Vector3.new(2, 2, 2) }, custom)
+		custom.PrimaryPart = body
+		local wing =
+			w.rt:create("Part", { Name = "Wing", Size = env.Vector3.new(1, 0.2, 1) }, custom)
+		wing:SetAttribute("Animate", "flap") -- capital letters count
+		custom.Parent = w.rt:find("ReplicatedStorage.Custom.Cosmetics")
+		local function warned(): number
+			local n = 0
+			for _, text in w.rt.warnings do
+				if string.find(text, "your model Pumpkin_BlazeJack: Wing", 1, true) then
+					n += 1
+				end
+			end
+			return n
+		end
+		local item = itemOf(w, "Pumpkin_BlazeJack")
+		expect(invoke(w, player, "Wear", payload(w, item)).Ok).toBe(true)
+		expect(warned()).toBe(1)
+		rest(w)
+		expect(invoke(w, player, "Wear", payload(w, item)).Ok).toBe(true)
+		expect(warned()).toBe(1) -- once
+		custom:Destroy()
+		rest(w)
+		invoke(w, player, "StopWearing")
+	end)
+
 	it("keeps Wear calls to the cooldown", function()
 		rest(w)
 		local item = itemOf(w, "Pumpkin_BlazeJack")
@@ -1160,7 +1222,7 @@ describe("SkinStudioService", function()
 			"SkinStudio"
 		)
 		expect(okOff).toBe(true) -- the command ran...
-		expect(messageOff).toBe(off.Config.SkinStudio.Text.NotAllowed) -- ...and said no
+		expect(messageOff).toBe(off.Config.SkinStudio.Text.SwitchedOff) -- ...and said which switch
 		expect(kid:GetAttribute("SkinStudioOpenAt")).toBeNil()
 	end)
 
@@ -2006,6 +2068,31 @@ describe("SkinStudioUI", function()
 		w.rt:advance(0.5)
 	end)
 
+	it("shows what's wrong with your own model's Animate marks in the Animate tab", function()
+		local c = clientWorld({})
+		local custom = c.rt:create("Model", { Name = "Pumpkin_BlazeJack" })
+		local body = c.rt:create("Part", { Name = "Body", Size = env.Vector3.new(2, 2, 2) }, custom)
+		custom.PrimaryPart = body
+		local wing =
+			c.rt:create("Part", { Name = "Wing", Size = env.Vector3.new(1, 0.2, 1) }, custom)
+		wing:SetAttribute("Animate", "Spin")
+		wing:SetAttribute("Speed", "2") -- a string attribute
+		custom.Parent = c.rt:find("ReplicatedStorage.Custom.Cosmetics")
+		c.UI.Open()
+		c.UI.SelectSkin("Pumpkin_BlazeJack")
+		c.UI.ShowTab("Animate")
+		c.rt:advance(0.5)
+		local label = panelOf(c).Content.Warnings_Animate
+		expect(label.Visible).toBe(true)
+		expect(label.Text).toMatch("Wing: Spin: Speed should be a number")
+		wing:SetAttribute("Speed", 2)
+		c.UI.Current():Set({ "Name" }, "Blaze Jack Too") -- (any change checks again)
+		c.rt:advance(0.5)
+		expect(label.Visible).toBe(false)
+		c.UI.Current():Reset()
+		c.UI.Close()
+	end)
+
 	it("circles your character with the turntable and gives the camera back", function()
 		local panel = panelOf(w)
 		local camera = w.rt.workspace.CurrentCamera
@@ -2044,29 +2131,49 @@ describe("SkinStudioUI", function()
 		expect(liveConnections(w.rt)).toBe(connections)
 	end)
 
-	for _, size in { "upright", "on its side" } do
-		it("is a bottom sheet with big buttons on phones (no shrinking), " .. size, function()
+	for _, screen in { { 568, 300 }, { 667, 339 }, { 844, 390 } } do
+		local label = ("%dx%d"):format(screen[1], screen[2])
+		it("is a column on the right with big buttons on a phone on its side, " .. label, function()
 			local phone = clientWorld({
 				phone = true,
-				size = if size == "upright" then nil else env.Vector2.new(844, 390),
+				size = env.Vector2.new(screen[1], screen[2]),
 			})
+			local cfg = phone.Config.SkinStudio.Panel
 			phone.UI.Open()
 			phone.UI.SelectSkin("Pumpkin_MegaGourdSupreme")
 			phone.rt:advance(0.5)
 			local panel = panelOf(phone)
-			expect(panel.AnchorPoint.Y).toBe(1)
-			expect(panel.Size.Y.Scale).toBeNear(
-				phone.Config.SkinStudio.Panel.PhoneHeightScale,
-				1e-4
+			-- the right part of the screen, full height, so the middle (your character) is at
+			-- most half covered
+			expect(panel.AnchorPoint.X).toBe(1)
+			expect(panel.Position.X.Scale).toBe(1)
+			expect(panel.Size.Y.Scale).toBe(1)
+			local width = panel.Size.X.Offset
+			expect(width).toBe(
+				math.clamp(
+					math.floor(screen[1] * cfg.PhoneWidthScale),
+					cfg.PhoneMinWidth,
+					cfg.PhoneMaxWidth
+				)
 			)
+			expect(screen[1] - width).toBeGreaterThanOrEqual(screen[1] / 2 - 60)
 			expect(panel:FindFirstChild("FitScale")).toBeNil()
-			expect(panel.Header:FindFirstChild("Preview")).toBeNil() -- your real character is above
-			-- on its side: tabs in one row on top, the buttons and Wear on me in one row below
-			local wide = size ~= "upright"
-			expect(panel.Footer.Buttons:FindFirstChild("WearOnMe") ~= nil).toBe(wide)
-			expect(panel:FindFirstChildOfClass("UISizeConstraint").MinSize.Y).toBe(
-				phone.Config.SkinStudio.Panel.PhoneMinHeight
-			)
+			expect(panel:FindFirstChildOfClass("UISizeConstraint")).toBeNil()
+			-- room for two whole controls (a label row and a control row each) between the bands
+			-- on a usual phone, and one on the smallest
+			local content = panel.Content
+			expect(content.Size.Y.Scale).toBe(1)
+			local fields = if screen[2] >= 330 then 2 else 1
+			expect(screen[2] + content.Size.Y.Offset).toBeGreaterThanOrEqual(fields * (2 * 44 + 2))
+			expect(panel.Footer.Status.Visible).toBe(false) -- (messages use the bubble)
+			-- the turning preview sits left of the panel and shows the skin
+			expect(panel.Header:FindFirstChild("Preview")).toBeNil()
+			local preview = panel:FindFirstChild("Preview")
+			expect(preview).toBeInstanceOf("ViewportFrame")
+			expect(preview.AnchorPoint.X).toBe(1)
+			expect(preview.Position.X.Scale).toBe(0)
+			expect(preview.Position.X.Offset).toBeLessThan(0)
+			expect(preview:FindFirstChildOfClass("Model")).toBeTruthy()
 			for _, tabName in { "Skins", "Look", "Animate", "Catalog", "Save" } do
 				expect(panel.Tabs:FindFirstChild("Tab_" .. tabName)).toBeTruthy()
 				phone.UI.ShowTab(tabName)
@@ -2098,7 +2205,7 @@ describe("SkinStudioUI", function()
 					end
 				end
 			end
-			-- no header preview on phones, yet the head piece's own parts are still targets
+			-- the head piece's own parts are animation targets
 			phone.UI.ShowTab("Animate")
 			phone.UI.Current():Set({ "Style", "Animate" }, { { Effect = "Spin", Target = "Head" } })
 			phone.rt:advance(0.3)
@@ -2106,7 +2213,91 @@ describe("SkinStudioUI", function()
 			local items = panel.Popover.Body.Items
 			expect(items:FindFirstChild("Option_Part:Crown")).toBeTruthy()
 			expect(items:FindFirstChild("Option_Part:MiniPumpkin")).toBeTruthy()
+			phone.rt:fire(panel.Popover.Close, "Activated")
 			phone.UI.Current():Reset()
+			phone.rt:advance(0.5)
+
+			-- a "?" shows its whole help in the bubble (wrapped), which goes by itself or on a tap
+			phone.UI.ShowTab("Look")
+			phone.rt:advance(0.2)
+			local help, bar
+			for _, d in panel.Content:GetDescendants() do
+				if not help and d.Name == "Help" and d:IsA("TextButton") then
+					help = d
+				end
+				if
+					not bar
+					and d.Name == "Bar"
+					and d:IsA("TextButton")
+					and not d.Parent.Parent:FindFirstChild("Lock")
+				then
+					bar = d
+				end
+			end
+			expect(help and bar).toBeTruthy()
+			phone.rt:fire(help, "Activated")
+			local bubble = panel.StatusBubble
+			expect(bubble.Visible).toBe(true)
+			expect(bubble.TextWrapped).toBe(true)
+			expect(bubble.Text).toBe(panel.Footer.Status.Text)
+			expect(#bubble.Text).toBeGreaterThan(20)
+			phone.rt:advance(cfg.StatusSeconds + 0.5)
+			expect(bubble.Visible).toBe(false)
+			phone.rt:fire(help, "Activated")
+			phone.rt:fire(bubble, "Activated")
+			expect(bubble.Visible).toBe(false)
+
+			-- a finger scrolling over a slider leaves its number alone; a sideways drag moves it
+			local state = phone.UI.Current()
+			expect(state:Dirty()).toBe(false)
+			local input = phone.rt.game:GetService("UserInputService")
+			Dom.rawSet(bar, "AbsoluteSize", env.Vector2.new(200, 44))
+			Dom.rawSet(bar, "AbsolutePosition", env.Vector2.new(100, 100))
+			local finger = {
+				UserInputType = Enum.UserInputType.Touch,
+				Position = env.Vector3.new(110, 120, 0),
+			}
+			phone.rt:fire(bar, "InputBegan", finger)
+			expect(state:Dirty()).toBe(false) -- landing on it changes nothing
+			finger.Position = env.Vector3.new(116, 170, 0) -- mostly down: scrolling
+			phone.rt:fire(input, "InputChanged", finger)
+			finger.Position = env.Vector3.new(290, 175, 0)
+			phone.rt:fire(input, "InputChanged", finger)
+			phone.rt:fire(input, "InputEnded", finger)
+			phone.rt:advance(0.5)
+			expect(state:Dirty()).toBe(false)
+			finger.Position = env.Vector3.new(110, 120, 0)
+			phone.rt:fire(bar, "InputBegan", finger)
+			finger.Position = env.Vector3.new(250, 124, 0) -- sideways: a drag
+			phone.rt:fire(input, "InputChanged", finger)
+			expect(panel.Content.ScrollingEnabled).toBe(false) -- the list holds still meanwhile
+			phone.rt:fire(input, "InputEnded", finger)
+			phone.rt:advance(0.5)
+			expect(state:Dirty()).toBe(true)
+			expect(state:CanUndo()).toBe(true)
+			expect(panel.Content.ScrollingEnabled).toBe(true)
+			state:Reset()
+			phone.rt:advance(0.5)
+			expect(state:Dirty()).toBe(false)
+			finger.Position = env.Vector3.new(150, 120, 0) -- a tap: jumps to that spot
+			phone.rt:fire(bar, "InputBegan", finger)
+			phone.rt:fire(input, "InputEnded", finger)
+			phone.rt:advance(0.5)
+			expect(state:Dirty()).toBe(true)
+			state:Reset()
+			phone.rt:advance(0.5)
+
+			-- the turntable puts your character in the middle of the free part, left of the panel
+			local camera = phone.rt.workspace.CurrentCamera
+			phone.rt:fire(panel.Footer.Buttons.Turntable, "Activated")
+			phone.rt:advance(0.2)
+			local character = phone.rt.localPlayer.Character
+			local at = camera:WorldToViewportPoint(character.HumanoidRootPart.Position)
+			local view = camera.ViewportSize
+			local free = 1 - width / screen[1] -- the part of the screen left of the panel
+			expect(at.X).toBeNear(view.X * free / 2, view.X * 0.05)
+			phone.rt:fire(panel.Footer.Buttons.Turntable, "Activated")
+			expect(camera.CameraType).toBe(Enum.CameraType.Custom)
 		end)
 	end
 end)
@@ -2381,4 +2572,47 @@ describe("save-skins (tests/tools/SkinFile.luau)", function()
 			"\tALIEN ABDUCTION CRATE SKINS (23): 14 Common, 5 Uncommon, 3 Rare, and 1 CRAZY that is ONE IN A MILLION (Odds)."
 		)
 	end)
+
+	it(
+		"shows each draft's note, and marks written drafts so Skin Studio stops reminding",
+		function()
+			w.rt:advance(2)
+			local item = itemOf(w, "Pumpkin_SirGourdington")
+			item.Id = "Pumpkin_NoteTaker"
+			item.Name = "Note Taker"
+			local saved =
+				invoke(w, player, "Save", payload(w, item, { Note = "put it in the Candy crate" }))
+			if not saved.Ok then
+				error(saved.Message)
+			end
+			local draftId = saved.Data.DraftId
+			local plan = SkinFile.Plan(exported(), deps(), { Only = { Pumpkin_NoteTaker = true } })
+			local change = plan.Files.Pumpkin.Changes[1]
+			expect(change.Id).toBe("Pumpkin_NoteTaker")
+			expect(change.Note).toBe("put it in the Candy crate")
+			expect(change.Sum).toBeA("number")
+			local function summary(): any
+				w.rt:advance(1)
+				for _, s in invoke(w, player, "Hello").Data.Drafts do
+					if s.DraftId == draftId then
+						return s
+					end
+				end
+				return nil
+			end
+			-- the running game still has the old theme files: not "in the game files" yet...
+			expect(summary().InGameFiles).toBe(false)
+			-- ...until /save-skins says it wrote this exact draft
+			expect(serde.decode("json", Export.MarkWritten({ 12345 })).Marked).toBe(0)
+			expect(serde.decode("json", Export.MarkWritten({ change.Sum })).Marked).toBe(1)
+			expect(summary().InGameFiles).toBe(true)
+			-- saved again (changed): reminded about again
+			item.Name = "Note Taker Two"
+			w.rt:advance(2)
+			expect(invoke(w, player, "Save", payload(w, item, { DraftId = draftId })).Ok).toBe(true)
+			expect(summary().InGameFiles).toBe(false)
+			w.rt:advance(1)
+			invoke(w, player, "Delete", draftId)
+		end
+	)
 end)

@@ -300,7 +300,25 @@ end
 -- "not a valid member" error like older Roblox clients (and the harness) give when unset.
 -- Animator:LoadAnimation also keeps the tracks it makes in the runtime's `loadedTracks`.
 -- Humanoid:GetState can be made to fail for other players' characters (`getStateTrap`).
+-- ContentProvider:PreloadAsync answers through the runtime's `preloadStatus(contentId)`
+-- (an Enum.AssetFetchStatus, or nil = no answer, like a download still going).
 local LuneEnum = require("@lune/roblox").Enum
+Dom.define("ContentProvider", {
+	PreloadAsync = function(self, list, callback)
+		local d = Dom.data(self)
+		local answer = d.world.preloadStatus
+		if not answer or type(callback) ~= "function" then
+			return
+		end
+		for _, thing in list do
+			local id = if type(thing) == "string" then thing else thing.AnimationId
+			local status = answer(id)
+			if status then
+				callback(id, status)
+			end
+		end
+	end,
+})
 Dom.define("Animator", {
 	EvaluationThrottled = {
 		get = function(_, d)
@@ -597,18 +615,73 @@ describe("SkinWalk (client)", function()
 		for i = loads + 1, #again do
 			expect(again[i].IsPlaying).toBe(false)
 		end
-		-- an animation that never loads (not the owner's) is skipped, with one warning in Studio
+		-- an animation that never loads (not the owner's) is skipped after LoadGiveUpSeconds
+		-- (not before: a slow download isn't a failure), with one warning in Studio
+		local function warningsFor(id: string): number
+			local n = 0
+			for _, w in c.rt.warnings do
+				if string.find(w, "animation " .. id .. " didn't load", 1, true) then
+					n += 1
+				end
+			end
+			return n
+		end
+		root.AssemblyLinearVelocity = c.env.Vector3.new(10, 0, 0)
 		mine:SetAttribute("SkinMotionIds", "Walk=44")
-		c.rt:advance(cfg.LoadCheckSeconds + 0.5)
-		local warnings = 0
-		for _, w in c.rt.warnings do
-			if string.find(w, "animation 44 didn't load", 1, true) then
-				warnings += 1
+		c.rt:advance(cfg.LoadGiveUpSeconds - 1)
+		expect(warningsFor("44")).toBe(0)
+		local never = c.rt.loadedTracks[#c.rt.loadedTracks]
+		expect(never.IsPlaying).toBe(true) -- kept (and asked to play) while it may still download
+		c.rt:advance(1.5)
+		expect(warningsFor("44")).toBe(1)
+		expect(never.IsPlaying).toBe(false)
+	end)
+
+	it("waits for slow downloads, and drops at once what Roblox says failed", function()
+		local c = client({ studio = true })
+		local cfg = c.Config.SkinMotion
+		c.rt.loadedTracks = {}
+		c.rt.preloadStatus = function(id: string)
+			return if string.find(id, "66", 1, true)
+				then c.env.Enum.AssetFetchStatus.Failure
+				else nil
+		end
+		local _, mine = rigFor(c, "SlowRig", "R15", 0, 0, c.me)
+		local root = mine.HumanoidRootPart
+		mine:SetAttribute("SkinMotionIds", "Walk=55;Run=66")
+		c.rt:advance(0.2)
+		local walk, run
+		for _, track in c.rt.loadedTracks do
+			local id = string.match(track.Animation.AnimationId, "%d+")
+			if id == "55" then
+				walk = track
+			elseif id == "66" then
+				run = track
 			end
 		end
-		expect(warnings).toBe(1)
-		root.AssemblyLinearVelocity = c.env.Vector3.new(10, 0, 0)
+		expect(walk and run).toBeTruthy()
+		-- the run failed (not the owner's): dropped straight away, running uses the walk
 		c.rt:advance(0.2)
-		expect(c.rt.loadedTracks[#c.rt.loadedTracks].IsPlaying).toBe(false)
+		local warned = 0
+		for _, w in c.rt.warnings do
+			if string.find(w, "animation 66 didn't load", 1, true) then
+				warned += 1
+			end
+		end
+		expect(warned).toBe(1)
+		expect(run.IsPlaying).toBe(false)
+		-- the walk is still downloading 10 seconds later (a phone joining): kept, never warned
+		c.rt:advance(10)
+		for _, w in c.rt.warnings do
+			expect(string.find(w, "animation 55", 1, true)).toBeNil()
+		end
+		Dom.rawSet(walk, "Length", 1) -- now it has loaded
+		root.AssemblyLinearVelocity = c.env.Vector3.new(0, 0, cfg.RunSpeed + 5)
+		c.rt:advance(0.2)
+		expect(walk.IsPlaying).toBe(true) -- running plays the walk (the run failed)
+		-- loaded tracks are never given up later
+		c.rt:advance(cfg.LoadGiveUpSeconds + 1)
+		expect(walk.IsPlaying).toBe(true)
+		c.rt.preloadStatus = nil
 	end)
 end)

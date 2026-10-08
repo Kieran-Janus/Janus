@@ -48,17 +48,22 @@ return {
 	Panel = {
 		Width = 440, -- on a PC the panel sits on the right, this wide
 		Margin = 8, -- gap from the screen edges
-		PhoneHeightScale = 0.55, -- on phones it is a sheet along the bottom, this much of the screen...
-		PhoneMinHeight = 250, -- ...but never shorter than this (phones on their side are short)
-		PhoneWideWidth = 600, -- a phone screen this wide puts the tabs and buttons in one row each
-		PhoneTabWidth = 84, -- a tab or footer button in that one-row layout
+		-- On phones (on their side) it is a full-height column on the right, this much of the
+		-- screen wide, so your character in the middle stays half in view...
+		PhoneWidthScale = 0.5,
+		PhoneMinWidth = 340, -- ...but never narrower than this (room for the controls)...
+		PhoneMaxWidth = 460, -- ...or wider than this
+		PhonePreviewSize = 96, -- phones: the small turning preview, just left of the panel...
+		PhonePreviewTop = 80, -- ...this far down (below the round info at the top)
 		HeaderHeight = 132,
 		TabHeight = 36,
 		FooterHeight = 112,
-		PhoneFooterHeight = 110,
+		PhoneFooterHeight = 48, -- phones: just the buttons (messages pop up in a bubble)
 		RowHeight = 34, -- one control (PC)
 		PhoneRowHeight = 44, -- one control on phones (44 = big enough for a finger)
-		PreviewSize = 112, -- the small turning preview in the header (PC only)
+		PreviewSize = 112, -- the small turning preview in the header (PC)
+		StatusSeconds = 6, -- phones: help and messages pop up in a bubble this long (tap it to close)
+		DragDeadZone = 12, -- phones: a finger moves this far (pixels) sideways before a slider moves
 	},
 	PreviewSpinSeconds = 6, -- one turn of the header preview
 	Turntable = { Seconds = 8, Distance = 9, Height = 2 }, -- the camera circling you
@@ -123,6 +128,7 @@ return {
 	Text = {
 		Title = "Skin Studio",
 		NotAllowed = "Not allowed: Skin Studio is for admins in Studio.",
+		SwitchedOff = "Skin Studio is switched off: set SkinStudio = true in src/shared/Config/Features.luau.",
 		SlowDown = "Slow down!",
 		Broken = "That went wrong: %s",
 		Opened = "Skin Studio opened.",

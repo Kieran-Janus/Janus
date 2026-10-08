@@ -12,7 +12,9 @@
 	  EquipItem(slot, itemId or "") -> State
 	Server -> client: ShopState(State) whenever it changes for another reason (VIP, packs).
 	Skin Studio (admins in Studio): ShopService.SetSkinOverride(player, item?) wears a draft
-	skin instead of the equipped one; ShopService.SkinOverride(player) reads it.
+	skin instead of the equipped one; ShopService.SkinOverride(player) reads it. Choosing a
+	skin yourself (buying or equipping one: Shop, Menu > Skins, a crate's Equip) takes the
+	draft off, so what you picked is what you wear.
 ]]
 
 local Players = game:GetService("Players")
@@ -78,7 +80,8 @@ end
 
 -- Skin Studio: wear `item` in the Skin slot instead of the equipped skin (no ownership check:
 -- SkinStudioService only calls this for admins; the save never changes). nil = back to normal.
--- Dress (and so every respawn) uses it until it is cleared or the player leaves.
+-- Dress (and so every respawn) uses it until it is cleared, the player picks a skin in the
+-- shop (onBuy / onEquip) or the player leaves.
 function ShopService.SetSkinOverride(player: Player, item: any?)
 	skinOverrides[player] = item
 end
@@ -158,6 +161,9 @@ local function onBuy(player: Player, itemId: unknown): (boolean, string, State)
 	data.Owned[item.Id] = true
 	-- Wear new things straight away; that's what players expect after buying.
 	data.Equipped[item.Slot] = item.Id
+	if item.Slot == "Skin" then
+		skinOverrides[player] = nil -- (a Skin Studio draft comes off: they chose this one)
+	end
 	ShopService.Dress(player)
 	return true, "Bought " .. item.Name .. "!", ShopService.State(player)
 end
@@ -178,6 +184,9 @@ local function onEquip(player: Player, slot: unknown, itemId: unknown): State
 			return ShopService.State(player)
 		end
 		data.Equipped[slot] = item.Id
+	end
+	if slot == "Skin" then
+		skinOverrides[player] = nil -- (a Skin Studio draft comes off: they chose this one)
 	end
 	ShopService.Dress(player)
 	return ShopService.State(player)

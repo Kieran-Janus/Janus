@@ -56,6 +56,7 @@
 ]]
 
 local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
 
 local Config = require(script.Parent.Config)
 local CustomAssets = require(script.Parent.CustomAssets)
@@ -1337,6 +1338,27 @@ local function hasMarks(m: Model): boolean
 	return false
 end
 
+-- In Studio the server says once, in Output, what's wrong with a custom model's Animate
+-- marks: a wrong one stops that part moving at all (docs/CUSTOMIZE.md, "Animate parts of
+-- your own model"). Skin Studio's Animate tab shows the same.
+local warnedMarks: { [string]: boolean } = {}
+local function warnMarks(name: string)
+	if not (RunService:IsStudio() and RunService:IsServer()) then
+		return
+	end
+	local template = CustomAssets.Find("Cosmetics", name)
+	if not template then
+		return
+	end
+	for _, problem in SkinAnimate.ModelProblems(template) do
+		local key = name .. "|" .. problem
+		if not warnedMarks[key] then
+			warnedMarks[key] = true
+			warn(("[Cosmetics] your model %s: %s"):format(name, problem))
+		end
+	end
+end
+
 local MARK_KEYS = { "Animate", "Speed", "Amount", "Delay", "Every", "Axis", "Reverse", "Color2" }
 
 -- The middle of the parts' bounding box (world space).
@@ -2003,6 +2025,9 @@ local function wearSkin(character: Model, item: any, head: BasePart, root: BaseP
 		m:PivotTo(head.CFrame)
 		index = markHead(m)
 		marked = Config.Features.SkinAnimations and hasMarks(m)
+		if Config.Features.SkinAnimations then
+			warnMarks(modelIdOf(item))
+		end
 		rig = newRig(effects, m)
 		if rig then
 			rigHead(rig, m, head, true)

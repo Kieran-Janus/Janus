@@ -262,27 +262,31 @@ Then run the full check: [Test in Studio](#test-in-studio).
 
 ## Turn a feature off
 
-Something broken, or you just don't want it? Open `src/shared/Config/Features.luau`, change `true` to `false` on its line, and save. Rojo syncs it; press Play again. Everything else keeps working. Change it back to `true` to bring it back.
+Something broken, or you just don't want it? Open `src/shared/Config/Features.luau`, find the feature's line by its name (Ctrl+F; there is one line per feature), change `true` to `false` on that line, and save. Rojo syncs it; press Play again. Everything else keeps working. Change it back to `true` to bring it back.
 
 | Feature | The line in `src/shared/Config/Features.luau` |
 | --- | --- |
-| Ready pad (off = everyone in the lobby plays every round) | line 13: `ReadyPad = true,` |
-| Watching the round from the lobby (Menu > Spectate) | line 14: `LobbySpectate = true,` |
-| Top-left Menu (off = the old column of buttons comes back) | line 15: `Menu = true,` |
-| King Hunt mode | line 16: `KingHunt = true,` |
-| Pumpkin Hide & Seek mode | line 17: `HideSeek = true,` |
-| ScareMaze mode | line 18: `ScareMaze = true,` |
-| Parkour course | line 19: `Parkour = true,` |
-| Candy Rush | line 20: `CandyRush = true,` |
-| Web Scour | line 21: `WebScour = true,` |
-| Tormented Tower | line 22: `TowerParkour = true,` |
-| Photo Spot dances | line 23: `Dances = true,` |
-| Secret pumpkins (Easter eggs) | line 24: `EasterEggs = true,` |
-| Crates (all of them) | line 25: `Crates = true,` |
-| Robux crates only (coin crates stay) | line 26: `RobuxCrates = true,` |
-| CRAZY skins' animations (rainbow, orbiting pieces, pulsing glow) | line 27: `SkinEffects = true,` |
-| The old first-round tutorial (already off) | line 28: `Tutorial = false,` |
-| Round maps coming alive (bobbing pumpkins, fireflies, wobbling Hide & Seek pumpkins; only on screens) | line 29: `MapLife = true,` |
+| Ready pad (off = everyone in the lobby plays every round) | `ReadyPad = true,` |
+| Watching the round from the lobby (Menu > Spectate) | `LobbySpectate = true,` |
+| Top-left Menu (off = the old column of buttons comes back) | `Menu = true,` |
+| Skin Studio, the skin editor for admins in Studio (players never see it) | `SkinStudio = true,` |
+| King Hunt mode | `KingHunt = true,` |
+| Pumpkin Hide & Seek mode | `HideSeek = true,` |
+| ScareMaze mode | `ScareMaze = true,` |
+| Parkour course | `Parkour = true,` |
+| Candy Rush | `CandyRush = true,` |
+| Web Scour | `WebScour = true,` |
+| Tormented Tower | `TowerParkour = true,` |
+| Photo Spot dances | `Dances = true,` |
+| Secret pumpkins (Easter eggs) | `EasterEggs = true,` |
+| Crates (all of them) | `Crates = true,` |
+| Robux crates only (coin crates stay) | `RobuxCrates = true,` |
+| CRAZY skins' animations (rainbow, orbiting pieces, pulsing glow) | `SkinEffects = true,` |
+| Skin pieces that move or change colour (flapping wings, wagging tails, spinning heads) | `SkinAnimations = true,` |
+| Skins that change how you walk (Zombie, Ghost, Robot... and uploaded walk animations) | `WalkStyles = true,` |
+| Real Roblox catalog hats and clothes in skins (already off: `true` turns it on, test in Studio first) | `SkinCatalog = false,` |
+| The old first-round tutorial (already off) | `Tutorial = false,` |
+| Round maps coming alive (bobbing pumpkins, fireflies, wobbling Hide & Seek pumpkins; only on screens) | `MapLife = true,` |
 
 Good to know:
 - A switched-off lobby area (parkour, Candy Rush, crates, Ready pad) is taken out of the running game. Your saved place still has it, so switching it back on brings it back.
