@@ -78,6 +78,7 @@ local Config = {
 	Skins = require(script.Skins.Settings),
 	SkinAnimate = require(script.SkinAnimate),
 	SkinMotion = require(script.SkinMotion),
+	SkinCatalog = require(script.SkinCatalog),
 	Menu = require(script.Menu),
 	Dances = require(script.Dances),
 	TowerParkour = require(script.TowerParkour),

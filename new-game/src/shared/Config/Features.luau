@@ -27,6 +27,7 @@ return {
 	SkinEffects = true, -- CRAZY skins' animated rainbow, orbiting pieces and pulsing glow
 	SkinAnimations = true, -- skin pieces that move or change colour (Style.Animate: flapping wings, wagging tails...)
 	WalkStyles = true, -- skins that change how you walk (Style.Motion: Zombie, Ghost, Robot...)
+	SkinCatalog = false, -- real Roblox catalog hats and clothes in skins (Style.Catalog; test in Studio first)
 	Tutorial = false, -- Boo Guide's first-round tips (removed in v2; true brings them back)
 	MapLife = true, -- round maps come alive on each screen: bobbing pumpkins, fireflies, wobbling decoys
 }

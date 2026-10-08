@@ -16,6 +16,8 @@
 	Cosmetics.MovingPatterns               the patterns whose pieces can move (Wings, Tail, Cape)
 	Cosmetics.BodyParts(character) -> { BasePart }   the body parts a skin paints, in a fixed
 	                                       order (never HumanoidRootPart)
+	Cosmetics.OnSkinChanged(fn) -> disconnect   server: fn(character, item?) runs after a skin
+	                                       goes on (item) or is taken off on its own (nil)
 
 	Hats are built with y = 0 at the top of the head; pets around their own centre; skin head
 	pieces (src/shared/HeadPieces.luau) around the centre of the head.
@@ -36,6 +38,9 @@
 	            each player's own screen (src/client/SkinAnim.luau)
 	  Motion    a walk style (src/shared/SkinMotion.luau): the character attributes
 	            SkinMotion / SkinMotionIds, posed by src/client/SkinWalk.luau
+	  Catalog   real Roblox catalog accessories and clothes (src/shared/SkinCatalog.luau), put
+	            on by src/server/Services/SkinCatalogService.luau when OnSkinChanged fires.
+	            They are marked SkinCatalog = true, so a head piece never hides them.
 	Everything a skin changes on the avatar is remembered in attributes ("Skin_*") and put
 	back by TakeOff; everything it adds lives in the character's Cosmetic_Skin model, which
 	TakeOff deletes. A CRAZY skin's model has the tag Tags.SkinFx so SkinFx can find it; a
@@ -1847,6 +1852,8 @@ local function weldAll(m: Model, to: BasePart)
 end
 
 local STASH = "SkinStash"
+-- A character has at most one of each of these.
+local ONE_ONLY = { BodyColors = true, Shirt = true, Pants = true, ShirtGraphic = true }
 
 remember = function(instance: Instance, property: string, value: any)
 	local key = "Skin_" .. property
@@ -1886,7 +1893,13 @@ local function restoreSkin(character: Model)
 	local stash = character:FindFirstChild(STASH)
 	if stash then
 		for _, child in stash:GetChildren() do
-			child.Parent = character
+			if ONE_ONLY[child.ClassName] and character:FindFirstChildOfClass(child.ClassName) then
+				-- Something newer took its place while it was put away (a catalog item's apply
+				-- makes a new BodyColors or Shirt): the newer one wins, no doubles.
+				child:Destroy()
+			else
+				child.Parent = character
+			end
 		end
 		stash:Destroy()
 	end
@@ -1906,11 +1919,12 @@ local function stashIn(character: Model): Folder
 	return folder
 end
 
--- Accessories (hair, hats from the avatar) attached to the head.
+-- Accessories (hair, hats from the avatar) attached to the head. Not the skin's own catalog
+-- items (SkinCatalog = true): the skin asked for those, so they stay visible.
 local function headAccessories(character: Model, head: BasePart): { BasePart }
 	local list = {}
 	for _, child in character:GetChildren() do
-		if child:IsA("Accessory") then
+		if child:IsA("Accessory") and child:GetAttribute("SkinCatalog") ~= true then
 			local handle = child:FindFirstChild("Handle")
 			if handle and handle:IsA("BasePart") then
 				for _, j in handle:GetChildren() do
@@ -2042,7 +2056,32 @@ local function headPivot(character: Model): BasePart?
 	return nil
 end
 
-function Cosmetics.TakeOff(character: Model, slot: string)
+-- Server listeners told when a character's skin changes (SkinCatalogService).
+local skinListeners: { (Model, any?) -> () } = {}
+
+function Cosmetics.OnSkinChanged(fn: (Model, any?) -> ()): () -> ()
+	table.insert(skinListeners, fn)
+	return function()
+		local i = table.find(skinListeners, fn)
+		if i then
+			table.remove(skinListeners, i)
+		end
+	end
+end
+
+local function skinChanged(character: Model, item: any?)
+	for _, fn in table.clone(skinListeners) do
+		local ok, err = pcall(function(): any
+			fn(character, item)
+			return nil
+		end)
+		if not ok then
+			warn("[Cosmetics] an OnSkinChanged listener failed: " .. tostring(err))
+		end
+	end
+end
+
+local function takeOff(character: Model, slot: string)
 	if slot == "Skin" then
 		restoreSkin(character)
 		-- A hat welded to the moving head piece goes back onto the head before the head piece
@@ -2076,6 +2115,13 @@ function Cosmetics.TakeOff(character: Model, slot: string)
 	end
 end
 
+function Cosmetics.TakeOff(character: Model, slot: string)
+	takeOff(character, slot)
+	if slot == "Skin" then
+		skinChanged(character, nil)
+	end
+end
+
 -- Puts `item` on `character` (server). Returns false if the character isn't ready.
 function Cosmetics.Wear(character: Model, item: any): boolean
 	local head = character:FindFirstChild("Head") :: BasePart?
@@ -2083,9 +2129,11 @@ function Cosmetics.Wear(character: Model, item: any): boolean
 	if not head or not root then
 		return false
 	end
-	Cosmetics.TakeOff(character, item.Slot)
+	takeOff(character, item.Slot)
 	if item.Slot == "Skin" then
-		return wearSkin(character, item, head, root)
+		local worn = wearSkin(character, item, head, root)
+		skinChanged(character, item)
+		return worn
 	end
 	if item.Slot == "Trail" then
 		local a0 = Instance.new("Attachment")
