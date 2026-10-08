@@ -832,8 +832,9 @@ function SkinAnimate.Offset(effect: Effect, t: number, side: number?): CFrame
 	elseif name == "Wobble" or name == "Wag" then
 		return turn(ax, math.rad(p.Degrees * a * math.sin(angle(effect, t, p.Seconds))))
 	elseif name == "Flap" then
+		-- each wing swings its tip backward (toward the other wing) and open again, mirrored
 		local wave = 0.5 + 0.5 * math.sin(angle(effect, t, p.Seconds))
-		return turn(ax, math.rad((side or 1) * p.Degrees * a * wave))
+		return turn(ax, math.rad(-(side or 1) * p.Degrees * a * wave))
 	elseif name == "Breathe" then
 		local s = math.sin(angle(effect, t, p.Seconds))
 		return CFrame.new(0, p.Height * a * s, 0) * turn(ax, math.rad(p.Degrees * a * s))

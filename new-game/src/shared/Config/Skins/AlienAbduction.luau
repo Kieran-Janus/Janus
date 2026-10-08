@@ -309,6 +309,18 @@ return {
 			Glow = { Color = rgb(90, 255, 220), Brightness = 3, Range = 16 },
 			Aura = { Kind = "Sparkles", Color = rgb(120, 255, 230), Color2 = rgb(200, 120, 255) },
 			Crazy = { Rainbow = true, Pulse = true, Orbit = "Stars", Count = 5, Effect = "UfoBeam" },
+			Animate = {
+				{ Effect = "Float", Target = "Head", Speed = 0.6, Amount = 0.7 },
+				{ Effect = "Spin", Target = "Part:PlanetRing", Speed = 0.5 },
+				{ Effect = "Breathe", Target = "Cape", Amount = 2 },
+				{
+					Effect = "ColorCycle",
+					Target = "Glow",
+					Colors = { rgb(90, 255, 220), rgb(200, 120, 255) },
+				},
+				{ Effect = "SparkleBurst", Every = 4, Count = 20 },
+			} :: { any }, -- (effects differ in shape)
+			Motion = "Robot",
 		},
 	},
 } :: { any }

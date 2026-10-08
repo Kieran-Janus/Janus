@@ -210,6 +210,9 @@ return {
 			HeadColor2 = rgb(255, 225, 240),
 			Glow = { Color = rgb(255, 120, 200) },
 			Aura = { Kind = "Bubbles", Color = rgb(255, 180, 230), Color2 = rgb(255, 255, 255) },
+			Animate = {
+				{ Effect = "Flap", Target = "Wings", Speed = 1.3 },
+			} :: { any }, -- (effects differ in shape)
 		},
 	},
 	{
@@ -226,6 +229,9 @@ return {
 			GlowColor = rgb(255, 120, 200),
 			Glow = { Color = rgb(200, 170, 255) },
 			Aura = { Kind = "Hearts", Color = rgb(255, 140, 200), Color2 = rgb(200, 170, 255) },
+			Animate = {
+				{ Effect = "Wag", Target = "Tail" },
+			} :: { any }, -- (effects differ in shape)
 		},
 	},
 
@@ -243,6 +249,12 @@ return {
 			Glow = { Color = rgb(255, 120, 220), Brightness = 2.2, Range = 14 },
 			Aura = { Kind = "Hearts", Color = rgb(255, 140, 200) },
 			Crazy = { Rainbow = true, Pulse = true, Orbit = "Candies", Count = 4 },
+			Animate = {
+				{ Effect = "Bob", Target = "Head", Speed = 1.8 },
+				{ Effect = "Wobble", Target = "Head", Speed = 0.9, Delay = 0.3 },
+				{ Effect = "SparkleBurst", Every = 2.5, Count = 15 },
+			} :: { any }, -- (effects differ in shape)
+			Motion = "Bouncy",
 		},
 	},
 } :: { any }

@@ -1006,6 +1006,52 @@ describe("Cosmetics: animated skins on characters", function()
 		Cosmetics.TakeOff(r15, "Skin")
 	end)
 
+	it("finds every target of every animated catalogue skin (no typo'd Part: names)", function()
+		local checked = 0
+		for _, item in skins() do
+			local effects = SkinAnimate.Normalize(item.Style.Animate, item.Style)
+			if not effects or #effects == 0 then
+				continue
+			end
+			checked += 1
+			for _, character in { r15, r6Body } do
+				Cosmetics.Wear(character, item)
+				local model = character.Cosmetic_Skin
+				local found = pivots(model)
+				for _, effect in effects do
+					local target = effect.Target
+					local ok
+					if SkinAnimate.IsMotion(effect.Effect) then
+						ok = if target == "Wings"
+							then found.WingL ~= nil and found.WingR ~= nil
+							else found[target] ~= nil
+					elseif target == "Glow" then
+						ok = model:FindFirstChild("SkinGlow", true) ~= nil
+					elseif target == "Aura" then
+						ok = model:FindFirstChildWhichIsA("ParticleEmitter", true) ~= nil
+					elseif target == "Body" then
+						ok = true
+					else
+						ok = #SkinAnimate.PartsFor(model, target) > 0
+					end
+					if not ok then
+						error(
+							("%s on %s: %s finds nothing on %s"):format(
+								item.Id,
+								character.Name,
+								effect.Effect,
+								target
+							)
+						)
+					end
+				end
+				Cosmetics.TakeOff(character, "Skin")
+			end
+		end
+		T.note(checked, "animated catalogue skins checked on R15 and R6")
+		expect(checked).toBeGreaterThan(10)
+	end)
+
 	it("turns a custom model's Animate attributes into moving groups (found by ModelId)", function()
 		local folder = rt:find("ReplicatedStorage.Custom.Cosmetics")
 		local custom = rt:create("Model", { Name = "Test_Robo" })

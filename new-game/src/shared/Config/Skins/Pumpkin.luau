@@ -46,6 +46,19 @@
 	                  Candies, Ghosts, Bones, Eyes, Stars, Bats), Count of them
 	                  CRAZY heads are one per crate: MegaGourd, SugarStorm, PhantomKing,
 	                  StarSkull, GloopMonster, MoonCrown, NightLord, DiscoDemon, StarVoyager
+	  Pieces that move or glow (Uncommon 1 effect, Rare 3, CRAZY 6; docs/CUSTOMIZE.md >
+	  "Animated skins"):
+	    Animate = { { Effect = "Flap", Target = "Wings" }, { Effect = "Pulse", Target = "Glow" } }
+	                  Moving: Spin, Bob, Float, Wobble, Flap, Wag, Breathe (Target Head, Wings,
+	                  Tail, Cape or "Part:<name>"). Colours: Pulse, ColorCycle, Flicker, Shimmer
+	                  (Target Glow, Head, Accents, a pattern like "Belt", Body or All).
+	                  SparkleBurst (Target Aura). Optional: Speed = 2, Amount = 0.5, Delay = 1,
+	                  Axis = "X", Colors = { rgb(...), rgb(...) } (ColorCycle), Every, Count.
+	                  CRAZY skins can't colour their accents or pulse their glow (CRAZY does).
+	                  End the list with } :: { any }, like the skins below that have one.
+	  Rare and up, a walk style:
+	    Motion = "Zombie"   Zombie, Mummy, Ghost, Robot, Bat, Sneaky, Bouncy or Proud, or your
+	                  own animations: Motion = { Walk = "rbxassetid://123", Idle = "..." }
 	How each rarity should look: Common = colours, materials and an accent; Uncommon = + a
 	head piece; Rare = + glow and particles; CRAZY = everything + rainbow + orbiting pieces.
 ]]
@@ -274,6 +287,10 @@ return {
 			GlowColor = rgb(255, 220, 90),
 			Glow = { Color = rgb(255, 180, 80), Brightness = 1.5 },
 			Aura = { Kind = "Sparkles", Color = rgb(255, 220, 120), Color2 = rgb(200, 140, 255) },
+			Animate = {
+				{ Effect = "Breathe", Target = "Cape" },
+				{ Effect = "Wobble", Target = "Head", Speed = 0.5, Amount = 0.5 },
+			} :: { any }, -- (effects differ in shape)
 		},
 	},
 	{
@@ -315,6 +332,13 @@ return {
 			Glow = { Color = rgb(255, 170, 60), Brightness = 2.2, Range = 14 },
 			Aura = { Kind = "Embers", Color = rgb(255, 210, 90) },
 			Crazy = { Rainbow = true, Pulse = true, Orbit = "Pumpkins", Count = 3 },
+			Animate = {
+				{ Effect = "Float", Target = "Head" },
+				{ Effect = "Shimmer", Target = "Head", Delay = 0.5 },
+				{ Effect = "Breathe", Target = "Cape" },
+				{ Effect = "SparkleBurst", Every = 4, Count = 18 },
+			} :: { any }, -- (effects differ in shape)
+			Motion = "Bouncy",
 		},
 	},
 } :: { any }

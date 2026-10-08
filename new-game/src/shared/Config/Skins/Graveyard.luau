@@ -261,6 +261,12 @@ return {
 			Glow = { Color = rgb(255, 220, 120), Brightness = 2.2, Range = 14 },
 			Aura = { Kind = "Stars", Color = rgb(255, 230, 140) },
 			Crazy = { Rainbow = true, Pulse = true, Orbit = "Bones", Count = 4 },
+			Animate = {
+				{ Effect = "Wobble", Target = "Head", Speed = 1.6, Amount = 1.2 },
+				{ Effect = "Shimmer", Target = "Head", Speed = 0.7 },
+				{ Effect = "SparkleBurst", Every = 3, Count = 20 },
+			} :: { any }, -- (effects differ in shape)
+			Motion = "Proud",
 		},
 	},
 } :: { any }
