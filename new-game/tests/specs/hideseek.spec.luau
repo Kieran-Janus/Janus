@@ -274,7 +274,7 @@ end)
 
 -- A round of Hide & Seek on the Pumpkin Farm, driven step by step. `setup(rt, players, map)`
 -- (optional) runs once the players' saves and the map are loaded, just before the round.
-local function newRound(playerCount: number, setup: ((any, { any }, any) -> ())?)
+local function newRound(playerCount: number, setup: ((any, { any }, any) -> ())?, mapId: string?)
 	local rt = Runtime.new()
 	local Config = rt:require("ReplicatedStorage.Shared.Config")
 	local DataService = rt:require("ServerScriptService.Server.Services.DataService")
@@ -287,7 +287,7 @@ local function newRound(playerCount: number, setup: ((any, { any }, any) -> ())?
 		table.insert(players, rt:addPlayer({ Name = "Player" .. i }))
 	end
 	rt:advance(1)
-	local map = MapService.Load("PumpkinFarm")
+	local map = MapService.Load(mapId or "PumpkinFarm")
 	if setup then
 		setup(rt, players, map)
 	end
@@ -296,7 +296,12 @@ local function newRound(playerCount: number, setup: ((any, { any }, any) -> ())?
 		Map = map,
 		Players = players,
 		Difficulty = "Easy",
-		Playlist = { Id = "HideSeekFarm", Mode = "HideSeek", Map = "PumpkinFarm", Name = "Test" },
+		Playlist = {
+			Id = "HideSeekTest",
+			Mode = "HideSeek",
+			Map = mapId or "PumpkinFarm",
+			Name = "Test",
+		},
 		SetState = function(s, timeLeft)
 			RS:SetAttribute("State", s)
 			RS:SetAttribute("TimeLeft", timeLeft)
@@ -842,5 +847,40 @@ describe("Hide & Seek through the real round loop", function()
 		local _, again = server:invokeServer(admin, players[1], "ForceHideSeek")
 		expect(again).toMatch("Hide")
 		expect(again == message).toBe(false)
+	end)
+end)
+
+describe("A Hide & Seek round on the Midnight Market", function()
+	it("hides, lets the seeker out and ends when every pumpkin is tagged", function()
+		local round = newRound(4, nil, "MidnightMarket")
+		local rt, RS = round.rt, round.RS
+		local cfg = round.Config.HideSeek
+		local seekers = round.withRole("Seeker")
+		local hiders = round.withRole("Hider")
+		expect(#seekers).toBe(1)
+		expect(#hiders).toBe(3)
+		for _, hider in hiders do
+			expect(round.pumpkinOf(hider)).toBeTruthy()
+		end
+		rt:advance(cfg.HeadStart + 0.5)
+		local seeker = seekers[1]
+		local Vector3, CFrame = rt.env.Vector3, rt.env.CFrame
+		for _, hider in hiders do
+			rt:advance(cfg.Gun.FireCooldown + 0.1)
+			local target = round.pumpkinOf(hider).PrimaryPart.Position
+			-- (close and from above: the market is full of crates and stalls)
+			seeker.Character:PivotTo(CFrame.new(target + Vector3.new(0, 5, 3), target))
+			local gun = seeker.Backpack:FindFirstChildOfClass("Tool")
+				or seeker.Character:FindFirstChildOfClass("Tool")
+			if gun then
+				gun.Parent = seeker.Character
+			end
+			rt:fireServer(round.shoot, seeker, target)
+		end
+		expect(RS:GetAttribute("HidersLeft")).toBe(0)
+		rt:advance(2)
+		expect(round.state.Done).toBe(true)
+		expect(round.state.Result.Winner).toBe(cfg.Text.SeekersWin)
+		expect(#rt.errors).toBe(0)
 	end)
 end)
