@@ -174,15 +174,15 @@ No picture yet: it only shows in a Studio playtest. Step by step: [`docs/CUSTOMI
 - **Real Roblox catalog items** (hats, back items, classic clothes) in skins, only items made by Roblox, you or your group, and only ids you approve. **Switched off** until you've tried it.
 - **Saving**: press **Save** in Skin Studio, then type **`/save-skins`** in Claude Code **before you press Stop** (drafts only live in the playtest). Claude Code writes them into the theme files, runs the tests, commits and pushes. **Copy code** in the Save tab always works as a backup. You don't need Studio API access for any of this: leave it off (turning it on makes Studio use your real save and the public leaderboard).
 - **Turn it off**: `SkinStudio = false,` in `src/shared/Config/Features.luau` hides the editor. Skins you already saved stay in the game as normal skins. The moving pieces have their own switch (`SkinAnimations = false,`), and so do walk styles (`WalkStyles = false,`). Catalog items are already off (`SkinCatalog = false,`). See [Turn a feature off](#turn-a-feature-off).
-- **Needs a check in Studio** (built and tested offline only, with no Studio here):
-  1. Open Skin Studio from the Menu and from F8, change something in every tab, and check your character updates within half a second and keeps the skin after a respawn. Close it by accident (Escape, M, the Shop) and open it again: nothing lost.
-  2. Moving pieces on R15 and R6 avatars: smooth while walking, jumping and dancing at the Photo Spot, still attached after a respawn, and the same on both screens in a 2-player test (Test > Clients and Servers).
-  3. Every walk style on R15 and R6. Ghost, Bat and Bouncy inside the Tormented Tower and the ScareMaze: you don't bump the ceiling.
-  4. A CRAZY skin (Mega Gourd Supreme): the rainbow and pulsing glow look as before, with no flicker.
-  5. A Hide & Seek hider wearing an animated skin: nothing moves, sparkles or changes colour.
-  6. Shop and crate cards of animated skins move (PC), and a phone (Test > Device) stays smooth with several animated skins in view.
-  7. `/save-skins` with the Studio MCP: save two drafts, run it before Stop, see ✓ in Skin Studio, press Stop, and the skins are in the Shop next playtest. Try Copy code once too.
-  8. Catalog items, only once you switch them on: the steps are in [`docs/CUSTOMIZE.md` > Way 3](CUSTOMIZE.md#way-3-your-own-model-in-studio-and-catalog-items).
+- **Checked in Studio on 8 October** (solo, 2 players, and 2 players on phone screens):
+  1. Skin Studio opens from the Menu and from F8, every tab works, a change reaches your character in about 0.4 s, the skin stays after a respawn, and closing it (M, the Shop) and opening it again loses nothing. (Escape wasn't tried: the test tool can't press it.)
+  2. Moving pieces stay attached on R15 and R6 while walking, jumping, dancing and after a respawn, and both screens show the same movement at the same moment. **Fixed:** on R6 avatars every skin lost its body colours.
+  3. All 8 walk styles change the pose on R6. Your own character is lifted 0.2 studs at most (Bouncy); the Tormented Tower has 7+ studs of headroom everywhere except under its spinning bars, and the ScareMaze has no roof.
+  4. Mega Gourd Supreme: smooth rainbow and pulsing glow, no flicker.
+  5. A Hide & Seek hider in Mega Gourd Supreme: nothing of the skin shows, moves, glows or sparkles on the seeker's screen.
+  6. Shop and crate cards move on PC (4 at a time, `Config.SkinAnimate.MaxPreviewMotion`). On phones the cards hold still (`PreviewMotionOnPhones`) and only the 4 nearest characters animate; 7 skinned characters in view cost no frame rate.
+  7. `/save-skins`: two drafts written into the theme files, ✓ shown, in the game after Stop and Play; Copy code works. **Fixed:** Skin Studio's close, Undo, Redo, remove and draft marks showed as empty boxes.
+  8. Catalog items: not tried (still switched off). The steps are in [`docs/CUSTOMIZE.md` > Way 3](CUSTOMIZE.md#way-3-your-own-model-in-studio-and-catalog-items).
 
 ### Top-left Menu
 No picture yet: you'll see it the moment you press Play.
