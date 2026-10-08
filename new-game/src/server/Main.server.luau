@@ -15,6 +15,7 @@ local ORDER = {
 	"HubService", -- early, so the hub spawn exists before characters load
 	"DataService",
 	"ShopService",
+	"SkinCatalogService", -- catalog items in skins (after ShopService: it re-dresses players)
 	"TutorialService", -- does nothing while Config.Features.Tutorial is off
 	"MonetizationService",
 	"CrateService", -- after Shop and Monetization (crates grant items and take Robux)
