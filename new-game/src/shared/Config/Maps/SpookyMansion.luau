@@ -36,7 +36,9 @@ return {
 		Orange = Color3.fromRGB(255, 130, 20),
 		Green = Color3.fromRGB(110, 200, 90),
 		Glow = Color3.fromRGB(255, 200, 90),
-		Slime = Color3.fromRGB(120, 255, 110),
+		Slime = Color3.fromRGB(120, 255, 110), -- also the portraits' glowing eyes
+		Moon = Color3.fromRGB(70, 95, 170), -- the moonlit windows on the outside walls
+		Panel = Color3.fromRGB(120, 78, 52), -- the wood panelling along the bottom of the inside walls
 	},
 	Layout = {
 		-- A 3x3 grid of rooms, listed north-west to south-east. The middle one is
@@ -54,6 +56,7 @@ return {
 		},
 		WallHeight = 16, -- inside walls
 		WallThickness = 2,
+		PanelHeight = 4, -- the dark wood panelling along the bottom of every inside wall
 		DoorWidth = 12,
 		DoorHeight = 11,
 		-- Extra gaps hidden behind a fake bookcase: players walk through, the King

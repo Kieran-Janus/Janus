@@ -54,6 +54,7 @@ describe("EasterEggRules", function()
 		expect(with({ InRound = true })).toBe("InRound")
 		expect(with({ SinceLastTry = 0 })).toBe("TooFast")
 		expect(with({ Distance = cfg.ReachDistance + 1 })).toBe("TooFar")
+		expect(with({ Teleported = true })).toBe("Teleported")
 	end)
 end)
 
@@ -189,8 +190,11 @@ local function toasts(rt: any, player: any): { any }
 	return out
 end
 
+-- Puts the player next to an egg and waits there as long as it takes to have walked (the
+-- anti-teleport check, Config.EasterEggs.AntiTeleport, only remembers WindowSeconds).
 local function standBy(rt: any, player: any, part: any, distance: number)
 	player.Character:PivotTo(rt.env.CFrame.new(part.Position + rt.env.Vector3.new(distance, 2, 0)))
+	rt:advance(cfg.AntiTeleport.WindowSeconds + 0.5)
 end
 
 describe("EasterEggService", function()
@@ -275,6 +279,39 @@ describe("EasterEggService", function()
 		expect(data.Receipts).toEqual({ "purchase-7" })
 		expect(data.Coins).toBe(0)
 		rt:removePlayer(player)
+		expect(#rt.errors).toBe(0)
+	end)
+
+	it("refuses an egg to someone who teleported to it (but not after a respawn)", function()
+		local rt = server()
+		local eggs = eggsIn(rt, rt.workspace.Hub)
+		local player = rt:addPlayer({ Name = "Hopper" })
+		rt:advance(1)
+		local data = rt:require("ServerScriptService.Server.Services.DataService").Get(player)
+		local shop = eggs.ShopPumpkin
+		local V3 = rt.env.Vector3
+		-- Standing far away for a while, then at the egg in an instant: refused.
+		player.Character:PivotTo(rt.env.CFrame.new(shop.Position + V3.new(200, 2, 200)))
+		rt:advance(3)
+		player.Character:PivotTo(rt.env.CFrame.new(shop.Position + V3.new(3, 2, 0)))
+		rt:triggerPrompt(shop:FindFirstChildOfClass("ProximityPrompt"), player)
+		expect(data.EasterEggs.ShopPumpkin).toBeNil()
+		-- Waiting a moment there doesn't help...
+		rt:advance(2)
+		rt:triggerPrompt(shop:FindFirstChildOfClass("ProximityPrompt"), player)
+		expect(data.EasterEggs.ShopPumpkin).toBeNil()
+		-- ...only once the jump is older than WindowSeconds (as long as walking would take).
+		rt:advance(cfg.AntiTeleport.WindowSeconds)
+		rt:triggerPrompt(shop:FindFirstChildOfClass("ProximityPrompt"), player)
+		expect(data.EasterEggs.ShopPumpkin).toBe(true)
+		-- A new character (a respawn, or back from a round) starts afresh.
+		local grave = eggs.GraveCandy
+		player.Character:PivotTo(rt.env.CFrame.new(grave.Position + V3.new(300, 2, 0)))
+		rt:advance(3)
+		rt:spawnCharacter(player, rt.env.CFrame.new(grave.Position + V3.new(2, 2, 0)))
+		rt:advance(1)
+		rt:triggerPrompt(grave:FindFirstChildOfClass("ProximityPrompt"), player)
+		expect(data.EasterEggs.GraveCandy).toBe(true)
 		expect(#rt.errors).toBe(0)
 	end)
 

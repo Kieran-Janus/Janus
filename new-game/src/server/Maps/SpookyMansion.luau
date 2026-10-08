@@ -583,6 +583,76 @@ local function buildSegment(
 			Color = colors.Wall,
 			Material = Enum.Material.Plaster,
 		}, parent)
+		-- Old-house dressing on both faces: dark wood panels below a rail, a gold crown along
+		-- the top, and a portrait with glowing eyes on longer walls. Decoration only.
+		local function along(offset: number, y: number): Vector3
+			return if vertical
+				then MapBase.at(ctx, fixed, mid + offset, y)
+				else MapBase.at(ctx, mid + offset, fixed, y)
+		end
+		local function slab(extra: number, height: number, len: number): Vector3
+			return if vertical
+				then Vector3.new(t + extra, height, len)
+				else Vector3.new(len, height, t + extra)
+		end
+		Kit.decor({
+			Name = "Crown",
+			Size = slab(0.6, 0.6, length),
+			CFrame = CFrame.new(along(0, y1 - 0.3)),
+			Color = colors.Gold:Lerp(colors.Trim, 0.55),
+			Material = Enum.Material.Wood,
+		}, parent)
+		if y0 == 0 and length >= 3 then
+			local panel = layout.PanelHeight or 4
+			Kit.decor({
+				Name = "Panelling",
+				Size = slab(0.25, panel, length),
+				CFrame = CFrame.new(along(0, panel / 2)),
+				Color = colors.Panel or colors.Wood,
+				Material = Enum.Material.WoodPlanks,
+			}, parent)
+			Kit.decor({
+				Name = "Rail",
+				Size = slab(0.5, 0.4, length),
+				CFrame = CFrame.new(along(0, panel + 0.2)),
+				Color = colors.Trim,
+				Material = Enum.Material.Wood,
+			}, parent)
+		end
+		if y0 == 0 and length >= 12 then
+			local portrait = Kit.model("Portrait", parent)
+			local tints = { colors.Curtain, colors.RugAlt, colors.Plant, colors.Trim }
+			local tint = tints[(math.floor(math.abs(mid) + math.abs(fixed)) % #tints) + 1]
+			Kit.decor({
+				Name = "Frame",
+				Size = slab(0.4, 5.6, 4.4),
+				CFrame = CFrame.new(along(0, 8.5)),
+				Color = colors.Gold,
+				Material = Enum.Material.Wood,
+			}, portrait)
+			Kit.decor({
+				Name = "Canvas",
+				Size = slab(0.6, 4.6, 3.4),
+				CFrame = CFrame.new(along(0, 8.5)),
+				Color = tint,
+				Material = Enum.Material.Fabric,
+			}, portrait)
+			for _, face in { -1, 1 } do
+				for _, eye in { -0.6, 0.6 } do
+					local normal = (t / 2 + 0.35) * face
+					Kit.decor({
+						Name = "Eye",
+						Shape = Enum.PartType.Ball,
+						Size = Vector3.new(0.45, 0.45, 0.45),
+						Position = if vertical
+							then MapBase.at(ctx, fixed + normal, mid + eye, 9.2)
+							else MapBase.at(ctx, mid + eye, fixed + normal, 9.2),
+						Color = colors.Slime,
+						Material = Enum.Material.Neon,
+					}, portrait)
+				end
+			end
+		end
 		-- Dark skirting board along the bottom.
 		if y0 == 0 then
 			Kit.decor({
@@ -731,6 +801,79 @@ function SpookyMansion.Build(def: any): Model
 				colors.Bone,
 				room.Model
 			)
+		end
+		-- Tall moonlit windows on the mansion's outside walls (cold blue glow, no lights).
+		for _, side in
+			{ { col == 0, -1, 0 }, { col == 2, 1, 0 }, { row == 0, 0, -1 }, { row == 2, 0, 1 } }
+		do
+			if side[1] then
+				local dx, dz = side[2], side[3]
+				local wallAt = cell / 2 + 0.1
+				local base = room.Center + Vector3.new(dx * wallAt, 0, dz * wallAt)
+				local across = if dx ~= 0 then Vector3.new(0, 0, 1) else Vector3.new(1, 0, 0)
+				local window = Kit.model("Window", room.Model)
+				local function box(
+					partName: string,
+					offset: Vector3,
+					size: Vector3,
+					color: Color3,
+					material: Enum.Material
+				)
+					local s = if dx ~= 0 then Vector3.new(size.Z, size.Y, size.X) else size
+					Kit.decor({
+						Name = partName,
+						Size = s,
+						Position = base + offset,
+						Color = color,
+						Material = material,
+					}, window)
+				end
+				local glass = colors.Moon or Color3.fromRGB(70, 95, 170)
+				box(
+					"Glass",
+					Vector3.new(0, 8, 0),
+					Vector3.new(5, 8, 0.3),
+					glass,
+					Enum.Material.Neon
+				)
+				box(
+					"Sill",
+					Vector3.new(0, 3.8, 0),
+					Vector3.new(6.4, 0.5, 1),
+					colors.Trim,
+					Enum.Material.Wood
+				)
+				box(
+					"Arch",
+					Vector3.new(0, 12.3, 0),
+					Vector3.new(6.4, 0.8, 0.8),
+					colors.Trim,
+					Enum.Material.Wood
+				)
+				box(
+					"MullionV",
+					Vector3.new(0, 8, 0),
+					Vector3.new(0.4, 8, 0.6),
+					colors.Trim,
+					Enum.Material.Wood
+				)
+				box(
+					"MullionH",
+					Vector3.new(0, 8.6, 0),
+					Vector3.new(5, 0.4, 0.6),
+					colors.Trim,
+					Enum.Material.Wood
+				)
+				for _, edge in { -1, 1 } do
+					box(
+						"Jamb",
+						across * edge * 2.9 + Vector3.new(0, 8, 0),
+						Vector3.new(0.8, 8.6, 0.8),
+						colors.Trim,
+						Enum.Material.Wood
+					)
+				end
+			end
 		end
 		local fill =
 			Kit.holder("RoomLight", c(room, 0, layout.WallHeight - 1, 0), Vector3.one, room.Model)

@@ -21,6 +21,7 @@ local ORDER = {
 	"RewardsService",
 	"AdminService",
 	"MapService",
+	"MapVisitService", -- Studio only: F8 "Visit map" and the name finder
 	"NoiseService",
 	"SprintService",
 	"ShoutService",

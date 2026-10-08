@@ -1569,6 +1569,15 @@ local Config = {
 		OpenKey = Enum.KeyCode.F8,
 		AllowInLiveServers = false, -- false = only in Studio playtests
 		CoinsPerClick = 1000,
+		-- Studio-only looking tools in the same panel (src/server/Services/MapVisitService.luau,
+		-- src/client/NameFinder.luau): "Visit map: ..." walks you round a round map between
+		-- rounds; "Name finder on/off" shows the name of anything you click, to copy and send.
+		Tools = {
+			VisitAttribute = "VisitingMap", -- set on a player while they visit a map
+			NameFinderAttribute = "NameFinder", -- set on a player while the name finder is on
+			NameFinderRange = 600, -- studs: how far a click looks for something
+			NameFinderHighlight = Color3.fromRGB(80, 255, 140), -- outline on the clicked thing
+		},
 	},
 
 	-- Saved player data. A new saved field only needs a line in Template: old saves get the

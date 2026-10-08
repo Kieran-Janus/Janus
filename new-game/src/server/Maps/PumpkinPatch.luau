@@ -586,6 +586,40 @@ function PumpkinPatch.Build(def: any): Model
 	buildField(ctx, model)
 	buildGraveyard(ctx, model)
 
+	-- Trodden dirt: a patch in the spawn clearing and a path out to each area, so the open
+	-- ground reads as a farm and players can see where to go. Flat decoration only.
+	local paths = Kit.group("Paths", model)
+	local pathWidth: number = layout.PathWidth or 7
+	Kit.decor({
+		Name = "ClearingDirt",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.2, layout.ClearingRadius * 1.3, layout.ClearingRadius * 1.3),
+		CFrame = CFrame.new(MapBase.at(ctx, 0, 0, 0.06)) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = colors.Dirt,
+		Material = Enum.Material.Ground,
+	}, paths).CastShadow =
+		false
+	for _, area in { layout.CornMaze, layout.Barn, layout.Field, layout.Graveyard } do
+		local to = Vector3.new(area.Offset.X, 0, area.Offset.Z)
+		local edge = math.min(area.Size.X, area.Size.Z) / 2
+		local length = to.Magnitude - edge - layout.ClearingRadius * 0.5
+		if length > 2 then
+			local dir = to.Unit
+			local mid = dir * (layout.ClearingRadius * 0.5 + length / 2)
+			Kit.decor({
+				Name = "Path",
+				Size = Vector3.new(pathWidth, 0.12, length),
+				CFrame = CFrame.lookAt(
+					MapBase.at(ctx, mid.X, mid.Z, 0.06),
+					MapBase.at(ctx, to.X, to.Z, 0.06)
+				),
+				Color = colors.Dirt,
+				Material = Enum.Material.Ground,
+			}, paths).CastShadow =
+				false
+		end
+	end
+
 	-- The spawn clearing: a big scarecrow lantern in the middle of the spawn ring.
 	local centre = Kit.model("Clearing", model)
 	scarecrow(ctx, CFrame.new(MapBase.at(ctx, 0, 0, 0)), centre)

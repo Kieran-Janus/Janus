@@ -33,6 +33,7 @@ local ORDER = {
 	"RewardsUI",
 	"SettingsUI",
 	"AdminUI",
+	"NameFinder", -- Studio only: F8 > "Name finder on/off" shows what anything is called
 	"KingHeardUI",
 	"RoundJuiceUI",
 	"TutorialUI", -- does nothing while Config.Features.Tutorial is off

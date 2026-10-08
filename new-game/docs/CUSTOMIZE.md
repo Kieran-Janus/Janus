@@ -8,7 +8,7 @@ The game is built so you can change almost anything without touching code. There
 | **2. Custom models** | How every character, NPC, hat, pet, skin and decoration *looks* (one model swaps every copy) | Studio: `ReplicatedStorage > Custom` | Build or import a model, give it the right name. |
 | **3. Code** | New behaviour (a new monster, mode, item type) | `src/` | Ask Claude Code with a slash command (bottom of this page). |
 
-Test anything fast in a Studio playtest with **F8** (admin panel; phones get an Admin button at the top right): + Coins, Unlock all items, Reset daily reward, **Rebuild hub**, **Repaint hub**, **Apply custom props**, Reset my save, Start round now, Force mode, plus buttons the v2 features add (parkour, Candy Rush, Web Scour, Easter eggs, crates). It only works in Studio unless you turn it on for live servers (`Config.Admin`).
+Test anything fast in a Studio playtest with **F8** (admin panel; phones get an Admin button at the top right): + Coins, Unlock all items, Reset daily reward, **Rebuild hub**, **Repaint hub**, **Apply custom props**, Reset my save, Start round now, Force mode, plus buttons the v2 features add (parkour, Candy Rush, Web Scour, Easter eggs, crates), **Visit map** and the **Name finder** ([Maps](#maps)). It only works in Studio unless you turn it on for live servers (`Config.Admin`).
 
 Every v2 feature has an on/off switch in `src/shared/Config/Features.luau`. New to v2? Start with [`docs/V2-CHANGES.md`](V2-CHANGES.md).
 
@@ -453,6 +453,21 @@ A **mode** is a way to play: King Hunt, Pumpkin Hide & Seek or ScareMaze. A **pl
 ---
 
 ## Maps
+
+### Look round a map and tell Claude what to change
+In a Studio playtest press **F8** (phones: the Admin button):
+1. **Visit map: Haunted Pumpkin Patch** (or any other map) puts you on that map between rounds, with its own lighting. Nothing hunts you. Walk around, or press **Shift+P** for a free camera. **Leave the map** brings you back. A round starting sends you back to the lobby first.
+2. **Name finder on/off**: while it is on, click anything (in the lobby too) and a box at the top right shows:
+   - its name and where it is, e.g. `Map.InnerWalls.Wall at -45, 8, 30`. On a map the numbers are from the map's centre, the same numbers its settings file uses;
+   - the prop name if it is a prop (every copy can be swapped at once, see [Swap every copy of something at once](#swap-every-copy-of-something-at-once));
+   - the file that builds it, and its size, colour and material.
+3. Click the name in the box, press **Ctrl+A** then **Ctrl+C**, and paste it to Claude Code with what you want: "make `Map.Barn.Roof at -60, 16, -58` darker", "more of `Map.Scatter.HayBale`".
+
+Both are Studio-only (never in a live game). Settings: `Config.Admin.Tools`.
+
+**Around every map** (`src/server/Maps/MapScenery.luau`): the ground carries on past the walls, with dark hills and bare trees on the horizon and glowing posts along the wall tops. It is decoration only (walk-through, outside the play area). Change it per map with a `Scenery` block in the map's settings file, e.g. `Scenery = { Trees = 12, Hills = 14, PostSpacing = 34, Glow = Color3.fromRGB(255, 160, 60) }` (also `Ground`, `Hill`, `Tree`, `Post`, `Reach`, `WallPosts = false`), or `Scenery = false` for none.
+
+### Use your own map
 Each map is built from code in `src/server/Maps/` until you give it a hand-made version. To use your own:
 1. Build the map as one Model. It needs:
    - a Part named **Floor** (the main ground; pumpkins and monsters spawn on it),
