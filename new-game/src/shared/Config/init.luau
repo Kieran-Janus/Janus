@@ -356,12 +356,20 @@ local Config = {
 		WanderRepathSeconds = 3, -- and while wandering or investigating
 		StuckSeconds = 2.5, -- no progress for this long = give up on the current goal
 		WaypointReachedDistance = 2.5, -- studs (flat) to count a path waypoint as reached
+		-- His look (the part-built body in src/server/Build/KingBody.luau; a custom PumpkinKing
+		-- model replaces it). HeadSize scales the pumpkin head; the rest is colours.
 		HipHeight = 3,
-		BodySize = Vector3.new(3, 4, 2),
+		BodySize = Vector3.new(3, 4, 2), -- his eyes are BodySize.Y above his root (line of sight)
 		HeadSize = 4.5,
-		BodyColor = Color3.fromRGB(40, 25, 55),
-		HeadColor = Color3.fromRGB(255, 110, 0),
-		CrownColor = Color3.fromRGB(255, 210, 60),
+		BodyColor = Color3.fromRGB(40, 25, 55), -- robe, sleeves and chest
+		HeadColor = Color3.fromRGB(255, 125, 15), -- the pumpkin
+		CrownColor = Color3.fromRGB(255, 210, 60), -- crown, shoulders, buckle and trims
+		CapeColor = Color3.fromRGB(125, 18, 36),
+		VineColor = Color3.fromRGB(70, 120, 45), -- neck, hands and stem
+		FaceColor = Color3.fromRGB(255, 196, 70), -- the glowing carved eyes and grin
+		GemColor = Color3.fromRGB(235, 30, 70), -- the crown's gems
+		FaceGlow = { Brightness = 1.1, Range = 12 }, -- the light inside his head
+		Embers = 6, -- sparks rising off his head per second (0 = none)
 		Path = {
 			AgentRadius = 2.5,
 			AgentHeight = 8,
@@ -741,24 +749,24 @@ local Config = {
 		]]
 		Lighting = {
 			ClockTime = 19.4, -- dusk
-			Brightness = 1.7,
-			Ambient = Color3.fromRGB(78, 60, 104),
-			OutdoorAmbient = Color3.fromRGB(104, 82, 132),
+			Brightness = 1.35, -- lower = darker (was 1.7 before 8 October)
+			Ambient = Color3.fromRGB(66, 50, 90),
+			OutdoorAmbient = Color3.fromRGB(88, 70, 114),
 			Atmosphere = {
 				Density = 0.34,
 				Offset = 0.12,
 				Color = Color3.fromRGB(150, 116, 196),
 				Decay = Color3.fromRGB(255, 136, 72),
-				Glare = 0.25,
+				Glare = 0.15,
 				Haze = 1.8,
 			},
 			ColorCorrection = {
-				Brightness = 0.03,
+				Brightness = 0,
 				Contrast = 0.14,
-				Saturation = 0.22,
+				Saturation = 0.16,
 				TintColor = Color3.fromRGB(255, 240, 255),
 			},
-			Bloom = { Intensity = 0.8, Size = 30, Threshold = 0.9 },
+			Bloom = { Intensity = 0.5, Size = 28, Threshold = 0.95 }, -- the glow around bright things
 			Sky = {
 				StarCount = 3000,
 				CelestialBodiesShown = true,

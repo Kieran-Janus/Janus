@@ -9,9 +9,9 @@
 	  3. Wander - a random spot on the floor
 	A player within CatchRange is caught; GameService decides what that means.
 
-	The placeholder body is built from parts. To use your own King, put a Model named
-	PumpkinKing in ReplicatedStorage.Custom.Characters (docs/CUSTOMIZE.md). It can be a real
-	R15 rig (Humanoid + HumanoidRootPart, e.g. from Avatar > Rig Builder; it walks with
+	The placeholder body is built from parts (src/server/Build/KingBody.luau). To use your
+	own King, put a Model named PumpkinKing in ReplicatedStorage.Custom.Characters
+	(docs/CUSTOMIZE.md). It can be a real R15 rig (Humanoid + HumanoidRootPart, e.g. from Avatar > Rig Builder; it walks with
 	Config.Custom.RigAnimations) or any plain model (it glides, welded to a hidden root).
 ]]
 
@@ -22,6 +22,7 @@ local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local CustomAssets = require(ReplicatedStorage.Shared.CustomAssets)
+local KingBody = require(script.Parent.Parent.Build.KingBody)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local MapService = require(script.Parent.MapService)
 local NoiseService = require(script.Parent.NoiseService)
@@ -182,61 +183,12 @@ local function buildCustomKing(model: Model, position: Vector3): King
 end
 
 local function buildKing(position: Vector3): King
-	local cfg = Config.King
 	local custom = CustomAssets.Clone("Characters", "PumpkinKing")
 	if custom then
 		return buildCustomKing(custom, position)
 	end
-	local model = Instance.new("Model")
-	model.Name = "PumpkinKing"
-
-	local root = Instance.new("Part")
-	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(2, 2, 1)
-	root.Transparency = 1
-	root.CFrame = CFrame.new(position)
-	root.Parent = model
-	model.PrimaryPart = root
-
-	local body = Instance.new("Part")
-	body.Name = "Body"
-	body.Size = cfg.BodySize
-	body.Color = cfg.BodyColor
-	body.Material = Enum.Material.Fabric
-	body.Parent = model
-	weld(body, root, CFrame.new(0, cfg.BodySize.Y / 2 - 1, 0))
-
-	local head = Instance.new("Part")
-	head.Name = "Head"
-	head.Shape = Enum.PartType.Ball
-	head.Size = Vector3.one * cfg.HeadSize
-	head.Color = cfg.HeadColor
-	head.Material = Enum.Material.SmoothPlastic
-	head.Parent = model
-	weld(head, root, CFrame.new(0, cfg.BodySize.Y - 1 + cfg.HeadSize / 2, 0))
-
-	local crown = Instance.new("Part")
-	crown.Name = "Crown"
-	crown.Size = Vector3.new(cfg.HeadSize * 0.6, cfg.HeadSize * 0.3, cfg.HeadSize * 0.6)
-	crown.Color = cfg.CrownColor
-	crown.Material = Enum.Material.Neon
-	crown.Parent = model
-	weld(crown, root, CFrame.new(0, cfg.BodySize.Y - 1 + cfg.HeadSize, 0))
-
-	local humanoid = Instance.new("Humanoid")
-	humanoid.HipHeight = cfg.HipHeight
-	humanoid.DisplayName = cfg.Name
-	humanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
-	humanoid.RigType = Enum.HumanoidRigType.R15
-	humanoid.RequiresNeck = false -- no real neck joint on the placeholder body
-	humanoid.BreakJointsOnDeath = false
-	humanoid.Parent = model
-
-	for _, part in model:GetDescendants() do
-		if part:IsA("BasePart") then
-			part.CollisionGroup = "King"
-		end
-	end
+	local model, humanoid, root = KingBody.Build(position)
+	setCollisionGroup(model)
 	return { Model = model, Humanoid = humanoid, Root = root, Thread = nil }
 end
 

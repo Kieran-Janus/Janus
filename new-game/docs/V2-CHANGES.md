@@ -64,7 +64,7 @@ The vote offers three random **playlists**. A playlist is one mode on one map. O
 
 | Mode | How to play | Maps | Players |
 | --- | --- | --- | --- |
-| **King Hunt** (the original) | Grab pumpkins, stay quiet, don't get caught by the Pumpkin King | Haunted Pumpkin Patch, Spooky Mansion | 1+ |
+| **King Hunt** (the original) | Grab pumpkins, stay quiet, don't get caught by the Pumpkin King (redesigned on 8 October: a ribbed pumpkin head with an angry glowing grin, a gold crown with gems, a robe down to the floor, a red cape and clawed vine hands reaching for you) | Haunted Pumpkin Patch, Spooky Mansion | 1+ |
 | **Pumpkin Hide & Seek** (new) | Hiders turn into pumpkins and hide among the decoys. Seekers count in a hut, then come out with **candy guns**. A candy that hits a hider tags them, and they join the seekers. Hiders giggle every 20 seconds and glow in the last 30 seconds, so they are fairly easy to find. | Pumpkin Farm, Hedge Maze | 2+ |
 | **ScareMaze** (new) | Survivors run through a cornfield maze to the green exit. Stand still for 3 seconds and you're OUT. Haunters press **BOO** to scare them. Scarecrows, zombies, bats and ghosts jump out of hidden traps. | ScareMaze | 2+ (Haunters from 3 players) |
 
@@ -95,7 +95,7 @@ Fair-play rules that were added after review:
 - A glowing sign lies on the ground in front of each area (READY? STEP IN!, PUMPKIN SHOP, MYSTERY CRATES, CANDY RUSH, WEB SCOUR, PARKOUR), readable from far away.
 - The lobby is solid: trees, lampposts, benches, gravestones, crates, stalls, statues and big pumpkins can't be walked through, and nothing you stand on lets you fall through. Paths, area entrances and the Ready pad stay clear.
 - The Photo Spot has 10 spooky dances (Zombie Shuffle, Skeleton Rattle, Ghost Float, Pumpkin Head Spin, Monster Mash, Bat Flap, Scaredy Cat Shiver, Witchy Cackle, Mummy Wobble, Spooky Floss) that everyone can see. Walk or jump to stop.
-- Dusk lighting with a big moon, stars, clouds and soft haze.
+- Dusk lighting with a big moon, stars, clouds and soft haze (toned down a little on 8 October: less bright, less glow; the round maps too, except the already-dark ScareMaze).
 - The lobby is sorted into **folders** with readable names (one per area, plus `Plaza`, `Decor`...), and every single thing in them (one pumpkin, one bench, one parkour step) is its own Model. In Studio a click selects just that one thing, so you can move it without dragging the whole lobby along (see [Make it look like yours](#make-it-look-like-yours)).
 - The lobby comes alive: the shopkeeper breathes, turns to you and waves; the Ready ring pulses (faster when someone is ready) and its sign hops when the count changes; the floor signs shimmer; the cauldron bubbles; bats flap across the sky.
 
@@ -388,6 +388,7 @@ Each feature has its own short settings file in `src/shared/Config/`. Every file
 | Spectating | `Config/Lobby.luau` > `Spectate` | `NextKeys`, `PreviousKeys`, `ShowWatchButton` |
 | Modes and the vote | `Config/Modes.luau` | `VoteChoices` (3), each mode's `MinPlayers`, the `Playlists` list |
 | King Hunt round | `Config/init.luau` > `Round`, `Rewards`, `King` | `Round.Duration` (300 s), `Rewards.CoinsPerPumpkin` (5) |
+| The Pumpkin King's look | `Config/init.luau` > `King` | `HeadColor`, `CapeColor`, `BodyColor`, `FaceGlow`, `Embers` (sparks per second, 0 = none) |
 | Hide & Seek | `Config/HideSeek.luau` | `HeadStart` (15 s), `Duration` (165 s), `SeekerRatio` (0.25), `GiggleInterval` (20 s), `GlowLastSeconds` (30), `Rewards` |
 | ScareMaze | `Config/ScareMaze.luau` | `Duration` (240 s), `StopSeconds` (3), `HaunterRatio` (0.2), `MinPlayersForHaunters` (3), `Boo.Cooldown` (8 s), `Rewards` |
 | A map's lighting, size, decorations | `Config/Maps/<MapId>.luau` | `Lighting`, `AmbientSound`, `Layout` |
@@ -547,7 +548,7 @@ Things that are not done, or need your eyes in Studio:
 - **Tested in Studio on 6 October** (`/verify-v2`): solo, 2 players (Clients and Servers), an iPhone-sized screen and an iPad (Test > Device). What was fixed is listed in `docs/PROGRESS.md`. The longer parkour was climbed start to finish in a Studio playtest (all 7 checkpoints, coins paid). The Tormented Tower was checked in Studio piece by piece (spinning bars, cogs and vanishing platforms moving, the last stage climbed, the skin and the announcement given); a full climb by hand is worth doing, it is meant to be very hard. Still worth doing yourself: a 3-player ScareMaze (real Haunters, an OUT Survivor turning into a Haunter, and the new BOO cooldown ring: none of these was seen in Studio with 3 players), a parkour climb with your own hands, and a live test with friends after publishing. The 7 October additions (animations, cartoon crates, phone Shop and crate panel, server fixes) are covered by offline tests; run `/verify-v2` once to see them in Studio.
 - **Lighting Technology** must be set to Future by hand once (see above).
 - **Sounds**: new features reuse sound ids that were already in the game (the hider giggle is a pitched-up bat squeak). Swap any you don't like in each feature's `Sounds` block.
-- **Art is still built from Parts**: the Pumpkin King, the round maps and the scare characters. Real models can replace them (see [Make it look like yours](#make-it-look-like-yours)).
+- **Art is still built from Parts**: the Pumpkin King (a detailed part-built body since 8 October, but it glides rather than walks), the round maps and the scare characters. Real models can replace them (see [Make it look like yours](#make-it-look-like-yours)).
 - **A saved, Locked lobby keeps what it was built with.** Changing the parkour `Course`, the crate list, the Candy Rush stand or where an egg hides only shows after a rebuild (`Bake.Hub(true)`), or move the pieces by hand. Rewards, prices, timings and words always work straight away.
 - **Signposts** still point at a switched-off area until the lobby is rebuilt.
 - **ScareMaze with 2 players has no Haunters** (Haunters need 3+). The scares move on the server, so they may look a little choppy on slow connections.

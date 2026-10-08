@@ -67,7 +67,7 @@ return {
 	},
 	Lighting = {
 		ClockTime = 22,
-		Brightness = 1.4,
+		Brightness = 1.2,
 		Ambient = Color3.fromRGB(95, 70, 120),
 		OutdoorAmbient = Color3.fromRGB(105, 85, 135),
 		Atmosphere = {
@@ -79,12 +79,12 @@ return {
 			Haze = 1.4,
 		},
 		ColorCorrection = {
-			Brightness = 0.03,
+			Brightness = 0,
 			Contrast = 0.15,
 			Saturation = 0.1,
 			TintColor = Color3.fromRGB(245, 230, 255),
 		},
-		Bloom = { Intensity = 0.9, Size = 26, Threshold = 0.88 },
+		Bloom = { Intensity = 0.6, Size = 26, Threshold = 0.88 },
 	},
 	Particles = {
 		Dust = { Rate = 10, Color = Color3.fromRGB(230, 220, 200) },

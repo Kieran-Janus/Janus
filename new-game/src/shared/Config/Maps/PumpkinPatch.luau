@@ -75,7 +75,7 @@ return {
 	},
 	Lighting = {
 		ClockTime = 0.2, -- full moon
-		Brightness = 2,
+		Brightness = 1.7,
 		Ambient = Color3.fromRGB(85, 70, 110),
 		OutdoorAmbient = Color3.fromRGB(110, 100, 150),
 		Atmosphere = {
@@ -87,12 +87,12 @@ return {
 			Haze = 2,
 		},
 		ColorCorrection = {
-			Brightness = 0.04,
+			Brightness = 0.01,
 			Contrast = 0.1,
 			Saturation = 0.2,
 			TintColor = Color3.fromRGB(240, 235, 255),
 		},
-		Bloom = { Intensity = 0.8, Size = 30, Threshold = 0.9 },
+		Bloom = { Intensity = 0.55, Size = 30, Threshold = 0.9 },
 	},
 	Particles = {
 		Fireflies = { Rate = 14, Color = Color3.fromRGB(210, 255, 120) },

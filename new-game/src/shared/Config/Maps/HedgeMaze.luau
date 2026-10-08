@@ -69,7 +69,7 @@ return {
 	},
 	Lighting = { -- moonlit twilight, with warm lamps, so hiders can still be found
 		ClockTime = 19.6,
-		Brightness = 2,
+		Brightness = 1.75,
 		Ambient = Color3.fromRGB(110, 104, 140),
 		OutdoorAmbient = Color3.fromRGB(140, 134, 176),
 		Atmosphere = {
@@ -81,12 +81,12 @@ return {
 			Haze = 1.3,
 		},
 		ColorCorrection = {
-			Brightness = 0.06,
+			Brightness = 0.03,
 			Contrast = 0.1,
 			Saturation = 0.15,
 			TintColor = Color3.fromRGB(240, 242, 255),
 		},
-		Bloom = { Intensity = 0.7, Size = 26, Threshold = 0.9 },
+		Bloom = { Intensity = 0.5, Size = 26, Threshold = 0.9 },
 	},
 	Particles = {
 		Fireflies = { Rate = 12, Color = Color3.fromRGB(210, 255, 120) },

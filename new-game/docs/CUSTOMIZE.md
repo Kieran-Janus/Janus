@@ -36,6 +36,7 @@ Jump to: [Animations](#turn-animations-off-or-down) · [Change and animate skins
 | Coins per pumpkin, survivor bonus | `Config.Rewards` |
 | Easy/Hard pumpkins, reward multiplier | `Config.Difficulty.Levels` |
 | King speed, hearing, sight, how many Kings | `Config.King.Difficulty` |
+| The Pumpkin King's look (robe, cape, pumpkin, crown, face glow, embers) | `Config.King` (`BodyColor`, `HeadColor`, `CapeColor`, `CrownColor`, `VineColor`, `FaceColor`, `GemColor`, `HeadSize`, `FaceGlow`, `Embers`); built in `src/server/Build/KingBody.luau`. A custom `PumpkinKing` model replaces it (below) |
 | How loud sprinting/shouting/talking is to the King | `Config.King.Noise`, `Config.Voice.Noise` |
 | Skeletons, bats, ghost cats (count, speed, damage, messages) | `Config.Monsters` |
 | Player walk/sprint speed | `Config.Player` |

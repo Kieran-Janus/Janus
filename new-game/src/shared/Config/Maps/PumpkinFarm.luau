@@ -140,7 +140,7 @@ return {
 	},
 	Lighting = { -- a warm sunset, bright enough that hiders are fairly easy to spot
 		ClockTime = 17.4,
-		Brightness = 2.4,
+		Brightness = 2.1,
 		Ambient = Color3.fromRGB(130, 104, 96),
 		OutdoorAmbient = Color3.fromRGB(160, 132, 118),
 		Atmosphere = {
@@ -152,12 +152,12 @@ return {
 			Haze = 1.2,
 		},
 		ColorCorrection = {
-			Brightness = 0.04,
+			Brightness = 0.02,
 			Contrast = 0.08,
 			Saturation = 0.2,
 			TintColor = Color3.fromRGB(255, 240, 225),
 		},
-		Bloom = { Intensity = 0.6, Size = 26, Threshold = 0.95 },
+		Bloom = { Intensity = 0.45, Size = 26, Threshold = 0.95 },
 	},
 	Particles = {
 		Fireflies = { Rate = 10, Color = Color3.fromRGB(210, 255, 120) },
