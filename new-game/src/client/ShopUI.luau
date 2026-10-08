@@ -36,6 +36,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local CatalogBadge = require(script.Parent.CatalogBadge)
 local CrateUI = require(script.Parent.CrateUI)
 local FramePace = require(script.Parent.FramePace)
 local Layout = require(script.Parent.Layout)
@@ -648,6 +649,7 @@ function ShopUI.Mount(gui: ScreenGui)
 		view.Size = UDim2.new(1, -16, 0, previewHeight)
 		table.insert(spins, spin)
 		local tag = rarityTag(item, frame)
+		CatalogBadge.Add(view, item) -- pictures of the skin's Roblox catalog items (Style.Catalog)
 		local stop = function() end
 		if item.Slot == "Skin" or info.Rainbow then
 			-- moving pieces (Style.Animate) and CRAZY rainbow parts, while the card is in view

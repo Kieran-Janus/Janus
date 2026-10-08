@@ -45,6 +45,7 @@ local CrateArt = require(ReplicatedStorage.Shared.CrateArt)
 local CrateLook = require(ReplicatedStorage.Shared.CrateLook)
 local CrateOdds = require(ReplicatedStorage.Shared.CrateOdds)
 local Items = require(ReplicatedStorage.Shared.Items)
+local CatalogBadge = require(script.Parent.CatalogBadge)
 local FramePace = require(script.Parent.FramePace)
 local Layout = require(script.Parent.Layout)
 local PanelManager = require(script.Parent.PanelManager)
@@ -1584,6 +1585,7 @@ function CrateUI.Mount(gui: ScreenGui)
 				viewport.Size = UDim2.fromScale(1, 1)
 				showModel(viewport, model, 0.9)
 				revealStop = SkinFx.AnimatePreview(model)
+				CatalogBadge.Add(viewport, item) -- pictures of its Roblox catalog items
 			end
 		end
 		local name = label(result.ItemName or (item and item.Name) or itemId, 22, card)
