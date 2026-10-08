@@ -89,7 +89,7 @@ Spec: `docs/V2-SPEC.md`. Plain-English guide: `docs/V2-CHANGES.md`. Every featur
 | Secret pumpkins (11 Easter eggs) | `EasterEggs` | verified in Studio (all 11 reachable) |
 | Rarity prices (125 / 500 / 1,000 / 100,000), 5 coins per pumpkin | | verified in Studio |
 | 126 skins (120 crate skins in 6 themes), CRAZY effects, paged Skins tab | `SkinEffects` | verified in Studio (R15; R6 not checked) |
-| 10 crates with odds preview, coin and Robux crates, region rule | `Crates`, `RobuxCrates` | verified in Studio; Robux needs product ids |
+| 10 crates with odds preview, coin and Robux crates, region rule | `Crates`, `RobuxCrates` | verified in Studio; Robux products made 8 Oct (all 34) |
 | Top-left Menu in the top bar, side buttons moved into it, one panel at a time | `Menu` | verified in Studio (PC, phone, tablet) |
 | Review fixes: Hide & Seek fair play, anti-teleport, saved-lobby repair, phone layouts, safer Robux receipts, saved Web Scour cooldown | | verified in Studio |
 
@@ -110,7 +110,7 @@ All of this is in git and passes the offline tests (`lune run tests/run`). Guide
 - New store thumbnails and icon from renders of the real game, in the repo's top-level `thumbnails/output/pumpkin-panic-v2/` folder (outside `new-game`; `thumbnails/README.md` says where each goes on Creator Hub).
 
 **Still needs Kieran:**
-1. **Robux products** (Creator Hub > Monetization; steps in `docs/V2-CHANGES.md` > "Robux setup"): the VIP pass (`Config.Monetization.VipGamePassId`), 3 coin packs (`Config.Monetization.Products`) and the crate products (each crate's `Robux.ProductId` in `src/shared/Config/Crates.luau`; at least the 6 classic stand crates). Every id is `0` today, so the buttons say "Coming soon". Then M6 can be `done`.
+1. **Robux products:** done 8 Oct through Open Cloud: the 3 coin packs (Pumpkin Pouch, Cart, Mountain) and all 34 crates are on sale, ids in Config. Still to do: the **VIP pass** (the API key needs the Game Passes permission), then a test purchase in a live server. Then M6 can be `done`.
 2. **Publish** the place (File > Publish to Roblox) and buy one cheap product in a live server.
 3. **A friends test** on the published game (voice, ghost modes, Candy Rush races, crates on real phones).
 4. ~~ScareMaze with 3 players~~ done 8 Oct (below).

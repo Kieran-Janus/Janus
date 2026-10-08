@@ -529,7 +529,7 @@ Things that are not done, or need your eyes in Studio:
 - **ScareMaze with 2 players has no Haunters** (Haunters need 3+). The scares move on the server, so they may look a little choppy on slow connections.
 - **Hide & Seek**: hiders' invisible bodies can still bump into decoy pumpkins.
 - **Anti-cheat**: a very slow fly upwards on the parkour still passes the speed check (the 45-second minimum time stops instant wins). A Candy Rush auto-clicker could be about twice as fast as a person; coins are still capped. General speed hacks are possible in every Roblox game; pickups and rewards check speed.
-- **Robux**: no products exist yet. The VIP pass, the 3 coin packs and the crate products all have id `0` in Config, so their buttons say "Coming soon" (see [Robux setup](#robux-setup)).
+- **Robux**: the 3 coin packs and all 34 crates are on sale (made 8 Oct; ids in Config). The VIP pass is not made yet (`VipGamePassId = 0`, its button says "Coming soon"). Products use Roblox's default icon until you upload one on Creator Hub.
 - **Crates**: the region check and real Robux purchases can only be tested on the published game.
 - **Skins**: the 6 classic skins don't have the new rarity effects. The Menu's Skins tile opens all skins (not "owned only").
 - **Phones**: the full lobby is about 4,230 parts and 88 lights (the phone budget is 4,300 parts and 90 lights). That is inside the phone budget the tests check, but check the frame rate on a real phone.

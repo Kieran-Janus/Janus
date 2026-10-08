@@ -62,6 +62,15 @@ describe("Config.Crates and CrateOdds", function()
 			expect(crate.Rarity).toBe(rarity)
 		end
 		local ids = {}
+		-- Every Robux product id (crates and coin packs) is used once: a copied id would give
+		-- the buyer the wrong thing.
+		local products = {}
+		for _, pack in Config.Monetization.Products do
+			if pack.Id ~= 0 then
+				expect(products[pack.Id]).toBeNil()
+				products[pack.Id] = true
+			end
+		end
 		for _, crate in Config.Crates.List do
 			expect(ids[crate.Id]).toBeNil()
 			ids[crate.Id] = true
@@ -71,7 +80,14 @@ describe("Config.Crates and CrateOdds", function()
 			expect(typeof(crate.Trim)).toBe("Color3")
 			expect(typeof(crate.Glow)).toBe("Color3")
 			expect(CrateOdds.CoinPrice(crate)).toBeGreaterThan(0)
-			expect(crate.Robux.ProductId).toBe(0) -- "Coming soon" until Kieran makes the products
+			local productId = crate.Robux.ProductId
+			expect(productId).toBeA("number") -- 0 = "Coming soon"
+			expect(productId >= 0 and productId % 1 == 0).toBe(true)
+			if productId ~= 0 then
+				expect(products[productId]).toBeNil()
+				products[productId] = true
+				expect(CrateOdds.ByProductId(productId)).toBe(crate)
+			end
 			expect(crate.Robux.SuggestedRobux).toBeGreaterThan(0)
 		end
 		expect(CrateOdds.Get("NoSuchCrate")).toBeNil()
@@ -990,7 +1006,18 @@ describe("CrateUI (client)", function()
 				expect(b.Text).toMatch(currency)
 			end
 		end
-		expect(preview.Side.Extras.OpenRobux.Text).toBe(CConfig.Crates.Text.ComingSoon)
+		-- With a product id the Robux button can be pressed and shows a price (the suggested one
+		-- until Roblox answers; never "R$ 0"); with id 0 it says "Coming soon".
+		local pumpkin = CConfig.Crates.List[1]
+		local robuxButton = preview.Side.Extras.OpenRobux
+		if pumpkin.Robux.ProductId ~= 0 then
+			expect(robuxButton.Active).toBe(true)
+			expect(robuxButton.Text).toBe(
+				CConfig.Crates.Text.OpenRobux:format(pumpkin.Robux.SuggestedRobux)
+			)
+		else
+			expect(robuxButton.Text).toBe(CConfig.Crates.Text.ComingSoon)
+		end
 		expect(preview.Side.Extras.QuickOpen.Text).toMatch(CConfig.Crates.Text.QuickOpen)
 		-- A one-in-a-million skin shows its exact chance.
 		CrateUI.Open("VampireCastleCrate")

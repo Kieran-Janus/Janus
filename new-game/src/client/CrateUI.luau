@@ -524,7 +524,13 @@ function CrateUI.Mount(gui: ScreenGui)
 			local ok, info = pcall(function()
 				return MarketplaceService:GetProductInfo(id, Enum.InfoType.Product)
 			end)
-			if ok and type(info) == "table" and typeof(info.PriceInRobux) == "number" then
+			-- (No price, or 0, keeps the suggested price already on the button.)
+			if
+				ok
+				and type(info) == "table"
+				and typeof(info.PriceInRobux) == "number"
+				and info.PriceInRobux > 0
+			then
 				priceCache[id] = info.PriceInRobux
 				b.Text = text.OpenRobux:format(info.PriceInRobux)
 			end

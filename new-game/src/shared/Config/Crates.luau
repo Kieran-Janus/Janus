@@ -432,7 +432,7 @@ return {
 			Look = { Style = "Pumpkin", Accent = rgb(90, 170, 60) },
 			Category = "Classic",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218517, SuggestedRobux = 79 },
 		},
 		{
 			Id = "CandyCrate",
@@ -445,7 +445,7 @@ return {
 			Look = { Style = "Candy", Accent = rgb(120, 220, 255) },
 			Category = "Classic",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218522, SuggestedRobux = 79 },
 		},
 		{
 			Id = "SpookyCrate",
@@ -458,7 +458,7 @@ return {
 			Look = { Style = "Coffin", Accent = rgb(240, 245, 255) },
 			Category = "Classic",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218525, SuggestedRobux = 79 },
 		},
 		{
 			Id = "GraveyardCrate",
@@ -471,7 +471,7 @@ return {
 			Look = { Style = "Tomb", Accent = rgb(95, 150, 75) },
 			Category = "Classic",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218527, SuggestedRobux = 79 },
 		},
 		{
 			Id = "MonsterCrate",
@@ -484,7 +484,7 @@ return {
 			Look = { Style = "Monster", Accent = rgb(255, 250, 235), Shake = 1.4 },
 			Category = "Classic",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218530, SuggestedRobux = 79 },
 		},
 		{
 			Id = "MoonlightCrate",
@@ -497,7 +497,7 @@ return {
 			Look = { Style = "Moon", Accent = rgb(255, 240, 150) },
 			Category = "Classic",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218537, SuggestedRobux = 79 },
 		},
 
 		-- THE NEWER THEMED CRATES (in Menu > Crates; the lobby stand shows the ones in Stand.Themed).
@@ -514,7 +514,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218542, SuggestedRobux = 79 },
 		},
 		{
 			Id = "ZombieTownCrate",
@@ -528,7 +528,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218548, SuggestedRobux = 79 },
 		},
 		{
 			Id = "WerewolfWoodsCrate",
@@ -542,7 +542,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218553, SuggestedRobux = 79 },
 		},
 		{
 			Id = "MummyTombCrate",
@@ -556,7 +556,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218557, SuggestedRobux = 79 },
 		},
 		{
 			Id = "SkeletonCrewCrate",
@@ -570,7 +570,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218558, SuggestedRobux = 79 },
 		},
 		{
 			Id = "SwampCreaturesCrate",
@@ -584,7 +584,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218561, SuggestedRobux = 79 },
 		},
 		{
 			Id = "GoblinMarketCrate",
@@ -598,7 +598,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Monsters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218565, SuggestedRobux = 79 },
 		},
 		{
 			Id = "HauntedCarnivalCrate",
@@ -612,7 +612,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218568, SuggestedRobux = 79 },
 		},
 		{
 			Id = "HauntedHotelCrate",
@@ -626,7 +626,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218571, SuggestedRobux = 79 },
 		},
 		{
 			Id = "GhostShipCrate",
@@ -640,7 +640,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218576, SuggestedRobux = 79 },
 		},
 		{
 			Id = "PhantomTheatreCrate",
@@ -654,7 +654,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218577, SuggestedRobux = 79 },
 		},
 		{
 			Id = "GraveyardPartyCrate",
@@ -668,7 +668,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218579, SuggestedRobux = 79 },
 		},
 		{
 			Id = "MadScientistLabCrate",
@@ -682,7 +682,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Haunted Places",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218581, SuggestedRobux = 79 },
 		},
 		{
 			Id = "BatCaveCrate",
@@ -696,7 +696,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Creepy Critters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218584, SuggestedRobux = 79 },
 		},
 		{
 			Id = "SpiderLairCrate",
@@ -710,7 +710,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Creepy Critters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218586, SuggestedRobux = 79 },
 		},
 		{
 			Id = "BlackCatAlleyCrate",
@@ -724,7 +724,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Creepy Critters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218590, SuggestedRobux = 79 },
 		},
 		{
 			Id = "ScarecrowFarmCrate",
@@ -738,7 +738,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Creepy Critters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218593, SuggestedRobux = 79 },
 		},
 		{
 			Id = "AlienAbductionCrate",
@@ -752,7 +752,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Creepy Critters",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218597, SuggestedRobux = 79 },
 		},
 		{
 			Id = "CursedToysCrate",
@@ -766,7 +766,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218602, SuggestedRobux = 79 },
 		},
 		{
 			Id = "MonsterDiscoCrate",
@@ -780,7 +780,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218605, SuggestedRobux = 79 },
 		},
 		{
 			Id = "CandyFactoryCrate",
@@ -794,7 +794,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218610, SuggestedRobux = 79 },
 		},
 		{
 			Id = "WitchsBrewCrate",
@@ -808,7 +808,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218614, SuggestedRobux = 79 },
 		},
 		{
 			Id = "FrostyFrightCrate",
@@ -822,7 +822,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218619, SuggestedRobux = 79 },
 		},
 		{
 			Id = "AutumnLeavesCrate",
@@ -836,7 +836,7 @@ return {
 			New = true, -- the NEW ribbon in Menu > Crates
 			Category = "Sweet & Silly",
 			Price = 600,
-			Robux = { ProductId = 0, SuggestedRobux = 79 },
+			Robux = { ProductId = 3717218622, SuggestedRobux = 79 },
 		},
 
 		-- RARITY CRATES (every crate skin of one rarity, from every theme) ---------------------
@@ -852,7 +852,7 @@ return {
 			Look = { Emblem = "Gem" },
 			Category = "By Rarity",
 			Price = 100,
-			Robux = { ProductId = 0, SuggestedRobux = 19 },
+			Robux = { ProductId = 3717218625, SuggestedRobux = 19 },
 		},
 		{
 			Id = "UncommonCrate",
@@ -866,7 +866,7 @@ return {
 			Look = { Emblem = "Gem" },
 			Category = "By Rarity",
 			Price = 400,
-			Robux = { ProductId = 0, SuggestedRobux = 69 },
+			Robux = { ProductId = 3717218630, SuggestedRobux = 69 },
 		},
 		{
 			Id = "RareCrate",
@@ -880,7 +880,7 @@ return {
 			Look = { Emblem = "Gem" },
 			Category = "By Rarity",
 			Price = 800,
-			Robux = { ProductId = 0, SuggestedRobux = 129 },
+			Robux = { ProductId = 3717218636, SuggestedRobux = 129 },
 		},
 		{
 			Id = "CrazyCrate",
@@ -895,7 +895,7 @@ return {
 			Category = "By Rarity",
 			Price = 80000,
 			-- Optional: leave ProductId at 0 to keep this one coins-only.
-			Robux = { ProductId = 0, SuggestedRobux = 1999 },
+			Robux = { ProductId = 3717218640, SuggestedRobux = 1999 },
 		},
 	} :: { Crate },
 }
