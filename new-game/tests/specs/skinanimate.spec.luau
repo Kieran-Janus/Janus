@@ -1079,3 +1079,657 @@ describe("Cosmetics: animated skins on characters", function()
 		custom:Destroy()
 	end)
 end)
+
+-- Client (src/client/SkinAnim.luau) ----------------------------------------------------------------
+
+local Dom = require("../harness/Dom")
+
+type Client = {
+	rt: any,
+	env: any,
+	Config: any,
+	Cosmetics: any,
+	SkinAnimate: any,
+	SkinAnim: any,
+	SkinFx: any,
+	gui: any,
+}
+
+-- A client screen with its camera at (0, 5, -30) looking along +Z. `phone` = a 640 x 302 touch
+-- screen (Layout.IsPhone).
+local function client(opts: { phone: boolean?, mount: boolean? }?): Client
+	local o = opts or {}
+	local c = Runtime.new({ client = true })
+	local cenv = c.env
+	local player = c.game:GetService("Players").LocalPlayer
+	local gui = c:create("ScreenGui", { Name = "GameUI" }, player:WaitForChild("PlayerGui"))
+	local Client = c:find("StarterPlayer.StarterPlayerScripts.Client")
+	if o.phone then
+		gui:SetAttribute("ForceTouch", true)
+		Dom.rawSet(gui, "AbsoluteSize", cenv.Vector2.new(640, 302))
+	else
+		Dom.rawSet(gui, "AbsoluteSize", cenv.Vector2.new(1280, 720))
+	end
+	c:require(Client.Layout).Mount(gui)
+	c.workspace.CurrentCamera.CFrame =
+		cenv.CFrame.lookAt(cenv.Vector3.new(0, 5, -30), cenv.Vector3.new(0, 3, 0))
+	local SkinAnim = c:require(Client.SkinAnim)
+	if o.mount ~= false then
+		SkinAnim.Mount(gui)
+	end
+	return {
+		rt = c,
+		env = cenv,
+		Config = c:require("ReplicatedStorage.Shared.Config"),
+		Cosmetics = c:require("ReplicatedStorage.Shared.Cosmetics"),
+		SkinAnimate = c:require("ReplicatedStorage.Shared.SkinAnimate"),
+		SkinAnim = SkinAnim,
+		SkinFx = c:require(Client.SkinFx),
+		gui = gui,
+	}
+end
+
+-- A player whose character stands at (x, 3, z) wearing `item` (as the server would dress it).
+local function wearer(c: Client, name: string, x: number, z: number, item: any): (any, any)
+	local p = c.rt:addPlayer({ Name = name })
+	p.Character:PivotTo(c.env.CFrame.new(x, 3, z))
+	if item then
+		c.Cosmetics.Wear(p.Character, item)
+	end
+	return p, p.Character
+end
+
+local function motors(character: any): { any }
+	local list = {}
+	for _, d in character:GetDescendants() do
+		if d:IsA("Motor6D") and d.Name == "SkinMotor" then
+			table.insert(list, d)
+		end
+	end
+	return list
+end
+
+local function moved(character: any): boolean
+	for _, m in motors(character) do
+		if m.Transform ~= CFrame.identity then
+			return true
+		end
+	end
+	return false
+end
+
+-- Records every property change on everything under `root` ("<full name>.<property>").
+local function watchChanges(root: any, into: { [string]: number }): () -> ()
+	local connections = {}
+	local function watch(d: any)
+		table.insert(
+			connections,
+			d.Changed:Connect(function(property: string)
+				local key = d:GetFullName() .. "." .. property
+				into[key] = (into[key] or 0) + 1
+			end)
+		)
+	end
+	watch(root)
+	for _, d in root:GetDescendants() do
+		watch(d)
+	end
+	return function()
+		for _, connection in connections do
+			connection:Disconnect()
+		end
+	end
+end
+
+local FLOATY = {
+	Head = "SkinPumpkin",
+	Animate = { { Effect = "Float", Target = "Head" }, { Effect = "Pulse", Target = "Body" } },
+}
+
+local function floaty(c: Client, id: string?): any
+	local style = table.clone(FLOATY)
+	style.Animate = table.clone(FLOATY.Animate)
+	return testSkin(id or "StudioDraft_Floaty", style)
+end
+
+describe("SkinAnim (client)", function()
+	it("does nothing with the feature off, and never waits", function()
+		local c = client({ mount = false })
+		c.Config.Features.SkinAnimations = false
+		c.SkinAnim.Mount(c.gui) -- (returns at once: it never waits for anything)
+		local _, character = wearer(c, "Off", 0, 10, floaty(c))
+		c.rt:advance(1)
+		expect(c.SkinAnim.Active()).toBe(0)
+		expect(moved(character)).toBe(false)
+		expect(c.rt.listening.PreSimulation or 0).toBe(0)
+		-- previews too
+		local stop = c.SkinAnim.AnimatePreview(c.Cosmetics.Preview(floaty(c)))
+		stop()
+		expect(c.rt.listening.PreSimulation or 0).toBe(0)
+	end)
+
+	it(
+		"animates the closest characters, yours first, up to MaxCharacters (PC 8, phone 4)",
+		function()
+			for _, onPhone in { false, true } do
+				local c = client({ phone = onPhone })
+				local cfg = c.Config.SkinAnimate
+				local characters = {}
+				for i = 1, 10 do
+					local _, character = wearer(c, "Near" .. i, 0, i * 8, floaty(c))
+					table.insert(characters, character)
+				end
+				local _, far = wearer(c, "TooFar", 0, cfg.MaxDistance + 20, floaty(c))
+				-- your own character, behind everyone else, still comes first
+				local me = c.rt.game:GetService("Players").LocalPlayer.Character
+				me:PivotTo(c.env.CFrame.new(0, 3, 100))
+				c.Cosmetics.Wear(me, floaty(c))
+				c.rt:advance(1)
+				local limit = if onPhone then cfg.PhoneMaxCharacters else cfg.MaxCharacters
+				expect(c.SkinAnim.Active()).toBe(limit)
+				expect(moved(me)).toBe(true)
+				for i, character in characters do
+					expect(moved(character)).toBe(i <= limit - 1)
+				end
+				expect(moved(far)).toBe(false)
+			end
+		end
+	)
+
+	it("stops a Hide & Seek hider at once and starts again after the round", function()
+		local c = client()
+		local player, character = wearer(c, "Hider", 0, 10, floaty(c))
+		c.rt:advance(1)
+		expect(moved(character)).toBe(true)
+		player:SetAttribute("HideSeekRole", "Hider")
+		c.rt:flush()
+		expect(moved(character)).toBe(false) -- straight away, not at the next pick
+		c.rt:advance(1)
+		expect(moved(character)).toBe(false)
+		player:SetAttribute("HideSeekRole", nil)
+		c.rt:advance(1)
+		expect(moved(character)).toBe(true)
+	end)
+
+	it("only puts a colour back when nothing else changed it meanwhile", function()
+		local c = client()
+		local player, character = wearer(c, "Recolour", 0, 10, floaty(c))
+		local arm, leg = character.LeftUpperArm, character.RightUpperLeg
+		local armBase, legBase = arm.Color, leg.Color
+		c.rt:advance(0.8)
+		expect(colourGap(arm.Color, armBase) + colourGap(leg.Color, legBase)).toBeGreaterThan(0)
+		-- the server paints the arm green (a new colour replicates in) while the effect runs
+		local green = c.env.Color3.new(0, 1, 0)
+		arm.Color = green
+		player:SetAttribute("HideSeekRole", "Hider") -- the effect stops
+		c.rt:flush()
+		expect(arm.Color).toBeNear(green, 1e-6)
+		expect(leg.Color).toBeNear(legBase, 1e-6)
+	end)
+
+	it("never writes what CRAZY already animates (SkinFx + SkinAnim on a CRAZY draft)", function()
+		local style = {
+			Head = "MegaGourd",
+			BodyColor = rgb(240, 120, 30),
+			Accent = { Pattern = { "Belt", "Cape" }, Material = env.Enum.Material.Neon },
+			Glow = { Color = rgb(255, 170, 60), Brightness = 2 },
+			Aura = { Kind = "Embers", Color = rgb(255, 210, 90) },
+			Crazy = { Rainbow = true, Pulse = true, Orbit = "Pumpkins" },
+			Animate = {
+				{ Effect = "Float", Target = "Head" },
+				{ Effect = "Shimmer", Target = "Head" },
+				{
+					Effect = "ColorCycle",
+					Target = "Glow",
+					Colors = { rgb(255, 0, 0), rgb(0, 0, 255) },
+				},
+				{ Effect = "Pulse", Target = "Body" },
+				{ Effect = "Breathe", Target = "Cape" },
+				{ Effect = "SparkleBurst" },
+			},
+		}
+		local _, errors = SkinAnimate.Normalize(style.Animate, style)
+		expect(#errors).toBe(0)
+		local function run(which: string): { [string]: number }
+			local c = client({ mount = false })
+			local _, character = wearer(c, "Crazy", 0, 10, nil)
+			if which == "SkinFx" then
+				c.SkinFx.Start()
+			else
+				c.SkinAnim.Mount(c.gui)
+			end
+			c.Cosmetics.Wear(character, testSkin("StudioDraft_Crazy", table.clone(style)))
+			c.rt:advance(0.1)
+			local changes = {}
+			local stop = watchChanges(character, changes)
+			c.rt:advance(3)
+			stop()
+			return changes
+		end
+		local fx, anim = run("SkinFx"), run("SkinAnim")
+		local colours, both = 0, {}
+		for key in anim do
+			if string.find(key, "%.Color$") or string.find(key, "%.Brightness$") then
+				colours += 1
+				if fx[key] then
+					table.insert(both, key)
+				end
+			end
+		end
+		expect(next(fx)).toBeTruthy() -- the draft's CRAZY effects ran (from its LiveStyle)
+		expect(colours).toBeGreaterThan(5)
+		if #both > 0 then
+			error("written by both SkinFx and SkinAnim: " .. table.concat(both, ", "))
+		end
+	end)
+
+	it("writes moving joints every frame, also at half rate far away", function()
+		local c = client()
+		local cfg = c.Config.SkinAnimate
+		local item = testSkin("StudioDraft_Spinner", {
+			Head = "SkinPumpkin",
+			Animate = { { Effect = "Spin", Target = "Head" } },
+		})
+		-- further than HalfRateDistance from the camera, still in range and on screen
+		local _, character = wearer(c, "Far", 0, cfg.HalfRateDistance + 10, item)
+		c.rt:advance(1)
+		local motor = motors(character)[1]
+		expect(motor).toBeTruthy()
+		for _ = 1, 12 do
+			motor.Transform = CFrame.identity -- like Roblox's Animator resetting the joint
+			c.rt:advance(1 / 60)
+			expect(motor.Transform ~= CFrame.identity).toBe(true)
+		end
+		-- off screen (behind the camera): no writes at all
+		character:PivotTo(c.env.CFrame.new(0, 3, -60))
+		c.rt:advance(1)
+		motor.Transform = CFrame.identity
+		c.rt:advance(0.2)
+		expect(motor.Transform == CFrame.identity).toBe(true)
+	end)
+
+	it("changes colours ColorHz times a second and skips colours that don't change", function()
+		local c = client()
+		local cfg = c.Config.SkinAnimate
+		local item = testSkin("StudioDraft_Colours", {
+			Head = "SkinPumpkin",
+			Animate = {
+				{
+					Effect = "ColorCycle",
+					Target = "Head",
+					Colors = { rgb(255, 0, 0), rgb(0, 0, 255) },
+				},
+				{ Effect = "Pulse", Target = "Body", Amount = 0 }, -- never changes anything
+			},
+		})
+		local _, character = wearer(c, "Colours", 0, 10, item)
+		c.rt:advance(1)
+		local changes = {}
+		local stop = watchChanges(character, changes)
+		c.rt:advance(1)
+		stop()
+		local head = SkinAnimate.PartsFor(character.Cosmetic_Skin, "Head")[1]
+		local n = changes[head:GetFullName() .. ".Color"] or 0
+		expect(n).toBeGreaterThan(cfg.ColorHz * 0.5)
+		expect(n).toBeLessThanOrEqual(cfg.ColorHz + 1)
+		expect(changes[character.LeftUpperArm:GetFullName() .. ".Color"]).toBeNil()
+	end)
+
+	it("bursts sparkles only from a switched-on aura, half as many on phones", function()
+		for _, onPhone in { false, true } do
+			local c = client({ phone = onPhone })
+			local item = testSkin("StudioDraft_Sparkly", {
+				Head = "SkinPumpkin",
+				Aura = { Kind = "Stars", Color = rgb(255, 255, 200) },
+				Animate = { { Effect = "SparkleBurst", Every = 1, Count = 20 } },
+			})
+			local _, character = wearer(c, "Sparkly", 0, 10, item)
+			c.rt:advance(3.05)
+			local calls = c.rt:calls("ParticleEmitter", "Emit")
+			expect(#calls).toBeGreaterThanOrEqual(2)
+			expect(#calls).toBeLessThanOrEqual(4)
+			for _, call in calls do
+				expect(call.args[1]).toBe(if onPhone then 10 else 20)
+			end
+			local emitter = nil
+			for _, d in character:GetDescendants() do
+				if d:IsA("ParticleEmitter") then
+					emitter = d
+				end
+			end
+			emitter.Enabled = false -- a disguised hider's aura, say
+			local before = #calls
+			c.rt:advance(3)
+			expect(#c.rt:calls("ParticleEmitter", "Emit")).toBe(before)
+		end
+	end)
+
+	it("never touches Transparency or Enabled, with every effect running", function()
+		local c = client()
+		local first = testSkin("StudioDraft_All1", {
+			Head = "BatHead",
+			Accent = { Pattern = { "Wings", "Tail", "Cape", "Belt" } },
+			Glow = { Color = rgb(255, 0, 0) },
+			Aura = { Kind = "Sparkles", Color = rgb(255, 255, 255) },
+			Animate = {
+				{ Effect = "Spin", Target = "Part:Wing" },
+				{ Effect = "Flap", Target = "Wings" },
+				{ Effect = "Wag", Target = "Tail" },
+				{ Effect = "Breathe", Target = "Cape" },
+				{ Effect = "Flicker", Target = "Glow" },
+				{ Effect = "SparkleBurst", Every = 0.5 },
+			},
+		})
+		local second = testSkin("StudioDraft_All2", {
+			Head = "SkinPumpkin",
+			Accent = { Pattern = { "Belt", "Stripes" } },
+			Glow = { Color = rgb(0, 255, 0) },
+			Animate = {
+				{ Effect = "Bob", Target = "Head" },
+				{ Effect = "Wobble", Target = "Head" },
+				{ Effect = "Pulse", Target = "Glow" },
+				{
+					Effect = "ColorCycle",
+					Target = "Belt",
+					Colors = { rgb(1, 2, 3), rgb(200, 100, 0) },
+				},
+				{ Effect = "Shimmer", Target = "Stripes" },
+				{ Effect = "Flicker", Target = "Body" },
+			},
+		})
+		local _, a = wearer(c, "AllA", -3, 10, first)
+		local _, b = wearer(c, "AllB", 3, 10, second)
+		c.rt:advance(0.5)
+		local changes = {}
+		local stopA, stopB = watchChanges(a, changes), watchChanges(b, changes)
+		c.rt:advance(5)
+		stopA()
+		stopB()
+		local seen = {}
+		for key in changes do
+			local property = string.match(key, "%.(%w+)$")
+			seen[property] = true
+			for _, banned in { "Transparency", "Enabled", "LocalTransparencyModifier" } do
+				if property == banned then
+					error("changed " .. key)
+				end
+			end
+		end
+		-- (while the effects really ran)
+		expect(seen.Transform and seen.Color and seen.Brightness).toBe(true)
+	end)
+
+	it("runs nothing per frame once no animated skin is about", function()
+		local c = client()
+		local _, character = wearer(c, "Leaver", 0, 10, floaty(c))
+		c.rt:advance(1)
+		expect(c.rt.listening.PreSimulation).toBeGreaterThan(0)
+		character.Cosmetic_Skin:Destroy()
+		c.rt:advance(1)
+		expect(c.rt.listening.PreSimulation or 0).toBe(0)
+		expect(c.SkinAnim.Active()).toBe(0)
+	end)
+
+	it("keeps 32 animated characters inside the colour budget, on PC and phones", function()
+		for _, onPhone in { false, true } do
+			local c = client({ phone = onPhone })
+			local cfg = c.Config.SkinAnimate
+			local all = { rgb(255, 0, 0), rgb(0, 255, 0), rgb(0, 0, 255) }
+			local item = testSkin("StudioDraft_Busy", {
+				Head = "BatHead",
+				Accent = { Pattern = { "Stripes", "Bones", "Wraps" } },
+				Animate = {
+					{ Effect = "ColorCycle", Target = "All", Colors = all },
+					{ Effect = "Shimmer", Target = "All" },
+					{ Effect = "Pulse", Target = "All" },
+					{ Effect = "Flicker", Target = "All" },
+					{ Effect = "ColorCycle", Target = "All", Colors = all, Speed = 2 },
+					{ Effect = "Spin", Target = "Head" },
+				},
+			})
+			local characters = {}
+			for i = 1, 32 do
+				local _, character =
+					wearer(c, "Busy" .. i, (i % 8) * 3 - 12, 10 + math.floor(i / 8) * 6, item)
+				table.insert(characters, character)
+			end
+			local paints = #SkinAnimate.PartsFor(characters[1].Cosmetic_Skin, "All")
+			expect(paints).toBeGreaterThanOrEqual(cfg.MaxColorParts)
+			c.rt:advance(1)
+			local limit = if onPhone then cfg.PhoneMaxColorWrites else cfg.MaxColorWrites
+			local most, events = 0, 0
+			local changes = {}
+			local stops = {}
+			for _, character in characters do
+				table.insert(stops, watchChanges(character, changes))
+			end
+			for _ = 1, 180 do
+				table.clear(changes)
+				c.rt:advance(1 / 60)
+				local n = 0
+				for key, count in changes do
+					if string.find(key, "%.Color$") then
+						n += count
+					end
+				end
+				most = math.max(most, c.SkinAnim.ColorWrites())
+				events = math.max(events, n)
+				expect(n).toBeLessThanOrEqual(c.SkinAnim.ColorWrites())
+			end
+			for _, stop in stops do
+				stop()
+			end
+			local turning = 0
+			for _, character in characters do
+				if moved(character) then
+					turning += 1
+				end
+			end
+			T.note(
+				("%s: at most %d colour writes a frame (%d change events), %d of 32 moving"):format(
+					if onPhone then "phone" else "PC",
+					most,
+					events,
+					turning
+				)
+			)
+			expect(most).toBeLessThanOrEqual(limit)
+			expect(most).toBeGreaterThan(0)
+			expect(turning).toBeLessThanOrEqual(
+				if onPhone then cfg.PhoneMaxCharacters else cfg.MaxCharacters
+			)
+			expect(turning).toBeGreaterThan(0)
+		end
+	end)
+end)
+
+describe("SkinAnim previews", function()
+	-- A preview in a ViewportFrame on screen, like a shop card.
+	local function showPreview(c: Client, item: any, parent: any?): (any, any)
+		local model = c.Cosmetics.Preview(item)
+		local viewport = c.rt:create("ViewportFrame", { Name = "View" }, parent or c.gui)
+		model.Parent = viewport
+		return model, viewport
+	end
+
+	local function groupsOf(model: any): { [string]: any }
+		local found = {}
+		for _, d in model:GetDescendants() do
+			if d:IsA("Model") and d:GetAttribute("AnimGroup") then
+				found[d:GetAttribute("AnimGroup")] = d
+			end
+		end
+		return found
+	end
+
+	it(
+		"starts with SkinFx.AnimatePreview, even with SkinEffects off or no rainbow, and stops with it",
+		function()
+			local c = client()
+			c.Config.Features.SkinEffects = false
+			local item = testSkin("StudioDraft_Preview", {
+				Head = "SkinPumpkin",
+				BodyColor = rgb(100, 100, 100),
+				Animate = {
+					{ Effect = "Spin", Target = "Head" },
+					{
+						Effect = "ColorCycle",
+						Target = "Body",
+						Colors = { rgb(255, 0, 0), rgb(0, 0, 255) },
+					},
+				},
+			})
+			local model = showPreview(c, item)
+			local head = groupsOf(model).Head
+			local rest = head:GetPivot()
+			local torso = model.Torso
+			local stop = c.SkinFx.AnimatePreview(model)
+			c.rt:advance(0.5)
+			expect(cfGap(head:GetPivot(), rest)).toBeGreaterThan(1e-3)
+			expect(colourGap(torso.Color, rgb(100, 100, 100))).toBeGreaterThan(0.01)
+			stop()
+			expect(head:GetPivot()).toBeNear(rest, 1e-4)
+			expect(torso.Color).toBeNear(rgb(100, 100, 100), 1e-3)
+			c.rt:advance(0.5)
+			expect(head:GetPivot()).toBeNear(rest, 1e-4)
+			c.Config.Features.SkinEffects = true
+			-- a CRAZY draft: the one stop function stops the rainbow too
+			local crazy = testSkin("StudioDraft_PreviewCrazy", {
+				Head = "MegaGourd",
+				Accent = { Pattern = "Belt" },
+				Crazy = { Rainbow = true, Orbit = "Pumpkins" },
+				Animate = { { Effect = "Bob", Target = "Head" } },
+			})
+			local model2 = showPreview(c, crazy)
+			local stop2 = c.SkinFx.AnimatePreview(model2)
+			local belt = SkinAnimate.PartsFor(model2, "Belt")[1]
+			c.rt:advance(0.3)
+			stop2()
+			local colour = belt.Color
+			local pivot = groupsOf(model2).Head:GetPivot()
+			c.rt:advance(0.5)
+			expect(belt.Color).toBeNear(colour, 1e-6)
+			expect(groupsOf(model2).Head:GetPivot()).toBeNear(pivot, 1e-6)
+		end
+	)
+
+	it("animates only while shown and inside the scrolling list", function()
+		local c = client()
+		local Vector2 = c.env.Vector2
+		local list = c.rt:create("ScrollingFrame", { Name = "List" }, c.gui)
+		Dom.rawSet(list, "AbsolutePosition", Vector2.new(0, 0))
+		Dom.rawSet(list, "AbsoluteSize", Vector2.new(400, 300))
+		local item = floaty(c)
+		local inside, insideView = showPreview(c, item, list)
+		Dom.rawSet(insideView, "AbsolutePosition", Vector2.new(10, 10))
+		Dom.rawSet(insideView, "AbsoluteSize", Vector2.new(100, 100))
+		local outside, outsideView = showPreview(c, item, list)
+		Dom.rawSet(outsideView, "AbsolutePosition", Vector2.new(10, 900)) -- scrolled out of view
+		Dom.rawSet(outsideView, "AbsoluteSize", Vector2.new(100, 100))
+		expect(c.SkinAnim.PreviewVisible(insideView)).toBe(true)
+		expect(c.SkinAnim.PreviewVisible(outsideView)).toBe(false)
+		local restIn, restOut = groupsOf(inside).Head:GetPivot(), groupsOf(outside).Head:GetPivot()
+		c.SkinAnim.AnimatePreview(inside)
+		c.SkinAnim.AnimatePreview(outside)
+		local changes = {}
+		local stop = watchChanges(outside, changes)
+		c.rt:advance(0.5)
+		stop()
+		expect(cfGap(groupsOf(inside).Head:GetPivot(), restIn)).toBeGreaterThan(1e-3)
+		expect(groupsOf(outside).Head:GetPivot()).toBeNear(restOut, 1e-6)
+		expect(next(changes)).toBeNil()
+		-- a hidden card stops too
+		insideView.Visible = false
+		expect(c.SkinAnim.PreviewVisible(insideView)).toBe(false)
+	end)
+
+	it("moves pieces with the preview while CrateUI spins and scales it", function()
+		local c = client()
+		local item = testSkin("StudioDraft_Spun", {
+			Head = "BatHead",
+			Accent = { Pattern = "Wings" },
+			Animate = {
+				{ Effect = "Float", Target = "Head" },
+				{ Effect = "Flap", Target = "Wings" },
+				{ Effect = "Wobble", Target = "Part:Wing" },
+			},
+		})
+		local model = showPreview(c, item)
+		local groups = groupsOf(model)
+		expect(groups["Part:Wing"].Parent).toBe(groups.Head)
+		-- rest places relative to the parent group (or the model), at scale 1
+		local rest = {}
+		for name, g in groups do
+			local parent = if g.Parent:GetAttribute("AnimGroup")
+				then g.Parent:GetPivot()
+				else model:GetPivot()
+			rest[name] = parent:ToObjectSpace(g:GetPivot())
+		end
+		local base = model:GetPivot()
+		c.SkinAnim.AnimatePreview(model)
+		local run = c.rt.game:GetService("RunService")
+		local spin = run.RenderStepped:Connect(function()
+			local now = c.rt:now()
+			model:PivotTo(base * CFrame.Angles(0, now * 2, 0))
+			model:ScaleTo(1 + 0.5 * math.sin(now * 3))
+		end)
+		local checked = 0
+		for _ = 1, 40 do
+			c.rt:advance(1 / 60)
+			local t = c.rt.workspace:GetServerTimeNow()
+			local s = model:GetScale()
+			for _, name in { "Head", "WingL", "WingR", "Part:Wing" } do
+				local g = groups[name]
+				local effects = {
+					Head = { "Float" },
+					WingL = { "Flap" },
+					WingR = { "Flap" },
+					["Part:Wing"] = { "Wobble" },
+				}
+				local o = CFrame.identity
+				for _, effectName in effects[name] do
+					local list = SkinAnimate.Normalize(item.Style.Animate)
+					for _, e in list do
+						if e.Effect == effectName then
+							o *= SkinAnimate.Offset(e, t, g:GetAttribute("AnimSide") or 1)
+						end
+					end
+				end
+				local parent = if g.Parent:GetAttribute("AnimGroup")
+					then g.Parent:GetPivot()
+					else model:GetPivot()
+				local r = rest[name]
+				local want = parent
+					* CFrame.new(r.Position * s)
+					* r.Rotation
+					* CFrame.new(o.Position * s)
+					* o.Rotation
+				expect(g:GetPivot()).toBeNear(want, 1e-3)
+				checked += 1
+			end
+		end
+		spin:Disconnect()
+		T.note(checked, "group positions checked under spin and scale")
+	end)
+
+	it("moves at most MaxPreviewMotion previews at once, and none on phones", function()
+		for _, onPhone in { false, true } do
+			local c = client({ phone = onPhone })
+			local cfg = c.Config.SkinAnimate
+			local models = {}
+			for i = 1, cfg.MaxPreviewMotion + 3 do
+				local model = showPreview(c, floaty(c, "StudioDraft_Many" .. i))
+				c.SkinAnim.AnimatePreview(model)
+				table.insert(models, { Model = model, Rest = groupsOf(model).Head:GetPivot() })
+			end
+			c.rt:advance(0.5)
+			local moving = 0
+			for _, m in models do
+				if cfGap(groupsOf(m.Model).Head:GetPivot(), m.Rest) > 1e-3 then
+					moving += 1
+				end
+			end
+			expect(moving).toBe(if onPhone then 0 else cfg.MaxPreviewMotion)
+		end
+	end)
+end)
