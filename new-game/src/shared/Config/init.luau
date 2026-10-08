@@ -82,6 +82,7 @@ local Config = {
 	Announce = require(script.Announce),
 	MapLife = require(script.MapLife),
 	ScreenMotion = require(script.ScreenMotion),
+	SkinStudio = require(script.SkinStudio),
 
 	Game = {
 		Name = "Pumpkin Panic", -- working title, see docs/DESIGN.md
