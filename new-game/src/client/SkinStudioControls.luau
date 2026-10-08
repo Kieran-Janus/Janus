@@ -21,22 +21,11 @@ local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local SkinAnimate = require(ReplicatedStorage.Shared.SkinAnimate)
+local SkinCatalog = require(ReplicatedStorage.Shared.SkinCatalog)
+local SkinMotion = require(ReplicatedStorage.Shared.SkinMotion)
 local SkinSchema = require(ReplicatedStorage.Shared.SkinSchema)
 local Theme = require(script.Parent.Theme)
-
--- The animation modules (they may not be in the game yet: the editor keeps working).
-local function optionalModule(name: string): any
-	local module = ReplicatedStorage.Shared:FindFirstChild(name)
-	if module and module:IsA("ModuleScript") then
-		local ok, result = pcall(require :: any, module)
-		if ok and type(result) == "table" then
-			return result
-		end
-	end
-	return nil
-end
-local SkinAnimate = optionalModule("SkinAnimate")
-local SkinMotion = optionalModule("SkinMotion")
 
 local Controls = {}
 
@@ -962,7 +951,7 @@ end
 -- Animations (Style.Animate) -----------------------------------------------------------------------
 
 local function effectInfos(): { any }
-	return if SkinAnimate and type(SkinAnimate.Effects) == "table" then SkinAnimate.Effects else {}
+	return SkinAnimate.Effects
 end
 
 local function infoOf(name: any): any
@@ -1052,15 +1041,6 @@ end
 function Controls.Effects(parent: Instance, ctx: Context): Control
 	local holder = blank(parent, "Effects")
 	vlist(holder, 6)
-	if not SkinAnimate then
-		Controls.Note(
-			holder,
-			"Animations arrive with the animation update (src/shared/SkinAnimate.luau).",
-			ctx,
-			WARN
-		)
-		return { Frame = holder, Refresh = function() end }
-	end
 	local children: { Control } = {}
 	local builtKey = ""
 	local function key(): string
@@ -1357,8 +1337,7 @@ function Controls.Motion(parent: Instance, ctx: Context): Control
 	local path = { "Style", "Motion" }
 	local options = function(): { Option }
 		local out: { Option } = {}
-		local info = if SkinMotion and type(SkinMotion.Info) == "table" then SkinMotion.Info else {}
-		for _, entry in info do
+		for _, entry in SkinMotion.Info do
 			table.insert(out, { Value = entry.Name, Text = entry.Label or entry.Name })
 		end
 		return out
@@ -1454,7 +1433,7 @@ local function thumbnail(parent: Instance, id: number, size: number): ImageLabel
 	image.Name = "Thumb"
 	image.BackgroundColor3 = Color3.fromRGB(35, 32, 48)
 	image.Size = UDim2.fromOffset(size, size)
-	image.Image = ("rbxthumb://type=Asset&id=%d&w=150&h=150"):format(id)
+	image.Image = SkinCatalog.Thumbnail(id)
 	image.Parent = parent
 	Theme.round(image, 6)
 	return image

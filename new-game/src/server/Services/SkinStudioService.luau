@@ -40,19 +40,11 @@ local Workspace = game:GetService("Workspace")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local SkinCatalog = require(ReplicatedStorage.Shared.SkinCatalog)
 local SkinSchema = require(ReplicatedStorage.Shared.SkinSchema)
 local AdminService = require(script.Parent.AdminService)
 local ShopService = require(script.Parent.ShopService)
 local SkinExport = require(script.Parent.Parent.Tools.SkinExport)
-
-local SkinCatalog: any = nil
-do
-	local module = ReplicatedStorage.Shared:FindFirstChild("SkinCatalog")
-	if module and module:IsA("ModuleScript") then
-		local ok, result = pcall(require :: any, module)
-		SkinCatalog = if ok then result else nil
-	end
-end
 
 local SkinStudioService = {}
 
@@ -369,29 +361,8 @@ end
 
 -- Every catalog id in a skin's Catalog.
 local function catalogIds(catalog: any): { number }
-	if SkinCatalog and type(SkinCatalog.Ids) == "function" then
-		local ok, ids = pcall(SkinCatalog.Ids, catalog)
-		if ok and type(ids) == "table" then
-			return ids
-		end
-	end
-	local ids = {}
-	if type(catalog) ~= "table" then
-		return ids
-	end
-	if type(catalog.Accessories) == "table" then
-		for _, entry in catalog.Accessories do
-			if type(entry) == "table" and type(entry.Id) == "number" then
-				table.insert(ids, entry.Id)
-			end
-		end
-	end
-	for _, key in { "Shirt", "Pants", "TShirt", "ClassicFace" } do
-		if type(catalog[key]) == "number" then
-			table.insert(ids, catalog[key])
-		end
-	end
-	return ids
+	local ok, ids = pcall(SkinCatalog.Ids, catalog)
+	return if ok then ids else {}
 end
 
 local function character(player: Player): Model?
@@ -600,19 +571,6 @@ local function productInfo(id: number): any
 	error(if ok then "Roblox didn't say what that is" else tostring(info))
 end
 
-local function creatorAllowed(creatorType: string, creatorId: number, robloxMade: boolean): boolean
-	if SkinCatalog and type(SkinCatalog.CreatorAllowed) == "function" then
-		local ok, allowed = pcall(SkinCatalog.CreatorAllowed, creatorType, creatorId)
-		return ok and allowed == true
-	end
-	if robloxMade then
-		return true
-	end
-	-- (until SkinCatalog is in the game) the game's own creator
-	local ownerType = if game.CreatorType == Enum.CreatorType.Group then "Group" else "User"
-	return creatorType == ownerType and creatorId == game.CreatorId and creatorId ~= 0
-end
-
 handlers.LookupAsset = function(_player: Player, id: any): Reply
 	if type(id) ~= "number" or id ~= id or id < 1 or id >= 2 ^ 53 or math.floor(id) ~= id then
 		return reply(false, "A catalog id is a whole number, like 1234567890.")
@@ -630,12 +588,9 @@ handlers.LookupAsset = function(_player: Player, id: any): Reply
 	local creatorId = tonumber(creator.CreatorTargetId or creator.Id) or 0
 	local robloxMade = creatorType == "User" and creatorId == 1
 	local assetType = assetTypeName(info.AssetTypeId)
-	local catalogType = nil
-	if SkinCatalog and type(SkinCatalog.TypeFromAssetType) == "function" then
-		local okType, found = pcall(SkinCatalog.TypeFromAssetType, assetType)
-		catalogType = if okType and type(found) == "string" then found else nil
-	end
-	local allowed = creatorAllowed(creatorType, creatorId, robloxMade)
+	local catalogType = SkinCatalog.TypeFromAssetType(assetType)
+	-- Roblox, or a creator listed in Config.SkinCatalog.AllowedCreators (spec 5.6)
+	local allowed = SkinCatalog.CreatorAllowed(creatorType, creatorId)
 	local result = {
 		Name = tostring(info.Name),
 		Type = catalogType,

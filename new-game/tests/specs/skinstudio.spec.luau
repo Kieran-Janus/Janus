@@ -851,12 +851,20 @@ describe("SkinStudioService", function()
 		data.Equipped.Skin = "Zombie"
 		local item = itemOf(w, "Pumpkin_SirGourdington")
 		item.Name = "Sir Testington"
+		item.Style.Motion = "Robot"
 		local answer = invoke(w, player, "Wear", payload(w, item))
 		expect(answer.Ok).toBe(true)
 		expect(answer.Data.WornId).toBe("StudioDraft_U" .. player.UserId)
 		local model = player.Character:FindFirstChild("Cosmetic_Skin")
 		expect(model).toBeInstanceOf("Model")
 		expect(model:GetAttribute("ItemId")).toBe(answer.Data.WornId)
+		-- every screen animates the draft's own effects (LiveStyle) and walks its walk style
+		local SkinAnimate = w.rt:require("ReplicatedStorage.Shared.SkinAnimate")
+		local live = SkinAnimate.DecodeLive(model:GetAttribute("LiveStyle"))
+		expect(#live.Animate).toBe(#item.Style.Animate)
+		expect(live.Animate[1].Effect).toBe(item.Style.Animate[1].Effect)
+		expect(w.rt.game:GetService("CollectionService"):HasTag(model, "SkinAnim")).toBe(true)
+		expect(player.Character:GetAttribute("SkinMotion")).toBe("Robot")
 		expect(w.Shop.SkinOverride(player).ModelId).toBe("Pumpkin_SirGourdington")
 		expect(data.Equipped.Skin).toBe("Zombie") -- the save never changes
 		expect(data.Owned.Pumpkin_SirGourdington).toBeNil()
@@ -1063,17 +1071,32 @@ describe("SkinStudioService", function()
 				AssetTypeId = 8,
 				Creator = { Name = "Someone", CreatorType = "User", CreatorTargetId = 999 },
 			},
+			[444] = {
+				Name = "Group Wings",
+				AssetTypeId = 46, -- BackAccessory
+				Creator = { Name = "Our Group", CreatorType = "Group", CreatorTargetId = 77 },
+			},
 		}
 		local roblox = invoke(w, player, "LookupAsset", 111)
 		expect(roblox.Ok).toBe(true)
 		expect(roblox.Data.Name).toBe("Pumpkin Hat")
 		expect(roblox.Data.AssetType).toBe("Hat")
+		expect(roblox.Data.Type).toBe("Hat") -- SkinCatalog.TypeFromAssetType
 		expect(roblox.Data.RobloxMade).toBe(true)
 		expect(roblox.Data.Allowed).toBe(true)
 		rest(w)
 		local other = invoke(w, player, "LookupAsset", 222)
 		expect(other.Data.Allowed).toBe(false)
 		expect(other.Data.Problem).toBeA("string")
+		-- a group listed in Config.SkinCatalog.AllowedCreators is allowed (SkinCatalog.CreatorAllowed)
+		rest(w)
+		local groups = (w.Config :: any).SkinCatalog.AllowedCreators.GroupIds
+		table.insert(groups, 77)
+		local group = invoke(w, player, "LookupAsset", 444)
+		table.remove(groups, table.find(groups, 77))
+		expect(group.Data.Allowed).toBe(true)
+		expect(group.Data.Type).toBe("Back")
+		expect(group.Data.RobloxMade).toBe(false)
 		-- Save records the server's lookups, never the client's
 		rest(w)
 		local item = itemOf(w, "Pumpkin_SirGourdington")
@@ -1944,6 +1967,45 @@ describe("SkinStudioUI", function()
 		w.UI.Current():Reset()
 	end)
 
+	it("animates the header preview like a worn skin (SkinFx / SkinAnim)", function()
+		w.UI.Open()
+		w.UI.SelectSkin("Candy_BubblegumBat") -- Flap on its wings
+		w.rt:advance(0.5)
+		local viewport = panelOf(w).Header.Preview
+		local model = viewport:FindFirstChildOfClass("Model")
+		expect(model).toBeTruthy()
+		local wing: Model? = nil
+		for _, d in model:GetDescendants() do
+			if d:IsA("Model") and d:GetAttribute("AnimGroup") == "WingL" then
+				wing = d
+			end
+		end
+		assert(wing, "the preview has a moving left wing")
+		local function angle(): number
+			local rel = model:GetPivot():ToObjectSpace(wing:GetPivot())
+			local x, y, z = rel:ToEulerAnglesXYZ()
+			return x + y + z
+		end
+		local seen: { [number]: boolean } = {}
+		local count = 0
+		for _ = 1, 12 do
+			w.rt:advance(0.07)
+			local a = math.floor(angle() * 100 + 0.5)
+			if not seen[a] then
+				seen[a] = true
+				count += 1
+			end
+		end
+		expect(count >= 3).toBe(true)
+		-- a change rebuilds it: the old model is gone and the new one is animated
+		w.UI.Current():Set({ "Style", "Animate" }, nil)
+		w.rt:advance(0.5)
+		expect(model.Parent).toBeNil()
+		expect(viewport:FindFirstChildOfClass("Model")).toBeTruthy()
+		w.UI.Current():Reset()
+		w.rt:advance(0.5)
+	end)
+
 	it("circles your character with the turntable and gives the camera back", function()
 		local panel = panelOf(w)
 		local camera = w.rt.workspace.CurrentCamera
@@ -2036,6 +2098,15 @@ describe("SkinStudioUI", function()
 					end
 				end
 			end
+			-- no header preview on phones, yet the head piece's own parts are still targets
+			phone.UI.ShowTab("Animate")
+			phone.UI.Current():Set({ "Style", "Animate" }, { { Effect = "Spin", Target = "Head" } })
+			phone.rt:advance(0.3)
+			phone.rt:fire(panel.Content.Effects.Effect1.Target.Control.Pick, "Activated")
+			local items = panel.Popover.Body.Items
+			expect(items:FindFirstChild("Option_Part:Crown")).toBeTruthy()
+			expect(items:FindFirstChild("Option_Part:MiniPumpkin")).toBeTruthy()
+			phone.UI.Current():Reset()
 		end)
 	end
 end)
@@ -2254,13 +2325,11 @@ describe("save-skins (tests/tools/SkinFile.luau)", function()
 		expect(why.Pumpkin_HatTrick).toMatch("Someone")
 		expect(next(plan.Files)).toBeNil() -- nothing written
 		-- an approved id goes through
-		local approved = (w.Config :: any).SkinCatalog
-		if approved then
-			approved.ApprovedIds[1234567890] = "Top Hat, test"
-			local ok = SkinFile.Plan({ page({ record(hat, { Lookups = lookups }) }) }, deps())
-			approved.ApprovedIds[1234567890] = nil
-			expect(#ok.Refused).toBe(0)
-		end
+		local approved = (w.Config :: any).SkinCatalog.ApprovedIds
+		approved[1234567890] = "Top Hat, test"
+		local ok = SkinFile.Plan({ page({ record(hat, { Lookups = lookups }) }) }, deps())
+		approved[1234567890] = nil
+		expect(#ok.Refused).toBe(0)
 		-- economy changes: refused unless unlocked, then listed loudly
 		local pricier = itemOf(w, "Pumpkin_Gourdy")
 		pricier.Rarity = "Uncommon"

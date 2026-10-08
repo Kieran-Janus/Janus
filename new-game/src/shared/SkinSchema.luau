@@ -35,8 +35,8 @@
 	SkinSchema.IsCrateTheme(theme) -> boolean
 
 	The animation, walk-style and catalog parts of a Style (Animate, Motion, Catalog) are checked
-	by their own modules (SkinAnimate, SkinMotion, SkinCatalog: Normalize). When one of them isn't
-	in the game yet, a simpler built-in check is used so the editor keeps working.
+	by their own modules (SkinAnimate, SkinMotion, SkinCatalog: Normalize), so the editor, the
+	server and the tests all use the same rules.
 ]]
 
 local HttpService = game:GetService("HttpService")
@@ -44,21 +44,9 @@ local HttpService = game:GetService("HttpService")
 local Config = require(script.Parent.Config)
 local Cosmetics = require(script.Parent.Cosmetics)
 local HeadPieces = require(script.Parent.HeadPieces)
-
--- The animation modules (made by the animation update). Missing = the built-in checks below.
-local function optional(name: string): any
-	local module = script.Parent:FindFirstChild(name)
-	if module and module:IsA("ModuleScript") then
-		local ok, result = pcall(require :: any, module)
-		if ok and type(result) == "table" then
-			return result
-		end
-	end
-	return nil
-end
-local SkinAnimate = optional("SkinAnimate")
-local SkinMotion = optional("SkinMotion")
-local SkinCatalog = optional("SkinCatalog")
+local SkinAnimate = require(script.Parent.SkinAnimate)
+local SkinCatalog = require(script.Parent.SkinCatalog)
+local SkinMotion = require(script.Parent.SkinMotion)
 
 local SkinSchema = {}
 
@@ -175,21 +163,6 @@ local KEY_ORDER: { [string]: { string } } = {
 	Motion = { "Preset", "Walk", "Run", "Idle" },
 	Catalog = { "Accessories", "Shirt", "Pants", "TShirt", "ClassicFace" },
 	Accessory = { "Id", "Type" },
-}
-
--- Built-in checks for the animation keys, used only while SkinAnimate / SkinMotion /
--- SkinCatalog aren't in the game.
-local ANIMATE_KEYS: { [string]: string } = {
-	Effect = "string",
-	Target = "string",
-	Speed = "number",
-	Amount = "number",
-	Delay = "number",
-	Axis = "string",
-	Reverse = "boolean",
-	Colors = "Colors",
-	Every = "number",
-	Count = "number",
 }
 
 SkinSchema.ItemKeys = { "Id", "Name", "Rarity", "Crate", "Price", "CrateOnly", "Style" }
@@ -1100,7 +1073,7 @@ function SkinSchema.RarityProblems(item: any): { string }
 			end
 		end
 	end
-	if SkinAnimate and type(SkinAnimate.RarityProblems) == "function" and type(item) == "table" then
+	if type(item) == "table" then
 		local ok, more = pcall(SkinAnimate.RarityProblems, item)
 		if ok and type(more) == "table" then
 			for _, text in more do
@@ -1173,127 +1146,6 @@ end
 
 -- Animate / Motion / Catalog -------------------------------------------------------------------
 
-local function maxEffects(): number
-	local cfg = (Config :: any).SkinAnimate
-	return if type(cfg) == "table" and type(cfg.MaxEffects) == "number" then cfg.MaxEffects else 6
-end
-
-local function animateFallback(list: any, errors: { string })
-	if not isSequence(list) then
-		table.insert(errors, "Style.Animate must be a list")
-		return
-	end
-	if #list > maxEffects() then
-		table.insert(errors, ("Style.Animate has more than %d animations"):format(maxEffects()))
-	end
-	for i, effect in list do
-		local path = ("Style.Animate[%d]"):format(i)
-		if type(effect) ~= "table" then
-			table.insert(errors, path .. " must be a table")
-			continue
-		end
-		if type(effect.Effect) ~= "string" then
-			table.insert(errors, path .. " needs an Effect")
-		end
-		for key, value in effect do
-			local kind = if type(key) == "string" then ANIMATE_KEYS[key] else nil
-			if not kind then
-				table.insert(errors, ("%s has an unknown key %s"):format(path, tostring(key)))
-			elseif kind == "Colors" then
-				if type(value) ~= "table" or #value < 2 or #value > 6 then
-					table.insert(errors, path .. ".Colors must be 2 to 6 colours")
-				else
-					for _, c in value do
-						if typeof(c) ~= "Color3" then
-							table.insert(errors, path .. ".Colors must be 2 to 6 colours")
-							break
-						end
-					end
-				end
-			elseif type(value) ~= kind then
-				table.insert(
-					errors,
-					("%s.%s must be %s"):format(path, key, KIND_WORDS[kind] or kind)
-				)
-			end
-		end
-	end
-end
-
-local function idLike(value: any): boolean
-	if type(value) == "number" then
-		return isInteger(value) and value > 0 and value < 2 ^ 53
-	end
-	return type(value) == "string"
-		and (value:match("^rbxassetid://%d+$") ~= nil or value:match("^%d+$") ~= nil)
-		and #value <= 40
-end
-
-local function motionFallback(value: any, errors: { string })
-	if type(value) == "string" then
-		return
-	end
-	if type(value) ~= "table" then
-		table.insert(errors, "Style.Motion must be a walk style name or a table")
-		return
-	end
-	for key, v in value do
-		if key == "Preset" then
-			if type(v) ~= "string" then
-				table.insert(errors, "Style.Motion.Preset must be a walk style name")
-			end
-		elseif key == "Walk" or key == "Run" or key == "Idle" then
-			if not idLike(v) then
-				table.insert(errors, ("Style.Motion.%s must be an animation id"):format(key))
-			end
-		else
-			table.insert(errors, "Style.Motion has an unknown key " .. tostring(key))
-		end
-	end
-end
-
-local function catalogFallback(value: any, errors: { string })
-	if type(value) ~= "table" then
-		table.insert(errors, "Style.Catalog must be a table")
-		return
-	end
-	for key, v in value do
-		if key == "Accessories" then
-			if type(v) ~= "table" or not isSequence(v) then
-				table.insert(errors, "Style.Catalog.Accessories must be a list")
-				continue
-			end
-			if #v > 4 then
-				table.insert(errors, "Style.Catalog has more than 4 accessories")
-			end
-			for i, entry in v do
-				if
-					type(entry) ~= "table"
-					or not idLike(entry.Id)
-					or type(entry.Id) ~= "number"
-					or type(entry.Type) ~= "string"
-				then
-					table.insert(
-						errors,
-						("Style.Catalog.Accessories[%d] needs an Id (a number) and a Type"):format(
-							i
-						)
-					)
-				end
-			end
-		elseif key == "Shirt" or key == "Pants" or key == "TShirt" or key == "ClassicFace" then
-			if type(v) ~= "number" or not idLike(v) then
-				table.insert(
-					errors,
-					("Style.Catalog.%s must be a catalog id (a number)"):format(key)
-				)
-			end
-		else
-			table.insert(errors, "Style.Catalog has an unknown key " .. tostring(key))
-		end
-	end
-end
-
 local function addAll(into: { string }, list: any)
 	if type(list) == "table" then
 		for _, text in list do
@@ -1302,51 +1154,37 @@ local function addAll(into: { string }, list: any)
 	end
 end
 
--- The animation update's own checks (or the built-in ones). Fills errors and warnings.
+-- Animate, Motion and Catalog are checked by their own modules (SkinAnimate, SkinMotion,
+-- SkinCatalog), so the editor, the server and the tests use the same rules. Fills errors and
+-- warnings. (pcall: a draft comes from a client, so a check that throws still only refuses it.)
 local function checkExtras(style: any, errors: { string }, warnings: { string })
 	if style.Animate ~= nil then
-		if SkinAnimate and type(SkinAnimate.Normalize) == "function" then
-			local ok, result, errs, warns = pcall(SkinAnimate.Normalize, style.Animate, style)
-			if ok then
-				addAll(errors, errs)
-				addAll(warnings, warns)
-			else
-				table.insert(errors, "Style.Animate couldn't be checked: " .. tostring(result))
-			end
+		local ok, result, errs, warns = pcall(SkinAnimate.Normalize, style.Animate, style)
+		if ok then
+			addAll(errors, errs)
+			addAll(warnings, warns)
 		else
-			animateFallback(style.Animate, errors)
+			table.insert(errors, "Style.Animate couldn't be checked: " .. tostring(result))
 		end
 	end
 	if style.Motion ~= nil then
-		if SkinMotion and type(SkinMotion.Normalize) == "function" then
-			local ok, result, errs = pcall(SkinMotion.Normalize, style.Motion)
-			if ok then
-				addAll(errors, errs)
-			else
-				table.insert(errors, "Style.Motion couldn't be checked: " .. tostring(result))
-			end
+		local ok, result, errs = pcall(SkinMotion.Normalize, style.Motion)
+		if ok then
+			addAll(errors, errs)
 		else
-			motionFallback(style.Motion, errors)
+			table.insert(errors, "Style.Motion couldn't be checked: " .. tostring(result))
 		end
 	end
 	if style.Catalog ~= nil then
-		if SkinCatalog and type(SkinCatalog.Normalize) == "function" then
-			local ok, result, errs, warns = pcall(SkinCatalog.Normalize, style.Catalog, style)
-			if ok then
-				addAll(errors, errs)
-				addAll(warnings, warns)
-			else
-				table.insert(errors, "Style.Catalog couldn't be checked: " .. tostring(result))
-			end
+		local ok, result, errs, warns = pcall(SkinCatalog.Normalize, style.Catalog, style)
+		if ok then
+			addAll(errors, errs)
+			addAll(warnings, warns)
 		else
-			catalogFallback(style.Catalog, errors)
+			table.insert(errors, "Style.Catalog couldn't be checked: " .. tostring(result))
 		end
 	end
-	if
-		(style.Animate ~= nil or style.Crazy ~= nil)
-		and SkinAnimate
-		and type(SkinAnimate.EncodeLive) == "function"
-	then
+	if style.Animate ~= nil or style.Crazy ~= nil then
 		local ok, _, problem = pcall(SkinAnimate.EncodeLive, style)
 		if ok and problem == "too long" then
 			table.insert(

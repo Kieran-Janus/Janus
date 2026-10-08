@@ -34,28 +34,15 @@ local Workspace = game:GetService("Workspace")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
 local Items = require(ReplicatedStorage.Shared.Items)
+local SkinAnimate = require(ReplicatedStorage.Shared.SkinAnimate)
 local SkinSchema = require(ReplicatedStorage.Shared.SkinSchema)
 local Controls = require(script.Parent.SkinStudioControls)
 local Layout = require(script.Parent.Layout)
 local MenuUI = require(script.Parent.MenuUI)
 local PanelManager = require(script.Parent.PanelManager)
+local SkinFx = require(script.Parent.SkinFx)
 local SkinStudioState = require(script.Parent.SkinStudioState)
 local Theme = require(script.Parent.Theme)
-
-local SkinFx: any = nil
-do
-	local ok, result = pcall(require :: any, script.Parent:FindFirstChild("SkinFx"))
-	SkinFx = if ok then result else nil
-end
-
-local SkinAnimate: any = nil
-do
-	local module = ReplicatedStorage.Shared:FindFirstChild("SkinAnimate")
-	if module and module:IsA("ModuleScript") then
-		local ok, result = pcall(require :: any, module)
-		SkinAnimate = if ok then result else nil
-	end
-end
 
 local SkinStudioUI = {}
 
@@ -421,11 +408,10 @@ local function buildPreview()
 	end
 	place()
 	preview.Spin = RunService.RenderStepped:Connect(place)
-	if SkinFx and type(SkinFx.AnimatePreview) == "function" then
-		local okFx, stop = pcall(SkinFx.AnimatePreview, m)
-		if okFx and type(stop) == "function" then
-			preview.Stop = stop
-		end
+	-- moves and colours it like a worn skin (SkinAnim) and runs its CRAZY effects (SkinFx)
+	local okFx, stop = pcall(SkinFx.AnimatePreview, m)
+	if okFx and type(stop) == "function" then
+		preview.Stop = stop
 	end
 end
 
@@ -924,15 +910,34 @@ local function lockReason(path: { any }): string?
 	return nil
 end
 
+-- The names inside the skin's head piece ("Part:" animation targets). They come from the header
+-- preview; phones have no header preview (and on a PC it is built a moment after a change), so
+-- then a model is built just to read them, once per head piece.
+local namesFor = { Key = "", Names = {} :: { string } }
 local function partNames(): { string }
 	local model = preview.Model
-	if model and SkinAnimate and type(SkinAnimate.PartNames) == "function" then
+	if model then
 		local ok, names = pcall(SkinAnimate.PartNames, model)
-		if ok and type(names) == "table" then
-			return names
-		end
+		return if ok then names else {}
 	end
-	return {}
+	local skin = currentKey and states[currentKey]
+	if not skin then
+		return {}
+	end
+	local item = wearItem(skin)
+	local style = if type(item.Style) == "table" then item.Style else {}
+	local key = ("%s|%s"):format(tostring(style.Head), tostring(item.ModelId or item.Id))
+	if key ~= namesFor.Key then
+		local names: { string } = {}
+		local ok, built = pcall(Cosmetics.Preview, item)
+		if ok and typeof(built) == "Instance" then
+			local okNames, found = pcall(SkinAnimate.PartNames, built)
+			names = if okNames then found else {}
+			built:Destroy()
+		end
+		namesFor = { Key = key, Names = names }
+	end
+	return namesFor.Names
 end
 
 context = function(): Controls.Context
