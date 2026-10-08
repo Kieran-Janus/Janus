@@ -21,6 +21,7 @@ local ORDER = {
 	"CrateService", -- after Shop and Monetization (crates grant items and take Robux)
 	"RewardsService",
 	"AdminService",
+	"SkinStudioService", -- Skin Studio drafts (admins in Studio; after AdminService for its F8 button)
 	"MapService",
 	"NoiseService",
 	"SprintService",

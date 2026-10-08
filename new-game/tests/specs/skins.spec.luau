@@ -163,34 +163,14 @@ describe("Skin catalogue", function()
 	end)
 
 	it("makes every skin look clearly different (no two share a look)", function()
-		local function c(v: any): string
-			return if typeof(v) == "Color3"
-				then ("%d,%d,%d"):format(v.R * 255 + 0.5, v.G * 255 + 0.5, v.B * 255 + 0.5)
-				else tostring(v)
-		end
+		-- The look key lives in src/shared/SkinSchema.luau, so Skin Studio warns about the same thing.
+		local SkinSchema = rt:require("ReplicatedStorage.Shared.SkinSchema")
 		local seen: { [string]: string } = {}
 		for _, item in Config.Shop.Items do
 			if item.Slot ~= "Skin" then
 				continue
 			end
-			local s = item.Style
-			local accent = s.Accent or {}
-			local pattern = accent.Pattern
-			if type(pattern) == "table" then
-				pattern = table.concat(pattern, "+")
-			end
-			local key = table.concat({
-				tostring(s.Head),
-				c(s.HeadColor),
-				c(s.HeadColor2),
-				c(s.BodyColor),
-				c(s.TorsoColor),
-				c(s.ArmsColor),
-				c(s.LegsColor),
-				tostring(s.Material),
-				c(accent.Color),
-				tostring(pattern),
-			}, "|")
+			local key = SkinSchema.LookKey(item.Style)
 			if seen[key] then
 				error(("%s and %s look the same"):format(seen[key], item.Id))
 			end
@@ -352,40 +332,19 @@ describe("Skin styles", function()
 	end)
 
 	it("makes each rarity look better than the one below", function()
-		local crazyHeads = {}
+		-- The rules live in src/shared/SkinSchema.luau (RarityProblems, which also checks the
+		-- animation limits), so Skin Studio's warnings and this test always agree.
+		local SkinSchema = rt:require("ReplicatedStorage.Shared.SkinSchema")
 		for _, item in crateSkins() do
-			local s = item.Style
-			local id = item.Id
-			if item.Rarity == "Common" then
-				if s.Head or s.Glow or s.Aura or s.Crazy then
-					error(id .. ": Commons are colours, materials and accents only")
-				end
-				expect(s.BodyColor or s.TorsoColor).toBeTruthy()
-			elseif item.Rarity == "Uncommon" then
-				if not s.Head or s.Glow or s.Aura or s.Crazy then
-					error(
-						id .. ": Uncommons add a head piece (no glow, particles or CRAZY effects)"
-					)
-				end
-			elseif item.Rarity == "Rare" then
-				if not (s.Head and s.Glow and s.Aura) or s.Crazy then
-					error(id .. ": Rares have a head piece, a glow and particles")
-				end
-			else
-				if not (s.Head and s.Glow and s.Aura and s.Crazy) then
-					error(id .. ": CRAZY skins have everything")
-				end
-				expect(s.Crazy.Rainbow).toBe(true)
-				expect(s.Crazy.Orbit).toBeA("string")
-				crazyHeads[s.Head] = id
+			local problems = SkinSchema.RarityProblems(item)
+			if #problems > 0 then
+				error(problems[1])
 			end
 		end
 		-- A CRAZY head belongs to that skin only.
-		for _, item in skins() do
-			local owner = crazyHeads[item.Style.Head]
-			if owner and owner ~= item.Id then
-				error(("%s uses %s, the CRAZY head of %s"):format(item.Id, item.Style.Head, owner))
-			end
+		local taken = SkinSchema.CrazyHeadProblems(Config.Shop.Items)
+		if #taken > 0 then
+			error(taken[1])
 		end
 	end)
 end)

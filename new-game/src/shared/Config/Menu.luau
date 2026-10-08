@@ -106,5 +106,12 @@ return {
 		{ Id = "Parkour", Text = "Parkour", Icon = "🏃", Feature = "Parkour" },
 		{ Id = "TowerParkour", Text = "Tormented Tower", Icon = "🗼", Feature = "TowerParkour" },
 		{ Id = "EasterEggs", Text = "Secret Pumpkins", Icon = "🎃", Feature = "EasterEggs" },
+		{
+			Id = "SkinStudio",
+			Text = "Skin Studio",
+			Icon = "🎨",
+			Color = Color3.fromRGB(90, 60, 150),
+			Feature = "SkinStudio",
+		}, -- admins in Studio only
 	} :: { TileEntry },
 }

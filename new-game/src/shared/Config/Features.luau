@@ -13,6 +13,7 @@ return {
 	ReadyPad = true, -- stand on the Ready pad to join the next round (off = everyone plays)
 	LobbySpectate = true, -- players in the lobby can watch the round (Menu > Spectate)
 	Menu = true, -- the top-left Menu button with tiles for every panel
+	SkinStudio = true, -- the skin editor for admins in Studio (Menu > Skin Studio, F8): players never see it
 	KingHunt = true, -- the classic mode: grab pumpkins and hide from the Pumpkin King
 	HideSeek = true, -- Pumpkin Hide & Seek: seekers with candy guns vs pumpkin hiders
 	ScareMaze = true, -- ScareMaze: Survivors run the maze, Haunters scare them
