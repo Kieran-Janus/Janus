@@ -39,6 +39,8 @@
 	                                         the targets this style really has (for an effect:
 	                                         only those it may use)
 	SkinAnimate.PartNames(model) -> { string }   names of parts/Models in a head piece (Part:)
+	SkinAnimate.PartsFor(model, target) -> { BasePart }   the pieces a colour target means
+	                                         (by the SkinPart / SkinIndex attributes)
 	SkinAnimate.Offset(effect, t, side?) -> CFrame         a moving piece's offset at time t
 	SkinAnimate.Tint(effect, base, t, index, height, seed) -> Color3
 	SkinAnimate.Brightness(effect, base, t, seed) -> number
@@ -739,6 +741,55 @@ function SkinAnimate.PartNames(model: Instance): { string }
 	end
 	table.sort(out)
 	return out
+end
+
+-- The pieces a colour target means inside a skin model (Cosmetic_Skin or a shop preview), in
+-- SkinIndex order. Found by the attributes Cosmetics sets (SkinPart, SkinIndex), never by
+-- part names: a head piece's "Wing" is not the Wings pattern. ("Body" and the Glow light
+-- aren't pieces: the caller finds those.)
+function SkinAnimate.PartsFor(root: Instance, target: string): { BasePart }
+	local partName = if string.sub(target, 1, 5) == "Part:" then string.sub(target, 6) else nil
+	local function inNamedModel(d: Instance): boolean
+		local at = d.Parent
+		while at and at ~= root do
+			if
+				at:IsA("Model")
+				and at.Name == partName
+				and at:GetAttribute("SkinPart") == "Head"
+			then
+				return true
+			end
+			at = at.Parent
+		end
+		return false
+	end
+	local function wanted(d: BasePart): boolean
+		local kind = d:GetAttribute("SkinPart")
+		if type(kind) ~= "string" then
+			return false
+		elseif partName then
+			return kind == "Head" and (d.Name == partName or inNamedModel(d))
+		elseif target == "Head" or target == "Glow" then
+			return kind == target
+		elseif target == "Accents" then
+			return isPattern(kind)
+		elseif target == "All" then
+			return kind == "Head" or isPattern(kind)
+		end
+		return kind == target and isPattern(kind)
+	end
+	local list: { BasePart } = {}
+	for _, d in root:GetDescendants() do
+		if d:IsA("BasePart") and wanted(d) then
+			table.insert(list, d)
+		end
+	end
+	table.sort(list, function(a: BasePart, b: BasePart): boolean
+		local ia, ib = a:GetAttribute("SkinIndex"), b:GetAttribute("SkinIndex")
+		return (if type(ia) == "number" then ia else math.huge)
+			< (if type(ib) == "number" then ib else math.huge)
+	end)
+	return list
 end
 
 -- Maths ------------------------------------------------------------------------------------------

@@ -544,3 +544,538 @@ describe("SkinAnimate: drafts and rarity", function()
 		local _ = typeof
 	end)
 end)
+
+-- Server build (src/shared/Cosmetics.luau) ----------------------------------------------------------
+
+local Cosmetics = rt:require("ReplicatedStorage.Shared.Cosmetics")
+local Tags = rt:require("ReplicatedStorage.Shared.Tags")
+local CollectionService = rt.game:GetService("CollectionService")
+local Vector3 = env.Vector3
+
+-- A skin made up for a test (not in the catalogue, so it is worn like a Skin Studio draft).
+local function testSkin(id: string, style: { [string]: any }, extra: { [string]: any }?): any
+	style.Kind = "Skin"
+	style.HideClothes = true
+	local item = { Id = id, Name = id, Slot = "Skin", Rarity = "Crazy", Style = style }
+	for key, value in extra or {} do
+		item[key] = value
+	end
+	return item
+end
+
+local function pivots(model: any): { [string]: any }
+	local found = {}
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") and d:GetAttribute("AnimGroup") then
+			found[d:GetAttribute("AnimGroup")] = d
+		end
+	end
+	return found
+end
+
+local function count(t: { [any]: any }): number
+	local n = 0
+	for _ in t do
+		n += 1
+	end
+	return n
+end
+
+-- An R6 character (Torso, Left Arm, ...).
+local function r6(name: string): any
+	local m = rt:create("Model", { Name = name }, rt.workspace)
+	local function limb(partName: string, size: any, at: any): any
+		return rt:create("Part", { Name = partName, Size = size, CFrame = CFrame.new(at) }, m)
+	end
+	local root = limb("HumanoidRootPart", Vector3.new(2, 2, 1), Vector3.new(40, 3, 0))
+	limb("Torso", Vector3.new(2, 2, 1), Vector3.new(40, 3, 0))
+	local head = limb("Head", Vector3.new(2, 1, 1), Vector3.new(40, 4.5, 0))
+	rt:create("Decal", { Name = "face" }, head)
+	for _, side in { -1, 1 } do
+		local prefix = if side < 0 then "Left" else "Right"
+		limb(prefix .. " Arm", Vector3.new(1, 2, 1), Vector3.new(40 + side * 1.5, 3, 0))
+		limb(prefix .. " Leg", Vector3.new(1, 2, 1), Vector3.new(40 + side * 0.5, 1, 0))
+	end
+	local humanoid = rt:create("Humanoid", {}, m)
+	humanoid.RigType = env.Enum.HumanoidRigType.R6
+	m.PrimaryPart = root
+	return m
+end
+
+-- Everything about a character a skin may change, to compare before and after.
+local function snapshot(character: any): { [string]: any }
+	local shot = {}
+	for _, d in character:GetDescendants() do
+		if d:IsA("BasePart") then
+			shot[d:GetFullName()] = tostring(d.Color) .. tostring(d.Material) .. d.Transparency
+		elseif d:IsA("Decal") then
+			shot[d:GetFullName()] = d.Transparency
+		elseif d:IsA("WeldConstraint") or d:IsA("Weld") then
+			shot[d:GetFullName() .. "#joint"] = tostring(d.Part0) .. ">" .. tostring(d.Part1)
+		end
+	end
+	for key, value in character:GetAttributes() do
+		shot["@" .. key] = tostring(value)
+	end
+	return shot
+end
+
+local player = rt:addPlayer({ Name = "Animated" })
+local r15 = player.Character
+local r6Body = r6("R6Animated")
+
+describe("Cosmetics: animated skins on characters", function()
+	it("marks every piece with SkinPart and a unique SkinIndex, the same in previews", function()
+		local checked = 0
+		for i, item in skins() do
+			if i % 9 ~= 0 then
+				continue
+			end
+			checked += 1
+			Cosmetics.Wear(r15, item)
+			local model = r15:FindFirstChild("Cosmetic_Skin")
+			if not model then
+				continue
+			end
+			local seen: { [number]: any } = {}
+			for _, d in model:GetDescendants() do
+				if d:IsA("BasePart") and d:GetAttribute("AnimGroup") == nil then
+					local kind = d:GetAttribute("SkinPart")
+					local index = d:GetAttribute("SkinIndex")
+					expect(kind == "Head" or kind == "Aura" or Cosmetics.HasPattern(kind)).toBe(
+						true
+					)
+					expect(index).toBeA("number")
+					if seen[index] then
+						error(("%s: SkinIndex %d used twice"):format(item.Id, index))
+					end
+					seen[index] = { kind, d.Name }
+				end
+			end
+			-- the preview numbers the head piece and accents the same way
+			local preview = Cosmetics.Preview(item)
+			for _, d in preview:GetDescendants() do
+				local index = d:GetAttribute("SkinIndex")
+				if d:IsA("BasePart") and index then
+					local worn = seen[index]
+					expect(worn).toBeTruthy()
+					expect(worn[1]).toBe(d:GetAttribute("SkinPart"))
+					expect(worn[2]).toBe(d.Name)
+				end
+			end
+			preview:Destroy()
+			Cosmetics.TakeOff(r15, "Skin")
+		end
+		T.note(checked, "skins checked")
+	end)
+
+	it(
+		"keeps a head piece's Wing, Stripe or Wrap apart from the Wings, Stripes and Wraps patterns",
+		function()
+			for _, case in
+				{
+					{ "BatHead", { "Wings", "Stripes" }, "Wing", "Wings" },
+					{ "ToadstoolHead", { "Spots" }, "Spot", "Spots" },
+					{ "WitchHood", { "Belt" }, "Buckle", "Belt" }, -- the Belt pattern has a Buckle too
+					{ "PharaohHead", { "Stripes", "Wraps" }, "Stripe", "Stripes" },
+					{ "MummyHead", { "Wraps" }, "Wrap", "Wraps" },
+					{ "FrankenHead", { "Stitches" }, "Stitch", "Stitches" },
+					{ "NightLord", { "Collar", "Cape" }, "Collar", "Collar" },
+				}
+			do
+				local head, patterns, partName, pattern = case[1], case[2], case[3], case[4]
+				local item =
+					testSkin("Test_" .. head, { Head = head, Accent = { Pattern = patterns } })
+				Cosmetics.Wear(r15, item)
+				local model = r15.Cosmetic_Skin
+				local accents = SkinAnimate.PartsFor(model, pattern)
+				local pieces = SkinAnimate.PartsFor(model, "Part:" .. partName)
+				if #accents == 0 or #pieces == 0 then
+					error(
+						("%s: %d %s pieces, %d parts called %s"):format(
+							head,
+							#accents,
+							pattern,
+							#pieces,
+							partName
+						)
+					)
+				end
+				for _, p in accents do
+					expect(p:GetAttribute("SkinPart")).toBe(pattern)
+				end
+				for _, p in pieces do
+					expect(p:GetAttribute("SkinPart")).toBe("Head")
+					expect(p.Name).toBe(partName)
+				end
+				-- "Accents" never takes head-piece parts, "Head" never takes accent pieces
+				for _, p in SkinAnimate.PartsFor(model, "Accents") do
+					expect(p:GetAttribute("SkinPart")).never.toBe("Head")
+				end
+				for _, p in SkinAnimate.PartsFor(model, "Head") do
+					expect(p:GetAttribute("SkinPart")).toBe("Head")
+				end
+				Cosmetics.TakeOff(r15, "Skin")
+			end
+		end
+	)
+
+	it("builds pivots only for the groups an effect moves", function()
+		local style = {
+			Head = "BatHead",
+			Accent = { Pattern = { "Wings", "Tail", "Cape", "Belt" } },
+			Animate = { { Effect = "Flap", Target = "Wings" } },
+		}
+		Cosmetics.Wear(r15, testSkin("Test_Flapper", style))
+		local model = r15.Cosmetic_Skin
+		local found = pivots(model)
+		expect(count(found)).toBe(2)
+		local top = r15.UpperTorso
+		for name, side in { WingL = -1, WingR = 1 } do
+			local pivot = found[name]
+			expect(pivot:GetAttribute("AnimSide")).toBe(side)
+			local motor = pivot.SkinMotor
+			expect(motor.Part0).toBe(top)
+			expect(motor.C0).toBeNear(
+				CFrame.new(side * 0.3, top.Size.Y * 0.3, top.Size.Z / 2 + 0.12)
+					* CFrame.Angles(0, math.rad(side * -20), 0),
+				1e-5
+			)
+			expect(pivot.Transparency).toBe(1)
+			expect(pivot.CanCollide or pivot.CanTouch or pivot.CanQuery).toBe(false)
+			expect(pivot.Massless).toBe(true)
+		end
+		-- every wing piece hangs on a wing pivot; the tail and cape stay welded to the body
+		for _, p in model:GetDescendants() do
+			if p:IsA("BasePart") and p:GetAttribute("SkinPart") then
+				local to = p:FindFirstChildOfClass("WeldConstraint").Part0
+				if p:GetAttribute("SkinPart") == "Wings" then
+					local group = to:GetAttribute("AnimGroup")
+					expect(group == "WingL" or group == "WingR").toBe(true)
+				else
+					expect(to:GetAttribute("AnimGroup")).toBeNil()
+				end
+			end
+		end
+		expect(CollectionService:HasTag(model, Tags.SkinAnim)).toBe(true)
+		-- head, tail, cape and one part of the head piece: Part: hangs on the moving head
+		style.Animate = {
+			{ Effect = "Bob", Target = "Head" },
+			{ Effect = "Wag", Target = "Tail" },
+			{ Effect = "Breathe", Target = "Cape" },
+			{ Effect = "Spin", Target = "Part:Wing" },
+		}
+		Cosmetics.Wear(r15, testSkin("Test_Flapper", style))
+		model = r15.Cosmetic_Skin
+		found = pivots(model)
+		expect(count(found)).toBe(4)
+		expect(found.Head.SkinMotor.Part0).toBe(r15.Head)
+		expect(found.Head.SkinMotor.C0).toBeNear(CFrame.identity, 1e-6)
+		expect(found.Tail.SkinMotor.Part0).toBe(r15.LowerTorso)
+		expect(found.Cape.SkinMotor.Part0).toBe(r15.UpperTorso)
+		expect(found["Part:Wing"].SkinMotor.Part0).toBe(found.Head)
+		for _, p in SkinAnimate.PartsFor(model, "Part:Wing") do
+			expect(p:FindFirstChildOfClass("WeldConstraint").Part0).toBe(found["Part:Wing"])
+		end
+		-- the rest of the head piece rides the Head pivot
+		for _, p in SkinAnimate.PartsFor(model, "Head") do
+			if p.Name ~= "Wing" then
+				expect(p:FindFirstChildOfClass("WeldConstraint").Part0).toBe(found.Head)
+			end
+		end
+		Cosmetics.TakeOff(r15, "Skin")
+	end)
+
+	it("stops at MaxPivots moving groups", function()
+		local item = testSkin("Test_Many", {
+			Head = "BatHead",
+			Accent = { Pattern = { "Wings", "Tail", "Cape" } },
+			Animate = {
+				{ Effect = "Bob", Target = "Head" },
+				{ Effect = "Flap", Target = "Wings" },
+				{ Effect = "Wag", Target = "Tail" },
+				{ Effect = "Breathe", Target = "Cape" },
+				{ Effect = "Spin", Target = "Part:Wing" },
+				{ Effect = "Spin", Target = "Part:Ear" },
+			},
+		})
+		Cosmetics.Wear(r15, item)
+		expect(count(pivots(r15.Cosmetic_Skin))).toBe(Config.SkinAnimate.MaxPivots)
+		Cosmetics.TakeOff(r15, "Skin")
+	end)
+
+	it("builds exactly what it built before for a skin without moving effects", function()
+		local function shape(model: any): string
+			local lines = {}
+			for _, d in model:GetDescendants() do
+				local line = d.ClassName .. ":" .. d.Name
+				if d:IsA("WeldConstraint") then
+					line ..= ">" .. d.Part0.Name
+				end
+				table.insert(lines, line)
+			end
+			return table.concat(lines, "|")
+		end
+		for _, id in { "Pumpkin_SirGourdington", "Moonlight_LunarLegend", "Candy_SugarRushSupreme" } do
+			local item = Items.Get(id)
+			local plain = table.clone(item)
+			plain.Style = table.clone(item.Style)
+			plain.Style.Animate = nil
+			Cosmetics.Wear(r15, plain)
+			local on = shape(r15.Cosmetic_Skin)
+			Config.Features.SkinAnimations = false
+			Cosmetics.Wear(r15, item)
+			local off = shape(r15.Cosmetic_Skin)
+			expect(count(pivots(r15.Cosmetic_Skin))).toBe(0)
+			expect(CollectionService:HasTag(r15.Cosmetic_Skin, Tags.SkinAnim)).toBe(false)
+			expect(r15.Cosmetic_Skin:GetAttribute("LiveStyle")).toBeNil()
+			Config.Features.SkinAnimations = true
+			expect(off).toBe(on)
+			Cosmetics.TakeOff(r15, "Skin")
+		end
+	end)
+
+	it("sets every attribute and tag before the skin goes on the character", function()
+		local item = testSkin("StudioDraft_Test", {
+			Head = "SkinPumpkin",
+			Accent = { Pattern = "Belt" },
+			Crazy = { Pulse = true, Orbit = "Pumpkins" },
+			Animate = {
+				{ Effect = "Float", Target = "Head" },
+				{ Effect = "Shimmer", Target = "Belt" },
+			},
+		})
+		local seen = nil
+		local connection = r15.ChildAdded:Connect(function(child)
+			if child.Name == "Cosmetic_Skin" then
+				seen = {
+					ItemId = child:GetAttribute("ItemId"),
+					LiveStyle = child:GetAttribute("LiveStyle"),
+					SkinFx = CollectionService:HasTag(child, Tags.SkinFx),
+					SkinAnim = CollectionService:HasTag(child, Tags.SkinAnim),
+					Pivot = pivots(child).Head ~= nil,
+				}
+			end
+		end)
+		Cosmetics.Wear(r15, item)
+		connection:Disconnect()
+		expect(seen).toBeTruthy()
+		expect(seen.ItemId).toBe("StudioDraft_Test")
+		expect(seen.LiveStyle).toBeA("string")
+		expect(seen.SkinFx).toBe(true)
+		expect(seen.SkinAnim).toBe(true)
+		expect(seen.Pivot).toBe(true)
+		local style = SkinAnimate.StyleOf(r15.Cosmetic_Skin)
+		expect(style.Crazy.Orbit).toBe("Pumpkins")
+		expect(#style.Animate).toBe(2)
+		-- a catalogue skin needs no LiveStyle: every screen looks it up by its ItemId
+		Cosmetics.Wear(r15, Items.Get("Pumpkin_SirGourdington"))
+		expect(r15.Cosmetic_Skin:GetAttribute("LiveStyle")).toBeNil()
+		Cosmetics.TakeOff(r15, "Skin")
+	end)
+
+	it(
+		"puts a hat on the moving head piece, and back on the head when the skin comes off",
+		function()
+			local hat = Items.Get("PumpkinCap")
+			local item = testSkin("Test_Floaty", {
+				Head = "SkinPumpkin",
+				Animate = { { Effect = "Float", Target = "Head" } },
+			})
+			Cosmetics.Wear(r15, item)
+			Cosmetics.Wear(r15, hat)
+			local pivot = pivots(r15.Cosmetic_Skin).Head
+			for _, p in r15.Cosmetic_Hat:GetDescendants() do
+				if p:IsA("BasePart") then
+					expect(p:FindFirstChildOfClass("WeldConstraint").Part0).toBe(pivot)
+				end
+			end
+			local before = r15.Cosmetic_Hat:GetPivot()
+			Cosmetics.TakeOff(r15, "Skin")
+			expect(r15:FindFirstChild("Cosmetic_Hat")).toBeTruthy()
+			for _, p in r15.Cosmetic_Hat:GetDescendants() do
+				if p:IsA("BasePart") then
+					expect(p:FindFirstChildOfClass("WeldConstraint").Part0).toBe(r15.Head)
+				end
+			end
+			expect(r15.Cosmetic_Hat:GetPivot()).toBeNear(before, 1e-4)
+			Cosmetics.TakeOff(r15, "Hat")
+		end
+	)
+
+	it(
+		"puts animated skins on R15 and R6 and takes them off leaving the avatar as it was",
+		function()
+			local item = testSkin("Test_Everything", {
+				BodyColor = rgb(40, 200, 90),
+				Head = "BatHead",
+				Accent = { Pattern = { "Wings", "Tail", "Cape" }, Color = rgb(200, 40, 40) },
+				Glow = { Color = rgb(255, 200, 0) },
+				Aura = { Kind = "Sparkles", Color = rgb(255, 255, 255) },
+				Animate = {
+					{ Effect = "Wobble", Target = "Head" },
+					{ Effect = "Flap", Target = "Wings" },
+					{ Effect = "Wag", Target = "Tail" },
+					{ Effect = "Breathe", Target = "Cape" },
+					{ Effect = "Pulse", Target = "Glow" },
+					{ Effect = "SparkleBurst" },
+				},
+				Motion = { Preset = "Bat", Walk = 1234 },
+			})
+			for _, character in { r15, r6Body } do
+				local before = snapshot(character)
+				Cosmetics.Wear(character, item)
+				expect(character:GetAttribute("SkinMotion")).toBe("Bat")
+				expect(character:GetAttribute("SkinMotionIds")).toBe("Walk=1234")
+				expect(count(pivots(character.Cosmetic_Skin))).toBe(5)
+				Cosmetics.TakeOff(character, "Skin")
+				local after = snapshot(character)
+				for key, value in before do
+					if after[key] ~= value then
+						error(
+							("%s: %s is %s, was %s"):format(
+								character.Name,
+								key,
+								tostring(after[key]),
+								tostring(value)
+							)
+						)
+					end
+				end
+				for key in after do
+					if before[key] == nil then
+						error(("%s: %s was left behind"):format(character.Name, key))
+					end
+				end
+			end
+		end
+	)
+
+	it("sets walk styles only when switched on, and uploaded ids only when allowed", function()
+		local item = testSkin(
+			"Test_Walker",
+			{ BodyColor = rgb(1, 2, 3), Motion = { Preset = "Robot", Idle = 55 } }
+		)
+		Config.SkinMotion.AllowUploaded = false
+		Cosmetics.Wear(r15, item)
+		Config.SkinMotion.AllowUploaded = true
+		expect(r15:GetAttribute("SkinMotion")).toBe("Robot")
+		expect(r15:GetAttribute("SkinMotionIds")).toBeNil()
+		Config.Features.WalkStyles = false
+		Cosmetics.Wear(r15, item)
+		Config.Features.WalkStyles = true
+		expect(r15:GetAttribute("SkinMotion")).toBeNil()
+		Cosmetics.Wear(
+			r15,
+			testSkin("Test_Walker", { BodyColor = rgb(1, 2, 3), Motion = "Moonwalk" })
+		)
+		expect(r15:GetAttribute("SkinMotion")).toBeNil() -- a bad Motion is left out, quietly
+		Cosmetics.TakeOff(r15, "Skin")
+	end)
+
+	it("builds nothing extra and tags nothing with animations switched off", function()
+		local item = testSkin("Test_Off", {
+			Head = "SkinPumpkin",
+			Accent = { Pattern = "Wings" },
+			Animate = { { Effect = "Flap" }, { Effect = "Shimmer", Target = "Head" } },
+		})
+		Config.Features.SkinAnimations = false
+		Cosmetics.Wear(r15, item)
+		local preview = Cosmetics.Preview(item)
+		Config.Features.SkinAnimations = true
+		local model = r15.Cosmetic_Skin
+		expect(count(pivots(model))).toBe(0)
+		expect(CollectionService:HasTag(model, Tags.SkinAnim)).toBe(false)
+		expect(model:GetAttribute("LiveStyle")).toBeNil()
+		expect(preview:FindFirstChild("AnimGroup", true)).toBeNil()
+		-- the piece attributes are plain data: always there
+		expect(model:FindFirstChildWhichIsA("BasePart"):GetAttribute("SkinPart")).toBeA("string")
+		preview:Destroy()
+		Cosmetics.TakeOff(r15, "Skin")
+		-- an Animate-only skin with the feature off is just colours (no empty model)
+		Config.Features.SkinAnimations = false
+		Cosmetics.Wear(
+			r15,
+			testSkin(
+				"Test_Off2",
+				{ BodyColor = rgb(1, 2, 3), Animate = { { Effect = "Pulse", Target = "Body" } } }
+			)
+		)
+		Config.Features.SkinAnimations = true
+		expect(r15:FindFirstChild("Cosmetic_Skin")).toBeNil()
+		Cosmetics.TakeOff(r15, "Skin")
+	end)
+
+	it("turns a custom model's Animate attributes into moving groups (found by ModelId)", function()
+		local folder = rt:find("ReplicatedStorage.Custom.Cosmetics")
+		local custom = rt:create("Model", { Name = "Test_Robo" })
+		local function block(name: string, size: any, at: any, parent: any): any
+			return rt:create(
+				"Part",
+				{ Name = name, Size = size, CFrame = CFrame.new(at) },
+				parent or custom
+			)
+		end
+		local body = block("Body", Vector3.new(4, 4, 4), Vector3.new(0, 0, 0))
+		local prop = block("Propeller", Vector3.new(3, 0.2, 0.5), Vector3.new(0, 2.5, 0))
+		prop:SetAttribute("Animate", "Spin")
+		prop:SetAttribute("Speed", 3)
+		local antenna = rt:create("Model", { Name = "Antenna" }, custom)
+		block("Rod", Vector3.new(0.2, 1.5, 0.2), Vector3.new(1.5, 2.5, 0), antenna)
+		block("Tip", Vector3.new(0.4, 0.4, 0.4), Vector3.new(1.5, 3.3, 0), antenna)
+		antenna:SetAttribute("Animate", "Wobble")
+		local gem = block("Gem", Vector3.new(0.5, 0.5, 0.5), Vector3.new(0, 0, -2))
+		gem:SetAttribute("Animate", "ColorCycle") -- a colour mark: no pivot
+		gem:SetAttribute("Color2", rgb(0, 0, 255))
+		local junk = block("Junk", Vector3.new(0.5, 0.5, 0.5), Vector3.new(0, -1, -2))
+		junk:SetAttribute("Animate", "Explode") -- not an effect: ignored
+		custom.PrimaryPart = body
+		custom.Parent = folder
+
+		-- a Skin Studio draft of "Test_Robo": worn under its own Id, the model found by ModelId
+		local item = testSkin(
+			"StudioDraft_Robo",
+			{ HeadColor = rgb(1, 2, 3) },
+			{ ModelId = "Test_Robo" }
+		)
+		Cosmetics.Wear(r15, item)
+		local model = r15.Cosmetic_Skin
+		expect(model:GetAttribute("ItemId")).toBe("StudioDraft_Robo")
+		expect(model:FindFirstChild("Propeller", true)).toBeTruthy()
+		expect(CollectionService:HasTag(model, Tags.SkinAnim)).toBe(true)
+		local found = pivots(model)
+		expect(count(found)).toBe(2)
+		expect(found["Custom:1"]:GetAttribute("Animate")).toBe("Spin")
+		expect(found["Custom:1"]:GetAttribute("Speed")).toBe(3)
+		expect(found["Custom:2"]:GetAttribute("Animate")).toBe("Wobble")
+		expect(found["Custom:1"].SkinMotor.Part0).toBe(r15.Head)
+		local function weldedTo(name: string): any
+			return model:FindFirstChild(name, true):FindFirstChildOfClass("WeldConstraint").Part0
+		end
+		expect(weldedTo("Propeller")).toBe(found["Custom:1"])
+		expect(weldedTo("Tip")).toBe(found["Custom:2"])
+		expect(weldedTo("Gem")).toBe(r15.Head)
+		-- with a moving head piece the custom groups hang on it
+		item.Style.Animate = { { Effect = "Float", Target = "Head" } }
+		Cosmetics.Wear(r15, item)
+		found = pivots(r15.Cosmetic_Skin)
+		expect(found["Custom:1"].SkinMotor.Part0).toBe(found.Head)
+		expect(found["Custom:2"].SkinMotor.Part0).toBe(found.Head)
+		Cosmetics.TakeOff(r15, "Skin")
+		-- the preview groups them the same way (a Model per group, inside the Head group)
+		local preview = Cosmetics.Preview(item)
+		local groups = {}
+		for _, d in preview:GetDescendants() do
+			if d:IsA("Model") and d:GetAttribute("AnimGroup") then
+				groups[d:GetAttribute("AnimGroup")] = d
+			end
+		end
+		expect(groups.Head).toBeTruthy()
+		expect(groups["Custom:1"].Parent).toBe(groups.Head)
+		expect(groups["Custom:1"]:GetAttribute("Animate")).toBe("Spin")
+		expect(groups["Custom:2"]:FindFirstChild("Antenna")).toBeTruthy()
+		expect(preview.PrimaryPart:IsDescendantOf(groups.Head)).toBe(false)
+		preview:Destroy()
+		custom:Destroy()
+	end)
+end)
