@@ -18,6 +18,8 @@ local Items = rt:require("ReplicatedStorage.Shared.Items")
 local Cosmetics = rt:require("ReplicatedStorage.Shared.Cosmetics")
 local HeadPieces = rt:require("ReplicatedStorage.Shared.HeadPieces")
 local Tags = rt:require("ReplicatedStorage.Shared.Tags")
+local SkinAnimate = rt:require("ReplicatedStorage.Shared.SkinAnimate")
+local SkinMotion = rt:require("ReplicatedStorage.Shared.SkinMotion")
 local CollectionService = rt.game:GetService("CollectionService")
 
 local THEMES = { "Pumpkin", "Candy", "Spooky", "Graveyard", "Monster", "Moonlight" }
@@ -49,6 +51,8 @@ local STYLE_KEYS = {
 	Glow = "table",
 	Aura = "table",
 	Crazy = "table",
+	Animate = "table", -- moving pieces and colour effects (src/shared/SkinAnimate.luau)
+	Motion = { "string", "table" }, -- a walk style (src/shared/SkinMotion.luau)
 }
 
 local function crateSkins(): { any }
@@ -247,8 +251,15 @@ describe("Skin styles", function()
 				if not want then
 					error(("%s: unknown Style key %s (typo?)"):format(item.Id, key))
 				end
-				if typeof(value) ~= want then
-					error(("%s: Style.%s should be a %s"):format(item.Id, key, want))
+				local wants = if type(want) == "table" then want else { want }
+				if not table.find(wants, typeof(value)) then
+					error(
+						("%s: Style.%s should be a %s"):format(
+							item.Id,
+							key,
+							table.concat(wants, " or ")
+						)
+					)
 				end
 				local isMaterial = want ~= "EnumItem"
 					or pcall(function()
@@ -256,6 +267,19 @@ describe("Skin styles", function()
 					end)
 				if not isMaterial then
 					error(("%s: Style.%s should be an Enum.Material"):format(item.Id, key))
+				end
+			end
+		end
+	end)
+
+	it("gives every skin valid animations and walk styles (no errors, no warnings)", function()
+		for _, item in skins() do
+			local style = item.Style
+			local _, errors, warnings = SkinAnimate.Normalize(style.Animate, style)
+			local _, motionErrors = SkinMotion.Normalize(style.Motion)
+			for _, list in { errors, warnings, motionErrors } do
+				if #list > 0 then
+					error(("%s: %s"):format(item.Id, table.concat(list, "; ")))
 				end
 			end
 		end
