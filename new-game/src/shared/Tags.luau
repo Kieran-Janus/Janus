@@ -71,6 +71,7 @@ local Tags = {
 	HidingSpot = "HidingSpot", -- blocks the King's view while you stand in it
 	-- Cosmetics (set by src/shared/Cosmetics.luau)
 	SkinFx = "SkinFx", -- a CRAZY skin's model: players' screens animate it (client SkinFx)
+	SkinAnim = "SkinAnim", -- a skin model with Style.Animate effects (client SkinAnim)
 }
 
 return Tags

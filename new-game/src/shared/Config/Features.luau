@@ -26,6 +26,8 @@ return {
 	Crates = true, -- crates bought with coins that give a random skin
 	RobuxCrates = true, -- crates can also be bought with Robux (needs Crates on too)
 	SkinEffects = true, -- CRAZY skins' animated rainbow, orbiting pieces and pulsing glow
+	SkinAnimations = true, -- skin pieces that move or change colour (Style.Animate: flapping wings, wagging tails...)
+	WalkStyles = true, -- skins that change how you walk (Style.Motion: Zombie, Ghost, Robot...)
 	Tutorial = false, -- Boo Guide's first-round tips (removed in v2; true brings them back)
 	MapLife = true, -- round maps come alive on each screen: bobbing pumpkins, fireflies, wobbling decoys
 }
