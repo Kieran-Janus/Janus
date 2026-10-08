@@ -69,6 +69,7 @@ local Tags = {
 	SeekerDoor = "SeekerDoor", -- Hide & Seek: the seeker hut's door, swings open when seekers are let out
 	-- Older tags (set by src/server/Build/Kit.luau)
 	HubFloat = "HubFloat", -- bobs up and down (client HubAmbience)
+	ClockHand = "ClockHand", -- the clock tower's minute hand: twitches towards midnight (client HubAmbience; attribute ClockFrame)
 	HubSway = "HubSway", -- rocks gently from side to side (client HubAmbience; attributes SwayAngle, SwaySeconds)
 	HubFlicker = "HubFlicker", -- light flickers (client HubAmbience)
 	HidingSpot = "HidingSpot", -- blocks the King's view while you stand in it

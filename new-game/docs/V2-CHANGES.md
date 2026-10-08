@@ -223,6 +223,8 @@ No picture yet: you'll see it the moment you press Play.
 - **Crate odds** read "6.1%", and anything under 1% reads "<1%" (`Config.Crates.SmallOdds`).
 - **Lighting** toned down a little (lobby and maps), the **floor signs** are gone, the **King statue** is the new King and sways.
 - **New Hide & Seek map: Midnight Market**: a small walled night market packed with stalls, crate stacks, barrels, sacks, hay and handcarts under strings of lanterns, with over 100 decoy pumpkins. The clutter, the decoys and the hider spawns move to new spots every round, so nobody can learn the hiding places (`Config/Maps/MidnightMarket.luau`: `Shuffle`, `Clutter`, `Decoys`). Seekers come out of the hut in the corner with their candy guns.
+- **The clock tower** is stuck at 11:55, and now its minute hand strains towards midnight: a jerk forward every second or so, then it falls back (`Config.Hub.ClockTower.ClockTwitch`).
+- The floating **READY** sign over the arch is a bit smaller, so it no longer covers the top of the screen near the spawn (`Config.Hub.ReadyArea.Sign.Size`).
 - **Haunted portraits** in the Spooky Mansion: painted portraits in gold frames whose eyes follow you round the room (`Config.Maps.PortraitEyes`). To hang real pictures instead, put image codes in `Config/Maps/SpookyMansion.luau` > `Paintings.Images`.
 
 ### Safer servers

@@ -8,6 +8,8 @@
 	             little bob as they lean (attributes SwayAngle degrees, SwaySeconds per rock):
 	             the Pumpkin King statue
 	  "HubFlicker" PointLights flicker like candles
+	  "ClockHand" the clock tower's minute hand jerks towards midnight and falls back
+	             (Config.Hub.ClockTower.ClockTwitch)
 	Anything tagged later (the hub may be built after this client starts) is picked up too.
 	Cheap on phones (Config.Performance): only things near the camera animate (looked for a
 	few times a second, not every frame; closer still on phones), and the
@@ -112,6 +114,24 @@ function HubAmbience.Mount()
 	-- In between, only those move: nothing far away costs anything per frame.
 	local nearFloats: { Model } = {}
 	local nearFlickers: { PointLight } = {}
+	-- The clock tower's minute hand (tag ClockHand): it jerks towards midnight and falls back.
+	type Hand = { Base: CFrame, Frame: CFrame }
+	local hands: { [BasePart]: Hand } = {}
+	local nearHands: { BasePart } = {}
+	local function addHand(instance: Instance)
+		local frame = instance:GetAttribute("ClockFrame")
+		if instance:IsA("BasePart") and typeof(frame) == "CFrame" then
+			hands[instance] = { Base = instance.CFrame, Frame = frame }
+		end
+	end
+	for _, instance in CollectionService:GetTagged(Tags.ClockHand) do
+		addHand(instance)
+	end
+	CollectionService:GetInstanceAddedSignal(Tags.ClockHand):Connect(addHand)
+	CollectionService:GetInstanceRemovedSignal(Tags.ClockHand):Connect(function(instance)
+		hands[instance :: BasePart] = nil
+	end)
+	local twitch = Config.Hub.ClockTower.ClockTwitch
 	local nextScan = 0
 	local nextFlicker = 0
 	local maxDistance = perf.AmbienceDistance
@@ -139,6 +159,16 @@ function HubAmbience.Mount()
 			end
 			if ((base :: CFrame).Position - eye).Magnitude <= maxDistance then
 				table.insert(nearFloats, m)
+			end
+		end
+		table.clear(nearHands)
+		if twitch.Degrees > 0 then
+			for part, hand in hands do
+				if not part.Parent then
+					hands[part] = nil
+				elseif (hand.Base.Position - eye).Magnitude <= maxDistance * 2 then
+					table.insert(nearHands, part)
+				end
 			end
 		end
 		table.clear(nearFlickers)
@@ -192,7 +222,22 @@ function HubAmbience.Mount()
 			-- local offset would slide them sideways instead of up and down.
 			m:PivotTo(CFrame.new(0, math.sin(t * 1.5 + f.Phase) * f.Bob, 0) * base)
 		end
-		local busy = #nearFloats > 0 or #nearFlickers > 0
+		if #nearHands > 0 then
+			-- A quick jerk forward, then a slower fall back, once every Seconds.
+			local period = math.max(twitch.Seconds, 0.3)
+			local u = t % period
+			local pulse = if u < 0.08 then u / 0.08 else math.max(0, 1 - (u - 0.08) / 0.35)
+			local angle = math.rad(twitch.Degrees) * pulse
+			for _, part in nearHands do
+				local hand = hands[part]
+				if hand and part.Parent then
+					part.CFrame = hand.Frame
+						* CFrame.Angles(0, 0, -angle)
+						* hand.Frame:ToObjectSpace(hand.Base)
+				end
+			end
+		end
+		local busy = #nearFloats > 0 or #nearFlickers > 0 or #nearHands > 0
 		if t < nextFlicker or #nearFlickers == 0 then
 			return busy
 		end

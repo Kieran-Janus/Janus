@@ -847,6 +847,7 @@ local Config = {
 			-- (src/client/ReadySign.luau); %d is replaced by a number.
 			Sign = {
 				Height = 18, -- studs above the plaza
+				Size = Vector2.new(12, 4.5), -- studs wide and tall (plus a few pixels so it reads from afar)
 				MaxDistance = 300, -- hidden further away than this (studs)
 				-- Hidden while the camera is this close (flat distance, studs): from right under it
 				-- only its cut-off bottom shows, over the top of the screen. 0 = always shown.
@@ -909,7 +910,10 @@ local Config = {
 			Width = 22, -- room for the Tormented Tower inside
 			Lean = 2.2, -- degrees each floor tilts, for the crooked look
 			Twist = 4, -- degrees each floor turns
-			ClockTime = { Hour = 11, Minute = 55 }, -- the hands are frozen just before midnight
+			ClockTime = { Hour = 11, Minute = 55 }, -- the hands are stuck just before midnight
+			-- ...and the minute hand strains towards it: every Seconds it jerks Degrees forward and
+			-- falls back (players' screens, client HubAmbience). Degrees = 0: perfectly still.
+			ClockTwitch = { Degrees = 5, Seconds = 1.2 },
 			Bats = 4, -- bats flapping round the roof
 		},
 		-- The bubbling cauldron in the middle, on a round stone step (Dais).

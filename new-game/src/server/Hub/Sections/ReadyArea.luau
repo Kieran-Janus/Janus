@@ -301,7 +301,7 @@ local function buildSign(parent: Instance, base: CFrame): BasePart
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Sign"
 	-- Sized in studs like a real sign, plus a few pixels so it stays readable from afar.
-	gui.Size = UDim2.new(16, 120, 6, 44)
+	gui.Size = UDim2.new(cfg.Sign.Size.X, 120, cfg.Sign.Size.Y, 44)
 	gui.MaxDistance = cfg.Sign.MaxDistance
 	gui.LightInfluence = 0
 	gui.Parent = anchor

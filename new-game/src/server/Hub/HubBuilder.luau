@@ -685,7 +685,7 @@ local function buildClockTower(parent: Instance)
 						glowLight(face, "Glow", 34, 1.6, false)
 					end
 					local function hand(name: string, angle: number, length: number, thick: number)
-						decor({
+						local part = decor({
 							Name = name,
 							Size = Vector3.new(thick, length, 0.2),
 							CFrame = faceCf
@@ -693,6 +693,11 @@ local function buildClockTower(parent: Instance)
 								* CFrame.new(0, length / 2 - 0.3, -0.45),
 							PaletteRole = "Iron",
 						}, tower)
+						if name == "MinuteHand" then
+							-- Players' screens make it strain towards midnight (HubAmbience).
+							part:SetAttribute("ClockFrame", faceCf)
+							CollectionService:AddTag(part, Tags.ClockHand)
+						end
 					end
 					hand(
 						"HourHand",
