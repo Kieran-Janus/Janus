@@ -25,6 +25,9 @@ return {
 	-- fit between the entrance field (PlazaDepth) and the escape yard (YardDepth).
 	Size = Vector3.new(198, 1, 205),
 	WallHeight = 16, -- the fence around the edge
+	-- The world outside the fence (src/server/Maps/MapScenery.luau): lighter here, because the
+	-- corn hides the view and the camera stays close (keeps the map under its phone part budget).
+	Scenery = { Trees = 12, Hills = 14, PostSpacing = 34 },
 	Spawns = 16, -- Survivor start spots in the field (more players share them)
 	SpawnRadius = 14, -- (not used by this map: the spots are in a grid in front of the gate)
 	Colors = {

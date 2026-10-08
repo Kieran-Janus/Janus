@@ -10,7 +10,8 @@
 	eggs that aren't in the list). On start, eggs in Config.EasterEggs.List that the lobby
 	doesn't have are placed (Sections/EasterEggs).
 	Collecting: the egg's "Take" button or walking into it. The server checks the player's
-	save is loaded, they aren't in a round, they are within ReachDistance of the egg, aren't
+	save is loaded, they aren't in a round, they are within ReachDistance of the egg, didn't
+	teleport there (Config.EasterEggs.AntiTeleport), aren't
 	grabbing too fast and haven't found that egg before; then it adds the coins and tells
 	the player ("Easter egg found! +50 Coins (3/10)").
 
@@ -45,6 +46,50 @@ local foundEvent: RemoteEvent? = nil
 local lastTry: { [Player]: number } = {}
 local wired: { [BasePart]: { RBXScriptConnection } } = {}
 local publishQueued = false
+
+-- Where each player has been lately (Config.EasterEggs.AntiTeleport), newest last.
+type Sample = { T: number, P: Vector3 }
+local trail: { [Player]: { Sample } } = {}
+
+local function sampleAll()
+	local now = os.clock()
+	local keep = cfg.AntiTeleport.WindowSeconds + 0.5
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if root and root:IsA("BasePart") then
+			local list = trail[player]
+			if not list then
+				list = {}
+				trail[player] = list
+			end
+			table.insert(list, { T = now, P = root.Position })
+			while #list > 0 and now - list[1].T > keep do
+				table.remove(list, 1)
+			end
+		end
+	end
+end
+
+-- Did the player get to `position` faster than anyone can run? (No history yet = no.)
+local function teleported(player: Player, position: Vector3): boolean
+	local list = trail[player]
+	if not list then
+		return false
+	end
+	local limits = cfg.AntiTeleport
+	local now = os.clock()
+	for _, sample in list do
+		local age = now - sample.T
+		if age <= limits.WindowSeconds then
+			local flat = Vector3.new(position.X - sample.P.X, 0, position.Z - sample.P.Z)
+			if flat.Magnitude > limits.MaxSpeed * age + limits.Slack then
+				return true
+			end
+		end
+	end
+	return false
+end
 
 -- Egg parts that are really in the game.
 local function eggParts(): { BasePart }
@@ -162,6 +207,7 @@ function EasterEggService.Collect(player: Player, part: BasePart): boolean
 		Distance = if root and root:IsA("BasePart")
 			then (root.Position - part.Position).Magnitude
 			else math.huge,
+		Teleported = root ~= nil and root:IsA("BasePart") and teleported(player, root.Position),
 	}, cfg)
 	if why == "Found" or why == "TooFast" then
 		return false
@@ -299,6 +345,24 @@ function EasterEggService.Start()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		lastTry[player] = nil
+		trail[player] = nil
+	end)
+	-- Anti-teleport history: sampled a few times a second; a new character starts afresh (a
+	-- respawn or the trip back from a round isn't a teleport).
+	local function watch(player: Player)
+		player.CharacterAdded:Connect(function()
+			trail[player] = nil
+		end)
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
+	task.spawn(function()
+		while true do
+			task.wait(cfg.AntiTeleport.SampleSeconds)
+			sampleAll()
+		end
 	end)
 
 	AdminService.Register("EasterEggsReset", "Easter eggs: reset mine", function(player, data)

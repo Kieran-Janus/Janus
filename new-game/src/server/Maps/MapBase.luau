@@ -7,6 +7,7 @@
 
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 local Kit = require(script.Parent.Parent.Build.Kit)
+local MapScenery = require(script.Parent.MapScenery)
 
 export type Ctx = {
 	Def: any,
@@ -84,6 +85,9 @@ function MapBase.new(def: any, style: Style): Ctx
 	local hotspots = Instance.new("Folder")
 	hotspots.Name = "Hotspots"
 	hotspots.Parent = model
+
+	-- The world outside the walls (ground to the horizon, hills, trees, wall posts).
+	MapScenery.Build(def, style, Vector3.new(origin.X, top, origin.Z), size, model)
 
 	Kit.ambientParticles(
 		Vector3.new(origin.X, top, origin.Z),

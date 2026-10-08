@@ -23,6 +23,7 @@ local ORDER = {
 	"AdminService",
 	"SkinStudioService", -- Skin Studio drafts (admins in Studio; after AdminService for its F8 button)
 	"MapService",
+	"MapVisitService", -- Studio only: F8 "Visit map" and the name finder
 	"NoiseService",
 	"SprintService",
 	"ShoutService",

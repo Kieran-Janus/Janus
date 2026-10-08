@@ -36,6 +36,7 @@ local ORDER = {
 	"SettingsUI",
 	"AdminUI",
 	"SkinStudioUI", -- the skin editor (admins in Studio only: Menu > Skin Studio, F8)
+	"NameFinder", -- Studio only: F8 > "Name finder on/off" shows what anything is called
 	"KingHeardUI",
 	"RoundJuiceUI",
 	"TutorialUI", -- does nothing while Config.Features.Tutorial is off

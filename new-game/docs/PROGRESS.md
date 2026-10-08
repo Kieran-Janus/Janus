@@ -12,7 +12,7 @@ The `/next-milestone` command reads this file. Update the Status column when a m
 | M6 | Shop, pumpkin currency, saving, VIP pass and products | blocked | create gamepass/product IDs in Creator Hub |
 | V1 | Verify the overnight cloud work in Studio (run `/verify`): skins tab, custom models, codes, daily streak, invite, F8 admin panel, anti-teleport pumpkins | done | 2-player test (see notes) |
 | M7 | UI polish, thumbnails and icon, security audit, playtest | in progress | upload thumbnails, friends playtest |
-| V2 | v2 update: Ready pad, 3 modes and 5 maps, lobby redesign, parkour, Candy Rush, Web Scour, secret pumpkins, rarity prices, about 630 skins and 34 crates, top-left Menu, witch/Boo Guide/tutorial removed, Pumpkin Vendor fix (see `docs/V2-CHANGES.md`) | in progress: Studio checks passed 6 Oct (solo, 2 players, phone, tablet) and 8 Oct (7 Oct additions, 3-player ScareMaze); phone look at the 7 Oct animations to do | yes: Robux ids, friends test |
+| V2 | v2 update: Ready pad, 3 modes and 5 maps, lobby redesign, parkour, Candy Rush, Web Scour, secret pumpkins, rarity prices, about 630 skins and 34 crates, top-left Menu, witch/Boo Guide/tutorial removed, Pumpkin Vendor fix (see `docs/V2-CHANGES.md`) | in progress: Studio checks passed 6 Oct (solo, 2 players, phone, tablet) and 8 Oct (7 Oct additions, 3-player ScareMaze); phone look at the 7 Oct animations to do | yes: publish, a live test purchase, friends test |
 | Launch | Set the experience public on 20 October | todo | yes: only the owner does this |
 
 Status values: `todo`, `in progress`, `done`, `blocked` (add the reason in a note below).
@@ -110,7 +110,7 @@ All of this is in git and passes the offline tests (`lune run tests/run`). Guide
 - New store thumbnails and icon from renders of the real game, in the repo's top-level `thumbnails/output/pumpkin-panic-v2/` folder (outside `new-game`; `thumbnails/README.md` says where each goes on Creator Hub).
 
 **Still needs Kieran:**
-1. **Robux products:** done 8 Oct through Open Cloud: the 3 coin packs (Pumpkin Pouch, Cart, Mountain) and all 34 crates are on sale, ids in Config. Still to do: the **VIP pass** (the API key needs the Game Passes permission), then a test purchase in a live server. Then M6 can be `done`.
+1. **Robux products:** done 8 Oct through Open Cloud: the VIP pass (249), the 3 coin packs (Pumpkin Pouch, Cart, Mountain) and all 34 crates are on sale, ids in Config, prices checked in Studio. Still to do: one test purchase in a live server (after publishing). Then M6 can be `done`.
 2. **Publish** the place (File > Publish to Roblox) and buy one cheap product in a live server.
 3. **A friends test** on the published game (voice, ghost modes, Candy Rush races, crates on real phones).
 4. ~~ScareMaze with 3 players~~ done 8 Oct (below).
@@ -122,3 +122,10 @@ Played in Studio (solo, then Test > Clients and Servers with 3 players). Offline
 - **3 players, real `MinPlayersForHaunters` = 3:** 1 Haunter and 2 Survivors; BOO's jumpscare, the 8 s cooldown and its ring; Survivors seen through the walls; the red 3-2-1 and OUT; an OUT Survivor turning into a Haunter; the catch credited; results with teams, badges and MVP. Spectating from the lobby (King, then players with Q/E) and stopping by itself when the round ends.
 - **Fixed:** the CRAZY unbox banner showed before the winner's own chest opened (it now waits `Config.Crates.AnnounceDelay`, 4.5 s); the BOO button showed "BO8O!" while recharging (the number now replaces the word); "Tormented Tower" spilled out of its side button with the Menu off (it wraps). From a code review of the 7 Oct commits: a ghost's camera could stay on the old map when the round ended during the spectate glide (`SpectateTargets`); one error in an idle lobby animation scan stopped that animation for the rest of the session (`FramePace`); a second TAGGED! arriving during the first one's fade-out stayed invisible (`HideSeekUI`). Each has a test that fails without the fix.
 - **Not a bug:** in King Hunt the Ghost Cat steals pumpkins, so a count can go down.
+
+## 8 Oct 2026 (later): Robux products, map scenery, Studio map tools, more cheat tests
+- **Robux:** the VIP pass, 3 coin packs and all 34 crates were made through Open Cloud and are on sale; ids in Config (see "Still needs Kieran" above for the live test purchase).
+- **Maps:** every round map now has a world round it (`MapScenery`: ground to the horizon, hills, a tree line, glowing wall posts). The Spooky Mansion's walls got panelling, portraits with glowing eyes and moonlit windows; the Pumpkin Patch got dirt paths from the clearing. Checked in Studio: King Hunt rounds on both maps (35 pumpkins, all on the floor, the King moving), 60 fps on the Pumpkin Farm, every map under its part budget.
+- **Studio tools (F8):** "Visit map: ..." / "Leave the map" and the **Name finder** (click anything to get its copyable name, position, prop name and the file that builds it). Guide: `docs/CUSTOMIZE.md` > Maps.
+- **Cheat tests (Studio):** teleporting to the parkour finish or the top of the Tormented Tower gives nothing; Candy Rush puts out a player who steps off their pad; Web Scour ends when you walk away. **Fixed:** a player could teleport next to a secret pumpkin and take it; now refused unless they could have walked there (`Config.EasterEggs.AntiTeleport`).
+- Offline tests: 4,104 passing.

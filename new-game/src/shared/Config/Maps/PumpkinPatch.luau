@@ -39,6 +39,7 @@ return {
 	-- Offsets are from the map centre (x, z); the spawn clearing is in the middle.
 	Layout = {
 		ClearingRadius = 30, -- nothing big is placed here
+		PathWidth = 7, -- the dirt paths from the clearing out to each area
 		CornMaze = { -- tall rows block the King's view; gaps are the way through
 			Offset = Vector3.new(58, 0, -58),
 			Size = Vector3.new(76, 10, 76), -- y = stalk height

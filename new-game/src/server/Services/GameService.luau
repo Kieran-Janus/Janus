@@ -36,6 +36,7 @@ local DataService = require(script.Parent.DataService)
 local GhostService = require(script.Parent.GhostService)
 local LeaderboardService = require(script.Parent.LeaderboardService)
 local MapService = require(script.Parent.MapService)
+local MapVisitService = require(script.Parent.MapVisitService)
 local ReadyService = require(script.Parent.ReadyService)
 local RewardsService = require(script.Parent.RewardsService)
 local VotingService = require(script.Parent.VotingService)
@@ -292,6 +293,7 @@ local function playOneRound(): boolean
 	end
 	local playlist: Playlists.Playlist = forced or Playlists.Get(playlistId) or Playlists.Fallback()
 
+	MapVisitService.EndAll() -- (F8 map visitors back to the lobby first)
 	local map = MapService.Load(playlist.Map)
 	if map.Id ~= playlist.Map then
 		-- The map was broken and MapService loaded a fallback one: play the fallback mode there.
@@ -473,6 +475,9 @@ end
 
 function GameService.Start()
 	roundResults = Remotes.Event("RoundResults")
+	MapVisitService.SetRoundCheck(function()
+		return activeMode ~= nil
+	end)
 	registerAdminCommands()
 	task.spawn(loop)
 end

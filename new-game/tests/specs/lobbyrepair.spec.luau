@@ -402,6 +402,7 @@ describe("Config reaches a saved hub", function()
 		local player = rt:addPlayer({ Name = "Finder" })
 		rt:advance(1)
 		player.Character:PivotTo(rt.env.CFrame.new(part.Position + rt.env.Vector3.new(0, 2, 0)))
+		rt:advance(w.Config.EasterEggs.AntiTeleport.WindowSeconds + 0.5) -- (standing there, not teleporting)
 		local data = rt:require(SERVICES .. "DataService").Get(player)
 		local before = data.Coins
 		expect(rt:require(SERVICES .. "EasterEggService").Collect(player, part)).toBe(true)

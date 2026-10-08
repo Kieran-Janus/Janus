@@ -31,6 +31,7 @@ export type CollectCheck = {
 	InRound: boolean,
 	SinceLastTry: number, -- seconds since this player's previous grab (math.huge = never)
 	Distance: number, -- studs from the player to the egg
+	Teleported: boolean?, -- moved here faster than anyone can run (anti-cheat)
 }
 
 export type CollectConfig = { ReachDistance: number, CooldownSeconds: number }
@@ -86,6 +87,9 @@ function EasterEggRules.CheckCollect(check: CollectCheck, cfg: CollectConfig): s
 	end
 	if check.SinceLastTry < cfg.CooldownSeconds then
 		return "TooFast"
+	end
+	if check.Teleported then
+		return "Teleported"
 	end
 	if check.Distance ~= check.Distance or check.Distance > cfg.ReachDistance then
 		return "TooFar"

@@ -57,6 +57,9 @@ return {
 	SnapHeight = 6, -- default for Snap (see above)
 	ReachDistance = 14, -- studs: you must be this close to an egg to collect it (anti-cheat)
 	CooldownSeconds = 0.5, -- per player: grabs closer together than this are ignored
+	-- Anti-teleport: an egg can't be taken by someone who got there faster than anyone can run
+	-- (MaxSpeed studs a second, plus Slack) in the last WindowSeconds. A respawn starts afresh.
+	AntiTeleport = { MaxSpeed = 60, Slack = 16, WindowSeconds = 8, SampleSeconds = 0.25 },
 	TouchToCollect = true, -- true = walking into an egg collects it (as well as its button)
 	MaxCoins = 500, -- an egg never gives more than this, whatever its Coins attribute says
 	Prompt = {
