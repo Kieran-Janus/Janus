@@ -1130,7 +1130,7 @@ function Controls.Effects(parent: Instance, ctx: Context): Control
 					ctx,
 					if action == "✕" then Color3.fromRGB(140, 40, 40) else OFF
 				)
-				b.Name = ({ ["▲"] = "Up", ["▼"] = "Down", ["✕"] = "Remove" })[action]
+				b.Name = ({ ["▲"] = "MoveUp", ["▼"] = "MoveDown", ["✕"] = "RemoveEffect" })[action]
 				b.LayoutOrder = 10 + order
 				b.Activated:Connect(function()
 					local now = list()
@@ -1517,7 +1517,7 @@ function Controls.Catalog(parent: Instance, ctx: Context): Control
 			local l = label(line, words, ctx)
 			l.Size = UDim2.new(1, -(ctx.Row * 2 + 16), 1, 0)
 			local remove = button(line, "✕", ctx, Color3.fromRGB(140, 40, 40))
-			remove.Name = "Remove"
+			remove.Name = "RemoveItem"
 			remove.Activated:Connect(function()
 				local now = catalog()
 				table.remove(now.Accessories, i)

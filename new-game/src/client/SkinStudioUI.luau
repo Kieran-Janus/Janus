@@ -884,6 +884,7 @@ local function popover(title: string, build: (body: Frame, close: () -> ()) -> (
 	body.Position = UDim2.fromOffset(8, row() + 10)
 	body.Size = UDim2.new(1, -16, 1, -(row() + 16))
 	body.ScrollBarThickness = 6
+	body.ScrollingDirection = Enum.ScrollingDirection.Y
 	body.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	body.CanvasSize = UDim2.new()
 	body.Parent = pop
@@ -1906,6 +1907,7 @@ local function build(gui: ScreenGui): Ui
 	content.Position = UDim2.fromOffset(8, topHeight)
 	content.Size = UDim2.new(1, -16, 1, -(topHeight + footerHeight + 6))
 	content.ScrollBarThickness = if phone then 10 else 6
+	content.ScrollingDirection = Enum.ScrollingDirection.Y -- sideways drags are for the sliders
 	content.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	content.CanvasSize = UDim2.new()
 	content.Parent = panel

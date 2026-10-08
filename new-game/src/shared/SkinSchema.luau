@@ -1853,7 +1853,7 @@ local function tableText(t: { [any]: any }, indent: number, orderFor: string?, l
 		return "{}"
 	end
 	local inline = "{ " .. table.concat(items, ", ") .. " }"
-	if not inline:find("\n") and width(lead .. inline .. ",") <= 100 then
+	if not inline:find("\n") and width(lead .. inline) <= 100 then
 		return inline
 	end
 	local pad = string.rep("\t", indent + 1)
@@ -1885,6 +1885,9 @@ value = function(v: any, indent: number, orderFor: string?, lead: string): strin
 	end
 	return "nil"
 end
+
+-- A lead too long for anything to fit on its line: the table is written one item per line.
+local LONG_LEAD = string.rep(" ", 101)
 
 local function commas(n: number): string
 	local out = tostring(math.floor(n + 0.5))
@@ -1929,6 +1932,16 @@ function SkinSchema.ToLuau(item: any, theme: string?): string
 					continue
 				end
 				local prefix = "\t\t\t" .. keyText(styleKey) .. " = "
+				if styleKey == "Animate" and type(sv) == "table" then
+					-- one effect per line, marked for the type checker (effects differ in shape),
+					-- the way the theme files write them
+					local text = value(sv, 3, styleKey, LONG_LEAD)
+					table.insert(
+						lines,
+						prefix .. text .. " :: { any }, -- (effects differ in shape)"
+					)
+					continue
+				end
 				table.insert(lines, prefix .. value(sv, 3, styleKey, prefix) .. ",")
 			end
 			table.insert(lines, "\t\t},")

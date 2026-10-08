@@ -164,6 +164,13 @@ describe("SkinSchema", function()
 		expect(text).never.toMatch("Slot =")
 		expect(text).never.toMatch("\n\t\t\tKind =")
 		expect(text:sub(1, 2)).toBe("\t{")
+		-- animation lists are written one effect per line, marked like the theme files do
+		local animated = rare()
+		animated.Style.Animate =
+			{ { Effect = "Bob", Target = "Head" }, { Effect = "Wobble", Speed = 2 } }
+		expect(Schema.ToLuau(animated)).toMatch(
+			"\n\t\t\t} :: { any }, %-%- %(effects differ in shape%)"
+		)
 	end)
 
 	it("finds every look unique and every rarity rule kept (the catalogue rules)", function()
@@ -1855,6 +1862,86 @@ describe("SkinStudioUI", function()
 			expect(#panelOf(w).Content:GetChildren()).toBeGreaterThan(2)
 		end
 		expect(#w.rt.errors).toBe(0)
+	end)
+
+	it("edits animations, walk styles and catalog items", function()
+		local panel = panelOf(w)
+		w.UI.SelectSkin("Pumpkin_BlazeJack") -- Rare: up to 3 animations
+		w.UI.ShowTab("Animate")
+		w.rt:advance(0.3)
+		local state = w.UI.Current()
+		state:Set({ "Style", "Animate" }, nil)
+		w.rt:advance(0.1)
+		w.rt:fire(panel.Content.Effects.AddAnimation, "Activated")
+		w.rt:advance(0.3)
+		expect(#state:Peek().Style.Animate).toBe(1)
+		local card = panel.Content.Effects.Effect1
+		w.rt:fire(card.Effect.Control.Pick, "Activated")
+		w.rt:fire(panel.Popover.Body.Items.Option_Wobble, "Activated")
+		w.rt:advance(0.1)
+		expect(state:Peek().Style.Animate[1].Effect).toBe("Wobble")
+		expect((w.Schema.Validate(state:Get()))).toBe(true)
+		w.rt:fire(panel.Content.Effects.Effect1.Title.RemoveEffect, "Activated")
+		w.rt:advance(0.1)
+		expect(state:Peek().Style.Animate).toBeNil()
+		-- the walk style
+		w.rt:fire(panel.Content.Motion.Preset.Control.Pick, "Activated")
+		w.rt:fire(panel.Popover.Body.Items.Option_Zombie, "Activated")
+		w.rt:advance(0.1)
+		expect(state:Peek().Style.Motion).toBe("Zombie")
+		-- a CRAZY skin can't colour its rainbow accents: the target is greyed with the reason
+		w.UI.SelectSkin("Pumpkin_MegaGourdSupreme")
+		w.UI.ShowTab("Animate")
+		local crazy = w.UI.Current()
+		crazy:Set({ "Style", "Animate" }, { { Effect = "Shimmer", Target = "Head" } })
+		w.rt:advance(0.3)
+		w.rt:fire(panel.Content.Effects.Effect1.Target.Control.Pick, "Activated")
+		local accents = panel.Popover.Body.Items.Option_Accents
+		expect(accents.Text).toMatch("CRAZY Rainbow")
+		w.rt:fire(accents, "Activated")
+		expect(crazy:Peek().Style.Animate[1].Target).toBe("Head")
+		-- a Common skin can't animate: the button says why
+		w.UI.SelectSkin("Pumpkin_CandleKid")
+		w.UI.ShowTab("Animate")
+		w.rt:advance(0.2)
+		w.rt:fire(panel.Content.Effects.AddAnimation, "Activated")
+		expect(w.UI.Current():Peek().Style.Animate).toBeNil()
+		expect(panel.Footer.Status.Text).toMatch("Common")
+		-- catalog items: looked up on the server, refused when the creator isn't allowed
+		w.UI.SelectSkin("Pumpkin_BlazeJack")
+		w.UI.ShowTab("Catalog")
+		w.rt:advance(0.2)
+		w.reply.LookupAsset = function(id)
+			local allowed = id == 111
+			return {
+				Ok = true,
+				Message = "",
+				Data = {
+					Name = if allowed then "Pumpkin Hat" else "Someone's Hat",
+					Type = "Hat",
+					AssetType = "Hat",
+					Creator = if allowed then "Roblox" else "Someone",
+					CreatorType = "User",
+					CreatorId = if allowed then 1 else 999,
+					RobloxMade = allowed,
+					Allowed = allowed,
+					Problem = if allowed then nil else w.Config.SkinStudio.Text.NotAllowedCreator,
+				},
+			}
+		end
+		panel.Content.Catalog.AddItem.IdBox.Text = "111"
+		w.rt:fire(panel.Content.Catalog.AddItem.LookUp, "Activated")
+		w.rt:advance(0.3)
+		local catalog = w.UI.Current():Peek().Style.Catalog
+		expect(catalog.Accessories[1].Id).toBe(111)
+		expect(catalog.Accessories[1].Type).toBe("Hat")
+		panel.Content.Catalog.AddItem.IdBox.Text = "222"
+		w.rt:fire(panel.Content.Catalog.AddItem.LookUp, "Activated")
+		w.rt:advance(0.3)
+		expect(#w.UI.Current():Peek().Style.Catalog.Accessories).toBe(1)
+		expect(panel.Footer.Status.Text).toBe(w.Config.SkinStudio.Text.NotAllowedCreator)
+		w.reply.LookupAsset = nil
+		w.UI.Current():Reset()
 	end)
 
 	it("circles your character with the turntable and gives the camera back", function()
