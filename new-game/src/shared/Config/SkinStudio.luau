@@ -48,12 +48,14 @@ return {
 	Panel = {
 		Width = 440, -- on a PC the panel sits on the right, this wide
 		Margin = 8, -- gap from the screen edges
-		PhoneHeightScale = 0.55, -- on phones it is a sheet along the bottom, this much of the screen
+		PhoneHeightScale = 0.55, -- on phones it is a sheet along the bottom, this much of the screen...
+		PhoneMinHeight = 250, -- ...but never shorter than this (phones on their side are short)
+		PhoneWideWidth = 600, -- a phone screen this wide puts the tabs and buttons in one row each
+		PhoneTabWidth = 84, -- a tab or footer button in that one-row layout
 		HeaderHeight = 132,
-		PhoneHeaderHeight = 60,
 		TabHeight = 36,
-		FooterHeight = 92,
-		PhoneFooterHeight = 104,
+		FooterHeight = 112,
+		PhoneFooterHeight = 110,
 		RowHeight = 34, -- one control (PC)
 		PhoneRowHeight = 44, -- one control on phones (44 = big enough for a finger)
 		PreviewSize = 112, -- the small turning preview in the header (PC only)

@@ -1549,7 +1549,14 @@ local function problemsOf(item: any, catalogue: { any }): ({ string }, { Section
 	end
 	-- Warnings: allowed in drafts, but the catalogue tests would complain.
 	for _, text in SkinSchema.RarityProblems(item) do
-		warn(if text:find("nimation") then "Animate" else "Basics", text)
+		local lower = text:lower()
+		warn(
+			if lower:find("walk style")
+				then "Walk"
+				elseif lower:find("animation") then "Animate"
+				else "Basics",
+			text
+		)
 	end
 	if s.Accent and s.Accent.Pattern == nil then
 		warn("Accent", "The accent has no pattern, so its colour doesn't show: pick one")

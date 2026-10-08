@@ -33,6 +33,7 @@ local ORDER = {
 	"RewardsUI",
 	"SettingsUI",
 	"AdminUI",
+	"SkinStudioUI", -- the skin editor (admins in Studio only: Menu > Skin Studio, F8)
 	"KingHeardUI",
 	"RoundJuiceUI",
 	"TutorialUI", -- does nothing while Config.Features.Tutorial is off
