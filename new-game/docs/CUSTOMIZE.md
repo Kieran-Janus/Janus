@@ -352,6 +352,57 @@ A trail is two colours: `Style = { Kind = "Trail", Color = ..., Color2 = ... }`.
 
 ---
 
+## Skin Studio
+Skin Studio is a skin editor for **you** (admins) in a Studio playtest: pick any skin or make a new one, change everything with colour pickers, sliders and dropdowns, and see it on your own character straight away (animations and walk styles too). Players never see it. Settings: `src/shared/Config/SkinStudio.luau` (on/off: `Config.Features.SkinStudio`).
+
+**Open it:** press Play in Studio, then **Menu > Skin Studio** (the 🎨 tile) or **F8 > Skin Studio**. It sits on the right of the screen so you can see your character on the left (on a phone it's a sheet along the bottom).
+
+**The tabs:**
+| Tab | What's there |
+| --- | --- |
+| Skins | Search names and Ids, pick a theme, a rarity, "Drafts" (your saved drafts) or "Animated". Tap a skin to edit it. **New** starts a blank skin in the chosen theme, **Duplicate** copies the one you're editing. ✎ = a draft, ✓ = already in the game files, 🎞 animated, 🚶 walk style, 🛍 catalog items. |
+| Look | Name, Id, theme, rarity, crate and price; body colours and materials; the head piece; the accent (colour, material, patterns: tap them in order); glow; particles; CRAZY. Every row has a **?** that explains it. Yellow lines under a section are warnings (allowed, but the tests would complain); red lines at the top are errors (it can't be worn or saved until fixed). |
+| Animate | Animations (+ Add animation: effect, what it moves, speed, amount...) and the walk style. Targets CRAZY already drives are greyed out with the reason. |
+| Catalog | Real Roblox catalog items: type an id and press **Look up**. Only items made by Roblox, you or your group are allowed. They only show in game once `Config.Features.SkinCatalog` is on. |
+| Save | **Save**, **Copy code**, **Print for Claude**, your drafts (open or delete them), a note for Claude Code and "Keep wearing after closing". |
+
+The footer has **Undo**, **Redo**, **Reset** (back to how the skin was when you opened it) and **🎥 Turn**: the camera circles your character so you can see every side (press it again, or close the panel, to get your camera back).
+
+**Wearing:** with **Wear on me** ticked, your character wears the skin a moment after each change, and again after you respawn. Your save never changes (you don't own it; only you see it as a test). **Closing the panel loses nothing** (Escape, the Roblox menu, opening the shop...): open it again and your skin, its Undo history and the tab are still there, and you keep wearing it (untick "Keep wearing after closing" in the Save tab to go back to your own skin when you close).
+
+**Skins players already own** keep their Id and theme, and their rarity, crate and price are locked 🔒: players own them and the Robux crate odds depend on them. "Unlock rarity, crate and price" asks first, and `/save-skins` warns about any such change.
+
+### Saving your skins into the game
+Saved drafts live in the playtest. They are gone when you press Stop, so:
+
+1. In Skin Studio, press **Save** on each skin you like (Save tab).
+2. In Claude Code, type **`/save-skins`** **before you press Stop**. Claude Code reads the drafts from the running playtest through the Studio MCP, shows you the plan (which file, added or changed, the new rarity counts, warnings), writes them into the theme files after you say yes, and runs the tests.
+3. Press Stop. Rojo syncs the changed theme files into Studio; next playtest the skins are in the shop and crates (and marked ✓ in Skin Studio).
+
+Two backups that always work:
+- **Print for Claude** (Save tab) prints every saved draft to Output. Claude Code reads it with `get_console_output` (the older MCP), or you copy it into Claude Code. When you press Stop, Studio prints them once more as a last chance.
+- **Copy code** (Save tab) shows the skin as Luau: Ctrl+A, Ctrl+C, paste it into Claude Code and say which theme file.
+
+Classic skins (not in a crate) and the Tormented Tower's skin can be tried in Skin Studio, but `/save-skins` doesn't write them: use Copy code.
+
+> ⚠️ **Keeping drafts after Stop needs Studio API access. Read this first.**
+> Turning on **Game Settings > Security > Enable Studio Access to API Services** makes Studio use your **REAL** player save and the **PUBLIC** leaderboard. Then F8 "+ Coins", "Unlock all" and "Reset my save" change your real save, and Studio test rounds post to the leaderboard everyone sees. **Skin Studio doesn't need it:** leave it off and use `/save-skins` during the playtest.
+
+Only if you still want drafts kept after Stop: turn on API access (knowing the above) and set `UseDataStore = true` in `Config.SkinStudio`. Drafts then also go into their own DataStore (`SkinStudioDrafts_v1`, never your player save), written at most every 7 seconds, and `/save-skins` can read them with Studio stopped. Live servers never touch it.
+
+**Troubleshooting:**
+| You see | What it means |
+| --- | --- |
+| "Saved for this playtest. Run /save-skins..." | Normal: the draft is saved until you press Stop. Run `/save-skins` now. |
+| "Not allowed" | Skin Studio only works for admins in Studio (`Config.Admin`, `Config.SkinStudio.AllowInLiveServers`), with `Config.Features.SkinStudio` on. |
+| "Slow down!" | Too many clicks at once; it tries again by itself for wearing. Wait a second for Save. |
+| "Animation didn't load" (Output, `[SkinWalk]`) | An uploaded walk/run/idle animation must be owned by you (or your group, if the game is a group game) or made by Roblox. |
+| "Not an allowed creator" | That catalog item isn't made by Roblox, you or your group (`Config.SkinCatalog.AllowedCreators`). |
+| "This skin's rarity is locked" | Players already own this skin: press "Unlock rarity, crate and price" only if you really mean to change it. |
+| A red ✕ line in the Look tab | Something can't be used (for example a pattern that doesn't exist). Fix it or press Undo. |
+
+---
+
 ## Crates
 Mystery crates give a random skin. Everything about them is in `src/shared/Config/Crates.luau`
 (switch them off with `Config.Features.Crates = false`, or only the Robux ones with
@@ -758,5 +809,6 @@ Moved to its own section: [Swap every copy of something at once](#swap-every-cop
 | `/new-event` | Limited-time event (double pumpkins, Blood Moon round, event cosmetics) |
 | `/tweak` | Balance or tune anything from a plain-English request |
 | `/polish-hub` | More detail and life in the lobby, within the phone budget |
+| `/save-skins` | Puts the skins you saved in Skin Studio into the theme files (run it before you press Stop) |
 
 Each command reads `CLAUDE.md`, keeps numbers in Config, playtests in Studio when it can, runs the offline tests (`lune run tests/run`) and commits.

@@ -1311,14 +1311,10 @@ describe("SkinStudioService with the DataStore", function()
 		expect(invoke(w, player, "Delete", "KEEP").Ok).toBe(true)
 		-- meanwhile another server writes its older copy back
 		local older = record(w, "KEEP", "Pumpkin_Merged", 10)
-		seed(
-			w.rt,
-			w.Config,
-			{
-				Version = 2,
-				Drafts = { KEEP = older, OLD = { DraftId = "OLD", Deleted = true, Updated = 0 } },
-			}
-		)
+		seed(w.rt, w.Config, {
+			Version = 2,
+			Drafts = { KEEP = older, OLD = { DraftId = "OLD", Deleted = true, Updated = 0 } },
+		})
 		w.rt:advance(w.Config.SkinStudio.FlushSeconds + 1)
 		local value = stored(w)
 		expect(value.Drafts.KEEP.Deleted).toBe(true)
@@ -1477,4 +1473,756 @@ describe("SkinExport", function()
 			expect(s.game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")).toBeNil()
 		end
 	)
+end)
+
+-- Client ------------------------------------------------------------------------------------------
+
+describe("SkinStudioState", function()
+	local client = Runtime.new({ client = true })
+	local State = client:require("StarterPlayer.StarterPlayerScripts.Client.SkinStudioState")
+	local CItems = client:require("ReplicatedStorage.Shared.Items")
+	local CConfig = client:require("ReplicatedStorage.Shared.Config")
+
+	it("undoes, redoes, resets and groups a drag into one step", function()
+		local state = State.new(CItems.Get("Pumpkin_BlazeJack"), "Pumpkin_BlazeJack")
+		local changes = 0
+		state.Changed:Connect(function()
+			changes += 1
+		end)
+		expect(state:Dirty()).toBe(false)
+		expect(state:CanUndo()).toBe(false)
+		state:Set({ "Name" }, "Blaze Jack Two")
+		state:Set({ "Style", "Glow", "Brightness" }, 4)
+		expect(state:Peek().Style.Glow.Brightness).toBe(4)
+		expect(state:Dirty()).toBe(true)
+		-- a slider drag: many Sets, one step
+		state:Begin()
+		for x = 1, 10 do
+			state:Set({ "Style", "Glow", "Range" }, x)
+		end
+		state:Commit()
+		expect(#state.History).toBe(3)
+		state:Undo()
+		expect(state:Peek().Style.Glow.Range).toBe(nil)
+		state:Undo()
+		expect(state:Peek().Style.Glow.Brightness).toBe(2)
+		state:Redo()
+		expect(state:Peek().Style.Glow.Brightness).toBe(4)
+		state:Reset()
+		expect(state:Peek().Name).toBe("Blaze Jack")
+		expect(state:Dirty()).toBe(false)
+		state:Undo() -- Reset can be undone too
+		expect(state:Peek().Name).toBe("Blaze Jack Two")
+		state:MarkSaved()
+		expect(state:Dirty()).toBe(false)
+		expect(changes).toBeGreaterThan(5)
+		-- setting the same value is not a step
+		local before = #state.History
+		state:Set({ "Name" }, "Blaze Jack Two")
+		expect(#state.History).toBe(before)
+		-- Get is a copy
+		state:Get().Name = "Changed"
+		expect(state:Peek().Name).toBe("Blaze Jack Two")
+	end)
+
+	it("remembers at most UndoSteps changes", function()
+		local state = State.new(CItems.Get("Pumpkin_BlazeJack"), nil)
+		for i = 1, CConfig.SkinStudio.UndoSteps + 10 do
+			state:Set({ "Style", "Glow", "Brightness" }, i / 100)
+		end
+		expect(#state.History).toBe(CConfig.SkinStudio.UndoSteps)
+	end)
+end)
+
+-- A client with a stand-in server (the remote's OnServerInvoke) and the Menu mounted.
+type ClientWorld = {
+	rt: any,
+	Config: any,
+	UI: any,
+	Menu: any,
+	Panels: any,
+	Schema: any,
+	gui: any,
+	calls: { string },
+	drafts: { any },
+	reply: { [string]: any },
+}
+
+local function clientWorld(options: {
+	admin: boolean?,
+	remote: boolean?,
+	phone: boolean?,
+	off: boolean?,
+	size: any?,
+}): ClientWorld
+	local c = Runtime.new({ client = true, studio = true })
+	local C = c:require("ReplicatedStorage.Shared.Config")
+	if options.off then
+		C.Features.SkinStudio = false
+	end
+	local world: ClientWorld = {
+		rt = c,
+		Config = C,
+		UI = nil,
+		Menu = nil,
+		Panels = nil,
+		Schema = c:require("ReplicatedStorage.Shared.SkinSchema"),
+		gui = nil,
+		calls = {},
+		drafts = {},
+		reply = {},
+	}
+	if options.remote ~= false then
+		local folder = c:create("Folder", { Name = "Remotes" }, c:find("ReplicatedStorage"))
+		local remote = c:create("RemoteFunction", { Name = "SkinStudio" }, folder)
+		remote.OnServerInvoke = function(_player, action, payload)
+			table.insert(world.calls, action)
+			local custom = world.reply[action]
+			if custom then
+				return custom(payload)
+			end
+			if action == "Hello" then
+				return {
+					Ok = true,
+					Message = "",
+					Data = { DataStore = "Off", Drafts = world.drafts },
+				}
+			elseif action == "Save" then
+				local body = c.game:GetService("HttpService"):JSONDecode(payload)
+				local record = {
+					DraftId = "D" .. #world.calls,
+					Item = body.Item,
+					Source = body.Source,
+					Updated = 1,
+					Author = 1,
+				}
+				return { Ok = true, Message = C.SkinStudio.Text.Saved, Data = record }
+			end
+			return { Ok = true, Message = "ok", Data = {} }
+		end
+	end
+	if options.admin ~= false then
+		c.localPlayer:SetAttribute("Admin", true)
+	end
+	local gui =
+		c:create("ScreenGui", { Name = "GameUI" }, c.localPlayer:FindFirstChildOfClass("PlayerGui"))
+	if options.phone then
+		gui:SetAttribute("ForceTouch", true)
+	end
+	if options.size then
+		Dom.rawSet(gui, "AbsoluteSize", options.size)
+	end
+	local folder = c:find("StarterPlayer.StarterPlayerScripts.Client")
+	c:require(folder.Layout).Mount(gui)
+	world.Panels = c:require(folder.PanelManager)
+	world.Panels.Mount(gui)
+	world.Menu = c:require(folder.MenuUI)
+	world.Menu.Mount(gui)
+	world.UI = c:require(folder.SkinStudioUI)
+	world.gui = gui
+	local co = coroutine.create(function()
+		world.UI.Mount(gui)
+	end)
+	assert(coroutine.resume(co))
+	expect(coroutine.status(co)).toBe("dead") -- Mount never waits
+	c:advance(0.5)
+	return world
+end
+
+local function count(list: { string }, what: string): number
+	local n = 0
+	for _, v in list do
+		if v == what then
+			n += 1
+		end
+	end
+	return n
+end
+
+local function panelOf(w: ClientWorld): any
+	return w.gui:FindFirstChild("SkinStudio")
+end
+
+local function rows(w: ClientWorld): { any }
+	local out = {}
+	local list = panelOf(w).Content:FindFirstChild("List")
+	for _, child in list:GetChildren() do
+		if child:IsA("TextButton") and child.Name:sub(1, 4) == "Row_" then
+			table.insert(out, child)
+		end
+	end
+	return out
+end
+
+local function liveConnections(c: any): number
+	local n = 0
+	for _, value in c.listening do
+		n += value
+	end
+	return n
+end
+
+describe("SkinStudioUI", function()
+	it("shows nothing when switched off, and never waits on a missing remote", function()
+		local off = clientWorld({ off = true })
+		off.Menu.Open()
+		expect(off.gui.Menu.Tiles:FindFirstChild("SkinStudioTile")).toBeNil()
+		off.UI.Open()
+		expect(panelOf(off)).toBeNil()
+		-- on, but the server never made the remote: the panel opens and says so
+		local lonely = clientWorld({ remote = false })
+		lonely.UI.Open()
+		expect(panelOf(lonely).Visible).toBe(true)
+		lonely.rt:advance(25)
+		expect(panelOf(lonely).Footer.Status.Text).toBe(lonely.Config.SkinStudio.Text.NoRemote)
+		expect(#lonely.rt.errors).toBe(0)
+	end)
+
+	it("shows the Menu tile to admins only", function()
+		local admin = clientWorld({})
+		admin.Menu.Open()
+		expect(admin.gui.Menu.Tiles.SkinStudioTile.Visible).toBe(true)
+		local player = clientWorld({ admin = false })
+		player.Menu.Open()
+		expect(player.gui.Menu.Tiles.SkinStudioTile.Visible).toBe(false)
+		player.UI.Open()
+		expect(panelOf(player)).toBeNil()
+	end)
+
+	it("opens on the first F8 press (the SkinStudioOpenAt attribute)", function()
+		local w = clientWorld({})
+		w.rt.localPlayer:SetAttribute("SkinStudioOpenAt", 12)
+		w.rt:advance(0.2)
+		expect(panelOf(w).Visible).toBe(true)
+	end)
+
+	local w = clientWorld({})
+	w.drafts = {
+		{
+			DraftId = "A1",
+			SkinId = "Pumpkin_DraftOne",
+			Name = "Draft One",
+			Theme = "Pumpkin",
+			Rarity = "Common",
+			Updated = 2,
+			InGameFiles = false,
+		},
+		{
+			DraftId = "B2",
+			SkinId = "Candy_DraftTwo",
+			Name = "Draft Two",
+			Theme = "Candy",
+			Rarity = "Rare",
+			Updated = 1,
+			InGameFiles = false,
+		},
+		{
+			DraftId = "C3",
+			SkinId = "Pumpkin_Gourdy",
+			Name = "Gourdy",
+			Theme = "Pumpkin",
+			Rarity = "Common",
+			Source = "Pumpkin_Gourdy",
+			Updated = 0,
+			InGameFiles = true,
+		},
+	}
+
+	it("searches and filters the skin list", function()
+		w.UI.Open()
+		w.rt:advance(0.5)
+		local panel = panelOf(w)
+		expect(panel.Visible).toBe(true)
+		expect(#rows(w)).toBe(w.Config.SkinStudio.ListPageSize)
+		panel.Content.SearchLine.Search.Text = "gourd"
+		w.rt:advance(0.1)
+		local found = rows(w)
+		expect(#found).toBeGreaterThan(1)
+		for _, r in found do
+			expect(r.Text:lower()).toMatch("gourd")
+		end
+		panel.Content.SearchLine.Search.Text = ""
+		w.rt:fire(panel.Content.RarityLine.Rarity_Crazy, "Activated")
+		local crazy = rows(w)
+		expect(#crazy).toBeGreaterThan(5)
+		w.rt:fire(panel.Content.RarityLine.Rarity_Any, "Activated")
+		w.rt:fire(panel.Content.ToggleLine.DraftsFilter, "Activated")
+		expect(#rows(w)).toBe(3) -- the three drafts
+		w.rt:fire(panel.Content.ToggleLine.DraftsFilter, "Activated")
+		-- the theme dropdown
+		w.rt:fire(panel.Content.ThemeLine.ThemeFilter, "Activated")
+		w.rt:fire(panel.Popover.Body.Items.Theme_Candy, "Activated")
+		expect(panel:FindFirstChild("Popover")).toBeNil()
+		for _, r in rows(w) do
+			expect(r.Text).toMatch("Candy")
+		end
+		w.rt:fire(panel.Content.ThemeLine.ThemeFilter, "Activated")
+		w.rt:fire(panel.Popover.Body.Items.Theme_All, "Activated")
+		-- the banner counts the two drafts not in the game files
+		expect(panel.Footer.Banner.Text).toMatch("2 drafts")
+	end)
+
+	it("wears once after a burst of edits", function()
+		w.UI.SelectSkin("Pumpkin_BlazeJack")
+		w.rt:advance(1)
+		local before = count(w.calls, "Wear")
+		expect(before).toBe(1) -- picking a skin wears it (Wear on me is on)
+		local state = w.UI.Current()
+		for i = 1, 6 do
+			state:Set({ "Style", "Glow", "Brightness" }, 1 + i / 10)
+			w.rt:advance(0.05)
+		end
+		w.rt:advance(1)
+		expect(count(w.calls, "Wear") - before).toBe(1)
+	end)
+
+	it("undoes, redoes and resets from the footer", function()
+		local panel = panelOf(w)
+		local state = w.UI.Current()
+		state:Set({ "Name" }, "Blaze Jack Remix")
+		w.rt:fire(panel.Footer.Buttons.Undo, "Activated")
+		expect(state:Peek().Name).toBe("Blaze Jack")
+		w.rt:fire(panel.Footer.Buttons.Redo, "Activated")
+		expect(state:Peek().Name).toBe("Blaze Jack Remix")
+		w.rt:fire(panel.Footer.Buttons.Reset, "Activated")
+		expect(state:Peek().Name).toBe("Blaze Jack")
+		expect(state:Peek().Style.Glow.Brightness).toBe(2)
+	end)
+
+	it("keeps the work, the history and the tab when closed by accident", function()
+		local state = w.UI.Current()
+		state:Set({ "Name" }, "Blaze Jack Keeper")
+		w.UI.ShowTab("Look")
+		w.rt:advance(1)
+		local steps = #state.History
+		local stops = count(w.calls, "StopWearing")
+		expect(w.Panels.CloseTop()).toBe(true) -- Escape
+		w.rt:advance(0.5)
+		expect(panelOf(w).Visible).toBe(false)
+		expect(w.gui:FindFirstChild("SkinStudioToast")).toBeTruthy()
+		expect(count(w.calls, "StopWearing")).toBe(stops) -- still wearing it
+		w.UI.Open()
+		w.rt:advance(0.5)
+		expect(w.UI.Current()).toBe(state)
+		expect(#state.History).toBe(steps)
+		expect(state:Peek().Name).toBe("Blaze Jack Keeper")
+		expect(panelOf(w).Content:FindFirstChild("Section_Basics")).toBeTruthy() -- the Look tab
+		expect(panelOf(w).Footer.Banner.Text).toMatch(w.Config.SkinStudio.Text.Unsaved)
+	end)
+
+	it("locks the rarity of a skin players own until unlocked", function()
+		local panel = panelOf(w)
+		w.UI.ShowTab("Look")
+		local rarity = panel.Content:FindFirstChild("Field_Rarity")
+		expect(rarity.Control:FindFirstChild("Lock")).toBeTruthy()
+		expect(panel.Content:FindFirstChild("Field_Id")).toBeNil() -- the Id is fixed
+		w.rt:fire(panel.Content.Unlock, "Activated")
+		w.rt:fire(panel.Popover.Body.Items.Yes, "Activated")
+		w.rt:advance(0.2)
+		rarity = panel.Content:FindFirstChild("Field_Rarity")
+		expect(rarity.Control:FindFirstChild("Lock")).toBeNil()
+		expect(w.UI.Current().UnlockEconomy).toBe(true)
+		-- a new skin has its Id and economy free
+		w.UI.New()
+		w.rt:advance(0.2)
+		expect(panel.Content:FindFirstChild("Field_Id")).toBeTruthy()
+		expect(panel.Content.Field_Rarity.Control:FindFirstChild("Lock")).toBeNil()
+	end)
+
+	it("copies exactly the code ToLuau writes, and saves", function()
+		local panel = panelOf(w)
+		w.UI.SelectSkin("Pumpkin_SirGourdington")
+		w.UI.ShowTab("Save")
+		w.rt:fire(panel.Content.SaveButtons.CopyCode, "Activated")
+		local box = panel.Popover.Body.Items.CopyCode
+		expect(box.Text).toBe(w.Schema.ToLuau(w.UI.Current():Get()))
+		box.Text = "typed over"
+		w.rt:fire(box, "FocusLost")
+		expect(box.Text).toBe(w.Schema.ToLuau(w.UI.Current():Get()))
+		w.UI.Current():Set({ "Name" }, "Sir Saved")
+		w.rt:fire(panel.Content.SaveButtons.Save, "Activated")
+		w.rt:advance(0.5)
+		expect(count(w.calls, "Save")).toBe(1)
+		expect(w.UI.Current().DraftId).toBeA("string")
+		expect(w.UI.Current():Dirty()).toBe(false)
+	end)
+
+	it("builds every tab", function()
+		w.UI.SelectSkin("Pumpkin_MegaGourdSupreme")
+		for _, name in { "Skins", "Look", "Animate", "Catalog", "Save" } do
+			w.UI.ShowTab(name)
+			w.rt:advance(0.3)
+			expect(#panelOf(w).Content:GetChildren()).toBeGreaterThan(2)
+		end
+		expect(#w.rt.errors).toBe(0)
+	end)
+
+	it("circles your character with the turntable and gives the camera back", function()
+		local panel = panelOf(w)
+		local camera = w.rt.workspace.CurrentCamera
+		w.rt:fire(panel.Footer.Buttons.Turntable, "Activated")
+		expect(camera.CameraType).toBe(Enum.CameraType.Scriptable)
+		w.rt:advance(0.1)
+		local first = camera.CFrame
+		w.rt:advance(1)
+		expect((camera.CFrame.Position - first.Position).Magnitude).toBeGreaterThan(0.1)
+		w.rt:fire(panel.Footer.Buttons.Turntable, "Activated")
+		expect(camera.CameraType).toBe(Enum.CameraType.Custom)
+		expect(camera.CameraSubject).toBe(
+			w.rt.localPlayer.Character:FindFirstChildOfClass("Humanoid")
+		)
+		-- closing stops it too
+		w.rt:fire(panel.Footer.Buttons.Turntable, "Activated")
+		w.UI.Close()
+		expect(camera.CameraType).toBe(Enum.CameraType.Custom)
+	end)
+
+	it("can open and close many times without leaking", function()
+		w.UI.Open()
+		w.rt:advance(1)
+		w.UI.Close()
+		w.rt:advance(8)
+		local instances = #w.rt.game:GetDescendants()
+		local connections = liveConnections(w.rt)
+		for _ = 1, 20 do
+			w.UI.Open()
+			w.rt:advance(0.3)
+			w.UI.Close()
+			w.rt:advance(0.3)
+		end
+		w.rt:advance(8)
+		expect(#w.rt.game:GetDescendants()).toBe(instances)
+		expect(liveConnections(w.rt)).toBe(connections)
+	end)
+
+	for _, size in { "upright", "on its side" } do
+		it("is a bottom sheet with big buttons on phones (no shrinking), " .. size, function()
+			local phone = clientWorld({
+				phone = true,
+				size = if size == "upright" then nil else env.Vector2.new(844, 390),
+			})
+			phone.UI.Open()
+			phone.UI.SelectSkin("Pumpkin_MegaGourdSupreme")
+			phone.rt:advance(0.5)
+			local panel = panelOf(phone)
+			expect(panel.AnchorPoint.Y).toBe(1)
+			expect(panel.Size.Y.Scale).toBeNear(
+				phone.Config.SkinStudio.Panel.PhoneHeightScale,
+				1e-4
+			)
+			expect(panel:FindFirstChild("FitScale")).toBeNil()
+			expect(panel.Header:FindFirstChild("Preview")).toBeNil() -- your real character is above
+			-- on its side: tabs in one row on top, the buttons and Wear on me in one row below
+			local wide = size ~= "upright"
+			expect(panel.Footer.Buttons:FindFirstChild("WearOnMe") ~= nil).toBe(wide)
+			expect(panel:FindFirstChildOfClass("UISizeConstraint").MinSize.Y).toBe(
+				phone.Config.SkinStudio.Panel.PhoneMinHeight
+			)
+			for _, tabName in { "Skins", "Look", "Animate", "Catalog", "Save" } do
+				expect(panel.Tabs:FindFirstChild("Tab_" .. tabName)).toBeTruthy()
+				phone.UI.ShowTab(tabName)
+				phone.rt:advance(0.2)
+				for _, d in panel:GetDescendants() do
+					if not (d:IsA("TextButton") or d:IsA("TextBox")) then
+						continue
+					end
+					local size = d.Size
+					local tall = size.Y.Offset >= 44
+					local parent = d.Parent
+					if not tall and size.Y.Scale >= 1 and parent:IsA("GuiObject") then
+						tall = parent.Size.Y.Offset >= 44
+					end
+					local grid = parent:FindFirstChildOfClass("UIGridLayout")
+					if not tall and grid then
+						tall = grid.CellSize.Y.Offset >= 44
+					end
+					if not tall and d.Name == "CopyCode" then
+						tall = true -- the code box grows with its text
+					end
+					if not tall then
+						error(
+							("%s on the %s tab is under 44 px tall"):format(
+								d:GetFullName(),
+								tabName
+							)
+						)
+					end
+				end
+			end
+		end)
+	end
+end)
+
+-- The save-skins tool ---------------------------------------------------------------------------------
+
+describe("save-skins (tests/tools/SkinFile.luau)", function()
+	local fs = require("@lune/fs")
+	local serde = require("@lune/serde")
+	local SkinFile = require("../tools/SkinFile")
+	local root = if fs.isDir("src") then "" else "new-game/"
+
+	local w = server({ studio = true }, function(C)
+		C.SkinStudio.SaveCooldown = 0
+	end)
+	local player = w.rt:addPlayer({ Name = "Kieran" })
+	w.rt:advance(3)
+	local Export = w.rt:require("ServerScriptService.Server.Tools.SkinExport")
+	local WItems = w.rt:require("ReplicatedStorage.Shared.Items")
+
+	local function readTheme(theme: string): string
+		return fs.readFile(root .. "src/shared/Config/Skins/" .. theme .. ".luau")
+	end
+
+	local function deps(): any
+		return {
+			Schema = w.Schema,
+			Export = Export,
+			Config = w.Config,
+			Items = WItems,
+			Decode = function(text: string): any
+				return serde.decode("json", text)
+			end,
+			ReadTheme = readTheme,
+		}
+	end
+
+	-- The server's export pages, as /save-skins would read them.
+	local function exported(): { any }
+		local count = serde.decode("json", Export.Count())
+		local out = {}
+		for p = 1, count.Pages do
+			table.insert(out, serde.decode("json", Export.Json(p)))
+		end
+		return out
+	end
+
+	-- A page made by hand from records (checksums worked out the same way).
+	local function page(records: { any }): any
+		local drafts = {}
+		for _, record in records do
+			local text = serde.encode("json", record)
+			table.insert(drafts, { Sum = Export.Sum(text), Text = text })
+		end
+		return { Version = 2, From = "Playtest", Page = 1, Pages = 1, Drafts = drafts }
+	end
+
+	-- The file's lines without the header line and without these entries.
+	local function rest(text: string, ids: { string }): string
+		local lines = {}
+		for line in (text .. "\n"):gmatch("(.-)\n") do
+			table.insert(lines, line)
+		end
+		local skip: { [number]: boolean } = { [3] = true }
+		for _, id in ids do
+			local first, last = SkinFile.Find(text, id)
+			if first then
+				for i = first :: number, last :: number do
+					skip[i] = true
+				end
+			end
+		end
+		local out = {}
+		for i, line in lines do
+			if not skip[i] then
+				table.insert(out, line)
+			end
+		end
+		return table.concat(out, "\n")
+	end
+
+	it("counts a theme file's skins", function()
+		local counts = SkinFile.Counts(readTheme("Pumpkin"))
+		expect(counts.Total).toBe(20)
+		expect(counts.Common).toBe(12)
+		expect(counts.Uncommon).toBe(5)
+		expect(counts.Rare).toBe(2)
+		expect(counts.Crazy).toBe(1)
+		local million = SkinFile.Counts(readTheme("AlienAbduction"))
+		expect(million.Million).toBe(1)
+		expect(million.Crazy).toBe(0)
+		expect(million.Total).toBe(22)
+		expect(SkinFile.HasLocals(readTheme("Pumpkin"))).toBe(true)
+	end)
+
+	it("replaces an entry and adds one after its rarity, leaving every other byte alone", function()
+		local edited = itemOf(w, "Pumpkin_BlazeJack")
+		edited.Style.BodyColor = Color3.fromRGB(12, 34, 56)
+		edited.Name = "Blaze Jack Deluxe"
+		expect(invoke(w, player, "Save", payload(w, edited, { Source = "Pumpkin_BlazeJack" })).Ok).toBe(
+			true
+		)
+		local new = itemOf(w, "Pumpkin_SirGourdington")
+		new.Id = "Pumpkin_SirTestalot"
+		new.Name = "Sir Testalot"
+		new.Style.TorsoColor = Color3.fromRGB(200, 100, 50)
+		local saved = invoke(w, player, "Save", payload(w, new))
+		if not saved.Ok then
+			error(saved.Message)
+		end
+		local plan = SkinFile.Plan(exported(), deps())
+		expect(plan.Damaged).toBeNil()
+		if #plan.Refused > 0 then
+			error(plan.Refused[1].Id .. ": " .. plan.Refused[1].Why)
+		end
+		local file = plan.Files.Pumpkin
+		expect(#file.Changes).toBe(2)
+		local before, after = file.Before, file.After
+		-- the new Rare comes straight after the last Rare
+		local _, lastRare = SkinFile.Find(after, "Pumpkin_BlazeJack")
+		local newFirst = SkinFile.Find(after, "Pumpkin_SirTestalot")
+		expect(newFirst).toBe((lastRare :: number) + 1)
+		-- nothing else changed
+		expect(rest(after, { "Pumpkin_BlazeJack", "Pumpkin_SirTestalot" })).toBe(
+			rest(before, { "Pumpkin_BlazeJack" })
+		)
+		expect(after).toMatch(
+			"PUMPKIN CRATE SKINS %(21%): 12 Common, 5 Uncommon, 3 Rare, 1 CRAZY%."
+		)
+		expect(file.CountsAfter.Rare).toBe(3)
+		-- and the file still loads, with both skins exactly as drafted
+		local fn = luau.load(after, {
+			environment = { rgb = Color3.fromRGB, M = Enum.Material, Color3 = Color3, Enum = Enum },
+		})
+		local list = fn()
+		local found = 0
+		for _, entry in list do
+			local want = if entry.Id == "Pumpkin_BlazeJack"
+				then edited
+				elseif entry.Id == "Pumpkin_SirTestalot" then new
+				else nil
+			if want then
+				found += 1
+				entry.Slot = "Skin"
+				entry.Theme = "Pumpkin"
+				entry.Crate = entry.Crate or "PumpkinCrate"
+				entry.Style.Kind = "Skin"
+				if entry.Style.HideClothes == nil then
+					entry.Style.HideClothes = true
+				end
+				expect(w.Schema.Same(entry, want)).toBe(true)
+			end
+		end
+		expect(found).toBe(2)
+		-- a Windows (CRLF) file keeps its line endings
+		local crlf = before:gsub("\n", "\r\n")
+		local replaced =
+			SkinFile.Replace(crlf, "Pumpkin_Gourdy", '\t{\n\t\tId = "Pumpkin_Gourdy",\n\t},')
+		expect((replaced :: string):find("[^\r]\n")).toBeNil()
+	end)
+
+	it("refuses renamed Ids, taken Ids, twins, Classic skins and unapproved catalog ids", function()
+		local function record(item: any, extra: { [string]: any }?): any
+			local r: { [string]: any } = {
+				DraftId = tostring(math.random(1, 1e9)),
+				Item = w.Schema.Encode(item),
+				Updated = 1,
+				Author = 1,
+			}
+			for k, v in extra or {} do
+				r[k] = v
+			end
+			return r
+		end
+		local renamed = itemOf(w, "Pumpkin_BlazeJack")
+		renamed.Id = "Pumpkin_BlazeJackier"
+		local taken = w.Schema.NewItem("Pumpkin")
+		taken.Id = "Pumpkin_Gourdy" -- already a skin, and this draft doesn't edit it
+		taken.Name = "Not Gourdy"
+		local twin = w.Schema.NewItem("Candy")
+		twin.Id = "Candy_Twin"
+		twin.Name = "Twin"
+		local classic = itemOf(w, "Zombie")
+		local hat = itemOf(w, "Pumpkin_SirGourdington")
+		hat.Id = "Pumpkin_HatTrick"
+		hat.Name = "Hat Trick"
+		hat.Style.TorsoColor = Color3.fromRGB(9, 9, 9)
+		hat.Style.Catalog = { Accessories = { { Id = 1234567890, Type = "Hat" } } }
+		local lookups = {
+			["1234567890"] = {
+				Name = "Top Hat",
+				Creator = "Someone",
+				CreatorType = "User",
+				CreatorId = 999,
+			},
+		}
+		local plan = SkinFile.Plan({
+			page({
+				record(renamed, { Source = "Pumpkin_BlazeJack" }),
+				record(taken),
+				record(twin),
+				record(twin),
+				record(classic, { Source = "Zombie" }),
+				record(hat, { Lookups = lookups }),
+			}),
+		}, deps())
+		local why: { [string]: string } = {}
+		for _, refused in plan.Refused do
+			why[refused.Id] = (why[refused.Id] or "") .. refused.Why
+		end
+		expect(why.Pumpkin_BlazeJackier).toMatch("Ids never change")
+		expect(why.Pumpkin_Gourdy).toMatch("already in the game")
+		expect(why.Candy_Twin).toMatch("two drafts")
+		expect(why.Zombie).toMatch("Classic")
+		expect(why.Pumpkin_HatTrick).toMatch("ApprovedIds")
+		expect(why.Pumpkin_HatTrick).toMatch("Someone")
+		expect(next(plan.Files)).toBeNil() -- nothing written
+		-- an approved id goes through
+		local approved = (w.Config :: any).SkinCatalog
+		if approved then
+			approved.ApprovedIds[1234567890] = "Top Hat, test"
+			local ok = SkinFile.Plan({ page({ record(hat, { Lookups = lookups }) }) }, deps())
+			approved.ApprovedIds[1234567890] = nil
+			expect(#ok.Refused).toBe(0)
+		end
+		-- economy changes: refused unless unlocked, then listed loudly
+		local pricier = itemOf(w, "Pumpkin_Gourdy")
+		pricier.Rarity = "Uncommon"
+		pricier.Style.Head = "SkinPumpkin"
+		local locked =
+			SkinFile.Plan({ page({ record(pricier, { Source = "Pumpkin_Gourdy" }) }) }, deps())
+		expect(#locked.Refused).toBe(1)
+		local unlocked = SkinFile.Plan({
+			page({ record(pricier, { Source = "Pumpkin_Gourdy", UnlockEconomy = true }) }),
+		}, deps())
+		expect(#unlocked.Refused).toBe(0)
+		expect(unlocked.Economy[1]).toMatch("Rarity Common %-> Uncommon")
+		expect(unlocked.Files.Pumpkin.CountsAfter.Uncommon).toBe(6)
+	end)
+
+	it("stops when a page was damaged in copying", function()
+		local good = page({
+			{ DraftId = "X", Item = w.Schema.Encode(itemOf(w, "Pumpkin_Gourdy")), Updated = 1 },
+		})
+		local text = good.Drafts[1].Text
+		good.Drafts[1].Text = text:sub(1, 20)
+			.. (if text:sub(21, 21) == "a" then "b" else "a")
+			.. text:sub(22)
+		local plan = SkinFile.Plan({ good }, deps())
+		expect(plan.Damaged).toMatch("page 1, draft 1 was damaged in copying")
+		expect(SkinFile.Plan({ { Version = 1 } }, deps()).Damaged).toBeA("string")
+	end)
+
+	it("keeps the header line right for every shape it has", function()
+		local function header(line: string, counts: any): string
+			local text = "--!strict\n--[[\n" .. line .. "\n]]\n"
+			return (SkinFile.UpdateHeader(text, counts):match("\n([^\n]*CRATE SKINS[^\n]*)\n"))
+		end
+		local c = { Total = 22, Common = 13, Uncommon = 6, Rare = 3, Crazy = 0, Million = 0 }
+		expect(header("\tZOMBIE TOWN CRATE SKINS (21): 13 Common, 5 Uncommon, 3 Rare.", c)).toBe(
+			"\tZOMBIE TOWN CRATE SKINS (22): 13 Common, 6 Uncommon, 3 Rare."
+		)
+		c = { Total = 21, Common = 12, Uncommon = 5, Rare = 2, Crazy = 2, Million = 0 }
+		expect(header("\tCANDY CRATE SKINS (20): 12 Common, 5 Uncommon, 2 Rare, 1 CRAZY.", c)).toBe(
+			"\tCANDY CRATE SKINS (21): 12 Common, 5 Uncommon, 2 Rare, 2 CRAZY."
+		)
+		c = { Total = 23, Common = 14, Uncommon = 5, Rare = 3, Crazy = 0, Million = 1 }
+		expect(
+			header(
+				"\tALIEN ABDUCTION CRATE SKINS (22): 13 Common, 5 Uncommon, 3 Rare, and 1 CRAZY that is ONE IN A MILLION (Odds).",
+				c
+			)
+		).toBe(
+			"\tALIEN ABDUCTION CRATE SKINS (23): 14 Common, 5 Uncommon, 3 Rare, and 1 CRAZY that is ONE IN A MILLION (Odds)."
+		)
+	end)
 end)
