@@ -45,7 +45,13 @@ type Effect = SkinAnimate.Effect
 local SkinAnim = {}
 
 -- A turning joint: its effects (several multiply, in list order) and the last offset worked out.
-type Motor = { Motor: Motor6D, Effects: { Effect }, Side: number, Cached: CFrame }
+type Motor = {
+	Motor: Motor6D,
+	Effects: { Effect },
+	Side: number,
+	Cached: CFrame,
+	Ready: boolean, -- Cached has been worked out at least once
+}
 -- A recoloured part: the effect that colours it (the last one in the list wins).
 type Paint = {
 	Part: BasePart,
@@ -354,6 +360,7 @@ local function activate(entry: Entry)
 					Effects = list,
 					Side = if type(side) == "number" then side else 1,
 					Cached = CFrame.identity,
+					Ready = false,
 				})
 			end
 		end
@@ -485,12 +492,13 @@ local function stepEntry(entry: Entry, t: number, colourTick: boolean, camera: C
 	-- maths only runs every second frame.
 	local compute = not entry.HalfRate or frame % 2 == 0
 	for _, m in entry.Motors do
-		if compute then
+		if compute or not m.Ready then
 			local offset = CFrame.identity
 			for _, effect in m.Effects do
 				offset *= SkinAnimate.Offset(effect, t, m.Side)
 			end
 			m.Cached = offset
+			m.Ready = true
 		end
 		if m.Motor.Parent then
 			m.Motor.Transform = m.Cached
