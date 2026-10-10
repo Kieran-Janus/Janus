@@ -134,7 +134,7 @@ describe("SkinSchema", function()
 		end
 	end)
 
-	it("turns every skin into JSON and back exactly (~634 skins)", function()
+	it("turns every skin in the game into JSON and back exactly", function()
 		local count = 0
 		for _, item in skins() do
 			local json = HttpService:JSONEncode(Schema.Encode(item))
@@ -145,7 +145,8 @@ describe("SkinSchema", function()
 			same(item, back, item.Id)
 			count += 1
 		end
-		expect(count).toBeGreaterThan(600)
+		expect(count).toBe(#skins()) -- (the themes switched on in Config/Skins/InGame.luau)
+		expect(count).toBeGreaterThan(100)
 		-- the special ones keep their extra keys
 		local king = Schema.Decode(Schema.Encode(Items.Get("KingSkin")))
 		expect(king.VipOnly).toBe(true)

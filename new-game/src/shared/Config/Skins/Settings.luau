@@ -7,7 +7,10 @@
 
 	Themes   one line per theme file. Id = the file name, Name = what players see,
 	         Crate = the crate its skins drop from (Config.Crates), Color = its colour in the
-	         shop. To add a theme: make a new file like Pumpkin.luau and add a line here.
+	         shop. To add a theme: make a new file like Pumpkin.luau, add a line here and a
+	         line in InGame.luau.
+	         WHICH THEMES ARE IN THE GAME: the on/off switches are in InGame.luau (next to this
+	         file). Themes = only the ones switched on; AllThemes = every theme.
 	Glow     the light around Rare and CRAZY skins, when a skin doesn't set its own.
 	Auras    the particle looks a skin's Aura can use (Aura = { Kind = "Embers", ... }).
 	         Texture can be any Roblox image id ("rbxassetid://123"); the ones below are
@@ -33,190 +36,205 @@ export type Aura = {
 	Spread: number,
 }
 
+local InGame = require(script.Parent.InGame)
+
+local ALL_THEMES: { Theme } = {
+	{
+		Id = "Pumpkin",
+		Name = "Pumpkin",
+		Crate = "PumpkinCrate",
+		Color = Color3.fromRGB(255, 130, 20),
+	},
+	{
+		Id = "Candy",
+		Name = "Candy",
+		Crate = "CandyCrate",
+		Color = Color3.fromRGB(255, 110, 190),
+	},
+	{
+		Id = "Spooky",
+		Name = "Spooky",
+		Crate = "SpookyCrate",
+		Color = Color3.fromRGB(150, 95, 230),
+	},
+	{
+		Id = "Graveyard",
+		Name = "Graveyard",
+		Crate = "GraveyardCrate",
+		Color = Color3.fromRGB(130, 160, 140),
+	},
+	{
+		Id = "Monster",
+		Name = "Monster",
+		Crate = "MonsterCrate",
+		Color = Color3.fromRGB(110, 210, 90),
+	},
+	{
+		Id = "Moonlight",
+		Name = "Moonlight",
+		Crate = "MoonlightCrate",
+		Color = Color3.fromRGB(110, 150, 255),
+	},
+	-- The 24 newer themes (each 21 skins, three of them with a ONE IN A MILLION CRAZY skin).
+	{
+		Id = "VampireCastle",
+		Name = "Vampire Castle",
+		Crate = "VampireCastleCrate",
+		Color = Color3.fromRGB(170, 20, 40),
+	},
+	{
+		Id = "ZombieTown",
+		Name = "Zombie Town",
+		Crate = "ZombieTownCrate",
+		Color = Color3.fromRGB(110, 150, 80),
+	},
+	{
+		Id = "HauntedCarnival",
+		Name = "Haunted Carnival",
+		Crate = "HauntedCarnivalCrate",
+		Color = Color3.fromRGB(220, 40, 50),
+	},
+	{
+		Id = "MummyTomb",
+		Name = "Mummy Tomb",
+		Crate = "MummyTombCrate",
+		Color = Color3.fromRGB(225, 200, 140),
+	},
+	{
+		Id = "WerewolfWoods",
+		Name = "Werewolf Woods",
+		Crate = "WerewolfWoodsCrate",
+		Color = Color3.fromRGB(120, 85, 60),
+	},
+	{
+		Id = "MadScientistLab",
+		Name = "Mad Scientist Lab",
+		Crate = "MadScientistLabCrate",
+		Color = Color3.fromRGB(120, 255, 80),
+	},
+	{
+		Id = "GhostShip",
+		Name = "Ghost Ship",
+		Crate = "GhostShipCrate",
+		Color = Color3.fromRGB(140, 230, 220),
+	},
+	{
+		Id = "BatCave",
+		Name = "Bat Cave",
+		Crate = "BatCaveCrate",
+		Color = Color3.fromRGB(110, 60, 160),
+	},
+	{
+		Id = "SpiderLair",
+		Name = "Spider Lair",
+		Crate = "SpiderLairCrate",
+		Color = Color3.fromRGB(130, 220, 60),
+	},
+	{
+		Id = "SkeletonCrew",
+		Name = "Skeleton Crew",
+		Crate = "SkeletonCrewCrate",
+		Color = Color3.fromRGB(240, 235, 215),
+	},
+	{
+		Id = "CursedToys",
+		Name = "Cursed Toys",
+		Crate = "CursedToysCrate",
+		Color = Color3.fromRGB(240, 140, 180),
+	},
+	{
+		Id = "ScarecrowFarm",
+		Name = "Scarecrow Farm",
+		Crate = "ScarecrowFarmCrate",
+		Color = Color3.fromRGB(230, 200, 110),
+	},
+	{
+		Id = "HauntedHotel",
+		Name = "Haunted Hotel",
+		Crate = "HauntedHotelCrate",
+		Color = Color3.fromRGB(150, 20, 40),
+	},
+	{
+		Id = "MonsterDisco",
+		Name = "Monster Disco",
+		Crate = "MonsterDiscoCrate",
+		Color = Color3.fromRGB(255, 60, 180),
+	},
+	{
+		Id = "BlackCatAlley",
+		Name = "Black Cat Alley",
+		Crate = "BlackCatAlleyCrate",
+		Color = Color3.fromRGB(150, 255, 80),
+	},
+	{
+		Id = "GoblinMarket",
+		Name = "Goblin Market",
+		Crate = "GoblinMarketCrate",
+		Color = Color3.fromRGB(110, 170, 60),
+	},
+	{
+		Id = "SwampCreatures",
+		Name = "Swamp Creatures",
+		Crate = "SwampCreaturesCrate",
+		Color = Color3.fromRGB(60, 140, 120),
+	},
+	{
+		Id = "WitchsBrew",
+		Name = "Witch's Brew",
+		Crate = "WitchsBrewCrate",
+		Color = Color3.fromRGB(100, 40, 140),
+	},
+	{
+		Id = "AlienAbduction",
+		Name = "Alien Abduction",
+		Crate = "AlienAbductionCrate",
+		Color = Color3.fromRGB(120, 230, 90),
+	},
+	{
+		Id = "FrostyFright",
+		Name = "Frosty Fright",
+		Crate = "FrostyFrightCrate",
+		Color = Color3.fromRGB(140, 200, 255),
+	},
+	{
+		Id = "GraveyardParty",
+		Name = "Graveyard Party",
+		Crate = "GraveyardPartyCrate",
+		Color = Color3.fromRGB(255, 110, 190),
+	},
+	{
+		Id = "CandyFactory",
+		Name = "Candy Factory",
+		Crate = "CandyFactoryCrate",
+		Color = Color3.fromRGB(255, 140, 200),
+	},
+	{
+		Id = "PhantomTheatre",
+		Name = "Phantom Theatre",
+		Crate = "PhantomTheatreCrate",
+		Color = Color3.fromRGB(160, 20, 40),
+	},
+	{
+		Id = "AutumnLeaves",
+		Name = "Autumn Leaves",
+		Crate = "AutumnLeavesCrate",
+		Color = Color3.fromRGB(230, 130, 40),
+	},
+}
+
+-- Only the themes switched on in InGame.luau (a theme missing there counts as on).
+local themes: { Theme } = {}
+for _, theme in ALL_THEMES do
+	if InGame.Themes[theme.Id] ~= false then
+		table.insert(themes, theme)
+	end
+end
+
 return {
-	Themes = {
-		{
-			Id = "Pumpkin",
-			Name = "Pumpkin",
-			Crate = "PumpkinCrate",
-			Color = Color3.fromRGB(255, 130, 20),
-		},
-		{
-			Id = "Candy",
-			Name = "Candy",
-			Crate = "CandyCrate",
-			Color = Color3.fromRGB(255, 110, 190),
-		},
-		{
-			Id = "Spooky",
-			Name = "Spooky",
-			Crate = "SpookyCrate",
-			Color = Color3.fromRGB(150, 95, 230),
-		},
-		{
-			Id = "Graveyard",
-			Name = "Graveyard",
-			Crate = "GraveyardCrate",
-			Color = Color3.fromRGB(130, 160, 140),
-		},
-		{
-			Id = "Monster",
-			Name = "Monster",
-			Crate = "MonsterCrate",
-			Color = Color3.fromRGB(110, 210, 90),
-		},
-		{
-			Id = "Moonlight",
-			Name = "Moonlight",
-			Crate = "MoonlightCrate",
-			Color = Color3.fromRGB(110, 150, 255),
-		},
-		-- The 24 newer themes (each 21 skins, three of them with a ONE IN A MILLION CRAZY skin).
-		{
-			Id = "VampireCastle",
-			Name = "Vampire Castle",
-			Crate = "VampireCastleCrate",
-			Color = Color3.fromRGB(170, 20, 40),
-		},
-		{
-			Id = "ZombieTown",
-			Name = "Zombie Town",
-			Crate = "ZombieTownCrate",
-			Color = Color3.fromRGB(110, 150, 80),
-		},
-		{
-			Id = "HauntedCarnival",
-			Name = "Haunted Carnival",
-			Crate = "HauntedCarnivalCrate",
-			Color = Color3.fromRGB(220, 40, 50),
-		},
-		{
-			Id = "MummyTomb",
-			Name = "Mummy Tomb",
-			Crate = "MummyTombCrate",
-			Color = Color3.fromRGB(225, 200, 140),
-		},
-		{
-			Id = "WerewolfWoods",
-			Name = "Werewolf Woods",
-			Crate = "WerewolfWoodsCrate",
-			Color = Color3.fromRGB(120, 85, 60),
-		},
-		{
-			Id = "MadScientistLab",
-			Name = "Mad Scientist Lab",
-			Crate = "MadScientistLabCrate",
-			Color = Color3.fromRGB(120, 255, 80),
-		},
-		{
-			Id = "GhostShip",
-			Name = "Ghost Ship",
-			Crate = "GhostShipCrate",
-			Color = Color3.fromRGB(140, 230, 220),
-		},
-		{
-			Id = "BatCave",
-			Name = "Bat Cave",
-			Crate = "BatCaveCrate",
-			Color = Color3.fromRGB(110, 60, 160),
-		},
-		{
-			Id = "SpiderLair",
-			Name = "Spider Lair",
-			Crate = "SpiderLairCrate",
-			Color = Color3.fromRGB(130, 220, 60),
-		},
-		{
-			Id = "SkeletonCrew",
-			Name = "Skeleton Crew",
-			Crate = "SkeletonCrewCrate",
-			Color = Color3.fromRGB(240, 235, 215),
-		},
-		{
-			Id = "CursedToys",
-			Name = "Cursed Toys",
-			Crate = "CursedToysCrate",
-			Color = Color3.fromRGB(240, 140, 180),
-		},
-		{
-			Id = "ScarecrowFarm",
-			Name = "Scarecrow Farm",
-			Crate = "ScarecrowFarmCrate",
-			Color = Color3.fromRGB(230, 200, 110),
-		},
-		{
-			Id = "HauntedHotel",
-			Name = "Haunted Hotel",
-			Crate = "HauntedHotelCrate",
-			Color = Color3.fromRGB(150, 20, 40),
-		},
-		{
-			Id = "MonsterDisco",
-			Name = "Monster Disco",
-			Crate = "MonsterDiscoCrate",
-			Color = Color3.fromRGB(255, 60, 180),
-		},
-		{
-			Id = "BlackCatAlley",
-			Name = "Black Cat Alley",
-			Crate = "BlackCatAlleyCrate",
-			Color = Color3.fromRGB(150, 255, 80),
-		},
-		{
-			Id = "GoblinMarket",
-			Name = "Goblin Market",
-			Crate = "GoblinMarketCrate",
-			Color = Color3.fromRGB(110, 170, 60),
-		},
-		{
-			Id = "SwampCreatures",
-			Name = "Swamp Creatures",
-			Crate = "SwampCreaturesCrate",
-			Color = Color3.fromRGB(60, 140, 120),
-		},
-		{
-			Id = "WitchsBrew",
-			Name = "Witch's Brew",
-			Crate = "WitchsBrewCrate",
-			Color = Color3.fromRGB(100, 40, 140),
-		},
-		{
-			Id = "AlienAbduction",
-			Name = "Alien Abduction",
-			Crate = "AlienAbductionCrate",
-			Color = Color3.fromRGB(120, 230, 90),
-		},
-		{
-			Id = "FrostyFright",
-			Name = "Frosty Fright",
-			Crate = "FrostyFrightCrate",
-			Color = Color3.fromRGB(140, 200, 255),
-		},
-		{
-			Id = "GraveyardParty",
-			Name = "Graveyard Party",
-			Crate = "GraveyardPartyCrate",
-			Color = Color3.fromRGB(255, 110, 190),
-		},
-		{
-			Id = "CandyFactory",
-			Name = "Candy Factory",
-			Crate = "CandyFactoryCrate",
-			Color = Color3.fromRGB(255, 140, 200),
-		},
-		{
-			Id = "PhantomTheatre",
-			Name = "Phantom Theatre",
-			Crate = "PhantomTheatreCrate",
-			Color = Color3.fromRGB(160, 20, 40),
-		},
-		{
-			Id = "AutumnLeaves",
-			Name = "Autumn Leaves",
-			Crate = "AutumnLeavesCrate",
-			Color = Color3.fromRGB(230, 130, 40),
-		},
-	} :: { Theme },
+	Themes = themes,
+	AllThemes = ALL_THEMES,
+	-- Skin Ids hidden one at a time (InGame.luau > SkinsOff).
+	SkinsOff = InGame.SkinsOff,
 
 	-- Rare and CRAZY skins glow. A skin's Glow = { Color = ..., Brightness = 2, Range = 12 }
 	-- uses these numbers for anything it leaves out.

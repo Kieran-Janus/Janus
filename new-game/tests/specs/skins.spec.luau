@@ -103,9 +103,9 @@ describe("Skin catalogue", function()
 	end)
 
 	it(
-		"has about 630 skins: 6 classic themes of 20, 24 newer themes of 21 (+3 one in a million)",
+		"has 6 classic themes of 20 skins and newer themes of 21 (+ one in a million in 3)",
 		function()
-			expect(#Config.Skins.Themes).toBe(30)
+			expect(#Config.Skins.AllThemes).toBe(30)
 			local million = 0
 			for _, theme in Config.Skins.Themes do
 				local classic = table.find(THEMES, theme.Id) ~= nil
@@ -138,29 +138,75 @@ describe("Skin catalogue", function()
 					(if classic then 20 else 21) + (if hasMillion then 1 else 0)
 				)
 			end
-			expect(million).toBe(3)
+			expect(million).toBeLessThanOrEqual(3)
+			-- Only the themes switched on in Config/Skins/InGame.luau are in the game.
+			local newer = #Config.Skins.Themes - #THEMES
+			expect(#crateSkins()).toBe(#THEMES * 20 + newer * 21 + million)
 			local total = #skins() + 1 -- (+ the Tormented Tower's own skin)
-			expect(total).toBeGreaterThanOrEqual(600)
-			expect(total).toBeLessThanOrEqual(660)
 			T.note(total, "skins in the game")
 		end
 	)
 
-	it("has exactly 10 CRAZY skins, 3 of them ONE IN A MILLION", function()
-		local crazy, million = 0, 0
-		for _, item in Config.Shop.Items do
-			if Items.Rarity(item) == "Crazy" then
-				crazy += 1
-				if item.OneInAMillion then
-					million += 1
-					expect(item.Odds).toBe(0.0001)
-					expect(type(item.Style.Crazy.Effect)).toBe("string") -- its own animated effect
-				end
+	it("switches themes and single skins on and off in Config/Skins/InGame.luau", function()
+		local InGame = rt:require("ReplicatedStorage.Shared.Config.Skins.InGame")
+		local on: { [string]: boolean } = {}
+		for _, theme in Config.Skins.Themes do
+			on[theme.Id] = true
+		end
+		local crates: { [string]: boolean } = {}
+		for _, crate in Config.Crates.List do
+			crates[crate.Id] = true
+		end
+		for _, theme in Config.Skins.AllThemes do
+			-- every theme has a switch, and the switch decides its skins and its crate
+			local switch = InGame.Themes[theme.Id]
+			if type(switch) ~= "boolean" then
+				error(theme.Id .. " has no true/false line in Config/Skins/InGame.luau")
+			end
+			expect(on[theme.Id] == true).toBe(switch)
+			expect(crates[theme.Crate] == true).toBe(switch)
+			expect(#Items.ByCrate(theme.Crate) > 0).toBe(switch)
+			-- a hidden theme's file still loads, ready to switch back on
+			local file = rt:require("ReplicatedStorage.Shared.Config.Skins." .. theme.Id)
+			expect(#file).toBeGreaterThan(0)
+		end
+		for id in InGame.Themes do
+			local known = false
+			for _, theme in Config.Skins.AllThemes do
+				known = known or theme.Id == id
+			end
+			if not known then
+				error("Config/Skins/InGame.luau has a switch for " .. id .. ", which isn't a theme")
 			end
 		end
-		expect(crazy).toBe(10)
-		expect(million).toBe(3)
+		-- the lobby stand's crates are switched on, so the stand has no gaps
+		for _, id in Config.Crates.Stand.Themed do
+			expect(crates[id]).toBe(true)
+		end
+		for _, id in InGame.SkinsOff do
+			expect(Items.Get(id)).toBeNil()
+		end
+		T.note(#Config.Skins.Themes, "of " .. #Config.Skins.AllThemes .. " skin themes on")
 	end)
+
+	it(
+		"has a CRAZY skin per classic theme (+ the one-in-a-million ones of the themes switched on)",
+		function()
+			local crazy, million = 0, 0
+			for _, item in Config.Shop.Items do
+				if Items.Rarity(item) == "Crazy" then
+					crazy += 1
+					if item.OneInAMillion then
+						million += 1
+						expect(item.Odds).toBe(0.0001)
+						expect(type(item.Style.Crazy.Effect)).toBe("string") -- its own animated effect
+					end
+				end
+			end
+			expect(million).toBeLessThanOrEqual(3)
+			expect(crazy).toBe(#THEMES + 1 + million) -- (+ the Tormented Tower's)
+		end
+	)
 
 	it("makes every skin look clearly different (no two share a look)", function()
 		-- The look key lives in src/shared/SkinSchema.luau, so Skin Studio warns about the same thing.

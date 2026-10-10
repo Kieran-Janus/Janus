@@ -284,7 +284,7 @@ describe("CrateArt", function()
 				end
 			end
 		end
-		expect(emblems).toBeGreaterThan(20)
+		expect(emblems).toBeGreaterThan(5) -- (only the crates of themes switched on in Config/Skins/InGame.luau)
 	end)
 
 	it("prefers your own crate model in Preview", function()

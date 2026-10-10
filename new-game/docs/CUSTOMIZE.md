@@ -20,7 +20,7 @@ Want to move, recolour or rebuild the lobby or a map **by hand** in Studio? See 
 
 Too much movement, or a phone feels slow? Every animation switch is in one list: [Turn animations off or down](#turn-animations-off-or-down).
 
-Jump to: [Pumpkin Tools](#pumpkin-tools-click-anything-to-change-its-look-or-its-words) · [Animations](#turn-animations-off-or-down) · [Change and animate skins](#change-and-animate-skins) · [Skin Studio](#skin-studio) · [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Toolbox codes](#with-a-toolbox-code-one-line-no-dragging) · [Move one thing](#move-just-one-thing) · [Tags](#parts-that-do-something-tags)
+Jump to: [Pumpkin Tools](#pumpkin-tools-click-anything-to-change-its-look-or-its-words) · [Animations](#turn-animations-off-or-down) · [Change and animate skins](#change-and-animate-skins) · [Skin Studio](#skin-studio) · [Fewer skins](#fewer-skins-switch-themes-on-or-off) · [Skins](#crate-skins-add-or-change-a-skin) · [Crates](#crates) · [Modes and playlists](#modes-and-playlists) · [Maps](#maps) · [Ready pad](#the-ready-pad) · [Parkour](#parkour-jumps) · [Candy Rush](#candy-rush) · [Web Scour](#web-scour) · [Dances](#photo-spot-dances) · [Floor signs](#floor-signs) · [Solid lobby](#a-solid-lobby) · [Tormented Tower](#tormented-tower) · [Secret pumpkins](#secret-pumpkins-easter-eggs) · [Menu](#menu-tiles) · [Lobby zones](#lobby-areas-zones) · [Swap every copy](#swap-every-copy-of-something-at-once) · [Toolbox codes](#with-a-toolbox-code-one-line-no-dragging) · [Move one thing](#move-just-one-thing) · [Tags](#parts-that-do-something-tags)
 
 ---
 
@@ -60,7 +60,8 @@ Jump to: [Pumpkin Tools](#pumpkin-tools-click-anything-to-change-its-look-or-its
 | Hub terrain, forest, mansion, statue, fence, glowing paths | `Config.Hub.Polish` (same rebuild) |
 | NPC names, positions, dialogue | `Config.Npcs.List` |
 | Shop items (hats, trails, pets, classic skins) | `Config.Shop.Items` |
-| Crate skins (about 630, 30 themes) | `src/shared/Config/Skins/<Theme>.luau` (see "Crate skins" below) |
+| Which skins are in the game (switch a theme or one skin on/off) | `src/shared/Config/Skins/InGame.luau` (see [Fewer skins](#fewer-skins-switch-themes-on-or-off)) |
+| Crate skins (30 themes, 12 switched on) | `src/shared/Config/Skins/<Theme>.luau` (see "Crate skins" below) |
 | A skin's look, moving pieces and walk style | Skin Studio in a playtest, its theme file, or your own model: [Change and animate skins](#change-and-animate-skins) |
 | Prices by rarity (Common, Uncommon, Rare, CRAZY), duplicate refunds | `Config.Rarity` (`src/shared/Config/Rarity.luau`) |
 | VIP perks, VIP pass, coin packs | `Config.Monetization` (IDs from Creator Hub) |
@@ -603,8 +604,21 @@ The price comes from the item's `Rarity` (`src/shared/Config/Rarity.luau`). To g
 ```
 Skins are removed cleanly when unequipped: the player's own avatar comes back.
 
+### Fewer skins: switch themes on or off
+All 30 skin themes (about 630 skins) are still in the files, but only the ones switched on are in the game: **12 themes, about 250 skins**. The switches are all in one short file: `src/shared/Config/Skins/InGame.luau`.
+
+1. Open `src/shared/Config/Skins/InGame.luau` in VS Code.
+2. Each theme has one line, like `ZombieTown = true,`. Change `true` to `false` to take that theme out of the game (its skins and its crate), or `false` to `true` to put it back. Nothing is deleted, so you can flip them as often as you like.
+3. To hide just one skin, put its Id in `SkinsOff`, e.g. `SkinsOff = { "Pumpkin_CandleKid" },` (find the Id in the theme file with Ctrl+F, or in Skin Studio).
+4. Save. Rojo copies it into Studio. Press **Play** and check **Menu > Skins** and **Menu > Crates**.
+5. Run the tests (`lune run tests/run`, or ask Claude Code).
+
+Switched on now: the six classic themes (`Pumpkin`, `Candy`, `Spooky`, `Graveyard`, `Monster`, `Moonlight`, the crates on the lobby stand: keep these on), plus `VampireCastle`, `ZombieTown`, `HauntedCarnival`, `SpiderLair`, `AlienAbduction` and `MonsterDisco` (those three hold the ONE IN A MILLION skins). Players who own a skin from a theme you switch off keep it in their save; it just can't be worn until the theme is back on.
+
+Or just tell Claude Code: "turn on Ghost Ship and turn off Zombie Town".
+
 ### Crate skins: add or change a skin
-The crate skins (about 630 with the classic ones) live in `src/shared/Config/Skins/`, one file per theme (30 themes). The six classic themes (`Pumpkin`, `Candy`, `Spooky`, `Graveyard`, `Monster`, `Moonlight`) have 20 skins each: 12 Common, 5 Uncommon, 2 Rare and 1 CRAZY. The 24 newer themes (`VampireCastle`, `ZombieTown`, `HauntedCarnival`, `MummyTomb`, `WerewolfWoods`, `MadScientistLab`, `GhostShip`, `BatCave`, `SpiderLair`, `SkeletonCrew`, `CursedToys`, `ScarecrowFarm`, `HauntedHotel`, `MonsterDisco`, `BlackCatAlley`, `GoblinMarket`, `SwampCreatures`, `WitchsBrew`, `AlienAbduction`, `FrostyFright`, `GraveyardParty`, `CandyFactory`, `PhantomTheatre`, `AutumnLeaves`) have 21 each: 13 Common, 5 Uncommon and 3 Rare, and three of them one ONE IN A MILLION CRAZY skin. There are exactly 10 CRAZY skins in the game (the six classic ones, the Tormented Tower's and the three one-in-a-million ones). The tests check that no two skins look the same. Every style option (colours, materials, patterns, head pieces, glow, auras, CRAZY effects) is explained at the top of `Pumpkin.luau`.
+The crate skins (about 630 with the classic ones, of which the themes switched on in `InGame.luau` are in the game) live in `src/shared/Config/Skins/`, one file per theme (30 themes). The six classic themes (`Pumpkin`, `Candy`, `Spooky`, `Graveyard`, `Monster`, `Moonlight`) have 20 skins each: 12 Common, 5 Uncommon, 2 Rare and 1 CRAZY. The 24 newer themes (`VampireCastle`, `ZombieTown`, `HauntedCarnival`, `MummyTomb`, `WerewolfWoods`, `MadScientistLab`, `GhostShip`, `BatCave`, `SpiderLair`, `SkeletonCrew`, `CursedToys`, `ScarecrowFarm`, `HauntedHotel`, `MonsterDisco`, `BlackCatAlley`, `GoblinMarket`, `SwampCreatures`, `WitchsBrew`, `AlienAbduction`, `FrostyFright`, `GraveyardParty`, `CandyFactory`, `PhantomTheatre`, `AutumnLeaves`) have 21 each: 13 Common, 5 Uncommon and 3 Rare, and three of them one ONE IN A MILLION CRAZY skin. With every theme on there are 10 CRAZY skins (the six classic ones, the Tormented Tower's and the three one-in-a-million ones). The tests check that no two skins look the same. Every style option (colours, materials, patterns, head pieces, glow, auras, CRAZY effects) is explained at the top of `Pumpkin.luau`.
 
 **Add a skin:**
 1. Open the theme file, e.g. `src/shared/Config/Skins/Candy.luau`.
@@ -618,7 +632,7 @@ The crate skins (about 630 with the classic ones) live in `src/shared/Config/Ski
 
 **Rules worth knowing:**
 - How rarities should look: Common = colours, materials and an accent; Uncommon = + a head piece; Rare = + glow and particles (`Glow`, `Aura`); CRAZY = everything + `Crazy = { Rainbow, Pulse, Orbit }`, and optionally its own animated `Effect` (`Torment`, `BloodMoon`, `DiscoInferno`, `UfoBeam`: `src/client/SkinEffects.luau`, numbers in `Skins/Settings.luau` > `Effects.Special`).
-- The Skins tab of the shop has a theme dropdown (the "All themes" chip) with all 30 themes.
+- The Skins tab of the shop has a theme dropdown (the "All themes" chip) with every theme switched on.
 - `CrateOnly = true` keeps a skin out of the Shop (crates only). `Price = 300` gives it its own price.
 - `Crate = "CandyCrate"` on one skin puts it in a different crate than its theme's.
 - **New theme:** copy a theme file, rename it and every `Id` in it, then add a line to `Themes` in `Skins/Settings.luau` (its `Id` is the file name, `Crate` is the crate it drops from). Add that crate too (see "Crates").

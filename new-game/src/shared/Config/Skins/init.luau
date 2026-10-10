@@ -19,8 +19,11 @@
 	Optional: Price = 300 (its own price), CrateOnly = true (only from crates, not sold in
 	the shop).
 
+	FEWER SKINS: InGame.luau (next to this file) switches whole themes on or off and hides
+	single skins by Id. Only the skins switched on are added to the game.
+
 	New theme: copy a theme file, rename it and every Id in it, then add a line to Themes in
-	Settings.luau (the Id there is the file name).
+	Settings.luau (the Id there is the file name) and one in InGame.luau.
 ]]
 
 local Settings = require(script.Settings)
@@ -34,6 +37,9 @@ for _, theme in Settings.Themes do
 	end
 	local list = (require :: any)(file) :: { any }
 	for _, item in list do
+		if table.find(Settings.SkinsOff, item.Id) then
+			continue
+		end
 		item.Slot = item.Slot or "Skin"
 		item.Crate = item.Crate or theme.Crate
 		item.Theme = item.Theme or theme.Id

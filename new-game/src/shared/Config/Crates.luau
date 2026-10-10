@@ -25,6 +25,8 @@
 	  Config/Skins/ fill this in for you: every Pumpkin skin is in PumpkinCrate).
 	  Rarity crates (they have Rarity = "Common" etc.): every crate skin of that rarity, from
 	  every themed crate, all equally likely.
+	  Fewer crates: switch a theme off in Config/Skins/InGame.luau and its crate leaves the
+	  game with its skins (the line below stays, ready for when you switch it back on).
 
 	CHANGE A PRICE   change Price (coins). Robux prices are set in Creator Hub (see Robux below).
 	CHANGE THE ODDS  change Odds below (every themed crate) or give one crate its own
@@ -89,7 +91,7 @@ export type Crate = {
 
 local rgb = Color3.fromRGB
 
-return {
+local crates = {
 	-- The chance of each rarity (percent) for every crate without its own Odds. Must add up
 	-- to 100. Rarity names are the ones in Config/Rarity.luau.
 	Odds = { Common = 73.48, Uncommon = 24, Rare = 2.5, Crazy = 0.02 } :: { [string]: number },
@@ -902,3 +904,23 @@ return {
 		},
 	} :: { Crate },
 }
+
+-- A themed crate whose theme is switched off (Config/Skins/InGame.luau) leaves the game with its
+-- skins: it isn't in Menu > Crates, and the rarity crates don't draw from it.
+local SkinSettings = require(script.Parent.Skins.Settings)
+local off: { [string]: boolean } = {}
+for _, theme in SkinSettings.AllThemes do
+	off[theme.Crate] = true
+end
+for _, theme in SkinSettings.Themes do
+	off[theme.Crate] = nil
+end
+local list: { Crate } = {}
+for _, crate in crates.List do
+	if not off[crate.Id] then
+		table.insert(list, crate)
+	end
+end
+crates.List = list
+
+return crates
