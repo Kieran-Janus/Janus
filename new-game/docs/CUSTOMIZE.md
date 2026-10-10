@@ -201,6 +201,8 @@ Good to know:
 - Take your model out of the folder and the built look comes back next time you press Play (in a lobby or map saved in your place, use Revert: see below).
 
 ### With a Toolbox code (one line, no dragging)
+**Easiest:** the Pumpkin Tools plugin (Plugins tab): click a thing, press **Just this one** or **Every <name>**, then click any model in the Toolbox. See `tools/studio-plugin/README.md`.
+
 Every free model in the Toolbox (Creator Store) has a code: the number in its link, e.g. `https://create.roblox.com/store/asset/11600489662/Pumpkin` has the code `11600489662`. In the Toolbox, right-click a model > **Copy Asset ID** to get it.
 1. Stop the game (edit mode). Open **View > Command Bar**.
 2. **Every copy** of a prop gets that look (here: every lobby pumpkin):

@@ -209,7 +209,7 @@ end
 local function makeButton(parent: Instance, label: string, color: Color3?): TextButton
 	local b = Theme.button(label, parent, color)
 	b.TextSize = textSize()
-	b.Size = UDim2.new(0, 80, 0, row())
+	b.Size = UDim2.fromOffset(80, row())
 	b.TextTruncate = Enum.TextTruncate.AtEnd
 	return b
 end
@@ -863,13 +863,13 @@ local function renderList(holder: Frame)
 	local pager = line(holder, "Pager", 100000)
 	local prev = makeButton(pager, "◀", nil)
 	prev.Name = "Prev"
-	prev.Size = UDim2.new(0, row() + 12, 0, row())
+	prev.Size = UDim2.fromOffset(row() + 12, row())
 	local label = Theme.label(("Page %d / %d"):format(page, pages), textSize(), pager)
 	label.Name = "PageLabel"
 	label.Size = UDim2.new(0, 120, 1, 0)
 	local nextButton = makeButton(pager, "▶", nil)
 	nextButton.Name = "Next"
-	nextButton.Size = UDim2.new(0, row() + 12, 0, row())
+	nextButton.Size = UDim2.fromOffset(row() + 12, row())
 	prev.Activated:Connect(function()
 		page = math.max(1, page - 1)
 		renderList(holder)
@@ -902,7 +902,7 @@ local function popover(title: string, build: (body: Frame, close: () -> ()) -> (
 	pop.Name = "Popover"
 	pop.BackgroundColor3 = Color3.fromRGB(28, 24, 40)
 	pop.ZIndex = 20
-	pop.Position = UDim2.new(0, 6, 0, top + 4)
+	pop.Position = UDim2.fromOffset(6, top + 4)
 	pop.Size = UDim2.new(1, -12, 1, -(top + 10))
 	pop.Parent = current.Panel
 	Theme.round(pop, 10)
@@ -940,7 +940,7 @@ local function popover(title: string, build: (body: Frame, close: () -> ()) -> (
 	local bodyFrame = Instance.new("Frame")
 	bodyFrame.Name = "Items"
 	bodyFrame.BackgroundTransparency = 1
-	bodyFrame.Size = UDim2.new(1, 0, 0, 0)
+	bodyFrame.Size = UDim2.fromScale(1, 0)
 	bodyFrame.AutomaticSize = Enum.AutomaticSize.Y
 	bodyFrame.Parent = body
 	local inner = Instance.new("UIListLayout")
@@ -1117,7 +1117,7 @@ end
 
 local function chip(parent: Instance, label: string, on: boolean, click: () -> ()): TextButton
 	local b = makeButton(parent, label, if on then Theme.Selected else nil)
-	b.Size = UDim2.new(0, math.max(row(), 14 + #label * 8), 0, row())
+	b.Size = UDim2.fromOffset(math.max(row(), 14 + #label * 8), row())
 	b.Activated:Connect(click)
 	return b
 end
@@ -1150,7 +1150,7 @@ local function renderSkins(content: ScrollingFrame)
 	local list = Instance.new("Frame")
 	list.Name = "List"
 	list.BackgroundTransparency = 1
-	list.Size = UDim2.new(1, 0, 0, 0)
+	list.Size = UDim2.fromScale(1, 0)
 	list.AutomaticSize = Enum.AutomaticSize.Y
 	list.LayoutOrder = 10
 	list.Parent = content
@@ -1208,7 +1208,7 @@ local function renderSkins(content: ScrollingFrame)
 		new.Activated:Connect(SkinStudioUI.New)
 		local dup = makeButton(toggleLine, "Duplicate", nil)
 		dup.Name = "Duplicate"
-		dup.Size = UDim2.new(0, 96, 0, row())
+		dup.Size = UDim2.fromOffset(96, row())
 		dup.Activated:Connect(duplicate)
 	end
 
@@ -1694,7 +1694,7 @@ local function renderSave(content: ScrollingFrame)
 		end)
 		local delete = makeButton(draftLine, "Delete", Color3.fromRGB(140, 40, 40))
 		delete.Name = "Delete"
-		delete.Size = UDim2.new(0, row() + 62, 0, row())
+		delete.Size = UDim2.fromOffset(row() + 62, row())
 		delete.Activated:Connect(function()
 			deleteDraft(summary.DraftId)
 		end)
@@ -1842,7 +1842,7 @@ local function build(gui: ScreenGui): Ui
 			cfg.PhoneMaxWidth
 		)
 		panel.AnchorPoint = Vector2.new(1, 0)
-		panel.Position = UDim2.new(1, 0, 0, 0)
+		panel.Position = UDim2.fromScale(1, 0)
 		panel.Size = UDim2.new(0, panelWidth, 1, 0)
 	else
 		-- docked to the right edge, so your character stays in view on the left
@@ -1862,7 +1862,7 @@ local function build(gui: ScreenGui): Ui
 	local function squareButton(label: string, parent: Instance): TextButton
 		local b = Theme.button(label, parent)
 		b.TextSize = size
-		b.Size = UDim2.new(0, rowHeight, 0, rowHeight)
+		b.Size = UDim2.fromOffset(rowHeight, rowHeight)
 		b.TextTruncate = Enum.TextTruncate.AtEnd
 		return b
 	end
@@ -1924,7 +1924,7 @@ local function build(gui: ScreenGui): Ui
 		-- the preview sits just left of the panel, below the round info at the top (the
 		-- panel doesn't clip its children)
 		viewport.AnchorPoint = Vector2.new(1, 0)
-		viewport.Position = UDim2.new(0, -8, 0, cfg.PhonePreviewTop)
+		viewport.Position = UDim2.fromOffset(-8, cfg.PhonePreviewTop)
 		viewport.Size = UDim2.fromOffset(cfg.PhonePreviewSize, cfg.PhonePreviewSize)
 		viewport.BackgroundTransparency = 0.25
 		viewport.Parent = panel
@@ -1932,7 +1932,7 @@ local function build(gui: ScreenGui): Ui
 		name.Size = UDim2.new(1, -(rowHeight + 170), 0, rowHeight)
 		wearToggle.AnchorPoint = Vector2.new(1, 0)
 		wearToggle.Position = UDim2.new(1, -(rowHeight + 12), 0, 4)
-		wearToggle.Size = UDim2.new(0, 150, 0, rowHeight)
+		wearToggle.Size = UDim2.fromOffset(150, rowHeight)
 	end
 	wearToggle.Activated:Connect(function()
 		wearOn = not wearOn
@@ -2148,7 +2148,7 @@ local function toast(message: string)
 	l.BackgroundTransparency = 0.15
 	l.AnchorPoint = Vector2.new(0.5, 1)
 	l.Position = UDim2.new(0.5, 0, 1, -110)
-	l.Size = UDim2.new(0, 460, 0, 64)
+	l.Size = UDim2.fromOffset(460, 64)
 	Theme.round(l, 10)
 	task.delay(6, function()
 		if l.Parent then

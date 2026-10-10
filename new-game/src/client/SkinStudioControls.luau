@@ -67,7 +67,7 @@ end
 local function button(parent: Instance, text: string, ctx: Context, color: Color3?): TextButton
 	local b = Theme.button(text, parent, color)
 	b.TextSize = ctx.TextSize
-	b.Size = UDim2.new(0, ctx.Row, 0, ctx.Row)
+	b.Size = UDim2.fromOffset(ctx.Row, ctx.Row)
 	return b
 end
 
@@ -92,7 +92,7 @@ local function blank(parent: Instance, name: string): Frame
 	f.Name = name
 	f.BackgroundTransparency = 1
 	f.BorderSizePixel = 0
-	f.Size = UDim2.new(1, 0, 0, 0)
+	f.Size = UDim2.fromScale(1, 0)
 	f.AutomaticSize = Enum.AutomaticSize.Y
 	f.Parent = parent
 	return f
@@ -117,7 +117,7 @@ local function row(
 	local ask = button(top, "?", ctx, OFF)
 	ask.Name = "Help"
 	ask.AnchorPoint = Vector2.new(1, 0)
-	ask.Position = UDim2.new(1, 0, 0, 0)
+	ask.Position = UDim2.fromScale(1, 0)
 	ask.Activated:Connect(function()
 		ctx.Help(text .. ": " .. help)
 	end)
@@ -127,11 +127,11 @@ local function row(
 	content.Parent = holder
 	if ctx.Phone then
 		top.Size = UDim2.new(1, 0, 0, ctx.Row)
-		content.Position = UDim2.new(0, 0, 0, ctx.Row + 2)
+		content.Position = UDim2.fromOffset(0, ctx.Row + 2)
 		content.Size = UDim2.new(1, 0, 0, ctx.Row)
 	else
 		top.Size = UDim2.new(0.4, -4, 0, ctx.Row)
-		content.Position = UDim2.new(0.4, 0, 0, 0)
+		content.Position = UDim2.fromScale(0.4, 0)
 		content.Size = UDim2.new(0.6, 0, 0, ctx.Row)
 	end
 	return holder, content
@@ -215,7 +215,7 @@ local function numberLine(parent: Instance, spec: NumberSpec, ctx: Context): (Fr
 		b.Name = "Step" .. d
 		b.LayoutOrder = i
 		if d == -10 then
-			b.Size = UDim2.new(0, ctx.Row + 8, 0, ctx.Row)
+			b.Size = UDim2.fromOffset(ctx.Row + 8, ctx.Row)
 		end
 		b.Activated:Connect(function()
 			spec.Set(snap(current() + d * step))
@@ -248,7 +248,7 @@ local function numberLine(parent: Instance, spec: NumberSpec, ctx: Context): (Fr
 		b.Name = "Step" .. d
 		b.LayoutOrder = 20 + i
 		if d == 10 then
-			b.Size = UDim2.new(0, ctx.Row + 8, 0, ctx.Row)
+			b.Size = UDim2.fromOffset(ctx.Row + 8, ctx.Row)
 		end
 		b.Activated:Connect(function()
 			spec.Set(snap(current() + d * step))
@@ -261,7 +261,7 @@ local function numberLine(parent: Instance, spec: NumberSpec, ctx: Context): (Fr
 	box.TextSize = ctx.TextSize
 	box.TextColor3 = Theme.Text
 	box.BackgroundColor3 = Color3.fromRGB(35, 32, 48)
-	box.Size = UDim2.new(0, 56, 0, ctx.Row)
+	box.Size = UDim2.fromOffset(56, ctx.Row)
 	box.LayoutOrder = 30
 	box.Parent = line
 	Theme.round(box, 6)
@@ -421,7 +421,7 @@ function Controls.Note(parent: Instance, text: string, ctx: Context, color: Colo
 	l.Name = "Note"
 	l.TextWrapped = true
 	l.TextTruncate = Enum.TextTruncate.None
-	l.Size = UDim2.new(1, 0, 0, 0)
+	l.Size = UDim2.fromScale(1, 0)
 	l.AutomaticSize = Enum.AutomaticSize.Y
 	return l
 end
@@ -445,8 +445,8 @@ function Controls.Section(
 		local b = button(f, if toggle.On then "On" else "Off", ctx, if toggle.On then GOOD else OFF)
 		b.Name = "Toggle"
 		b.AnchorPoint = Vector2.new(1, 0)
-		b.Position = UDim2.new(1, 0, 0, 0)
-		b.Size = UDim2.new(0, ctx.Row * 2, 0, ctx.Row)
+		b.Position = UDim2.fromScale(1, 0)
+		b.Size = UDim2.fromOffset(ctx.Row * 2, ctx.Row)
 		b.Activated:Connect(function()
 			toggle.Set(not toggle.On)
 		end)
@@ -468,7 +468,7 @@ function Controls.Color(
 	swatch.Name = "Swatch"
 	swatch.Font = Theme.Font
 	swatch.TextSize = ctx.TextSize
-	swatch.Size = UDim2.new(1, 0, 1, 0)
+	swatch.Size = UDim2.fromScale(1, 1)
 	swatch.Parent = content
 	Theme.round(swatch, 6)
 	local stroke = Instance.new("UIStroke")
@@ -525,10 +525,10 @@ function Controls.Color(
 				local line = blank(body, "Channel" .. part)
 				line.LayoutOrder = 10 + i
 				local l = label(line, ({ R = "Red", G = "Green", B = "Blue" })[part], ctx)
-				l.Size = UDim2.new(0, 56, 0, ctx.Row)
+				l.Size = UDim2.fromOffset(56, ctx.Row)
 				local holderLine = Instance.new("Frame")
 				holderLine.BackgroundTransparency = 1
-				holderLine.Position = UDim2.new(0, 60, 0, 0)
+				holderLine.Position = UDim2.fromOffset(60, 0)
 				holderLine.Size = UDim2.new(1, -64, 0, ctx.Row)
 				holderLine.Parent = line
 				local _, refreshLine = numberLine(holderLine, {
@@ -581,7 +581,7 @@ function Controls.Color(
 			hex.TextColor3 = Theme.Text
 			hex.BackgroundColor3 = Color3.fromRGB(35, 32, 48)
 			hex.PlaceholderText = "#RRGGBB"
-			hex.Size = UDim2.new(0, 100, 0, ctx.Row)
+			hex.Size = UDim2.fromOffset(100, ctx.Row)
 			hex.Parent = bottom
 			Theme.round(hex, 6)
 			local function showHex()
@@ -607,7 +607,7 @@ function Controls.Color(
 			if optional then
 				local clear = button(bottom, "Clear", ctx, OFF)
 				clear.Name = "Clear"
-				clear.Size = UDim2.new(0, 70, 0, ctx.Row)
+				clear.Size = UDim2.fromOffset(70, ctx.Row)
 				clear.Activated:Connect(function()
 					ctx.Set(path, nil)
 					close()
@@ -615,7 +615,7 @@ function Controls.Color(
 			end
 			local done = button(bottom, "Done", ctx, GOOD)
 			done.Name = "Done"
-			done.Size = UDim2.new(0, 70, 0, ctx.Row)
+			done.Size = UDim2.fromOffset(70, ctx.Row)
 			done.Activated:Connect(close)
 			-- keep the numbers in step while the popover is open
 			local watch = swatch:GetPropertyChangedSignal("BackgroundColor3"):Connect(showHex)
@@ -730,7 +730,7 @@ function Controls.Toggle(
 	local holder, content = row(parent, name, text, help, ctx)
 	local pill = button(content, "Off", ctx, OFF)
 	pill.Name = "Pill"
-	pill.Size = UDim2.new(0, ctx.Row * 2, 0, ctx.Row)
+	pill.Size = UDim2.fromOffset(ctx.Row * 2, ctx.Row)
 	local function refresh()
 		local on = ctx.Get(path) == true
 		pill.Text = if on then "On" else "Off"
@@ -817,19 +817,19 @@ function Controls.Patterns(
 	local ask = button(top, "?", ctx, OFF)
 	ask.Name = "Help"
 	ask.AnchorPoint = Vector2.new(1, 0)
-	ask.Position = UDim2.new(1, 0, 0, 0)
+	ask.Position = UDim2.fromScale(1, 0)
 	ask.Activated:Connect(function()
 		ctx.Help(text .. ": " .. help)
 	end)
 	local grid = Instance.new("Frame")
 	grid.Name = "Chips"
 	grid.BackgroundTransparency = 1
-	grid.Size = UDim2.new(1, 0, 0, 0)
+	grid.Size = UDim2.fromScale(1, 0)
 	grid.AutomaticSize = Enum.AutomaticSize.Y
 	grid.LayoutOrder = 2
 	grid.Parent = holder
 	local layout = Instance.new("UIGridLayout")
-	layout.CellSize = UDim2.new(0, if ctx.Phone then 104 else 96, 0, ctx.Row)
+	layout.CellSize = UDim2.fromOffset(if ctx.Phone then 104 else 96, ctx.Row)
 	layout.CellPadding = UDim2.fromOffset(4, 4)
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = grid
@@ -1115,7 +1115,7 @@ function Controls.Effects(parent: Instance, ctx: Context): Control
 			local card = Instance.new("Frame")
 			card.Name = "Effect" .. i
 			card.BackgroundColor3 = Color3.fromRGB(32, 28, 44)
-			card.Size = UDim2.new(1, 0, 0, 0)
+			card.Size = UDim2.fromScale(1, 0)
 			card.AutomaticSize = Enum.AutomaticSize.Y
 			card.LayoutOrder = i
 			card.Parent = holder
@@ -1276,7 +1276,7 @@ function Controls.Effects(parent: Instance, ctx: Context): Control
 					hlist(buttons)
 					local add = button(buttons, "+ Colour", ctx, OFF)
 					add.Name = "AddColour"
-					add.Size = UDim2.new(0, 110, 0, ctx.Row)
+					add.Size = UDim2.fromOffset(110, ctx.Row)
 					add.Activated:Connect(function()
 						local now = list()
 						local c = now[i] and now[i].Colors
@@ -1287,7 +1287,7 @@ function Controls.Effects(parent: Instance, ctx: Context): Control
 					end)
 					local remove = button(buttons, "− Colour", ctx, OFF)
 					remove.Name = "RemoveColour"
-					remove.Size = UDim2.new(0, 110, 0, ctx.Row)
+					remove.Size = UDim2.fromOffset(110, ctx.Row)
 					remove.Activated:Connect(function()
 						local now = list()
 						local c = now[i] and now[i].Colors
@@ -1561,7 +1561,7 @@ function Controls.Catalog(parent: Instance, ctx: Context): Control
 		Theme.round(box, 6)
 		local look = button(add, "Look up", ctx, GOOD)
 		look.Name = "LookUp"
-		look.Size = UDim2.new(0, 116, 0, ctx.Row)
+		look.Size = UDim2.fromOffset(116, ctx.Row)
 		local busy = false
 		look.Activated:Connect(function()
 			if busy then

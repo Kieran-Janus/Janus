@@ -359,7 +359,7 @@ local function stepWalker(w: Walker, t: number, dt: number)
 		local base = baseOf(w, joint, current, skipped)
 		local write = if jp.Mode == "Set"
 			then base:Lerp(jp.Turn, f)
-			else base * CFrame.identity:Lerp(jp.Turn, f)
+			else base * CFrame.new():Lerp(jp.Turn, f)
 		local motor: any = joint -- (Motor6D or AnimationConstraint: both have a Transform)
 		motor.Transform = write
 		w.Written[joint] = write

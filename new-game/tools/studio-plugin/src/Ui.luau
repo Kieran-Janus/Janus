@@ -86,7 +86,7 @@ end
 function Ui.Label(parent: Instance, text: string, size: number?): TextLabel
 	local label = Instance.new("TextLabel")
 	label.LayoutOrder = nextOrder()
-	label.Size = UDim2.new(1, 0, 0, 0)
+	label.Size = UDim2.fromScale(1, 0)
 	label.AutomaticSize = Enum.AutomaticSize.Y
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.Gotham
@@ -179,7 +179,7 @@ end
 function Ui.Holder(parent: Instance): Frame
 	local holder = Instance.new("Frame")
 	holder.LayoutOrder = nextOrder()
-	holder.Size = UDim2.new(1, 0, 0, 0)
+	holder.Size = UDim2.fromScale(1, 0)
 	holder.AutomaticSize = Enum.AutomaticSize.Y
 	holder.BackgroundTransparency = 1
 	list(holder, 4)

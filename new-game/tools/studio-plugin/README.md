@@ -11,6 +11,15 @@ rojo build tools/studio-plugin --plugin PumpkinTools.rbxm
 
 Then close and reopen Studio. A **Pumpkin Tools** button appears in the **Plugins** tab. Click it to show the panel.
 
+## Customise (the quickest way)
+1. Click anything in the game view (a barrel, a pumpkin, a tree...). The panel opens by itself (switch that off with the "Open this panel when I click something" button).
+2. Press **Just this one** or **Every <name>**.
+3. Click any model in the Toolbox (View > Toolbox). That's it: the Toolbox drops the model into the game, the panel turns it into the new look and removes the dropped copy. A pack gives its first model. Press **Cancel** to stop waiting.
+
+Ctrl+Z undoes it. Save the place (Ctrl+S) to keep it.
+
+The panel also keeps the editor camera free: if it gets stuck (right-click won't look around), it is put back within a second.
+
 ## Looks
 1. Click anything in the game view (a pumpkin, a lamppost, a tree...). The panel shows what it is and what every copy is called.
 2. Find a model in the Toolbox, right-click it > **Copy Asset ID**, and paste the number into the box.

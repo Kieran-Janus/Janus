@@ -1009,8 +1009,15 @@ end
 -- taken out like a Toolbox download. nil and why when it has nothing to see.
 local function ownCopy(look: Instance): (Model?, string?)
 	local model: Model
-	if look:IsA("Model") then
+	if look.ClassName == "Model" then
 		model = look:Clone()
+	elseif look:IsA("Tool") or look:IsA("Accessory") then
+		-- (a torch or a hat from the Toolbox: its parts, as a plain model nobody can pick up)
+		model = Instance.new("Model")
+		model.Name = look.Name
+		for _, child in look:Clone():GetChildren() do
+			child.Parent = model
+		end
 	elseif look:IsA("BasePart") or look:IsA("Folder") then
 		model = Instance.new("Model")
 		model.Name = look.Name
@@ -1019,7 +1026,20 @@ local function ownCopy(look: Instance): (Model?, string?)
 		return nil, ("%s isn't a model or a part."):format(look.Name)
 	end
 	for _, d in model:GetDescendants() do
-		if d:IsA("LuaSourceContainer") or d:IsA("TouchTransmitter") then
+		if d:IsA("Tool") or d:IsA("Accessory") then
+			-- (one inside the model: same as above)
+			for _, child in d:GetChildren() do
+				child.Parent = d.Parent
+			end
+			d:Destroy()
+		end
+	end
+	for _, d in model:GetDescendants() do
+		if
+			d:IsA("LuaSourceContainer")
+			or d:IsA("TouchTransmitter")
+			or (d:IsA("JointInstance") and d.Name == "AccessoryWeld")
+		then
 			d:Destroy()
 		end
 	end

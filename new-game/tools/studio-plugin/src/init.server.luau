@@ -129,7 +129,157 @@ local everyButton: TextButton
 local selectedLabel: TextLabel
 local myLookLabel: TextLabel
 
+----------------------------------------------------------------------------------------
+-- Customise: click a thing, press a button, click a model in the Toolbox. Done.
+-- (Studio doesn't tell plugins about Toolbox clicks, but a clicked Toolbox model is put in
+-- Workspace: while waiting, the first new model that arrives there is the pick.)
+----------------------------------------------------------------------------------------
+local AUTO_OPEN = "OpenOnClick"
+local waiting: { Mode: string, Targets: { Instance }, Prop: string? }? = nil
+local waitConnection: RBXScriptConnection? = nil
+local customiseLabel: TextLabel
+local justButton: TextButton
+local allButton: TextButton
+local cancelButton: TextButton
+
+local function stopWaiting(text: string?, bad: boolean?)
+	waiting = nil
+	if waitConnection then
+		waitConnection:Disconnect()
+		waitConnection = nil
+	end
+	cancelButton.Visible = false
+	justButton.Visible = true
+	allButton.Visible = true
+	if text then
+		say(text, bad)
+	end
+end
+
+-- The model to use from what the Toolbox put in Workspace (a pack: its first model).
+local function pickFrom(inserted: Instance): (Instance?, string)
+	if inserted:IsA("Folder") then
+		local models = {}
+		for _, child in inserted:GetChildren() do
+			if child:IsA("Model") or child:IsA("BasePart") then
+				table.insert(models, child)
+			end
+		end
+		if #models == 0 then
+			return nil, "That Toolbox item has no model in it."
+		end
+		return models[1],
+			if #models > 1
+				then (" (it was a pack of %d: I used the first one, %s)"):format(
+					#models,
+					models[1].Name
+				)
+				else ""
+	end
+	if inserted:IsA("Model") or inserted:IsA("BasePart") or inserted:IsA("Accessory") then
+		return inserted, ""
+	end
+	return nil, ("%s isn't a model (it's a %s)."):format(inserted.Name, inserted.ClassName)
+end
+
+local function onToolboxPick(inserted: Instance)
+	local job = waiting
+	if not job then
+		return
+	end
+	-- (let the whole model arrive, and Studio finish placing it)
+	task.wait(0.3)
+	if not inserted.Parent or waiting ~= job then
+		return
+	end
+	local look, note = pickFrom(inserted)
+	if not look then
+		stopWaiting(note, true)
+		return
+	end
+	local Swap = swap()
+	if not Swap then
+		stopWaiting()
+		return
+	end
+	local ok, n, message = pcall(function()
+		if job.Mode == "All" and job.Prop then
+			return Swap.UseModel(job.Prop, look)
+		end
+		return Swap.SelectedModel(look, job.Targets)
+	end)
+	-- The inserted copy was only the pick: the look now lives in Custom.Props.
+	inserted:Destroy()
+	ChangeHistoryService:SetWaypoint("Customise with a Toolbox model")
+	Selection:Set({})
+	if not ok then
+		stopWaiting("That didn't work: " .. tostring(n), true)
+	else
+		stopWaiting((message or "Done.") .. note .. " Ctrl+Z undoes it.", (n or 0) == 0)
+	end
+end
+
+local function startWaiting(mode: string)
+	if playing then
+		say("Stop the game first (looks are changed in edit mode).", true)
+		return
+	end
+	local _, prop = selectedInfo()
+	local targets = Selection:Get()
+	if #targets == 0 then
+		say("Click the thing you want to change in the game view first.", true)
+		return
+	end
+	if mode == "All" and not prop then
+		say("That one has no copies: use Just this one.", true)
+		return
+	end
+	stopWaiting()
+	waiting = { Mode = mode, Targets = targets, Prop = prop }
+	justButton.Visible = false
+	allButton.Visible = false
+	cancelButton.Visible = true
+	say(
+		if mode == "All"
+			then ("Now click a model in the Toolbox: every %s becomes it."):format(prop :: string)
+			else "Now click a model in the Toolbox: what you clicked becomes it."
+	)
+	waitConnection = workspace.ChildAdded:Connect(function(child)
+		if child:IsA("Camera") or child:IsA("Terrain") then
+			return
+		end
+		task.spawn(onToolboxPick, child)
+	end)
+end
+
 if not playing then
+	local customise = Ui.Section(page, "Customise (click, then pick in the Toolbox)")
+	customiseLabel = Ui.Label(customise, "")
+	Ui.Hint(
+		customise,
+		"1. Click a thing in the game view.  2. Press a button.  3. Click any model in the Toolbox (View > Toolbox)."
+	)
+	justButton = Ui.Button(customise, "Just this one", function()
+		startWaiting("Just")
+	end)
+	allButton = Ui.Button(customise, "Every copy", function()
+		startWaiting("All")
+	end)
+	cancelButton = Ui.Button(customise, "Cancel (stop waiting for the Toolbox)", function()
+		stopWaiting("Cancelled.")
+	end, true)
+	cancelButton.Visible = false
+	local autoButton: TextButton
+	local function autoText(): string
+		return if plugin:GetSetting(AUTO_OPEN) == false
+			then "Open this panel when I click something: Off"
+			else "Open this panel when I click something: On"
+	end
+	autoButton = Ui.Button(customise, autoText(), function()
+		plugin:SetSetting(AUTO_OPEN, plugin:GetSetting(AUTO_OPEN) == false)
+		autoButton.Text = autoText()
+	end, true)
+
 	local looks = Ui.Section(page, "Looks: a Toolbox model")
 	selectedLabel = Ui.Label(looks, "")
 	local code = Ui.Input(looks, "Toolbox code or link (e.g. 11600489662)")
@@ -447,7 +597,18 @@ local function onSelection()
 	local text, prop = selectedInfo()
 	selectedLabel.Text = text
 	everyButton.Text = if prop then "Every " .. prop else "Every copy"
+	if not waiting then
+		customiseLabel.Text = text
+		allButton.Text = if prop then "Every " .. prop else "Every copy"
+	end
 	local selected = Selection:Get()
+	-- Clicking something in the game opens the panel (unless switched off).
+	if #selected > 0 and not widget.Enabled and plugin:GetSetting(AUTO_OPEN) ~= false then
+		local first = selected[1]
+		if first:IsDescendantOf(workspace) and (first:IsA("BasePart") or first:IsA("Model")) then
+			widget.Enabled = true
+		end
+	end
 	if #selected > 0 then
 		showTexts(Texts.InThing(selected[1], 6))
 	else
@@ -456,6 +617,21 @@ local function onSelection()
 end
 
 if not playing then
+	-- Keep the editor camera free: a place saved while a script held the camera
+	-- (CameraType Scriptable) reopens with right-click look-around not working.
+	local function freeCamera()
+		local camera = workspace.CurrentCamera
+		if camera and camera.CameraType == Enum.CameraType.Scriptable then
+			camera.CameraType = Enum.CameraType.Fixed
+		end
+	end
+	task.spawn(function()
+		while true do
+			freeCamera()
+			task.wait(1)
+		end
+	end)
+
 	Selection.SelectionChanged:Connect(onSelection)
 	onSelection()
 	-- Word changes made in a playtest arrive here once the game stops.

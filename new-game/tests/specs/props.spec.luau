@@ -1152,4 +1152,41 @@ describe("Swap with your own models (the Pumpkin Tools plugin uses these)", func
 		expect(n).toBe(0)
 		expect(message).toMatch("PumpkinKing")
 	end)
+
+	it(
+		"turns a Toolbox tool or hat (what the plugin's Toolbox click inserts) into a plain look",
+		function()
+			local w = world()
+			local rt = w.rt
+			local Bake = rt:require("ServerScriptService.Server.Tools.Bake")
+			local Swap = rt:require("ServerScriptService.Server.Tools.Swap")
+			Bake.Hub()
+			Bake.Lock()
+			-- A torch (Tool) and a hat (Accessory) dropped in by a Toolbox click, and a model
+			-- with a tool inside it.
+			local torch = rt:create("Tool", { Name = "Torch" }, rt.workspace)
+			local handle =
+				rt:create("Part", { Name = "Handle", Size = w.Vector3.new(0.5, 3, 0.5) }, torch)
+			rt:create("TouchTransmitter", { Name = "TouchInterest" }, handle)
+			local hat = rt:create("Accessory", { Name = "WitchHat" }, rt.workspace)
+			rt:create("Part", { Name = "Handle", Size = w.Vector3.new(2, 2, 2) }, hat)
+			local box = w.model("Box")
+			box.Parent = rt.workspace
+			local inner = rt:create("Tool", { Name = "Inner" }, box)
+			rt:create("Part", { Name = "Handle" }, inner)
+			local props = rt:find("ReplicatedStorage.Custom.Props")
+			for _, case in { { torch, "Lantern" }, { hat, "Pumpkin" }, { box, "Barrel" } } do
+				local look, name = case[1], case[2]
+				expect(Swap.UseModel(name, look)).toBeGreaterThan(0)
+				local stored = props:FindFirstChild(name)
+				expect(stored.ClassName).toBe("Model")
+				expect(stored:FindFirstChild("Handle", true)).toBeTruthy()
+				for _, d in stored:GetDescendants() do
+					expect(d:IsA("Tool") or d:IsA("Accessory") or d:IsA("TouchTransmitter")).toBe(
+						false
+					)
+				end
+			end
+		end
+	)
 end)
