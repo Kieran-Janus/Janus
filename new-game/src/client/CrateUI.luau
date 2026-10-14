@@ -181,6 +181,12 @@ local function commas(n: number): string
 end
 
 -- "FF8014" for RichText colours.
+-- Text going into a RichText label: "<", ">" and "&" would be read as tags, so a chance
+-- shown as "<1%" (Config.Crates.SmallOdds) must be written as "&lt;1%".
+local function richEscape(text: string): string
+	return (text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
+end
+
 local function hex(color: Color3): string
 	return ("%02X%02X%02X"):format(
 		math.floor(color.R * 255 + 0.5),
@@ -918,7 +924,11 @@ function CrateUI.Mount(gui: ScreenGui)
 				local shown = CrateOdds.Format(share):gsub("%%$", "")
 				table.insert(
 					parts,
-					('<font color="#%s">%s %s%%</font>'):format(hex(level.Color), level.Name, shown)
+					('<font color="#%s">%s %s%%</font>'):format(
+						hex(level.Color),
+						richEscape(level.Name),
+						richEscape(shown)
+					)
 				)
 			end
 		end

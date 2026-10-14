@@ -984,6 +984,29 @@ describe("CrateUI (client)", function()
 		end
 	end)
 
+	it("writes every crate's rarity line as valid coloured text, including '<1%'", function()
+		-- The line is RichText: a bare "<" (from "<1%") breaks it and players see the raw
+		-- <font color=...> tags instead of the colours.
+		local checked = 0
+		for _, crate in CConfig.Crates.List do
+			CrateUI.Open(crate.Id)
+			local odds = panel.Body.Preview.Side.Odds
+			expect(odds.RichText).toBe(true)
+			local text = odds.Text
+			local bare = text:gsub('<font color="#%x%x%x%x%x%x">', ""):gsub("</font>", "")
+			if bare:find("[<>]") then
+				error(crate.Id .. ": unescaped < or > in " .. text)
+			end
+			local plain = bare:gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&")
+			expect(plain).toMatch("%d%%") -- e.g. "Rare 2.5%" (a rarity-only crate has one entry)
+			checked += 1
+		end
+		expect(checked).toBe(#CConfig.Crates.List)
+		-- A crate whose CRAZY chance is under 1% really does show "<1%" (escaped).
+		CrateUI.Open("PumpkinCrate")
+		expect(panel.Body.Preview.Side.Odds.Text).toMatch("&lt;1%%")
+	end)
+
 	it("shows every skin in a crate with its exact chance before buying", function()
 		CrateUI.Open("PumpkinCrate")
 		local preview = panel.Body.Preview
