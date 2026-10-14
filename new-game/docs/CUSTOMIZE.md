@@ -796,14 +796,20 @@ Only if you still want drafts kept after Stop: turn on API access (knowing the a
 ## Crates
 Mystery crates give a random skin. Everything about them is in `src/shared/Config/Crates.luau`
 (switch them off with `Config.Features.Crates = false`, or only the Robux ones with
-`Config.Features.RobuxCrates = false`).
-- **Odds**: `Odds = { Common = 73.48, Uncommon = 24, Rare = 2.5, Crazy = 0.02 }` is the chance (in
-  percent) of each rarity. The skins of one rarity share it equally, so in the Pumpkin Crate each
-  of the 12 Commons has 6.123% and its one CRAZY skin 0.020%. Keep the total at 100. One crate can
-  have its own `Odds`. Rare and CRAZY were made rarer in the big skin update.
+`Config.Features.RobuxCrates = false`). Three more switches in `Config/Features.luau` turn off one
+part each: `CrateLuck` (the luck meter), `CratePacks` (the x5 / x10 guarantees) and
+`PremiumCrates` (the Deluxe crates). Every number and rule is in `docs/CRATE-LUCK-SPEC.md`.
+- **Odds**: `Odds = { Common = 60.98, Uncommon = 24, Rare = 15, Crazy = 0.02 }` is the chance (in
+  percent) of each rarity for every themed crate. The skins of one rarity share it equally, so in
+  the Pumpkin Crate each of the 12 Commons has 5.082%, each of the 5 Uncommons 4.8%, each of the 2
+  Rares 7.5% and its one CRAZY skin 0.02%. Keep the total at 100. One crate can have its own
+  `Odds`. (Rare went up from 2.5% to 15% in October 2026; Common went down to make room.)
+  Chances always show as **exact numbers** on the crate page: 3 decimals from 1% up ("5.082%"),
+  4 digits under 1% ("0.04442%", "0.0001%"), never rounded to 0% or 100%. That is a Roblox rule
+  for paid random items, so there is no setting to round them.
 - **ONE IN A MILLION**: a skin with its own `Odds` (in its theme file: `Odds = 0.0001`) has exactly
-  that chance (0.0001% = 1 open in a million) and the rest of the crate shares the other 99.9999%;
-  the preview shows "<1%" (or "0.0001%" with `Config.Crates.SmallOdds = ""`). These skins (`OneInAMillion = true`: Night Lord Supreme in Vampire
+  that chance (0.0001% = 1 open in a million) at every luck level and in every pack, and the rest
+  of the crate shares the other 99.9999%. These skins (`OneInAMillion = true`: Night Lord Supreme in Vampire
   Castle, Disco Demon in Monster Disco, Star Voyager in Alien Abduction) are never in the CRAZY Crate.
   Anyone unboxing a CRAZY skin is announced to the whole server (an extra-big banner for these),
   words in `Text.AnnounceCrazy` / `Text.AnnounceMillion`, switch: `AnnounceCrazy`; it waits `AnnounceDelay` seconds (4.5) so the winner sees their own reveal first.
@@ -866,7 +872,49 @@ Mystery crates give a random skin. Everything about them is in `src/shared/Confi
   result; on the reel the cards next to yours (`Opening.TeaseGuard`) never show a rarer skin than
   the one you won, so there are no teasing near misses; no countdowns or "only X left"; the odds are
   one tap away on every card and on the stand.
-- **Test it**: F8 > "Crates: open free Pumpkin Crate", "Crates: open free CRAZY Crate" (the CRAZY celebration) and "Crates: +100k coins". Which crate the free button opens: `Admin.FreeCrate`. To see what players in a blocked region see, set `Policy.TestAsRestricted = true` (Studio only).
+- **Luck meter** (`Luck`, switch `CrateLuck`): every player has a meter for each themed crate, and
+  it is saved. Every crate that gives a Common or an Uncommon fills one step: the next crate of
+  that kind gets `PerStep` (2) % more Rare, taken from Common (`TakeFrom`). A Rare or better
+  (`Boost`) empties it. `Steps` (15) steps is a full meter: with `FullGuarantee = true` the next
+  crate is Rare or better for sure, so nobody opens more than 15 of the same crate in a row
+  without a Rare. The crate page always shows the exact chances for YOUR next crate. Good to know:
+  - Rarity crates and Deluxe crates have no meter, nor does a crate line with `Luck = false`.
+  - A crate whose Rare skins are all hidden (`SkinsOff`) has no meter (so hiding skins can never
+    turn the guarantee into a free CRAZY); its saved luck is kept for when they come back.
+  - Lower `Steps` = players whose saved luck is above the new number simply have a full meter.
+  - Keep `Steps x PerStep` at or below `Odds.Common`; `Boost` must be below CRAZY and `TakeFrom`
+    below `Boost`, or no crate gets a meter (the Output window says why).
+  - Switching `CrateLuck` off gives everyone plain odds and keeps their saved luck untouched for
+    when you switch it back on.
+- **Packs** (`Open.Guarantee`, switch `CratePacks`): x5 always includes at least one Uncommon or
+  better, x10 at least one Rare or better. A pack opens like that many single crates one after
+  another (the meter moves after each one); if the ones before the last missed it, the last crate
+  can only be that rarity or better. A guarantee is never above `Luck.Boost` (a higher one is
+  ignored), and a crate with no skins of that rarity gets none. Honest summary: packs are never
+  worse than single opens, but the bonus is small (an x10 from an empty meter gives about 3% more
+  Rares than 10 single opens, about 1% over time), and x5 only promises an Uncommon.
+- **Robux opens** (`RobuxOpen`): pressing R$ first checks the luck the player saw, then that crate
+  can't be opened with coins until Roblox's window is cancelled or the Robux crate has opened
+  (`HoldSeconds` while the window is open, at most `MaxHoldSeconds` after buying), so the Robux
+  crate rolls with the luck they saw. Other crates open as normal. `Cooldown` is the R$ button's
+  own spam timer.
+- **Deluxe crates** (`Premium`, switch `PremiumCrates`): one line in `Premium.Crates` per crate
+  (`Id`, `Base` = the themed crate whose skins it gives, `ProductId`). They cost `Price` (2,000),
+  use `Premium.Odds` (no Commons: Uncommon 50, Rare 49, CRAZY 1, so in the Deluxe Pumpkin Crate
+  each Uncommon has 10%, each Rare 24.5% and the CRAZY 1%), have no luck meter, sit on the
+  `Category` tab ("Deluxe") and are not on the lobby stand. They look like their base crate with
+  gold `Trim`, more `Sparkles` and `ShakeTimes` (1.25) times its shake. Your own model for the base
+  crate (e.g. `PumpkinCrate` in `Custom > Props`) is used for its Deluxe crate too, unless there is
+  one named after the Deluxe Id. With `ProductId = 0` the Robux button says "Coming soon" (make a
+  Developer Product to sell one). Heads-up: the "X unboxed a CRAZY skin!" message for the whole
+  server comes about 15 times as often for each coin spent on Deluxe crates;
+  `AnnounceCrazy = false` turns those messages off.
+- **Keep it fair**: `tests/specs/crates-luck.spec.luau` recomputes the economy from Config and
+  fails (naming the rule) when a change breaks one: a player who owns everything always loses
+  coins on a crate; no crate state is a cheaper way to a CRAZY than the CRAZY Crate; over time a
+  Rare costs more than the Rare Crate and crates are worth less per coin than the Shop; a pack is
+  never worse than the same number of single opens. Run it after changing odds, luck or prices.
+- **Test it**: F8 > "Crates: open free Pumpkin Crate", "Crates: open free CRAZY Crate" (the CRAZY celebration) and "Crates: +100k coins". Which crate the free button opens: `Admin.FreeCrate`. The luck meter (Studio only): "Crates: +5 luck on Pumpkin Crate" (`Admin.LuckSteps`), "Crates: +1 luck on Pumpkin Crate, screen not told (tests the odds check)" (press Open on the old page afterwards: nothing is bought and the page shows the new chances) and "Crates: reset my luck". To see what players in a blocked region see, set `Policy.TestAsRestricted = true` (Studio only).
 - Or ask Claude Code: `/add-crate a Witchy crate with 20 new skins`.
 
 **Roblox's rule for paid random items (please keep it):** players must see every item and its

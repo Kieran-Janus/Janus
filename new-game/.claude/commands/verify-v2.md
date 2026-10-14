@@ -50,9 +50,10 @@ v2 was built and tested offline only (Lune tests and renders). This is its first
 - Unequip restores my avatar exactly. Reset my character: the skin comes back. A hat sits on top of a head piece.
 
 ## 5. Crates (solo)
-- Menu > Crates lists 10 crates. The Pumpkin Crate preview shows all 20 skins with chances adding up to 100% (each Common 5.833%, each Uncommon 4.980%, each Rare 2.500%, the CRAZY 0.100%).
-- Open one with coins: the strip spins and slows, the reveal shows the skin, coins go down by 300, the skin is owned. A duplicate refunds coins. "Equip now" / "Open another" / "Back" work.
-- F8 > "Crates: open free Pumpkin Crate" works. The crate stand prompts in the lobby open the right crate. Robux buttons say "Coming soon" (all ProductIds are 0).
+- Menu > Crates lists 22 crates (16 + 6 Deluxe on the Deluxe tab, with 12 themes on). The Pumpkin Crate preview shows all 20 skins with exact chances adding up to 100% (each Common 5.082%, each Uncommon 4.8%, each Rare 7.5%, the CRAZY 0.02%).
+- Open one with coins: the chest opens, the reveal shows the skin, coins go down by 600, the skin is owned. A duplicate refunds coins. "Equip now" / "Open again" (back to the page with the new chances, it never buys) / "Back" work. After a Common or Uncommon the Pumpkin chances move 2% from Common to Rare; after a Rare they are back to the start. No open ever says "your chances just changed".
+- F8 > "Crates: +1 luck on Pumpkin Crate, screen not told", then Open on the old page: nothing is bought and the page shows the new chances. x10: at least one Rare or better.
+- F8 > "Crates: open free Pumpkin Crate" works. The crate stand prompts in the lobby open the right crate. Themed crates have real product ids (R$ buttons work); Deluxe crates say "Coming soon".
 - Region rule (temporary): set `Config.Crates.Policy.TestAsRestricted = true`, Play: every crate refuses with the region message, the Shop still sells skins. Set it back to `false`.
 
 ## 6. Ready pad, vote and rounds (solo)
