@@ -18,10 +18,24 @@
 	  exactly that chance (0.0001% = 1 open in a million), and the rest of the crate shares the
 	  other 99.9999%. These skins (OneInAMillion = true) are never in the CRAZY Crate.
 	  Rare went up to 15% in October 2026 (it was 2.5%); CRAZY stays 0.02%, so it stays
-	  special now that there are about 630 skins.
+	  special now that there are about 630 skins. These are the chances at luck 0.
 
-	LUCK, PACKS AND DELUXE CRATES: see Luck, Open.Guarantee, RobuxOpen and Premium below
-	(docs/CRATE-LUCK-SPEC.md has every detail and number).
+	LUCK METER (Luck below; switch Config.Features.CrateLuck). Each player has one per themed
+	  crate. At luck N the next crate has Rare = Odds.Rare + N x PerStep and Common =
+	  Odds.Common - N x PerStep (Uncommon and CRAZY don't change). Pumpkin Crate: luck 0 = Rare
+	  15% (Rare or better 15.02%), luck 4 = 23% (23.02%), luck 14 = 43% (43.02%). A full meter
+	  (luck 15) = Rare or better for sure: Rare 99.956% (49.978% each), CRAZY 0.04442%.
+	  Every Common or Uncommon adds 1 step, a Rare or better sets it back to 0. So at most 15
+	  crates in a row miss a Rare, and on average 1 crate in 4.76 is Rare or better.
+	PACKS (Open.Guarantee; switch Config.Features.CratePacks). x5 = at least one Uncommon or
+	  better, x10 = at least one Rare or better. The crates open one by one, each with the luck
+	  of that moment; only the LAST one can be forced, when the others missed. Pumpkin x10 from
+	  luck 0: in 9.3% of packs crate 10 is at luck 9 and can only be Rare 99.939% or CRAZY
+	  0.06057%. Rarity crates have no pack guarantee; Deluxe crates only the x10 one.
+	DELUXE CRATES (Premium; switch Config.Features.PremiumCrates). 2,000 coins, the same skins
+	  as their base crate, Common 0, Uncommon 50, Rare 49, CRAZY 1 (Deluxe Pumpkin: each
+	  Uncommon 10%, each Rare 24.5%, the CRAZY 1%), no luck meter.
+	docs/CUSTOMIZE.md > Crates explains every setting; docs/CRATE-LUCK-SPEC.md has every number.
 
 	WHICH SKINS ARE IN A CRATE
 	  Themed crates: every skin whose Crate is that crate's Id (the theme files in
@@ -65,13 +79,16 @@
 	  Luck       (optional) false = no luck meter for this crate
 	Prices (themed crates): 600 coins, double the old 300, since there are now 30 crates and the
 	best skins are much rarer: a crate is a gamble for the rare and the one-in-a-million skins,
-	not the cheap way to get Commons (buy those in the shop for 125). One open is worth about
-	366 coins at shop prices (0.6098 x 125 + 0.24 x 500 + 0.15 x 1000 + 0.0002 x 100000), about
-	418 on average with the luck meter. A player who already owns everything gets back about
-	208 in duplicate coins, so a crate never pays for itself. Packs are worth about 1% more per
-	crate over time. Deluxe crates: 2,000 coins, worth about 1,740. EVERY duplicate pays coins
-	back (Config/Rarity.luau, DuplicateRefund: about half the shop price), so a crate never
-	leaves you empty-handed.
+	not the cheap way to get Commons (buy those in the shop for 125). At luck 0 one open is worth
+	about 366 coins at shop prices (0.6098 x 125 + 0.24 x 500 + 0.15 x 1000 + 0.0002 x 100000),
+	about 418 on average with the luck meter. A player who already owns everything gets back
+	about 208 in duplicate coins on average (182 at luck 0, never more than 530), so a crate
+	never pays for itself. On average a Rare costs about 2,860 coins of themed crates (Rare
+	Crate 800, Shop 1,000) and a CRAZY about 3 million (CRAZY Crate 80,000). Packs are worth
+	about 1% more per crate over time. Deluxe crates: 2,000 coins, worth about 1,740 (870 back
+	in duplicates), a CRAZY every 100 opens on average (200,000 coins, twice the Shop price).
+	EVERY duplicate pays coins back (Config/Rarity.luau, DuplicateRefund: about half the shop
+	price), so a crate never leaves you empty-handed.
 	Rarity crates cost a bit less than buying one skin of that rarity in the shop (125, 500,
 	1000, 100000), because you don't get to choose which skin you get. They were NOT doubled:
 	doubled they would cost more than the shop.

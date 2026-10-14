@@ -12,7 +12,7 @@ Written 5 October 2026 (night) from Kieran's v2 request. This is the contract ev
 7. **Parkour** course in the lobby.
 8. **Easter eggs**: hidden pumpkins that give coins once each (e.g. a pumpkin behind the shop gives 50).
 9. **Economy**: each pumpkin = 5 coins. Rarity prices: Common 125, Uncommon 500, Rare 1000, CRAZY 100000.
-10. **Crates**, bought with coins or Robux, each item has a rarity. One crate per rarity, plus themed mixed crates with % chances (Pumpkin, Candy, Spooky + more, 20 skins each, one CRAZY skin at 0.1%). Preview shows every item and its chance.
+10. **Crates**, bought with coins or Robux, each item has a rarity. One crate per rarity, plus themed mixed crates with % chances (Pumpkin, Candy, Spooky + more, 20 skins each, one CRAZY skin at 0.1%). Preview shows every item and its chance. (Today CRAZY is 0.02% and Rare 15%, with a luck meter: see `docs/CUSTOMIZE.md` > Crates.)
 11. **Super easy to edit every part of every map** (IMPORTANT).
 12. **Top-left Menu**: skins, shop, crates, invite, vote, codes, settings, spectate.
 13. Remove the witch, Boo Guide and all tutorial pop-ups. The Pumpkin Vendor is the only shopkeeper.
@@ -80,7 +80,7 @@ Written 5 October 2026 (night) from Kieran's v2 request. This is the contract ev
 - Every shop item gets `Rarity`. Price = `item.Price` if set, else `Config.Rarity[item.Rarity].Price` (one helper: `src/shared/Items.luau`, `Items.Price(item)`, `Items.Get(id)`, `Items.ByCrate(crateId)`). Items can be `CrateOnly = true` (not sold directly) or `VipOnly`.
 
 ## Crates
-- `Config.Crates.List`: `{ Id, Name, Theme colours, Price (coins), ProductKey/ProductId (Robux, 0 = not for sale yet), Odds = { Common = 70, Uncommon = 24.9, Rare = 5, Crazy = 0.1 } }`. Items list themselves in a crate with `Crate = "<CrateId>"`. Per-rarity crates (`CommonCrate`, `UncommonCrate`, `RareCrate`, `CrazyCrate`) draw from every item of that rarity.
+- `Config.Crates.List`: `{ Id, Name, Theme colours, Price (coins), ProductKey/ProductId (Robux, 0 = not for sale yet), Odds = { Common = 70, Uncommon = 24.9, Rare = 5, Crazy = 0.1 } }` (the first plan; the odds today are Common 60.98, Uncommon 24, Rare 15, CRAZY 0.02, plus the luck meter, packs and Deluxe crates of `docs/CRATE-LUCK-SPEC.md`). Items list themselves in a crate with `Crate = "<CrateId>"`. Per-rarity crates (`CommonCrate`, `UncommonCrate`, `RareCrate`, `CrazyCrate`) draw from every item of that rarity.
 - An item's chance = its rarity's odds / number of items of that rarity in the crate. The preview shows every item with its % (sums to 100).
 - Roblox paid random items policy: odds shown before buying; players whose `PolicyService` says `ArePaidRandomItemsRestricted` can't open crates (coins can be bought with Robux, so coin crates count too). They can still buy skins directly at the fixed rarity price.
 - Rolls happen on the server (`Random.new()`), duplicates refund coins, results are saved before the client animation starts.

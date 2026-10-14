@@ -159,7 +159,7 @@ No picture: they are hidden on purpose.
 - **34 crates** in **Menu > Crates**, on tabs (Classic, Monsters, Haunted Places, Creepy Critters, Sweet & Silly, By Rarity) with pages. The **MYSTERY CRATES** stand next to the Pumpkin Shop shows the 6 classic ones and the rarity crates.
   - 30 themed crates (one per theme), 600 coins each (doubled).
   - 4 rarity crates: Common 100, Uncommon 400, Rare 800, CRAZY 80,000 coins (just under the shop price of their rarity).
-- **Odds** for every themed crate: Common 60.98%, Uncommon 24%, Rare 15%, CRAZY 0.02% (Rare went up from 2.5% in October 2026, see [Crate luck, packs and Deluxe crates](#crate-luck-packs-and-deluxe-crates-october-2026)). Skins of the same rarity share that chance equally.
+- **Odds** for every themed crate: Common 60.98%, Uncommon 24%, Rare 15%, CRAZY 0.02% (Rare went up from 2.5% in October 2026, see [Crate luck, packs and premium crates](#crate-luck-packs-and-premium-crates-october-2026)). Skins of the same rarity share that chance equally.
 - **Odds preview**: before you open a crate, the panel shows every skin in it and its exact chance for your next crate ("5.082%", "0.02%", "0.0001%": 3 decimals from 1% up, 4 digits under 1%). Roblox requires paid random items to show their odds, so there is no setting to round them.
 - **Open x1, x5 or x10**: the server rolls them all at once and takes the coins in one go. Each chest plays its opening (below); **Space**, a tap or **Skip** jumps to the result and then to the next crate. **Quick open** skips the strips and shows every result on one page, the best one highlighted. The server picks the skins before the animation starts, so they're yours even if you close the panel.
 - A skin you already own ALWAYS gives coins back ("Duplicate! +X coins back": 60, 250, 500 or 50,000 by rarity).
@@ -168,26 +168,24 @@ No picture: they are hidden on purpose.
 - Every crate skin is also for sale directly in the Shop at its rarity price.
 - **Crates that feel alive**: every theme has its own cartoon chest (a carved pumpkin with a leafy lid, a candy box with a bow, a coffin with a ghost peeking out, a mossy tombstone chest, a furry monster chest whose googly eyes follow you, a starry moon chest; the other themes have their emblem on the front). On the stand they bob, peek their lids with a puff of sparkles, and wake up when you walk close (name, price, Odds). Opening: the chest drops in, shakes faster and faster, bursts open with a beam in the colour of the rarity you really won, and the skin lands on a spinning pedestal; CRAZY gets a rainbow burst and confetti, duplicates pour out coins. Cards in Menu > Crates spin, new themes have a NEW ribbon, and every card has an Odds button. Settings: `Config/Crates.luau` (`LookDefaults`, each crate's `Look`, `Idle`, `Opening`).
 
-### Crate luck, packs and Deluxe crates (October 2026)
-You asked for "better odds the more you spend". Every chance is still shown as an exact number before anyone buys, and the server rolls with exactly those numbers. The full design (every rule and number) is `docs/CRATE-LUCK-SPEC.md`.
-- **Better odds for everyone**: every themed crate is now Common 60.98%, Uncommon 24%, Rare 15% (it was 2.5%), CRAZY 0.02%. The one-in-a-million skins keep exactly 0.0001%.
-- **Luck meter** (`Luck` in `Config/Crates.luau`): each player has a saved meter for each themed crate. Every crate that gives a Common or Uncommon fills one step (+2% Rare, taken from Common, for the next crate of that kind); a Rare or better empties it. 15 steps = the next crate is Rare or better for sure, so nobody opens more than 15 of the same crate in a row without a Rare. Rarity crates and Deluxe crates have no meter. Luck never runs out or changes by itself.
-- **Packs** (`Open.Guarantee`): x5 always includes an Uncommon or better, x10 a Rare or better. A pack opens like that many single crates one after another; if the ones before the last missed it, the last crate can only be that rarity or better. Packs are never worse than single opens, but the bonus is small (about 3% more Rares from an empty meter, about 1% over time). A crate that can't give anything below the guarantee anyway shows none (no x10 line on the Rare Crate, no x5 line on the Uncommon Crate or the Deluxe crates).
-- **Deluxe crates** (`Premium`): the six classic crates get a Deluxe version on a new "Deluxe" tab: the same skins for 2,000 coins, no Commons (Uncommon 50%, Rare 49%, CRAZY 1%), no luck meter, coins only for now ("Coming soon" on Robux), not on the lobby stand. Heads-up: the "X unboxed a CRAZY skin!" message comes about 15 times as often per coin spent on them; `AnnounceCrazy = false` in `Config/Crates.luau` turns those messages off.
-- **What players see** (Menu > Crates > a themed crate):
-  - A **luck strip** above the skins: "Luck 4 / 15", a meter with one block per step, "Rare or better, next crate: 23.02%" and a short line saying how it works. At 15 it says "Luck full. Your next crate is Rare or better for sure." No flashing, sounds or timers.
-  - **Every skin with its exact chance for your next crate**, also the ones that can't drop right now (they say 0%, e.g. the Commons at a full meter or in a Deluxe crate).
-  - **"Every chance"**: a list of the chances at every luck step (your row is marked), and a row for a one-in-a-million skin.
-  - Under the strip: "x5: at least one Uncommon or better    x10: at least one Rare or better".
-  - **x5 and x10 always ask first** ("Open Pumpkin Crate x10?"): the price, how packs work, your luck now and the exact chances of the guaranteed last crate. Only "Open 10 for 6,000 Coins" buys; Cancel buys nothing.
-  - A guaranteed crate says **GUARANTEED** when it opens, and a Robux crate says which luck it used ("Opened at luck 3 / 15").
-  - **"Open again"** goes back to the crate's page with the new chances; it never buys by itself.
-  - **Phones**: the strip is in the left column (it scrolls), and a short line ("Luck 4/15 · Rare or better 23.02%") sits right above the buy buttons, so it is always in view.
-  - Players whose region doesn't allow crates see the chances but no strip, pack line or buy buttons.
-  - Every word is in `Config/Crates.luau` > `Text` (`LuckTitle`, `LuckNext`, `EveryChance`, `PackTitle`, `PackConfirm`, `Guaranteed`...).
-- **Honest by design**: the crate page sends the luck it shows; if the server's is different (it changed meanwhile), nothing is bought and the page shows the new chances and says so. If your luck changes while the page just sits there (an F8 button, a Robux crate arriving), the page redraws and says so too. Your own opens never say it. Until the server has told the page your luck, its buttons say "Checking...". A Robux crate is checked by the server before Roblox's purchase window opens and holds that crate while the window is open, so it rolls at the luck you saw.
-- **Switches**: `CrateLuck`, `CratePacks` and `PremiumCrates` in `Features.luau` turn each part off on its own (see [Turn a feature off](#turn-a-feature-off)). Turning `CrateLuck` off keeps everyone's saved luck for when you turn it back on. To undo it completely, switch all three off; the odds are one line (`Odds` in `Config/Crates.luau`).
-- **Check in Studio**: F8 > "Crates: +100k coins", then Menu > Crates > Pumpkin Crate: exact chances (5.082%, 4.8%, 7.5%, 0.02%) and "Luck 0 / 15", "Rare or better, next crate: 15.02%". Open a few: the strip moves one step after each Common or Uncommon and empties after a Rare. F8 > "Crates: +1 luck on Pumpkin Crate, screen not told", then press Open: nothing is bought and the page shows the new chances. x10: the window first (Cancel buys nothing), then at least one Rare or better. "Every chance" on PC and a phone (Test > Device, iPhone sideways): the luck line above the buy buttons without scrolling. The Deluxe tab: six crates at 2,000 coins. `docs/CRATE-LUCK-SPEC.md` section 14 has the full list.
+### Crate luck, packs and premium crates (October 2026)
+You asked for "better odds the more you spend". Every chance is still shown as an exact number before anyone buys, and the server rolls with exactly those numbers. How to change each part: [`docs/CUSTOMIZE.md` > Crates](CUSTOMIZE.md#crates). Every rule and number: `docs/CRATE-LUCK-SPEC.md`.
+- **Better odds for everyone**: every themed crate is now Common 60.98%, Uncommon 24%, Rare 15% (it was 2.5%), CRAZY 0.02% (at luck 0). The one-in-a-million skins keep exactly 0.0001%. No prices changed.
+- **Luck meter**: each player has a saved meter for each themed crate. Every Common or Uncommon adds a step (+2% Rare, taken from Common, for the next crate of that kind); a Rare or better empties it. 15 steps = the next crate is Rare or better for sure, so nobody opens more than 15 of the same crate in a row without a Rare. Rarity crates and Deluxe crates have no meter.
+- **Packs**: x5 always includes an Uncommon or better, x10 a Rare or better. The crates open one by one with the luck of that moment; only the last one can be forced, when the others missed. x5 and x10 always ask first (price, how packs work, the forced crate's exact chances; Cancel buys nothing). Honest: the bonus is small, about 1% more Rares over time.
+- **Premium crates ("Deluxe")**: a Deluxe version of each classic crate on a new Deluxe tab: the same skins for 2,000 coins, no Commons (Uncommon 50%, Rare 49%, CRAZY 1%), no luck meter, coins only for now (R$ says "Coming soon"), not on the lobby stand. The "X unboxed a CRAZY skin!" message will come more often (`AnnounceCrazy = false` turns it off).
+- **The crate page**: a luck strip ("Luck 4 / 15", "Rare or better, next crate: 23.02%"), every skin's exact chance for YOUR next crate, "Every chance" (the chances at every luck step), the pack line, GUARANTEED on a forced crate, and on phones a luck line right above the buy buttons. If your luck changed meanwhile, nothing is bought and the page shows the new chances. Words: `Config/Crates.luau` > `Text`.
+- **Switches** (`Features.luau`, see [Turn a feature off](#turn-a-feature-off)): `CrateLuck` (off = plain odds; saved luck is kept), `CratePacks` (off = packs without a promise), `PremiumCrates` (off = no Deluxe tab). All three off = crates as before, with the new odds.
+- **Check in Studio** (`/verify-v2` has the full list):
+  1. F8 > "Crates: +100k coins", then Menu > Crates > Pumpkin Crate: each Common 5.082%, Uncommon 4.8%, Rare 7.5%, the CRAZY 0.02%, "Luck 0 / 15" and "Rare or better, next crate: 15.02%".
+  2. Open a few: the strip moves one step after each Common or Uncommon and empties after a Rare. No open of your own says "your chances just changed".
+  3. F8 > "Crates: +1 luck on Pumpkin Crate, screen not told", then Open: nothing is bought, and the page shows the new chances and says so.
+  4. F8 > "Crates: +5 luck on Pumpkin Crate" three times: "Luck full", Commons and Uncommons at 0%, and the next crate is Rare or better (GUARANTEED). F8 > "Crates: reset my luck" puts it back to 0.
+  5. x10: the window first (Cancel buys nothing), then 10 crates with at least one Rare or better.
+  6. A phone (Test > Device, iPhone sideways): the luck line sits right above the buy buttons without scrolling; "Every chance" and the x10 window fit.
+  7. The Deluxe tab: six crates at 2,000 coins, Commons at 0%, R$ says "Coming soon".
+  8. R$ on the Pumpkin Crate (a Studio test purchase is free): Roblox's window, then the crate opens and says "Opened at luck N / 15". Cancelling Roblox's window leaves every button working.
+  9. Set `CrateLuck`, `CratePacks` and `PremiumCrates` to `false` and press Play: no strip, no pack line, no Deluxe tab. Set them back to `true`: they come back, with your luck still there.
 
 ### Skin Studio: change and animate skins
 No picture yet: it only shows in a Studio playtest. Step by step: [`docs/CUSTOMIZE.md` > Change and animate skins](CUSTOMIZE.md#change-and-animate-skins).
@@ -440,7 +438,7 @@ Each feature has its own short settings file in `src/shared/Config/`. Every file
 | Web Scour | `Config/WebScour.luau` | `Critters` (6), `TimeLimit` (45 s), `CoinsPerCritter` (2), `FinishCoins` (20), `MaxCoins` (50), `RewardCooldown` (180 s) |
 | Secret pumpkins | `Config/EasterEggs.luau` | each egg's `Coins` and `Hint` in `List`, `TouchToCollect` |
 | Rarity prices | `Config/Rarity.luau` | each rarity's `Price` (125 / 500 / 1,000 / 100,000) and `DuplicateRefund` |
-| Crates | `Config/Crates.luau` | `Odds` (60.98 / 24 / 15 / 0.02), `Luck` (the luck meter), `Open.Guarantee` (x5 / x10), `RobuxOpen`, `Premium` (Deluxe crates), each crate's `Price`, `Robux.ProductId`, `RobuxFallbackCoins`, `LookDefaults` and each crate's `Look`, `Idle` (the stand), `Opening` |
+| Crates | `Config/Crates.luau` | `Odds` (60.98 / 24 / 15 / 0.02), `Luck` (the luck meter: `PerStep` 2, `Steps` 15, `FullGuarantee`), `Open.Guarantee` (x5 Uncommon / x10 Rare), `Premium` (Deluxe crates: `Price` 2,000, `Odds` 0 / 50 / 49 / 1, one line per crate in `Crates`), `RobuxOpen`, each crate's `Price`, `Robux.ProductId`, `RobuxFallbackCoins`, `LookDefaults` and each crate's `Look`, `Idle` (the stand), `Opening`. Guide: [CUSTOMIZE > Crates](CUSTOMIZE.md#crates) |
 | Skins | `Config/Skins/<Theme>.luau` | each skin's `Name`, `Rarity` and `Style` (never change an `Id`) |
 | CRAZY effects, themes, Skins tab | `Config/Skins/Settings.luau` | `Effects.MaxAnimated`, `Themes`, `Shop.PageSize` |
 | Menu | `Config/Menu.luau` | the `Tiles` list (order, words, icons, colours), `Key` (M) |
@@ -552,7 +550,7 @@ Words:
 2. Copy each **Product ID** into the matching `Id = 0` in `Config.Monetization.Products` (same file).
 
 ### Robux crates
-1. Monetization > **Developer Products** > Create one per crate you want to sell for Robux. All 34 crates have a Robux slot (Deluxe crates have one too, `Config.Crates.Premium.Crates`, `ProductId`: "Coming soon" until you fill it in); the 6 classic crates on the stand (Pumpkin, Candy, Spooky, Graveyard, Monster, Moonlight) are a good start. Suggested prices are in `Crates.luau`: 79 Robux for a themed crate (e.g. "Pumpkin Crate"); the rarity crates 19, 69, 129 and 1,999.
+1. Monetization > **Developer Products** > Create one per crate you want to sell for Robux. All 34 crates have a Robux slot (the 6 Deluxe crates have one too: `ProductId` on their line in `Config.Crates.Premium.Crates`, suggested 249 Robux, "Coming soon" until you fill it in); the 6 classic crates on the stand (Pumpkin, Candy, Spooky, Graveyard, Monster, Moonlight) are a good start. Suggested prices are in `Crates.luau`: 79 Robux for a themed crate (e.g. "Pumpkin Crate"); the rarity crates 19, 69, 129 and 1,999.
 2. Paste each Product ID into that crate's `Robux = { ProductId = 0, ... }` in `src/shared/Config/Crates.luau`.
 3. `SuggestedRobux` is only a note for you: the real price is the one in Creator Hub.
 4. The region rule still applies: players in regions that block paid random items can't open crates. If one somehow buys a Robux crate, they get the crate's coin price instead.
@@ -580,6 +578,7 @@ Shortcuts for testing by hand: press **F8** in a playtest (or the Admin button o
 - **Tower: teleport to start**, **Tower: teleport to checkpoint 1/2/3**, **Tower: reset my progress**
 - **Candy Rush: start solo test**, **Web Scour: start**, **Easter eggs: reset mine**, **Find every egg**
 - **Crates: open free Pumpkin Crate**, **Crates: open free CRAZY Crate** (Studio only: see the CRAZY celebration), **Crates: +100k coins**
+- **Crates: +5 luck on Pumpkin Crate**, **Crates: +1 luck on Pumpkin Crate, screen not told (tests the odds check)**, **Crates: reset my luck** (Studio only: the luck meter)
 - **Skin Studio** (the skin editor; see [Skin Studio](#skin-studio-change-and-animate-skins) above)
 
 ---
