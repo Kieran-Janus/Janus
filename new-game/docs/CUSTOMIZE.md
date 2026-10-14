@@ -901,7 +901,9 @@ part each: `CrateLuck` (the luck meter), `CratePacks` (the x5 / x10 guarantees) 
   better, x10 at least one Rare or better. A pack opens like that many single crates one after
   another (the meter moves after each one); if the ones before the last missed it, the last crate
   can only be that rarity or better. A guarantee is never above `Luck.Boost` (a higher one is
-  ignored), and a crate with no skins of that rarity gets none. The crate page lists them under
+  ignored), a crate with no skins of that rarity gets none, and so does a crate that can't give
+  anything below it (the Rare Crate, and the Deluxe crates for x5): it would promise nothing.
+  Guarantees are for packs only (a `[1]` line is ignored). The crate page lists them under
   the luck strip (`Text.PackLine`), and the x5 / x10 window shows the guaranteed crate's exact
   chances (`Text.PackTitle`, `PackHow`, `PackGuarantee`, `PackConfirm`...). Honest summary: packs are never
   worse than single opens, but the bonus is small (an x10 from an empty meter gives about 3% more
@@ -909,7 +911,9 @@ part each: `CrateLuck` (the luck meter), `CratePacks` (the x5 / x10 guarantees) 
 - **Robux opens** (`RobuxOpen`): pressing R$ first checks the luck the player saw, then that crate
   can't be opened with coins until Roblox's window is cancelled or the Robux crate has opened
   (`HoldSeconds` while the window is open, at most `MaxHoldSeconds` after buying), so the Robux
-  crate rolls with the luck they saw. Other crates open as normal. `Cooldown` is the R$ button's
+  crate rolls with the luck they saw. Other crates open as normal, except for the moment Roblox
+  hands the crate over: then the crates that can give the same skins (its Deluxe crate, the rarity
+  crates) wait too, so a failed save can't take back a skin. `Cooldown` is the R$ button's
   own spam timer. While Roblox finishes a purchase the other buttons wait, at most
   `ClientWaitSeconds` after buying (then "Roblox is taking a while", `Text.RobuxSlow`, and the
   other crates open again); the first R$ press waits at most `RemoteWaitSeconds` for the
@@ -919,7 +923,8 @@ part each: `CrateLuck` (the luck meter), `CratePacks` (the x5 / x10 guarantees) 
   use `Premium.Odds` (no Commons: Uncommon 50, Rare 49, CRAZY 1, so in the Deluxe Pumpkin Crate
   each Uncommon has 10%, each Rare 24.5% and the CRAZY 1%), have no luck meter, sit on the
   `Category` tab ("Deluxe") and are not on the lobby stand. They look like their base crate with
-  gold `Trim`, more `Sparkles` and `ShakeTimes` (1.25) times its shake. Your own model for the base
+  gold `Trim` and `ShakeTimes` (1.25) times its shake; `Premium.Look` can change their `Style`,
+  `Emblem` or `Accent` (the stand-only keys, like `Sparkles`, do nothing there). Your own model for the base
   crate (e.g. `PumpkinCrate` in `Custom > Props`) is used for its Deluxe crate too, unless there is
   one named after the Deluxe Id. With `ProductId = 0` the Robux button says "Coming soon" (make a
   Developer Product to sell one). Heads-up: the "X unboxed a CRAZY skin!" message for the whole
@@ -929,7 +934,12 @@ part each: `CrateLuck` (the luck meter), `CratePacks` (the x5 / x10 guarantees) 
   fails (naming the rule) when a change breaks one: a player who owns everything always loses
   coins on a crate; no crate state is a cheaper way to a CRAZY than the CRAZY Crate; over time a
   Rare costs more than the Rare Crate and crates are worth less per coin than the Shop; a pack is
-  never worse than the same number of single opens. Run it after changing odds, luck or prices.
+  never worse than the same number of single opens. Run it after changing odds, luck or prices
+  (`lune run tests/run -- crates` runs only the crate tests). The crate tests also check today's
+  exact numbers (the Pumpkin Crate's chances, the Deluxe price and odds, "E1: today's numbers"),
+  so a fair change makes those fail too with a plain "expected ... to be ..." message. That's
+  expected: ask Claude Code to update those numbers (and the docs that quote them). A rule
+  failure always names the rule (I1, I2...).
 - **Test it**: F8 > "Crates: open free Pumpkin Crate", "Crates: open free CRAZY Crate" (the CRAZY celebration) and "Crates: +100k coins". Which crate the free button opens: `Admin.FreeCrate`. The luck meter (Studio only): "Crates: +5 luck on Pumpkin Crate" (`Admin.LuckSteps`), "Crates: +1 luck on Pumpkin Crate, screen not told (tests the odds check)" (press Open on the old page afterwards: nothing is bought and the page shows the new chances) and "Crates: reset my luck". To see what players in a blocked region see, set `Policy.TestAsRestricted = true` (Studio only).
 - Or ask Claude Code: `/add-crate a Witchy crate with 20 new skins`.
 

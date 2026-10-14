@@ -769,6 +769,76 @@ describe("Robux crates (MonetizationService)", function()
 		expect(data.Receipts).toEqual(receipts)
 	end)
 
+	it(
+		"pays the coins of a crate whose theme is switched off (its product is still live)",
+		function()
+			local Config = w.Config
+			local CrateOdds = w.CrateOdds
+			-- AllList keeps every crate (the same tables as List), with no product id twice.
+			local all: { [any]: boolean } = {}
+			local products: { [number]: string } = {}
+			for _, c in Config.Crates.AllList do
+				all[c] = true
+				local id = CrateOdds.ProductId(c)
+				if id ~= 0 then
+					if products[id] then
+						error(("%s and %s share Robux.ProductId %d"):format(products[id], c.Id, id))
+					end
+					products[id] = c.Id
+				end
+			end
+			for _, c in Config.Crates.List do
+				expect(all[c]).toBe(true)
+			end
+			-- A crate that left the game with its theme (Config/Skins/InGame.luau), but whose
+			-- Developer Product still exists: WerewolfWoodsCrate while Werewolf Woods is off.
+			local gone = nil
+			for _, c in Config.Crates.AllList do
+				if CrateOdds.ProductId(c) ~= 0 and CrateOdds.Get(c.Id) == nil then
+					if gone == nil or c.Id == "WerewolfWoodsCrate" then
+						gone = c
+					end
+				end
+			end
+			if not gone then
+				T.note("every theme is switched on: no crate has left the game")
+				return
+			end
+			T.note("bought the switched-off " .. gone.Id)
+			local productId = CrateOdds.ProductId(gone)
+			expect(CrateOdds.ByProductId(productId)).toBe(gone)
+			local price = CrateOdds.CoinPrice(gone) or Config.Crates.RobuxFallbackCoins
+			if gone.Id == "WerewolfWoodsCrate" then
+				expect(productId).toBe(3717218553)
+				expect(price).toBe(600)
+			end
+			local before = data.Coins
+			local opened = data.Crates.Opened
+			local receipts = #data.Receipts
+			expect(w.rt:purchase(player, productId).Name).toBe("PurchaseGranted")
+			expect(data.Coins).toBe(before + price) -- its coins, not a skin from a crate that's gone
+			expect(data.Crates.Opened).toBe(opened)
+			expect(#data.Receipts).toBe(receipts + 1)
+			local sent = w.results(player)
+			expect(sent[#sent].Ok).toBe(false)
+			expect(sent[#sent].CrateId).toBe(gone.Id)
+			expect(sent[#sent].Message).toBe(
+				Config.Crates.Text.RobuxInstead:format(price, Config.Economy.CurrencyName)
+			)
+			-- Roblox asking again about the same purchase: granted, paid once.
+			local callback =
+				Dom.callback(w.rt.game:GetService("MarketplaceService"), "ProcessReceipt")
+			local again = w.rt:call(callback, {
+				PlayerId = player.UserId,
+				ProductId = productId,
+				PurchaseId = data.Receipts[#data.Receipts],
+				CurrencySpent = 0,
+			})
+			expect(again.Name).toBe("PurchaseGranted")
+			expect(data.Coins).toBe(before + price)
+		end
+	)
+
 	it("answers 'not yet' to a second ask about a purchase that is still saving", function()
 		local callback = Dom.callback(w.rt.game:GetService("MarketplaceService"), "ProcessReceipt")
 		local receipt = {

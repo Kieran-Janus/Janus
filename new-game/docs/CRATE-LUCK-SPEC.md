@@ -199,7 +199,7 @@ export type Boost = {
 - **`CrateOdds.Shown(crate, boost?) -> { Chance }`**: every skin of `Items(crate)`, in the same order as `Chances` (fixed-odds skins first, then highest rarity first, Config order inside a rarity), with `Chance = 0` for the ones that can't drop under that boost. Only the UI uses it; `Roll`, `Pick` and `Reel` keep using `Chances`.
 - Fixed-odds skins (the one-in-a-million ones, `item.Odds`) keep exactly their chance under every boost. They are CRAZY, so they are never below an `AtLeast`. The tests check this.
 - **Deluxe:** `local source = crate.Base or crate.Id`. `Items(crate)` uses `item.Crate == source`, and `fixedOdds` does too, so a one-in-a-million skin would keep its 0.0001% in a Deluxe crate as well.
-- `CrateOdds.Available(crate) -> boolean` is false for a crate with `Base` while `Config.Features.PremiumCrates` is off. `Get` and `List` skip crates that aren't available. `ByProductId` still finds them, so a receipt pays the coin fallback (section 5.5).
+- `CrateOdds.Available(crate) -> boolean` is false for a crate with `Base` while `Config.Features.PremiumCrates` is off. `Get` and `List` skip crates that aren't available. `ByProductId` still finds them (it searches `Config.Crates.AllList`, which also keeps the crates of switched-off themes), so a receipt pays the coin fallback (section 5.5).
 - `CrateOdds.Higher(a, b) -> string?` returns the higher of two rarity names (either may be nil).
 - `Format` changes as in section 2.2.
 
@@ -355,6 +355,7 @@ The newer crates have no ordinary CRAZY skin, so their odds are scaled over 99.9
   - **prepared** (a timed record, live while `os.clock() < Until`): removed when the server-side `MarketplaceService.PromptProductPurchaseFinished(userId, productId, false)` fires for that crate's product, when a receipt for that crate finishes, or when the player leaves. `PromptProductPurchaseFinished(..., true)` sets `Bought = true` and `Until = os.clock() + RobuxOpen.MaxHoldSeconds`: it then lasts until the receipt has been handled (or the player leaves), with a 10-minute safety limit (section 16). That event is connected in `Start()` after the feature check; with no prepared record for that crate (for example the receipt was handled first), it does nothing.
   - **receiving** (a counter, `receiving[player][crate.Id]`): `CrateService.ReceiptStarted(player, crate)` adds 1, `CrateService.ReceiptFinished(player, crate, granted)` takes 1 away (never below 0) and removes the prepared record. Two receipts for the same crate (for example retries on join) each keep their own count, so one finishing never releases the other's hold.
   - Both are cleared in `PlayerRemoving`.
+  - **While a receipt is being handled** (review fixes), coin opens of every crate that can give the same skins wait too (`RobuxFirst`): its Deluxe crate (same `Base`) and the rarity crates. Otherwise a failed save's `undo()` could take back a skin that a coin open in between counted as a duplicate (the player would pay, get only the duplicate coins, and lose the skin). Other crates open as normal.
 - **`ReceiptFinished(player, crate, granted)`** with `granted = false` (the receipt is not done: save failed, save not loaded, an error...) and the player still in the game sends a `CrateResult` `{ Ok = false, Message = Text.RobuxLater, CrateId, Paid = "Robux", Luck, LuckVersion }`. The hold ends, so the crate isn't locked for the session with a misleading "still opening" message. A granted receipt already sent its own `CrateResult`.
 
 **MonetizationService:**
@@ -366,7 +367,7 @@ The newer crates have no ordinary CRAZY skin, so their odds are scaled over 99.9
 
   Every exit of `handleReceipt` (`WaitForLoad` false, no data, already granted, a pcall error, a failed save) therefore ends the hold.
 - `processCrateReceipt` calls `Grant(player, crate, "Robux")`, which reads the current saved level. Thanks to the check and the hold, that is the level the player saw. When the save fails, `undo()` puts the level back exactly.
-- `CanOpenWithRobux(player, waitSeconds, crate?)` returns false for a crate that isn't `Available` (Deluxe while `PremiumCrates` is off). The buyer then gets the coin fallback, never nothing.
+- `CanOpenWithRobux(player, waitSeconds, crate?)` returns false for a crate that `CrateOdds.Get` doesn't find: not `Available` (Deluxe while `PremiumCrates` is off) or not in the game because its theme is switched off (`ByProductId` searches `Config.Crates.AllList`, so such a receipt is still recognised). The buyer then gets the coin fallback, never nothing.
 - **Robux opens always count:** they read and move the meter like coin opens. The `CrateResult` event carries `Luck`, `LuckAfter` and `LuckVersion`.
 
 **Client (CrateUI):**
@@ -403,7 +404,7 @@ In every case the opening shows the level it used. Nothing else about the purcha
 ## 4. Packs (x5 and x10)
 ### 4.1 Rules
 - A pack of N (from `Open.Counts`) costs N × Price, taken in one go as today. It opens N crates one after another, exactly like N single opens. Crate k uses the meter level after crates 1..k-1.
-- **Guarantee** (`G = CrateLuck.Guarantee(crate, N)`: `Open.Guarantee[N]`, with `CratePacks` on, G at or below `Luck.Boost`, and G itself possible in the crate): if crates 1..N-1 gave nothing at or above G, crate N is rolled with `AtLeast = G`. Otherwise crate N is a normal roll.
+- **Guarantee** (`G = CrateLuck.Guarantee(crate, N)`: `Open.Guarantee[N]`, with `CratePacks` on, N above 1 (an `Open.Guarantee[1]` line is ignored: a single crate always has its page's chances), G at or below `Luck.Boost`, G itself possible in the crate, and some rarity below G possible too, or the guarantee would promise nothing: the Rare Crate gets no x10 guarantee, the Uncommon Crate and the Deluxe crates no x5 one): if crates 1..N-1 gave nothing at or above G, crate N is rolled with `AtLeast = G`. Otherwise crate N is a normal roll.
   - x5: Uncommon or better.
   - x10: Rare or better.
 - **With the meter:** when the guarantee applies, every earlier crate was below G, which is at most Rare (D15), so the meter went up at every one. So crate N's level is `min(L0 + N - 1, Steps)` = `CrateLuck.PackLevel`, and `CrateLuck.Boost` combines the two guarantees by taking the higher one.
@@ -419,10 +420,12 @@ In every case the opening shows the level it used. Nothing else about the purcha
 		-- promises at least one skin of this rarity or better. The crates open one by one; if
 		-- the ones before the last haven't given it, the last crate can only give that rarity
 		-- or better (picked among those skins with their usual chances, scaled up to 100%).
-		-- Never above Luck.Boost (a higher one is ignored). A crate with no skins of that
-		-- rarity gets no guarantee. (x5 and x10 always ask "Open ... x10?" first, with the
-		-- price, how packs work and every chance: that window is where the guaranteed crate's
-		-- chances are shown.)
+		-- Never above Luck.Boost (a higher one is ignored). Packs only: a [1] line is ignored
+		-- (a single crate always has the chances on its page). A crate with no skins of that
+		-- rarity gets no guarantee, and neither does a crate that can't give anything below it
+		-- (the Rare Crate, Deluxe crates for x5): it would promise nothing. (x5 and x10 always
+		-- ask "Open ... x10?" first, with the price, how packs work and every chance: that
+		-- window is where the guaranteed crate's chances are shown.)
 		Guarantee = { [5] = "Uncommon", [10] = "Rare" } :: { [number]: string },
 	},
 ```
@@ -452,7 +455,7 @@ The batch result is still `table.clone(first)` with `Results`, but the server se
 - Pressing x5 or x10 opens the **pack window** (section 7.3) instead of buying, on every crate (rarity crates too: their window says `PackHowFixed`).
 - The window shows:
   - the price;
-  - `Text.PackHow` (or `PackHowFixed` for a crate without a meter);
+  - `Text.PackHow` (or, for a crate without a meter, `PackHowFixedLast` when the pack has a guarantee: "Crates 1 to 9 have the chances shown on this page. Crate 10 has them too, unless the rule below applies", and `PackHowFixed` when it has none);
   - the current level;
   - `Text.PackGuarantee`, with the exact chances of the guaranteed crate: `CrateOdds.Chances(crate, CrateLuck.Boost(crate, CrateLuck.PackLevel(crate, L0, N), G))`, grouped by rarity, or `PackFullFirst`;
   - an "Every chance" button;
@@ -491,7 +494,7 @@ There are six, one for each classic crate on the lobby stand: Pumpkin, Candy, Sp
 		NameFormat = "Deluxe %s", -- %s = the base crate's name
 		Blurb = "Same skins, no Commons, much better Rare and CRAZY chances.",
 		Trim = rgb(255, 205, 60), -- gold bands and lid edge
-		Look = { Sparkles = 16 }, -- these keys replace the base crate's Look
+		Look = {}, -- these keys replace the base crate's Look (only Style, Emblem and Accent show: Deluxe crates aren't on the stand)
 		ShakeTimes = 1.25, -- shakes this many times as hard as its base crate (Monster: 1.4 -> 1.75)
 		New = true, -- NEW ribbon on their cards
 		SuggestedRobux = 249, -- only a note: the real price is set in Creator Hub
@@ -535,7 +538,7 @@ The theme filter becomes `if not off[crate.Id] and not (crate.Base and off[crate
 - `CrateIdle` and `CrateStand` need nothing (not on the stand).
 
 ### 5.5 Robux
-`ProductId` 0 makes the button read "Coming soon", as today. When Kieran adds a product later, `ByProductId` finds the crate even while `PremiumCrates` is off. `CanOpenWithRobux(..., crate)` is then false, so the buyer gets 2,000 coins (the crate's coin `Price`), never nothing. (A crate whose *theme* is switched off is a different, older gap: section 15.)
+`ProductId` 0 makes the button read "Coming soon", as today. When Kieran adds a product later, `ByProductId` finds the crate even while `PremiumCrates` is off. `CanOpenWithRobux(..., crate)` is then false, so the buyer gets 2,000 coins (the crate's coin `Price`), never nothing. (A crate whose *theme* is switched off pays its coins the same way since the review fixes: section 15.)
 
 ### 5.6 Announcements
 Every CRAZY is announced to the whole server (`AnnounceCrazy`). Per coin spent, a Deluxe crate gives a CRAZY about 15 times as often as a themed crate (1% for 2,000 coins against about 0.02% for 600), so those messages will come about 15 times as often from Deluxe spending. The CUSTOMIZE "Deluxe crates" bullet tells Kieran, with `AnnounceCrazy = false` as the way to turn them off.
@@ -630,12 +633,12 @@ All new words are in `Config.Crates.Text` (section 8.3), and text is never small
 
 No timer and nothing preselected. Cancel closes it (Escape closes the whole panel, as today). The same layout is used on phones, with the buttons in a row at the bottom (36 px).
 
-**As built:** the window's EveryChance button is only on crates with a meter (on the others every row would be the same; `PackHowFixed` already says every crate has the page's chances). The luck line in the body is `Text.PackLuckNow`. The guaranteed crate's chances list only the rarities it can give. Four more `Text` keys: `PackLuckNow`, `LuckHelpNoFull` (the help without its last sentence when `Luck.FullGuarantee` is false; `LuckFull` and `LuckShortFull` are then not used either), `TryAgain` and `RobuxFailed` (Roblox's purchase window didn't open).
+**As built:** the window's EveryChance button is only on crates with a meter (on the others every row would be the same; `PackHowFixed` / `PackHowFixedLast` already say which crates have the page's chances). The luck line in the body is `Text.PackLuckNow`. The guaranteed crate's chances list only the rarities it can give. Four more `Text` keys: `PackLuckNow`, `LuckHelpNoFull` (the help without its last sentence when `Luck.FullGuarantee` is false; `LuckFull` and `LuckShortFull` are then not used either), `TryAgain` and `RobuxFailed` (Roblox's purchase window didn't open).
 
 ### 7.4 After opening
 - **"Open again"** (`OpenAnother`, on the reveal card and in the Quick open footer) calls `showPreview(crate)` and never invokes a remote. Remove the direct buys, and `lastCount` and `lastPaid` once nothing uses them.
 - After a pack, the level comes from the last entry of `Results` (the batch's `LuckAfter` says the same).
-- **Guaranteed crates** say so honestly. When a result has `Guaranteed`, the reveal card's `News` line starts with `Text.Guaranteed` (like `OneInAMillion`), and its Quick-open card gets a `Guaranteed` tag. The luck itself is not shown on the reveal: no "next time 25%!" nudges. The player sees it on the page.
+- **Guaranteed crates** say so honestly. When a result has `Guaranteed`, the reveal card gets a `Tags` line (18 px, between the rarity and `News`) with `Text.Guaranteed` (and `Text.OneInAMillion` before it for a one-in-a-million skin; both used to be glued to the front of `News`, which made "GUARANTEED  Duplicate! +500 Coins back" too long for one line), and its Quick-open card gets a `Guaranteed` tag (on its own row under `BEST!`: a 5-column PC card is about 130 px wide, too narrow for both). The luck itself is not shown on the reveal: no "next time 25%!" nudges. The player sees it on the page.
 - **Robux reveals** add `Text.RobuxLuck` ("Opened at luck 3 / 15") from the result's `Luck`, on crates with a meter: the level actually used (3.8).
 - **`asResult`** also checks the new fields:
   - `Luck` and `LuckAfter`, if present, are whole numbers from 0 to `Steps`;
@@ -667,7 +670,7 @@ The existing fields stay: `Ok, Message, CrateId, ItemId, ItemName, Rarity, Dupli
 - `Luck = { PerStep = 2, Steps = 15, FullGuarantee = true, Boost = "Rare", TakeFrom = "Common" }` (3.2).
 - `RobuxOpen = { Cooldown = 1, HoldSeconds = 60, MaxHoldSeconds = 600, ClientWaitSeconds = 60, RemoteWaitSeconds = 5 }` (3.2, 3.8).
 - `Open.Guarantee = { [5] = "Uncommon", [10] = "Rare" }` (4.2).
-- `Premium = { Price = 2000, Odds, Category = "Deluxe", NameFormat, Blurb, Trim, Look = { Sparkles = 16 }, ShakeTimes = 1.25, New, SuggestedRobux = 249, Crates = { 6 lines } }` (5.2). `Categories` gains "Deluxe".
+- `Premium = { Price = 2000, Odds, Category = "Deluxe", NameFormat, Blurb, Trim, Look = {}, ShakeTimes = 1.25, New, SuggestedRobux = 249, Crates = { 6 lines } }` (5.2). `Categories` gains "Deluxe".
 - `Admin.LuckSteps = 5` (3.9).
 - `Text` changes and additions. A `%s` rarity is the rarity's `Name` from `Config.Rarity`.
   ```lua
@@ -695,6 +698,7 @@ The existing fields stay: `Ok, Message, CrateId, ItemId, ItemName, Rarity, Dupli
   PackPrice = "Price: %s %s",
   PackHow = "The %d crates open one after another, just like %d single opens: each one uses your luck at that moment (Every chance shows them all).",
   PackHowFixed = "Every crate in the pack has the chances shown on this page.",
+  PackHowFixedLast = "Crates 1 to %d have the chances shown on this page. Crate %d has them too, unless the rule below applies.",
   PackGuarantee = "If crates 1 to %d give nothing %s or better, crate %d can only be %s or better. Its chances: %s",
   PackFullFirst = "If no %s or better comes first, your luck meter fills up during this pack, and a full meter makes that crate %s or better for sure.",
   PackConfirm = "Open %d for %s %s",
@@ -870,9 +874,12 @@ No lobby (`Kit.prop`) or hub changes, no `Config.Hub.BuildVersion` bump, and no 
 9. `Config.Crates.Policy.TestAsRestricted = true`: no buy buttons, luck strip, luck line or pack line; the chances are still shown.
 10. Switch `CrateLuck`, `CratePacks` and `PremiumCrates` off one at a time: the game runs without errors in Output, and the right parts disappear. Open a Pumpkin Crate with `CrateLuck` off, switch it back on: the earlier luck is still there.
 11. Leave and rejoin: the meter level is kept.
+12. (Review fixes) Quick open on, x10 on PC until the last crate is the guaranteed one: `GUARANTEED` under `BEST!`, not on top of it. Quick open off, a guaranteed crate that is a duplicate: `GUARANTEED` on its own line, "Duplicate! +500 Coins back" on one line, the buttons not covered.
+13. (Review fixes) Phone sideways (Test > Device, iPhone): with too few coins press Open on a crate: "You need ... more Coins" shows over the skins on the right, and the crate picture and buttons on the left keep their room. Every chance hides the message; Back brings it back.
+14. (Review fixes) The Deluxe Pumpkin Crate: no "x5:" pack line; its x10 window says "Crates 1 to 9 have the chances shown on this page...". The Rare Crate has no pack line.
 
 ## 15. Found in today's code (not caused by this spec; separate fixes)
-- **Robux receipts for a crate whose theme is switched off are never handled.** The theme filter removes the crate from `Config.Crates.List`, and `CrateOdds.ByProductId` only searches that list, so `handleReceipt` treats it as an unknown product and answers "not yet" forever. It should pay the coin fallback (`Price`, or `RobuxFallbackCoins`). Fix: keep the full crate list (for example `Config.Crates.AllList`, filled before the filter) for `ByProductId`, and make `CanOpenWithRobux` false for those crates. The same applies to a Deluxe crate whose base theme is off. Suggested as its own small change with a `crates.spec` test.
+- **Fixed (review fixes, 14 October 2026): Robux receipts for a crate whose theme is switched off were never handled.** `Config.Crates.AllList` (every crate, filled before the theme filter) is what `ByProductId` searches now, `CanOpenWithRobux` is false for a crate `CrateOdds.Get` doesn't find, and crates.spec buys `WerewolfWoodsCrate` (600 coins, granted once). What it was: the theme filter removes the crate from `Config.Crates.List`, and `CrateOdds.ByProductId` only searches that list, so `handleReceipt` treats it as an unknown product and answers "not yet" forever. It should pay the coin fallback (`Price`, or `RobuxFallbackCoins`). Fix: keep the full crate list (for example `Config.Crates.AllList`, filled before the filter) for `ByProductId`, and make `CanOpenWithRobux` false for those crates. The same applies to a Deluxe crate whose base theme is off. Suggested as its own small change with a `crates.spec` test.
 - **`DataService` has no session locking.** Two servers can load the same save at once. Luck adds no new exploit: coins, skins and luck are in one blob and always roll back together, and a Robux receipt is still saved before it is granted. Worth its own task (`UpdateAsync` with a session lock) if it ever matters.
 
 ## 16. Review (14 October 2026)
@@ -884,3 +891,13 @@ A review of the first version found 15 problems; all of them are fixed above. Th
 - **Two of the review's sample strings were recomputed.** The full-meter CRAZY chance is 0.02 / 45.02 = 0.044425%, which is "0.04442%" (not "0.04443%"), and the x10 guaranteed crate's is 0.02 / 33.02 = 0.060569%, which is "0.06057%" (not "0.06063%"). "0.04254%" for the x5 crate is right. Sections 2.2, 3.5, 4.5, 6 and the tests use the recomputed values.
 - **The client tracks versions per crate**, not only one number. A single-crate update (a result or a refusal) can then never make the client skip a full State that holds other crates' changes.
 - **Small additions beyond the review:** a meter also needs skins of `Luck.TakeFrom` (not only Boost), `CrateLuckReset` is Studio-only too, and the odds line lists 0% rarities like the grid. Each keeps the rules simple to explain.
+
+### Review fixes (after the build, 14 October 2026)
+A review of the built code found these; all are fixed, each with a test that fails without it.
+- **Robux receipts of switched-off themes** pay the crate's coins (section 15; crates.spec).
+- **A failed Robux save can't take back a skin a coin open just counted as a duplicate**: while a receipt is handled, the crates with the same skins wait too (3.8; R5).
+- **Pack guarantees are for packs only** (an `Open.Guarantee[1]` line is ignored) **and must change something**: no x10 line on the Rare Crate, no x5 line on the Uncommon Crate or the Deluxe crates (4.1; D15, C2, C5).
+- **The pack window of a crate without a meter** no longer says every crate has the page's chances when the last one may not (`PackHowFixedLast`, 4.4; C5).
+- **Quick open:** `GUARANTEED` sits on its own row under `BEST!` (they overlapped on a 130 px PC card). **Reveal card:** `GUARANTEED` / `ONE IN A MILLION!` have their own `Tags` line, so "Duplicate! +500 Coins back" fits (7.4; C6).
+- **Phones:** a message on a crate's page (for example "You need 550 more Coins") sits over the skins on the right, so the left column keeps its height (it shrank to about 27 px), and the pack window and Every chance get the whole page while they are open (phoneui).
+- **Docs and Config:** the odds example in the `Crates.luau` header is luck-safe (Crazy stays 0.02) with a note to run the crate tests; `Premium.Look` no longer has `Sparkles` (it only works on the stand, where Deluxe crates never are; K1 checks the keys); `docs/CUSTOMIZE.md` says the crate specs also check today's exact numbers, and E1's rule test now fails only when a rule breaks (today's numbers are in their own test).

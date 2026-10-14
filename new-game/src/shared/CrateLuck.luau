@@ -30,7 +30,8 @@
 	                                      guarantee (the higher of the two); nil = plain odds
 	CrateLuck.After(crate, level, rarity) -> number   the level after a crate gave `rarity`
 	CrateLuck.Guarantee(crate, count) -> rarity?      the pack guarantee for opening `count`
-	                                      at once (nil for x1, CratePacks off, or impossible)
+	                                      at once (nil for x1, CratePacks off, impossible, or
+	                                      when the crate can't give anything below it anyway)
 	CrateLuck.PackLevel(crate, level, count) -> number   the level of a pack's guaranteed last
 	                                      crate: min(level + count - 1, Steps) (0 without a meter)
 ]]
@@ -257,7 +258,9 @@ function CrateLuck.After(_crate: CrateOdds.Crate, level: number, rarity: string)
 end
 
 function CrateLuck.Guarantee(crate: CrateOdds.Crate, count: number): string?
-	if not Config.Features.CratePacks then
+	-- Packs only: a single crate always rolls with the chances on its page (an
+	-- Open.Guarantee[1] line is ignored).
+	if not Config.Features.CratePacks or not (count > 1) then
 		return nil
 	end
 	local wanted = (Config.Crates.Open.Guarantee :: any)[count]
@@ -286,7 +289,14 @@ function CrateLuck.Guarantee(crate: CrateOdds.Crate, count: number): string?
 	if not CrateOdds.CanGuarantee(crate, wanted) then
 		return nil
 	end
-	return wanted
+	-- A guarantee that changes nothing isn't one: the crate must be able to give something
+	-- below it (the Rare Crate is always Rare, a Deluxe crate never gives a Common).
+	for lower = 1, index - 1 do
+		if CrateOdds.Shares(crate, Config.Rarity.Order[lower]) then
+			return wanted
+		end
+	end
+	return nil
 end
 
 function CrateLuck.PackLevel(crate: CrateOdds.Crate, level: number, count: number): number

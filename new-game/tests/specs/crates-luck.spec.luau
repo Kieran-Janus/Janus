@@ -103,6 +103,9 @@ describe("Crate luck: Config (K1)", function()
 		expect(CrateLuck.ConfigOk()).toBe(true)
 		for count, rarity in cfg.Open.Guarantee do
 			expect(table.find(cfg.Open.Counts, count)).toBeTruthy()
+			if not (count > 1) then
+				error(("Open.Guarantee[%s]: guarantees are for packs (x5, x10) only"):format(count))
+			end
 			local index = table.find(order, rarity)
 			expect(index).toBeTruthy()
 			expect(index).toBeLessThanOrEqual(boost)
@@ -116,6 +119,39 @@ describe("Crate luck: Config (K1)", function()
 		expect(CrateLuck.Guarantee(pumpkin, 10)).toBe("Rare")
 		expect(CrateLuck.Applies(pumpkin)).toBe(true)
 		local warnings = #rt.warnings
+		-- A single crate always has its page's chances: an Open.Guarantee[1] line is ignored.
+		try(function()
+			cfg.Open.Guarantee[1] = "Uncommon"
+			expect(CrateLuck.Guarantee(pumpkin, 1)).toBeNil()
+		end, function()
+			cfg.Open.Guarantee[1] = nil
+		end)
+		-- A guarantee must change something: the crate must be able to give a rarity below it.
+		expect(CrateLuck.Guarantee(pumpkin, 5)).toBe("Uncommon")
+		expect(CrateLuck.Guarantee(CrateOdds.Get("RareCrate"), 10)).toBeNil() -- always Rare
+		expect(CrateLuck.Guarantee(CrateOdds.Get("UncommonCrate"), 5)).toBeNil()
+		expect(CrateLuck.Guarantee(CrateOdds.Get("PumpkinDeluxeCrate"), 5)).toBeNil() -- no Commons
+		expect(CrateLuck.Guarantee(CrateOdds.Get("PumpkinDeluxeCrate"), 10)).toBe("Rare")
+		for _, crate in CrateOdds.List() do
+			for _, count in cfg.Open.Counts do
+				local g = CrateLuck.Guarantee(crate, count)
+				if g then
+					local plain = CrateOdds.RarityOdds(crate)
+					local boosted = CrateOdds.RarityOdds(crate, { AtLeast = g })
+					local changed = false
+					for rarity, percent in plain do
+						if math.abs((boosted[rarity] or 0) - percent) > 1e-9 then
+							changed = true
+						end
+					end
+					if not changed then
+						error(
+							("%s x%d: the %s guarantee changes nothing"):format(crate.Id, count, g)
+						)
+					end
+				end
+			end
+		end
 		-- A CRAZY pack guarantee would hand out cheap CRAZY skins: ignored, with a warning.
 		try(function()
 			cfg.Open.Guarantee[10] = "Crazy"
@@ -182,6 +218,19 @@ describe("Crate luck: Config (K1)", function()
 		end
 		expect(total).toBeNear(100, 1e-9)
 		expect(premium.ShakeTimes).toBeGreaterThanOrEqual(1)
+		-- Deluxe crates are only in Menu > Crates and the opening (not on the lobby stand), so
+		-- a Look key only the stand uses (Bob, Sway, PeekEvery, PeekAngle, Sparkles, Sounds)
+		-- would do nothing, and ShakeTimes sets Shake.
+		local shows = { Style = true, Emblem = true, Accent = true }
+		for key in premium.Look do
+			if not shows[key] then
+				error(
+					("Premium.Look.%s does nothing: Deluxe crates aren't on the lobby stand"):format(
+						tostring(key)
+					)
+				)
+			end
+		end
 		expect(table.find(cfg.Categories, premium.Category)).toBeTruthy()
 		expect(cfg.Admin.LuckSteps).toBe(5)
 		local themeCrates: { [string]: boolean } = {}
@@ -217,7 +266,9 @@ describe("Crate luck: Config (K1)", function()
 				expect(crate.Trim).toBeNear(premium.Trim)
 				expect(crate.Odds).toEqual(premium.Odds)
 				expect(crate.Odds).never.toBe(premium.Odds) -- (its own copy)
-				expect(crate.Look.Sparkles).toBe(16)
+				for key, value in premium.Look do
+					expect(crate.Look[key]).toBe(value)
+				end
 				local baseShake = base.Look.Shake or cfg.LookDefaults.Shake
 				expect(crate.Look.Shake).toBeNear(baseShake * premium.ShakeTimes, 1e-9)
 				expect(crate.Look.Style).toBe(base.Look.Style)
@@ -936,25 +987,37 @@ describe("Crate luck: the economy stays sane (E1, E2)", function()
 		return worstThemed, worstDeluxe
 	end
 
+	-- (Only the rules fail here, naming the rule: a fair change to odds, luck or prices passes.
+	-- Today's exact numbers are checked in the next test.)
 	it("E1: I1 and I2 hold for every crate state (no free coins, no cheap CRAZY)", function()
 		local worstThemed, worstDeluxe = checkStates()
 		T.note(
 			"cheapest CRAZY: themed " .. commas(worstThemed) .. ", Deluxe " .. commas(worstDeluxe)
 		)
-		expect(math.floor(worstThemed + 0.5)).toBe(990600) -- the x10 guaranteed crate
-		expect(math.floor(worstDeluxe + 0.5)).toBe(100000) -- the Deluxe x10 guaranteed crate
 		-- With the luck meter switched off the pack guarantee alone is still no cheap CRAZY.
 		try(function()
 			Config.Features.CrateLuck = false
 			local offThemed = checkStates()
 			T.note("CrateLuck off: cheapest themed CRAZY " .. commas(offThemed))
-			expect(math.floor(offThemed + 0.5)).toBe(450600) -- x10 at plain odds: 600 / (0.02 / 15.02)
 		end, function()
 			Config.Features.CrateLuck = true
 		end)
 	end)
 
-	it("E1: the Pumpkin Crate's numbers in section 6", function()
+	-- Today's numbers, quoted in docs/CRATE-LUCK-SPEC.md section 6 and the Config comments.
+	-- Not rules: after a fair change to Odds, Luck, Open.Guarantee or Premium these simply
+	-- need the new numbers (and the docs too).
+	it("E1: today's numbers in section 6 (update them after changing Config)", function()
+		local worstThemed, worstDeluxe = checkStates()
+		expect(math.floor(worstThemed + 0.5)).toBe(990600) -- the x10 guaranteed crate
+		expect(math.floor(worstDeluxe + 0.5)).toBe(100000) -- the Deluxe x10 guaranteed crate
+		try(function()
+			Config.Features.CrateLuck = false
+			local offThemed = checkStates()
+			expect(math.floor(offThemed + 0.5)).toBe(450600) -- x10 at plain odds: 600 / (0.02 / 15.02)
+		end, function()
+			Config.Features.CrateLuck = true
+		end)
 		local pumpkin = CrateOdds.Get("PumpkinCrate")
 		local function row(name: string, one: any, price: number)
 			T.note(
@@ -2238,6 +2301,47 @@ describe("Crate luck: Robux opens (R1-R4)", function()
 			expect(data.Crates.Opened).toBe(opened + 4)
 		end
 	)
+
+	it("R5: while a receipt is handled, the crates with the same skins wait too", function()
+		local player, data = w.join("SameSkins")
+		data.Coins = 1000000
+		local callback = Dom.callback(w.rt.game:GetService("MarketplaceService"), "ProcessReceipt")
+		-- A receipt (retried on join: no purchase window, so no screen is busy) whose save
+		-- keeps failing for a while: it has given its skin and is retrying the save.
+		local box = {}
+		local owned = table.clone(data.Owned)
+		w.rt.dataStoreFailures = 100
+		w.rt.env.task.spawn(function()
+			box.Decision = callback({
+				PlayerId = player.UserId,
+				ProductId = productId,
+				PurchaseId = "same-skins",
+				CurrencySpent = 0,
+			})
+		end)
+		w.rt:advance(1)
+		expect(box.Decision).toBeNil()
+		-- Its Deluxe crate and the rarity crates can roll that same skin: if one counted it as
+		-- a duplicate now, the failed save's undo would take it away anyway. They wait.
+		for _, id in { "PumpkinDeluxeCrate", "CommonCrate", "UncommonCrate", "RareCrate" } do
+			local r = w.open(player, id)
+			expect(r.Ok).toBe(false)
+			expect(r.Message).toBe(text.RobuxFirst)
+		end
+		-- A crate with other skins opens as normal.
+		expect(w.open(player, "CandyCrate").Ok).toBe(true)
+		w.rt:advance(40)
+		w.rt.dataStoreFailures = 0
+		expect(box.Decision.Name).toBe("NotProcessedYet") -- undone: Roblox asks again later
+		for id in data.Owned do
+			if not owned[id] then
+				expect(w.Items.Get(id).Crate).toBe("CandyCrate") -- (only the Candy skin stayed)
+			end
+		end
+		-- Handled (here: given up for now): they open again.
+		expect(w.open(player, "PumpkinDeluxeCrate").Ok).toBe(true)
+		expect(w.open(player, "RareCrate").Ok).toBe(true)
+	end)
 end)
 
 describe("Crate luck: today's crate page against the real server (C8)", function()
@@ -2720,8 +2824,12 @@ describe("Crate luck: the crate page (C1-C7, C9-C11)", function()
 			expect(strip(preview)).toBeNil()
 			expect(preview:FindFirstChild("LuckLine", true)).toBeNil()
 		end
+		-- The Rare Crate is always Rare: no pack line at all.
+		expect(p.open("RareCrate"):FindFirstChild("Packs", true)).toBeNil()
 		local deluxe = p.open("PumpkinDeluxeCrate")
 		expect(deluxe.Info.Packs.Text).toMatch("x10: at least one Rare or better")
+		-- (no x5 line: a Deluxe crate never gives a Common, so it would promise nothing)
+		expect(deluxe.Info.Packs.Text:find("x5", 1, true)).toBeNil()
 		expect(deluxe.Side.Buy.OpenCoins.Text).toBe("Open 2,000 Coins")
 		expect(deluxe.Side.Buy.OpenCoins5.Text).toMatch("10,000")
 		expect(deluxe.Side.Buy.OpenCoins10.Text).toMatch("20,000")
@@ -2921,16 +3029,29 @@ describe("Crate luck: the crate page (C1-C7, C9-C11)", function()
 			expect(words).toMatch("your luck meter fills up during this pack")
 			expect(words:find("Its chances", 1, true)).toBeNil()
 			p.press(preview.PackConfirm.Buttons.Cancel)
-			-- A crate without a meter: its window says every crate has the page's chances.
+			-- A crate without a meter: crates 1 to 9 have the page's chances, and so does crate
+			-- 10 unless the guarantee kicks in (never "every crate has the page's chances").
 			local deluxe = p.open("PumpkinDeluxeCrate")
 			p.press(deluxe.Side.Buy.OpenCoins10)
 			words = plain(deluxe.PackConfirm.Body.Text.Text)
-			expect(words).toMatch(p.text.PackHowFixed)
+			expect(words:find(p.text.PackHowFixedLast:format(9, 10), 1, true)).toBeTruthy()
+			expect(words:find(p.text.PackHowFixed, 1, true)).toBeNil()
 			expect(words).toMatch("Its chances: CRAZY 2%% · Rare 98%% %(49%% each%)")
 			expect(words:find("Your luck now", 1, true)).toBeNil()
 			expect(deluxe.PackConfirm.Buttons:FindFirstChild("EveryChance")).toBeNil()
 			p.press(deluxe.PackConfirm.Buttons.Confirm)
 			expect(p.asked[3]).toEqual({ "PumpkinDeluxeCrate", 10, 0, "Rare" })
+			-- x5: a Deluxe crate never gives a Common, so "Uncommon or better" would promise
+			-- nothing: no guarantee, and every crate really has the page's chances.
+			p.rt:advance(1)
+			deluxe = p.open("PumpkinDeluxeCrate")
+			p.press(deluxe.Side.Buy.OpenCoins5)
+			words = plain(deluxe.PackConfirm.Body.Text.Text)
+			expect(words:find(p.text.PackHowFixed, 1, true)).toBeTruthy()
+			expect(words:find("Its chances", 1, true)).toBeNil()
+			expect(deluxe.PackConfirm:GetAttribute("Guarantee")).toBeNil()
+			p.press(deluxe.PackConfirm.Buttons.Confirm)
+			expect(p.asked[4]).toEqual({ "PumpkinDeluxeCrate", 5, 0 })
 		end
 	)
 
@@ -2939,12 +3060,16 @@ describe("Crate luck: the crate page (C1-C7, C9-C11)", function()
 		p.answer = function(crateId, count)
 			local results = {}
 			for k = 1, count do
+				local last = k == count and count > 1
 				results[k] = p.result(crateId, "Pumpkin_PumpkinSpice", {
 					Luck = 9,
 					LuckAfter = 10,
 					LuckVersion = 2,
-					Guaranteed = if k == count and count > 1 then "Rare" else nil,
-					Rarity = if k == count and count > 1 then "Rare" else "Common",
+					Guaranteed = if last then "Rare" else nil,
+					Rarity = if last then "Rare" else "Common",
+					-- (the guaranteed crate is a duplicate: the longest reveal line)
+					Duplicate = if last then true else nil,
+					Refund = if last then 500 else nil,
 				})
 			end
 			local batch = table.clone(results[1])
@@ -2959,6 +3084,7 @@ describe("Crate luck: the crate page (C1-C7, C9-C11)", function()
 		local asked = #p.asked
 		local card = p.panel.Body.Opening.Reveal.Card
 		expect(card.News.Text).never.toMatch(p.text.Guaranteed)
+		expect(card:FindFirstChild("Tags")).toBeNil()
 		p.press(card.Buttons.OpenAnother)
 		expect(p.panel.Body.Preview.Visible).toBe(true)
 		expect(#p.asked).toBe(asked)
@@ -2974,7 +3100,28 @@ describe("Crate luck: the crate page (C1-C7, C9-C11)", function()
 			end
 		end
 		card = p.panel.Body.Opening.Reveal.Card
-		expect(card.News.Text:sub(1, #p.text.Guaranteed)).toBe(p.text.Guaranteed)
+		-- (on a line of its own: "GUARANTEED  Duplicate! +500 Coins back" is too long for one
+		-- line of the card, about 0.6 em a letter in the game's font)
+		expect(card.Tags.Text).toBe(p.text.Guaranteed)
+		local duplicate = p.text.Duplicate:format(500, p.Config.Economy.CurrencyName)
+		expect(card.News.Text).toBe(duplicate)
+		expect(card.Tags.LayoutOrder).toBeGreaterThan(card.Rarity.LayoutOrder)
+		expect(card.Tags.LayoutOrder).toBeLessThan(card.News.LayoutOrder)
+		local inner = card.Size.X.Offset - 20 -- (10 px padding each side)
+		for _, line in { card.Tags, card.News } do
+			if #line.Text * line.TextSize * 0.6 > inner then
+				error(("the reveal line %q doesn't fit on one line of the card"):format(line.Text))
+			end
+		end
+		-- The picture leaves room for every line under it (and the gaps between them).
+		local gap = card:FindFirstChildOfClass("UIListLayout").Padding.Offset
+		local below = 0
+		for _, child in card:GetChildren() do
+			if child:IsA("GuiObject") and child.Name ~= "Art" then
+				below += child.Size.Y.Offset + gap
+			end
+		end
+		expect(-card.Art.Size.Y.Offset).toBe(below)
 		-- ...and on its Quick open card. Open again in the footer buys nothing either.
 		p.press(card.Buttons.OpenAnother)
 		p.press(p.panel.Body.Preview.Side.Extras.QuickOpen)
@@ -2985,6 +3132,15 @@ describe("Crate luck: the crate page (C1-C7, C9-C11)", function()
 		expect(results.Visible).toBe(true)
 		expect(results.Items.Result5:FindFirstChild("Guaranteed").Text).toBe(p.text.Guaranteed)
 		expect(results.Items.Result1:FindFirstChild("Guaranteed")).toBeNil()
+		-- The guaranteed crate is also the BEST! one: the two tags on separate rows (a PC card
+		-- is about 130 px wide, too narrow for both words side by side).
+		local best, sure = results.Items.Result5.Best, results.Items.Result5.Guaranteed
+		local bestTop, sureTop = best.Position.Y.Offset, sure.Position.Y.Offset
+		if math.abs(sureTop - bestTop) < best.Size.Y.Offset then
+			error("BEST! and GUARANTEED are on the same row of the Quick open card")
+		end
+		expect(sure.TextWrapped).toBe(false)
+		expect(sure.AutomaticSize).toBe(p.rt.env.Enum.AutomaticSize.X)
 		asked = #p.asked
 		p.press(results.Footer.OpenAnother)
 		expect(p.panel.Body.Preview.Visible).toBe(true)
@@ -3229,7 +3385,7 @@ describe("Crate luck: the crate page (C1-C7, C9-C11)", function()
 		noLuck.rt:advance(1)
 		noLuck.press(noLuck.panel.Body.Preview.Side.Buy.OpenCoins10)
 		local words = plain(noLuck.panel.Body.Preview.PackConfirm.Body.Text.Text)
-		expect(words).toMatch(noLuck.text.PackHowFixed)
+		expect(words:find(noLuck.text.PackHowFixedLast:format(9, 10), 1, true)).toBeTruthy()
 		expect(words).toMatch("Its chances")
 
 		local noPacks =

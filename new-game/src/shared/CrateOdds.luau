@@ -55,8 +55,10 @@
 	CrateOdds.Exact(percent) -> string     "6.123%", "0.020%", "0.0001%" (fixed 3 decimals)
 	CrateOdds.CoinPrice(crate) -> number?  coins to open it (nil = not sold for coins)
 	CrateOdds.ProductId(crate) -> number   its Robux Developer Product id (0 = not for sale)
-	CrateOdds.ByProductId(id) -> crate?    the crate a Developer Product opens (also an
-	                                       unavailable one, so its receipt still pays coins)
+	CrateOdds.ByProductId(id) -> crate?    the crate a Developer Product opens (also one that
+	                                       isn't in the game right now, from
+	                                       Config.Crates.AllList, so its receipt still pays
+	                                       coins)
 ]]
 
 local Config = require(script.Parent.Config)
@@ -479,12 +481,14 @@ function CrateOdds.ProductId(crate: Crate): number
 	return 0
 end
 
--- (Unavailable crates too: a Deluxe crate bought while PremiumCrates is off still pays its coins.)
+-- Every crate, also the ones not in the game right now (Config.Crates.AllList: a crate whose
+-- theme is switched off, a Deluxe crate while PremiumCrates is off), so a Robux purchase of one
+-- still pays its coins (CrateService.CanOpenWithRobux is false for them).
 function CrateOdds.ByProductId(id: unknown): Crate?
 	if typeof(id) ~= "number" or id == 0 then
 		return nil
 	end
-	for _, crate in Config.Crates.List do
+	for _, crate in Config.Crates.AllList do
 		if CrateOdds.ProductId(crate :: any) == id then
 			return crate :: any
 		end

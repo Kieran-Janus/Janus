@@ -33,8 +33,11 @@
 
 	CHANGE A PRICE   change Price (coins). Robux prices are set in Creator Hub (see Robux below).
 	CHANGE THE ODDS  change Odds below (every themed crate) or give one crate its own
-	                 Odds = { Common = 60, Uncommon = 30, Rare = 9.5, Crazy = 0.5 }. Keep the total
-	                 at 100 (the shop shows the exact numbers to players).
+	                 Odds = { Common = 64.98, Uncommon = 22, Rare = 13, Crazy = 0.02 }. Keep the
+	                 total at 100 (the shop shows the exact numbers to players). Keep Crazy tiny
+	                 (0.02): the luck meter and the x10 guarantee make CRAZY likelier on some
+	                 crates. Then run lune run tests/run -- crates: it checks no crate pays back
+	                 more than it costs or is a cheap way to a CRAZY skin.
 	ADD A CRATE      copy one line in List, give it a new Id (never rename an Id once the game is
 	                 live), a Name and colours, then put Crate = "<new Id>" on the skins it gives.
 	                 It appears in Menu > Crates straight away. The crate stand in the lobby
@@ -134,7 +137,9 @@ local crates = {
 
 	-- ROBUX OPENS. Pressing a crate's R$ button first checks the luck you saw. Then that crate
 	-- can't be opened with coins until Roblox's purchase is cancelled or its crate has opened,
-	-- so the Robux crate rolls with the luck you saw. Other crates open as normal.
+	-- so the Robux crate rolls with the luck you saw. Other crates open as normal, except for
+	-- the moment Roblox hands the crate over (longer if the save is slow): then the crates that
+	-- can give the same skins (its Deluxe crate, the rarity crates) wait too.
 	RobuxOpen = {
 		Cooldown = 1, -- seconds between two R$ presses by one player (its own timer)
 		HoldSeconds = 60, -- how long the hold waits for you to finish Roblox's purchase window
@@ -153,10 +158,12 @@ local crates = {
 		-- promises at least one skin of this rarity or better. The crates open one by one; if
 		-- the ones before the last haven't given it, the last crate can only give that rarity
 		-- or better (picked among those skins with their usual chances, scaled up to 100%).
-		-- Never above Luck.Boost (a higher one is ignored). A crate with no skins of that
-		-- rarity gets no guarantee. (x5 and x10 always ask "Open ... x10?" first, with the
-		-- price, how packs work and every chance: that window is where the guaranteed crate's
-		-- chances are shown.)
+		-- Never above Luck.Boost (a higher one is ignored). Packs only: a [1] line is ignored
+		-- (a single crate always has the chances on its page). A crate with no skins of that
+		-- rarity gets no guarantee, and neither does a crate that can't give anything below it
+		-- (the Rare Crate, Deluxe crates for x5): it would promise nothing. (x5 and x10 always
+		-- ask "Open ... x10?" first, with the price, how packs work and every chance: that
+		-- window is where the guaranteed crate's chances are shown.)
 		Guarantee = { [5] = "Uncommon", [10] = "Rare" } :: { [number]: string },
 	},
 	-- Quick open: a switch on the crate page. On = no spinning strip: every result at once on one
@@ -503,6 +510,8 @@ local crates = {
 		PackPrice = "Price: %s %s",
 		PackHow = "The %d crates open one after another, just like %d single opens: each one uses your luck at that moment (Every chance shows them all).",
 		PackHowFixed = "Every crate in the pack has the chances shown on this page.",
+		-- (instead of PackHowFixed when the pack has a guarantee: count - 1, count)
+		PackHowFixedLast = "Crates 1 to %d have the chances shown on this page. Crate %d has them too, unless the rule below applies.",
 		PackGuarantee = "If crates 1 to %d give nothing %s or better, crate %d can only be %s or better. Its chances: %s",
 		PackFullFirst = "If no %s or better comes first, your luck meter fills up during this pack, and a full meter makes that crate %s or better for sure.",
 		PackConfirm = "Open %d for %s %s",
@@ -529,7 +538,11 @@ local crates = {
 		NameFormat = "Deluxe %s", -- %s = the base crate's name
 		Blurb = "Same skins, no Commons, much better Rare and CRAZY chances.",
 		Trim = rgb(255, 205, 60), -- gold bands and lid edge
-		Look = { Sparkles = 16 } :: { [string]: any }, -- these keys replace the base crate's Look
+		-- Keys here replace the base crate's Look (LookDefaults lists them). Deluxe crates are
+		-- only in Menu > Crates and the opening, not on the lobby stand, so only the keys that
+		-- show there change anything: Style, Emblem and Accent (e.g. Accent = rgb(255, 205, 60)).
+		-- The stand's keys (Bob, Sway, PeekEvery, PeekAngle, Sparkles, Sounds) do nothing here.
+		Look = {} :: { [string]: any },
 		ShakeTimes = 1.25, -- shakes this many times as hard as its base crate (Monster: 1.4 -> 1.75)
 		New = true, -- NEW ribbon on their cards
 		SuggestedRobux = 249, -- only a note: the real price is set in Creator Hub
@@ -1022,6 +1035,11 @@ local crates = {
 			Robux = { ProductId = 3717218640, SuggestedRobux = 1999 },
 		},
 	} :: { Crate },
+
+	-- (Filled in at the bottom of this file; don't edit it.) Every crate above plus the Deluxe
+	-- crates, also the ones whose theme is switched off. Only used to find the crate a Robux
+	-- purchase was for, so a purchase of a crate that left the game still pays its coins.
+	AllList = {} :: { Crate },
 }
 
 -- Deluxe crates (Premium.Crates): one crate per line, made from its Base crate (the same
@@ -1074,7 +1092,8 @@ end
 
 -- A themed crate whose theme is switched off (Config/Skins/InGame.luau) leaves the game with its
 -- skins (and so does its Deluxe crate): it isn't in Menu > Crates, and the rarity crates don't
--- draw from it.
+-- draw from it. AllList keeps every crate (a Robux purchase of one that left still pays coins).
+crates.AllList = table.clone(crates.List)
 local SkinSettings = require(script.Parent.Skins.Settings)
 local off: { [string]: boolean } = {}
 for _, theme in SkinSettings.AllThemes do

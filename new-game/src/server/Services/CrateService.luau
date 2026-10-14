@@ -35,7 +35,11 @@
 	                                      receipt has been handled, Config.Crates.RobuxOpen
 	                                      HoldSeconds pass (window still open) or MaxHoldSeconds
 	                                      pass (bought, receipt not here yet). Its own cooldown
-	                                      (RobuxOpen.Cooldown), not OpenCrate's.
+	                                      (RobuxOpen.Cooldown), not OpenCrate's. While a receipt
+	                                      is being handled, the crates that can give the same
+	                                      skins (its Deluxe crate, the rarity crates) say
+	                                      RobuxFirst too, so a failed save's undo can't take
+	                                      back a skin a coin open counted as a duplicate.
 	Server -> client:
 	  CrateResult(Result)                 a crate opened some other way (Robux purchase, F8
 	                                      free crate), or a Robux crate that didn't open yet
@@ -228,8 +232,10 @@ function CrateService.CanOpenWithRobux(
 	if not (Config.Features.Crates and Config.Features.RobuxCrates) then
 		return false
 	end
-	-- (a Deluxe crate while PremiumCrates is off: the buyer gets its coins instead)
-	if crate and not CrateOdds.Available(crate) then
+	-- A crate that isn't in the game right now (its theme is switched off in
+	-- Config/Skins/InGame.luau, or a Deluxe crate while PremiumCrates is off): the buyer gets its
+	-- coins instead. (CrateOdds.Get only finds crates that are in the game.)
+	if crate and CrateOdds.Get(crate.Id) ~= crate then
 		return false
 	end
 	return not CrateService.IsRestricted(player, waitSeconds)
@@ -237,19 +243,38 @@ end
 
 -- Robux holds ------------------------------------------------------------------------------
 
--- Is a Robux purchase of this crate on its way for this player (so coins can't open it)?
-local function holding(player: Player, crateId: string): boolean
-	local counts = receiving[player]
-	if counts and (counts[crateId] or 0) > 0 then
+-- Can two crates give some of the same skins? A Deluxe crate gives its Base crate's skins, and
+-- a rarity crate gives skins from every themed crate.
+local function sameSkins(a: CrateOdds.Crate, b: CrateOdds.Crate): boolean
+	if a.Rarity ~= nil or b.Rarity ~= nil then
 		return true
 	end
+	return (a.Base or a.Id) == (b.Base or b.Id)
+end
+
+-- Is a Robux purchase on its way for this player that a coin open of `crate` must wait for?
+--   * A purchase window opened for this crate (PrepareCrateRobux) holds this crate only, so the
+--     Robux crate rolls with the luck the player saw.
+--   * A receipt being handled also holds every crate that can give the same skins (its Deluxe
+--     crate, the rarity crates): if its save fails, the undo takes its skin back, and a coin
+--     open in between that got that skin as a duplicate would lose it too.
+local function holding(player: Player, crate: CrateOdds.Crate): boolean
+	local counts = receiving[player]
+	if counts then
+		for id, count in counts do
+			local other = if id == crate.Id then crate else CrateOdds.Get(id)
+			if count > 0 and other and sameSkins(crate, other) then
+				return true
+			end
+		end
+	end
 	local holds = prepared[player]
-	local hold = holds and holds[crateId]
+	local hold = holds and holds[crate.Id]
 	if holds and hold then
 		if os.clock() < hold.Until then
 			return true
 		end
-		holds[crateId] = nil
+		holds[crate.Id] = nil
 	end
 	return false
 end
@@ -493,7 +518,7 @@ local function onOpen(
 		return refuse(player, id, t.NotLoaded)
 	end
 	-- A Robux purchase of this crate is on its way: it rolls with the luck the player saw.
-	if holding(player, crate.Id) then
+	if holding(player, crate) then
 		return refuse(player, id, t.RobuxFirst, data, crate)
 	end
 	-- The chances the player saw must be the ones the server has (never used to roll: the

@@ -515,18 +515,46 @@ function CrateUI.Mount(gui: ScreenGui)
 	local openView = view("Opening")
 
 	-- Phones: while a crate opens, the hint line goes and the chest gets its room (a short
-	-- landscape phone has little height to spare).
+	-- landscape phone has little height to spare). On a crate's page a message sits over the
+	-- skins on the right instead, so the left column (the crate, its luck and the pinned buy
+	-- buttons) keeps its full height. While the pack window or Every chance covers the page,
+	-- the line waits (those windows get the whole page) and comes back when they close.
+	local PHONE_SIDE = 168 -- the left column of a crate's page on phones (showPreview)
+	local fitBody = function() end
 	if compact then
-		local function fitBody()
-			-- (also whenever the line is only the hint; messages that matter, like "You need X more
-			-- coins" or the region rule, still show)
-			local full = openView.Visible or message.Text == text.Hint or message.Text == ""
-			message.Visible = not full
+		fitBody = function()
+			-- (the line hides whenever it is only the hint; messages that matter, like "You need
+			-- X more coins" or the region rule, still show)
+			local quiet = message.Text == text.Hint or message.Text == ""
+			local onPage = previewView.Visible and not openView.Visible
+			local covered = previewView:FindFirstChild("PackConfirm") ~= nil
+				or previewView:FindFirstChild("LuckTable") ~= nil
+			message.Visible = not (openView.Visible or quiet or (onPage and covered))
+			local full = onPage or not message.Visible
 			local top = if full then 46 else 46 + messageHeight
 			body.Position = UDim2.fromOffset(12, top)
 			body.Size = UDim2.new(1, -24, 1, -(top + 10))
+			-- On a crate's page: the line over the skins, and the skins start under it.
+			local overSkins = onPage and message.Visible
+			local skinsLeft = PHONE_SIDE + 8 -- where the skins start on the page
+			if overSkins then
+				message.Position = UDim2.fromOffset(12 + skinsLeft, 46)
+				message.Size = UDim2.new(1, -(12 + skinsLeft + 12), 0, messageHeight)
+			else
+				message.Position = UDim2.fromOffset(16, 42)
+				message.Size = UDim2.new(1, -32, 0, messageHeight)
+			end
+			local skins = previewView:FindFirstChild("Items")
+			if skins and skins:IsA("GuiObject") then
+				local drop = if overSkins then messageHeight + 4 else 0
+				skins.Position = UDim2.fromOffset(skinsLeft, drop)
+				skins.Size = UDim2.new(1, -skinsLeft, 1, -drop)
+			end
 		end
 		openView:GetPropertyChangedSignal("Visible"):Connect(fitBody)
+		previewView:GetPropertyChangedSignal("Visible"):Connect(fitBody)
+		previewView.ChildAdded:Connect(fitBody)
+		previewView.ChildRemoved:Connect(fitBody)
 		message:GetPropertyChangedSignal("Text"):Connect(fitBody)
 		fitBody()
 	end
@@ -1551,9 +1579,15 @@ function CrateUI.Mount(gui: ScreenGui)
 		local heading = sheet:FindFirstChild("Title") :: TextLabel
 		heading.Text = text.PackTitle:format(crate.Name, count)
 
+		-- How packs work. Without a meter every crate has the page's chances, except a
+		-- guaranteed last crate when the ones before it missed (its chances are below).
+		local how = if meter
+			then text.PackHow:format(count, count)
+			elseif guarantee then text.PackHowFixedLast:format(count - 1, count)
+			else text.PackHowFixed
 		local paragraphs = {
 			richEscape(text.PackPrice:format(commas(price * count), currency)),
-			richEscape(if meter then text.PackHow:format(count, count) else text.PackHowFixed),
+			richEscape(how),
 		}
 		if meter then
 			local now = text.PackLuckNow:format(level, steps, boostName(), nextChance(crate, level))
@@ -1669,7 +1703,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		local meter = CrateLuck.Applies(crate)
 		drawnWaiting = meter and not luckKnown
 		local shown = CrateOdds.Shown(crate, CrateLuck.Boost(crate, drawnLevel))
-		local sideWidth = if compact then 168 else 214
+		local sideWidth = if compact then PHONE_SIDE else 214
 		local closed = restriction()
 		local canBuy = closed ~= true
 		-- The luck strip, the phone luck line and the pack line: only for players who may buy.
@@ -1940,6 +1974,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		for i, chance in shown do
 			itemCard(grid, chance, i)
 		end
+		fitBody() -- (phones: room for a message over the skins)
 	end
 
 	-- Opening view: the spinning strip and the reveal -------------------------------------------
@@ -2377,7 +2412,21 @@ function CrateUI.Mount(gui: ScreenGui)
 			and type(result.Luck) == "number"
 			and opened ~= nil
 			and CrateLuck.Applies(opened)
+		-- ONE IN A MILLION / GUARANTEED get a line of their own: next to "Duplicate! +500 Coins
+		-- back" they don't fit on one line of the card.
+		local tagWords = {}
+		if result.OneInAMillion then
+			table.insert(tagWords, text.OneInAMillion)
+		end
+		if result.Guaranteed then
+			-- Honest: this crate could only be that rarity or better (pack guarantee or a full
+			-- luck meter). No "next time..." nudges: the page shows the luck.
+			table.insert(tagWords, text.Guaranteed)
+		end
 		local below = 26 + 20 + 20 + 36 + 4 * gap -- name, rarity, news, buttons and the gaps
+		if #tagWords > 0 then
+			below += 18 + gap -- (the ONE IN A MILLION / GUARANTEED line)
+		end
 		if luckUsed then
 			below += 18 + gap -- (the "Opened at luck" line)
 		end
@@ -2410,12 +2459,19 @@ function CrateUI.Mount(gui: ScreenGui)
 		rarityLabel.LayoutOrder = 3
 		rarityLabel.TextColor3 = level.Color:Lerp(Color3.new(1, 1, 1), 0.15)
 		rarityLabel.Size = UDim2.new(1, 0, 0, 20)
+		if #tagWords > 0 then
+			local tags = label(table.concat(tagWords, "  "), 14, card)
+			tags.Name = "Tags"
+			tags.LayoutOrder = 4
+			tags.TextColor3 = Color3.fromRGB(140, 235, 140)
+			tags.Size = UDim2.new(1, 0, 0, 18)
+		end
 		local news = if result.Duplicate
 			then text.Duplicate:format(result.Refund or 0, currency)
 			else text.New
 		local newsLabel = label(news, 16, card)
 		newsLabel.Name = "News"
-		newsLabel.LayoutOrder = 4
+		newsLabel.LayoutOrder = 5
 		newsLabel.TextColor3 = if result.Duplicate
 			then Theme.Selected
 			else Color3.fromRGB(140, 235, 140)
@@ -2423,7 +2479,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		if luckUsed then
 			local used = label(text.RobuxLuck:format(result.Luck or 0, CrateLuck.Steps()), 14, card)
 			used.Name = "LuckUsed"
-			used.LayoutOrder = 5
+			used.LayoutOrder = 6
 			used.TextColor3 = Theme.Muted
 			used.Size = UDim2.new(1, 0, 0, 18)
 		end
@@ -2431,7 +2487,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		local buttons = Instance.new("Frame")
 		buttons.Name = "Buttons"
 		buttons.BackgroundTransparency = 1
-		buttons.LayoutOrder = 6
+		buttons.LayoutOrder = 7
 		buttons.Size = UDim2.new(1, 0, 0, 36)
 		buttons.Parent = card
 		local row = Instance.new("UIListLayout")
@@ -2497,14 +2553,6 @@ function CrateUI.Mount(gui: ScreenGui)
 				reveal.Visible = false
 				showPreview(crate)
 			end)
-		end
-		if result.OneInAMillion then
-			newsLabel.Text = text.OneInAMillion .. "  " .. newsLabel.Text
-		end
-		if result.Guaranteed then
-			-- Honest: this crate could only be that rarity or better (pack guarantee or a full
-			-- luck meter). No "next time..." nudges: the page shows the luck.
-			newsLabel.Text = text.Guaranteed .. "  " .. newsLabel.Text
 		end
 		local back = button(text.Back, buttons)
 		back.Name = "Back"
@@ -3407,17 +3455,19 @@ function CrateUI.Mount(gui: ScreenGui)
 				tag.TextXAlignment = Enum.TextXAlignment.Left
 			end
 			if r.Guaranteed then
-				-- This crate could only be that rarity or better (the pack's guarantee).
+				-- This crate could only be that rarity or better (the pack's guarantee). On its
+				-- own row, under BEST! when the card has both (a 5-column PC card is too narrow
+				-- for the two words side by side).
 				local sure = label(text.Guaranteed, 14, card)
 				sure.Name = "Guaranteed"
 				sure.ZIndex = 3
 				sure.TextWrapped = false
 				sure.TextColor3 = Color3.fromRGB(140, 235, 140)
 				sure.TextStrokeTransparency = 0.2
-				sure.TextXAlignment = Enum.TextXAlignment.Right
-				sure.AnchorPoint = Vector2.new(1, 0)
-				sure.Position = UDim2.new(1, -6, 0, 4)
-				sure.Size = UDim2.new(0.6, 0, 0, 18)
+				sure.TextXAlignment = Enum.TextXAlignment.Left
+				sure.Position = UDim2.fromOffset(6, if i == best then 22 else 4)
+				sure.Size = UDim2.fromOffset(0, 18)
+				sure.AutomaticSize = Enum.AutomaticSize.X
 			end
 		end
 

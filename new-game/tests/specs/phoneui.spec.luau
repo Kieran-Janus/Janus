@@ -583,6 +583,75 @@ describe("The crate panel's room on a phone", function()
 		p.player:SetAttribute("CratesRestricted", false)
 		p.rt:advance(0.2)
 	end)
+
+	it("keeps a crate page's left column full height while a message shows", function()
+		local p = screen(640, 302, true)
+		p.Config.Features.Crates = true
+		p.Config.Features.CrateLuck = true
+		p.Config.Features.CratePacks = true
+		p.remotes.GetShopState.OnServerInvoke = function()
+			return {
+				Ready = true,
+				Coins = 50,
+				Owned = {},
+				Equipped = {},
+				Vip = false,
+				CrateLuck = { PumpkinCrate = 4 },
+				LuckVersion = 1,
+			}
+		end
+		local text = p.Config.Crates.Text
+		local noCoins = text.NoCoins:format(550, p.Config.Economy.CurrencyName)
+		p.remotes.OpenCrate.OnServerInvoke = function(_player, crateId)
+			return { Ok = false, Message = noCoins, CrateId = crateId, Luck = 4, LuckVersion = 1 }
+		end
+		local CrateUI = p.rt:require(p.Client.CrateUI)
+		CrateUI.Mount(p.gui)
+		p.rt:advance(0.5)
+		p.player:SetAttribute("CratesRestricted", false)
+		CrateUI.Open("PumpkinCrate")
+		p.rt:advance(0.2)
+		local panel = p.gui.Crates
+		local message = panel.Message
+		local preview = panel.Body.Preview
+		expect(message.Visible).toBe(false)
+		local column = preview.Side.Size.Y.Offset
+		-- A refusal ("You need 550 more Coins"): the line shows over the skins on the right, so
+		-- the page (and its left column: the crate, its luck and the buttons) keeps its height.
+		p.rt:fire(preview.Buttons.Buy.OpenCoins, "Activated")
+		p.rt:advance(0.5)
+		expect(message.Text).toBe(noCoins)
+		expect(message.Visible).toBe(true)
+		expect(panel.Body.Position.Y.Offset).toBe(46)
+		expect(preview.Side.Size.Y.Offset).toBe(column)
+		local skins = preview.Items
+		local body = panel.Body.Position
+		expect(message.Position.X.Offset).toBeGreaterThanOrEqual(
+			body.X.Offset + skins.Position.X.Offset
+		)
+		expect(message.Position.Y.Offset + message.Size.Y.Offset).toBeLessThanOrEqual(
+			body.Y.Offset + skins.Position.Y.Offset
+		)
+		-- Every chance covers the page: the line waits and the window gets the whole page.
+		p.rt:fire(preview.Side.Luck:FindFirstChild("EveryChance", true), "Activated")
+		p.rt:advance(0.1)
+		expect(preview.LuckTable).toBeTruthy()
+		expect(message.Visible).toBe(false)
+		expect(panel.Body.Position.Y.Offset).toBe(46)
+		p.rt:fire(preview.LuckTable.Back, "Activated")
+		p.rt:advance(0.1)
+		expect(message.Visible).toBe(true)
+		-- The crate list: the line back in its usual place, the list makes room for it.
+		p.rt:fire(preview.Buttons.Nav.Back, "Activated")
+		p.rt:advance(0.1)
+		message.Text = noCoins
+		p.rt:advance(0.1)
+		expect(message.Visible).toBe(true)
+		expect(message.Position.X.Offset).toBe(16)
+		expect(panel.Body.Position.Y.Offset).toBeGreaterThan(46)
+		p.gui.Crates.Visible = false
+		p.rt:advance(0.1)
+	end)
 end)
 
 describe("The owner panel on a phone", function()
