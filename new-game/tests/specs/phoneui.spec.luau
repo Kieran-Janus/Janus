@@ -1,8 +1,9 @@
 -- Phone layouts (fixes from the v2 review): on a short landscape phone (640 x 302 usable UI
 -- units, the top bar taken off) banners stay under the Hud, the results, vote, spectate and
 -- Secret Pumpkins panels fit at full size (no text shrunk below Config.UI.MinTextSize), the
--- shop's and the crate panel's Buy buttons are in view without scrolling, and the crate strip
--- only builds 3D pictures once it slows down.
+-- shop's and the crate panel's Buy buttons are in view without scrolling (with the crate's
+-- one-line luck summary pinned right above them), and the crate strip only builds 3D pictures
+-- once it slows down.
 --
 -- The harness has no GUI layout (AbsoluteSize reads zero), so each test sets the screen's
 -- size and the Hud's place by hand (Dom.rawSet), the way Roblox would lay them out.
@@ -411,29 +412,98 @@ describe("Buy buttons in view on a short phone screen", function()
 		expect(phonePad).toBeLessThan(pcPad)
 	end)
 
-	it("pins the crate's Open buttons under the scrolling column", function()
+	it("pins the crate's Open buttons under the scrolling column, with the luck line", function()
 		local p = screen(640, 302, true)
 		p.Config.Features.Crates = true
+		p.Config.Features.CrateLuck = true
+		p.Config.Features.CratePacks = true
+		-- The server's state: this player's Pumpkin Crate luck meter is at 4.
+		p.remotes.GetShopState.OnServerInvoke = function()
+			return {
+				Ready = true,
+				Coins = 5000,
+				Owned = {},
+				Equipped = {},
+				Vip = false,
+				CrateLuck = { PumpkinCrate = 4 },
+				LuckVersion = 1,
+			}
+		end
 		local CrateUI = p.rt:require(p.Client.CrateUI)
 		CrateUI.Mount(p.gui)
 		p.rt:advance(0.5)
 		p.player:SetAttribute("CratesRestricted", false)
 		CrateUI.Open("PumpkinCrate")
+		p.rt:advance(0.2)
 		local preview = p.gui.Crates.Body.Preview
 		expect(preview.Side:FindFirstChild("Buy")).toBeNil()
 		local pinned = preview.Buttons
 		expect(pinned.AnchorPoint.Y).toBe(1)
 		expect(pinned.Buy.OpenCoins).toBeInstanceOf("TextButton")
+		expect(pinned.Buy.OpenCoins.Text).toMatch("600") -- (not "Checking...": luck is known)
 		expect(pinned.Nav.Back).toBeInstanceOf("TextButton")
+		-- The luck strip scrolls in the column; its one-line summary is pinned right above the
+		-- buy buttons, so it is always in view.
+		local luck = preview.Side:FindFirstChild("Luck")
+		expect(luck).toBeTruthy()
+		expect(luck:FindFirstChild("Help", true)).toBeNil() -- (the help is in Every chance)
+		expect(preview.Side:FindFirstChild("Packs")).toBeTruthy()
+		expect(preview.Side:FindFirstChild("LuckLine", true)).toBeNil()
+		local line = pinned.LuckLine
+		expect(line.Text).toBe("Luck 4/15 · Rare or better 23.02%")
+		expect(line.LayoutOrder).toBeLessThan(pinned.Buy.LayoutOrder)
+		-- The pinned strip holds every visible row and the 6 px gaps between them.
+		local rows, height = 0, 0
+		for _, child in pinned:GetChildren() do
+			if child:IsA("GuiObject") and child.Visible then
+				rows += 1
+				height += child.Size.Y.Offset
+			end
+		end
+		expect(rows).toBe(4) -- LuckLine, Buy, Extras, Nav
+		expect(pinned.Size.Y.Offset).toBeGreaterThanOrEqual(height + 6 * (rows - 1))
 		-- The column above stops where the buttons start.
 		expect(preview.Side.Size.Y.Offset).toBe(-(pinned.Size.Y.Offset + 6))
-		-- Restricted players: no buy row, a shorter pinned strip.
+		-- Every new piece stays inside its column, and no text is too small.
+		local minText = p.Config.UI.MinTextSize
+		for _, piece in { luck, preview.Side.Packs, line } do
+			expect(piece.Size.X.Scale).toBeLessThanOrEqual(1)
+			expect(piece.Size.X.Offset).toBeLessThanOrEqual(0)
+			for _, d in piece:GetDescendants() do
+				if d:IsA("TextLabel") or d:IsA("TextButton") then
+					expect(d.TextSize).toBeGreaterThanOrEqual(minText)
+				end
+			end
+		end
+		expect(line.TextSize).toBeGreaterThanOrEqual(minText)
+		expect(line.TextWrapped).toBe(true)
+		-- Every chance on a phone: the rows wrap.
+		p.rt:fire(luck:FindFirstChild("EveryChance", true), "Activated")
+		local row = preview.LuckTable.Rows.Row4
+		expect(row.TextWrapped).toBe(true)
+		expect(row.AutomaticSize).toBe(p.rt.env.Enum.AutomaticSize.Y)
+		p.rt:fire(preview.LuckTable.Back, "Activated")
+		-- The pack window: its buttons in a row at the bottom.
+		p.rt:fire(pinned.Buy.OpenCoins10, "Activated")
+		local window = preview.PackConfirm
+		expect(window.Buttons.Size.Y.Offset).toBe(36)
+		expect(window.Buttons.Confirm).toBeInstanceOf("TextButton")
+		p.rt:fire(window.Buttons.Cancel, "Activated")
+		-- Restricted players: no buy row, no luck line, a shorter pinned strip.
 		p.player:SetAttribute("CratesRestricted", true)
 		p.rt:advance(0.1)
 		expect(preview.Buttons.Buy.Visible).toBe(false)
+		expect(preview.Buttons:FindFirstChild("LuckLine")).toBeNil()
+		expect(preview.Side:FindFirstChild("Luck")).toBeNil()
+		expect(preview.Side:FindFirstChild("Packs")).toBeNil()
 		expect(preview.Buttons.Size.Y.Offset).toBe(32)
 		p.player:SetAttribute("CratesRestricted", false)
 		p.rt:advance(0.1)
+		-- A crate without a meter keeps today's pinned height (no luck line).
+		CrateUI.Open("CommonCrate")
+		p.rt:advance(0.1)
+		expect(preview.Buttons:FindFirstChild("LuckLine")).toBeNil()
+		expect(preview.Buttons.Size.Y.Offset).toBe((40 + 6) + (34 + 6) + 32)
 	end)
 
 	it("builds 3D pictures only on the cards the slowing strip shows", function()

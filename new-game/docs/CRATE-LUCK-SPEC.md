@@ -598,6 +598,7 @@ All new words are in `Config.Crates.Text` (section 8.3), and text is never small
   - Phone (`compact` true): `Luck` and `Packs` go inside `Side`, right after `Odds`. LayoutOrder is a whole number, so renumber: `Odds` 4, `Luck` 5, `Packs` 6, then `Buy` 7, `Extras` 8 and `Nav` 9 (tests find them by name). On phones the side already scrolls with its buy buttons pinned below it.
   - **Phone summary line.** On a 640×302 screen only about 110 px of `Side` show above the pinned buttons, so the strip is out of view. A one-line TextLabel **`LuckLine`** goes at the top of the pinned `Buttons` frame (LayoutOrder 0, 20 px, `Text.LuckShort`: "Luck 4/15 · Rare or better 23.02%", or "Luck full · Rare or better 100%"). `buttonsHeight` grows by 20 + 6 when the line is shown (a crate with a meter and a player who isn't restricted), and `Side` shrinks to match. Restricted players and crates without a meter keep today's heights (32 px when restricted).
   - Tests find them with `preview:FindFirstChild("Luck", true)` and `preview:FindFirstChild("LuckLine", true)`.
+  - **As built:** "Luck 4/15 · Rare or better 23.02%" is about 220 px at 14 px, and the pinned column is 160 px wide, so `LuckLine` wraps onto two lines: it is 36 px tall and `buttonsHeight` grows by 36 + 6 (on 640×302 the scrolling `Side` keeps about 65 px). On PC the strip's help line wraps too, so `Info` sizes itself to its text and the grid starts under it, wherever that is (the strip is about 100 px, not 56).
 - **`Luck`** is a Frame, only for crates where `CrateLuck.Applies` and only when the player isn't restricted. It holds:
   - `Title`: "Luck 4 / 15" (`Text.LuckTitle`), or `Text.LuckFull` when the meter is full.
   - `Bar`: `Steps` segment frames named `Step1`..`StepN` when `Steps ≤ 20` (one `Fill` frame otherwise). Filled segments use the Rare colour (`Config.Rarity.Levels.Rare.Color`) and empty ones `Theme.Button`. No flashing, no pulsing, no sound.
@@ -606,6 +607,7 @@ All new words are in `Config.Crates.Text` (section 8.3), and text is never small
   - `EveryChance`: a TextButton that opens 7.2.
 
   PC layout: row 1 is Title (left), Bar (middle) and Chance (right); row 2 is Help and EveryChance. Phone layout: Title, Bar, Chance and EveryChance stacked, about 100 px. The help text is in the "Every chance" view.
+  **As built (PC):** row 1 is Title (left half) and Bar (right half), row 2 is Chance and EveryChance, row 3 is Help. At a full meter the Title is the long `LuckFull` sentence, which doesn't fit beside the Bar and Chance in one row.
 - **`Packs`**: a TextLabel that lists `Text.PackLine` for each count with a guarantee for this crate. It is hidden when there are none, or when the player is restricted.
 - **The grid shows every skin of the crate** (the base crate's skins for Deluxe): `CrateOdds.Shown(crate, CrateLuck.Boost(crate, luckOf(crate)))`, each card printed with `Format`, so a skin that can't drop right now reads "0%" (at a full meter the 12 Commons and 5 Uncommons; on every Deluxe page the Commons). The cards keep their names (`Items.<itemId>.Chance`).
 - **The odds line** uses the same boost and lists every rarity the crate has skins of, highest first, "0%" included ("CRAZY 0.04442%  Rare 99.956%  Uncommon 0%  Common 0%").
@@ -627,6 +629,8 @@ All new words are in `Config.Crates.Text` (section 8.3), and text is never small
 - `Cancel`.
 
 No timer and nothing preselected. Cancel closes it (Escape closes the whole panel, as today). The same layout is used on phones, with the buttons in a row at the bottom (36 px).
+
+**As built:** the window's EveryChance button is only on crates with a meter (on the others every row would be the same; `PackHowFixed` already says every crate has the page's chances). The luck line in the body is `Text.PackLuckNow`. The guaranteed crate's chances list only the rarities it can give. Four more `Text` keys: `PackLuckNow`, `LuckHelpNoFull` (the help without its last sentence when `Luck.FullGuarantee` is false; `LuckFull` and `LuckShortFull` are then not used either), `TryAgain` and `RobuxFailed` (Roblox's purchase window didn't open).
 
 ### 7.4 After opening
 - **"Open again"** (`OpenAnother`, on the reveal card and in the Quick open footer) calls `showPreview(crate)` and never invokes a remote. Remove the direct buys, and `lastCount` and `lastPaid` once nothing uses them.

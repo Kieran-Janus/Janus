@@ -974,6 +974,19 @@ describe("CrateUI (client)", function()
 	local CrateUI = client:require("StarterPlayer.StarterPlayerScripts.Client.CrateUI")
 	local me = client.game:GetService("Players").LocalPlayer
 	local gui = client:create("ScreenGui", { Name = "GameUI" }, me.PlayerGui)
+	-- A pretend server state: the save has loaded and every luck meter is empty (until it says
+	-- so, a crate with a luck meter shows "Checking..." on its buttons).
+	client:find("ReplicatedStorage.Remotes.GetShopState").OnServerInvoke = function()
+		return {
+			Ready = true,
+			Coins = 100000,
+			Owned = {},
+			Equipped = {},
+			Vip = false,
+			CrateLuck = {},
+			LuckVersion = 0,
+		}
+	end
 	CrateUI.Mount(gui)
 	client:advance(1)
 	local panel = gui:FindFirstChild("Crates")
@@ -1212,6 +1225,9 @@ describe("CrateUI (client)", function()
 		client:advance(0.1)
 		client:fire(panel.Body.Preview.Side.Buy.OpenCoins10, "Activated")
 		client:advance(0.2)
+		expect(#asked).toBe(0) -- (x10 asks first)
+		client:fire(panel.Body.Preview.PackConfirm.Buttons.Confirm, "Activated")
+		client:advance(0.2)
 		expect(#asked).toBe(1)
 		expect(asked[1][1]).toBe("PumpkinCrate")
 		expect(asked[1][2]).toBe(10)
@@ -1247,6 +1263,7 @@ describe("CrateUI (client)", function()
 		expect(side.Extras.QuickOpen.Text).toMatch("☑")
 		client:advance(CConfig.Crates.RequestCooldown)
 		client:fire(side.Buy.OpenCoins10, "Activated")
+		client:fire(panel.Body.Preview.PackConfirm.Buttons.Confirm, "Activated")
 		client:advance(0.2)
 		local results = panel.Body.Results
 		expect(results.Visible).toBe(true)
@@ -1584,6 +1601,7 @@ describe("CrateUI (client)", function()
 		CrateUI.Open("PumpkinCrate")
 		client:advance(CConfig.Crates.RequestCooldown)
 		client:fire(panel.Body.Preview.Side.Buy.OpenCoins10, "Activated")
+		client:fire(panel.Body.Preview.PackConfirm.Buttons.Confirm, "Activated")
 		client:advance(0.2)
 		local opening = panel.Body.Opening
 		expect(opening.Chest.Visible).toBe(true)

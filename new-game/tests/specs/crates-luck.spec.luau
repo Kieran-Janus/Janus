@@ -1,6 +1,9 @@
 -- Crate luck, pack guarantees and Deluxe crates (docs/CRATE-LUCK-SPEC.md, section 10):
--- Config (K1), the odds maths (O1-O5), the economy rules (E1, E2), the server (S1-S8) and
--- Robux receipts (R1-R4). The crate page itself is tested in crates.spec.
+-- Config (K1), the odds maths (O1-O5), the economy rules (E1, E2), the server (S1-S8),
+-- Robux receipts (R1-R4), the crate page against the real server (C8) and the crate page with
+-- pretend server answers (C1-C7, C9-C11: the luck strip, Every chance, the pack window, the
+-- in-flight and version rules, Open again, GUARANTEED, the R$ check and the Robux waits). The
+-- phone layout (LuckLine above the pinned buttons) is in phoneui.spec.
 
 local T = require("../harness/Test")
 local Runtime = require("../harness/Runtime")
@@ -157,7 +160,13 @@ describe("Crate luck: Config (K1)", function()
 	it("has positive Robux hold times", function()
 		local r = cfg.RobuxOpen
 		for _, key in
-			{ "Cooldown", "HoldSeconds", "MaxHoldSeconds", "ClientWaitSeconds", "RemoteWaitSeconds" }
+			{
+				"Cooldown",
+				"HoldSeconds",
+				"MaxHoldSeconds",
+				"ClientWaitSeconds",
+				"RemoteWaitSeconds",
+			}
 		do
 			expect(r[key]).toBeA("number")
 			expect(r[key]).toBeGreaterThan(0)
@@ -2274,7 +2283,7 @@ describe("Crate luck: today's crate page against the real server (C8)", function
 		replayed = #calls
 	end
 	local pushFirst = true -- the real order: a grant's ShopState arrives before its answer
-	for _, name in { "OpenCrate", "GetShopState", "EquipItem" } do
+	for _, name in { "OpenCrate", "PrepareCrateRobux", "GetShopState", "EquipItem" } do
 		local serverRemote = w.rt:find("ReplicatedStorage.Remotes." .. name)
 		client:find("ReplicatedStorage.Remotes." .. name).OnServerInvoke = function(_p, ...)
 			local out = table.pack(w.rt:invokeServer(serverRemote, player, ...))
@@ -2346,7 +2355,11 @@ describe("Crate luck: today's crate page against the real server (C8)", function
 		table.clear(saw)
 		client:fire(panel.Body.Preview.Side.Buy.OpenCoins10, "Activated")
 		client:advance(0.1)
+		expect(data.Coins).toBe(coins) -- (x10 asks first: nothing bought yet)
+		client:fire(panel.Body.Preview.PackConfirm.Buttons.Confirm, "Activated")
+		client:advance(0.1)
 		replay()
+		expect(data.Coins).toBeLessThan(coins) -- bought (one payment, less duplicate coins)
 		expect(panel.Body.Opening.Visible).toBe(true)
 		for _ = 1, 10 do
 			client:advance(6)
@@ -2410,26 +2423,832 @@ describe("Crate luck: today's crate page against the real server (C8)", function
 		expect(shownSpice()).toBe(spiceAt(moved))
 	end)
 
+	-- Passes the server's new events on in the opposite order (the result before the push).
+	local function replayReversed()
+		local calls = w.rt:calls("RemoteEvent", "FireClient")
+		local mine = {}
+		for i = replayed + 1, #calls do
+			if calls[i].args[1] == player then
+				table.insert(mine, 1, calls[i])
+			end
+		end
+		replayed = #calls
+		for _, call in mine do
+			local remote = client:find("ReplicatedStorage.Remotes." .. call.instance.Name)
+			client:fire(remote, "OnClientEvent", copy(call.args[2]))
+		end
+	end
+
 	it("a Robux crate opening never says 'your chances changed' either", function()
 		local pumpkin = w.CrateOdds.Get("PumpkinCrate")
 		local cPumpkin = CCrateOdds.Get("PumpkinCrate")
 		pumpkin.Robux.ProductId = 8008
 		cPumpkin.Robux.ProductId = 8008
+		local Marketplace = client.game:GetService("MarketplaceService")
 		try(function()
-			CrateUI.Open("PumpkinCrate")
-			client:advance(0.2)
-			table.clear(saw)
-			client:fire(panel.Body.Preview.Side.Extras.OpenRobux, "Activated")
-			client:advance(0.2)
-			-- Roblox hands the receipt over: the push comes first, then the result.
-			expect(w.receipt(player, 8008, "page-robux").Name).toBe("PurchaseGranted")
-			replay()
-			client:advance(12) -- (the last reveal's few seconds, then this opening)
-			expect(panel.Body.Opening.Reveal.Visible).toBe(true)
-			expect(sawOddsChanged()).toBe(false)
+			for round, reversed in { false, true } do
+				client:advance(12) -- (the last opening's few seconds)
+				CrateUI.Open("PumpkinCrate")
+				client:advance(0.2)
+				table.clear(saw)
+				local level = serverLevel()
+				-- The R$ press checks the luck shown with the real server first (its hold).
+				w.rt:advance(2)
+				client:fire(panel.Body.Preview.Side.Extras.OpenRobux, "Activated")
+				client:advance(0.2)
+				expect(panel.Message.Text).toBe(text.WaitingRobux)
+				client:fire(Marketplace, "PromptProductPurchaseFinished", me.UserId, 8008, true)
+				w.finished(player, 8008, true)
+				-- Roblox hands the receipt over: the push and the result, in either order.
+				expect(w.receipt(player, 8008, "page-robux-" .. round).Name).toBe("PurchaseGranted")
+				if reversed then
+					replayReversed()
+				else
+					replay()
+				end
+				client:advance(12) -- (this opening)
+				expect(panel.Body.Opening.Reveal.Visible).toBe(true)
+				expect(sawOddsChanged()).toBe(false)
+				-- It says the luck it used, and "Open again" shows the new level.
+				expect(panel.Body.Opening.Reveal.Card.LuckUsed.Text).toBe(
+					text.RobuxLuck:format(level, CCrateLuck.Steps())
+				)
+				client:fire(panel.Body.Opening.Reveal.Card.Buttons.OpenAnother, "Activated")
+				client:advance(0.2)
+				expect(shownSpice()).toBe(spiceAt(serverLevel()))
+				expect(sawOddsChanged()).toBe(false)
+			end
 		end, function()
 			pumpkin.Robux.ProductId = 3717218517
 			cPumpkin.Robux.ProductId = 3717218517
 		end)
+	end)
+end)
+
+-- The crate page with pretend server answers (C1-C7, C9-C11) ---------------------------------
+
+-- PromptProductPurchase that throws in a runtime with promptFails = true (any other runtime
+-- gets the harness's usual recorded call).
+Dom.define("MarketplaceService", {
+	PromptProductPurchase = function(self, ...)
+		local world = Dom.data(self).world
+		if world then
+			world:recordCall("MarketplaceService", "PromptProductPurchase", self, ...)
+			if world.promptFails then
+				error("PromptProductPurchase failed (test)", 2)
+			end
+		end
+	end,
+})
+
+-- A copy of a table, like Roblox sends over the network.
+local function deepCopy(value: any): any
+	if type(value) ~= "table" then
+		return value
+	end
+	local out = {}
+	for k, v in value do
+		out[k] = deepCopy(v)
+	end
+	return out
+end
+
+-- RichText without its tags ("<b>Luck 4</b>" -> "Luck 4").
+local function plain(text: string): string
+	return (text:gsub("<[^>]+>", ""):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&"))
+end
+
+local pageServer: any = nil -- (only for its Remotes folder)
+
+--[[
+	A client with the crate panel mounted and pretend server answers:
+	  p.state            what GetShopState answers (Ready, CrateLuck, LuckVersion...)
+	  p.answer(...)      what OpenCrate answers (default: a NoCoins refusal); p.asked lists
+	                     every OpenCrate call { crateId, count, luck, guarantee }
+	  p.prepare(...)     what PrepareCrateRobux answers (default: Ok); p.prepared lists calls
+	options: { luck = { [crateId] = level }, restricted, noPrepare, notReady, features }
+]]
+local function pageWorld(options: { [string]: any }?)
+	local opts = options or {}
+	if not pageServer then
+		pageServer = serverWorld()
+	end
+	local client = Runtime.new({ client = true })
+	client:replicateFrom(pageServer.rt)
+	local Config = client:require("ReplicatedStorage.Shared.Config")
+	for _, name in { "Crates", "RobuxCrates", "CrateLuck", "CratePacks", "PremiumCrates" } do
+		Config.Features[name] = true
+	end
+	for name, value in opts.features or {} do
+		Config.Features[name] = value
+	end
+	local remotes = client:find("ReplicatedStorage.Remotes")
+	if opts.noPrepare then
+		remotes.PrepareCrateRobux:Destroy()
+	end
+	local p: any = {
+		rt = client,
+		Config = Config,
+		text = Config.Crates.Text,
+		asked = {},
+		prepared = {},
+		answer = nil,
+		prepare = nil,
+		state = {
+			Ready = not opts.notReady,
+			Coins = 1000000,
+			Owned = {},
+			Equipped = {},
+			Vip = false,
+			CrateLuck = deepCopy(opts.luck or {}),
+			LuckVersion = 1,
+		},
+		CrateOdds = client:require("ReplicatedStorage.Shared.CrateOdds"),
+		CrateLuck = client:require("ReplicatedStorage.Shared.CrateLuck"),
+		remotes = remotes,
+	}
+	remotes.GetShopState.OnServerInvoke = function()
+		return deepCopy(p.state)
+	end
+	remotes.OpenCrate.OnServerInvoke = function(_player, crateId, count, luck, guarantee)
+		table.insert(p.asked, { crateId, count, luck, guarantee })
+		if p.answer then
+			return deepCopy(p.answer(crateId, count, luck, guarantee))
+		end
+		return {
+			Ok = false,
+			Message = p.text.NoCoins:format(100, Config.Economy.CurrencyName),
+			CrateId = crateId,
+			LuckVersion = p.state.LuckVersion,
+		}
+	end
+	if not opts.noPrepare then
+		remotes.PrepareCrateRobux.OnServerInvoke = function(_player, crateId, luck)
+			table.insert(p.prepared, { crateId, luck })
+			if p.prepare then
+				return deepCopy(p.prepare(crateId, luck))
+			end
+			return {
+				Ok = true,
+				Message = "",
+				CrateId = crateId,
+				Luck = luck,
+				LuckVersion = p.state.LuckVersion,
+			}
+		end
+	end
+	local me = client.game:GetService("Players").LocalPlayer
+	me:SetAttribute("CratesRestricted", opts.restricted == true)
+	local gui = client:create("ScreenGui", { Name = "GameUI" }, me.PlayerGui)
+	local CrateUI = client:require("StarterPlayer.StarterPlayerScripts.Client.CrateUI")
+	CrateUI.Mount(gui)
+	client:advance(1)
+	p.CrateUI = CrateUI
+	p.me = me
+	p.gui = gui
+	p.panel = gui:FindFirstChild("Crates")
+	p.saw = {}
+	p.panel.Message:GetPropertyChangedSignal("Text"):Connect(function()
+		table.insert(p.saw, p.panel.Message.Text)
+	end)
+	function p.open(crateId: string?): any
+		CrateUI.Open(crateId)
+		client:advance(0.2)
+		return p.panel.Body.Preview
+	end
+	function p.press(b: any)
+		client:fire(b, "Activated")
+		client:advance(0.2)
+	end
+	-- The server telling this screen new luck levels (a ShopState push).
+	function p.push(luck: { [string]: number }, version: number)
+		p.state.CrateLuck = deepCopy(luck)
+		p.state.LuckVersion = version
+		client:fire(remotes.ShopState, "OnClientEvent", deepCopy(p.state))
+		client:advance(0.1)
+	end
+	function p.sawText(words: string): boolean
+		return table.find(p.saw, words) ~= nil
+	end
+	-- What the server would send for one crate of `crateId` giving `itemId`.
+	function p.result(crateId: string, itemId: string, extra: { [string]: any }?): any
+		local reel = {}
+		for k = 1, 32 do
+			reel[k] = itemId
+		end
+		local item = p.CrateOdds.Get(crateId)
+		local r: any = {
+			Ok = true,
+			Message = "",
+			CrateId = crateId,
+			ItemId = itemId,
+			ItemName = itemId,
+			Rarity = "Common",
+			Duplicate = false,
+			Refund = 0,
+			Reel = reel,
+			WinIndex = 28,
+			Paid = "Coins",
+		}
+		local _ = item
+		for k, v in extra or {} do
+			r[k] = v
+		end
+		return r
+	end
+	return p
+end
+
+-- The Luck strip's parts on the page (nil when there is none).
+local function strip(preview: any): any
+	return preview:FindFirstChild("Luck", true)
+end
+
+describe("Crate luck: the crate page (C1-C7, C9-C11)", function()
+	it("C1: the strip, the grid and the odds line show the chances at your level", function()
+		local p = pageWorld({ luck = { PumpkinCrate = 4 } })
+		local preview = p.open("PumpkinCrate")
+		local luck = strip(preview)
+		expect(luck).toBeTruthy()
+		expect(luck:IsDescendantOf(preview.Info)).toBe(true) -- (PC: above the skins)
+		expect(luck:FindFirstChild("Title", true).Text).toBe("Luck 4 / 15")
+		local filled = 0
+		for i = 1, 15 do
+			local block = luck:FindFirstChild("Step" .. i, true)
+			expect(block).toBeTruthy()
+			if block:GetAttribute("Filled") then
+				filled += 1
+				expect(block.BackgroundColor3).toBeNear(p.Config.Rarity.Levels.Rare.Color)
+			end
+		end
+		expect(filled).toBe(4)
+		expect(luck:FindFirstChild("Step16", true)).toBeNil()
+		expect(luck:FindFirstChild("Chance", true).Text).toBe("Rare or better, next crate: 23.02%")
+		expect(luck:FindFirstChild("Help", true).Text).toBe(
+			"Every crate below Rare adds 2% to Rare (taken from Common). A Rare or better starts it again at 0. A full meter = Rare or better for sure."
+		)
+		expect(luck:FindFirstChild("EveryChance", true)).toBeTruthy()
+		-- Every card is the level-4 chance, the same numbers the server rolls with.
+		local pumpkin = p.CrateOdds.Get("PumpkinCrate")
+		local cards = 0
+		for _, c in p.CrateOdds.Shown(pumpkin, p.CrateLuck.Boost(pumpkin, 4)) do
+			expect(preview.Items[c.Item.Id].Chance.Text).toBe(p.CrateOdds.Format(c.Chance))
+			cards += 1
+		end
+		expect(cards).toBe(20)
+		expect(preview.Items.Pumpkin_PumpkinSpice.Chance.Text).toBe("4.415%")
+		local line = plain(preview.Side.Odds.Text)
+		for _, part in { "CRAZY 0.02%", "Rare 23%", "Uncommon 24%", "Common 52.98%" } do
+			if not line:find(part, 1, true) then
+				error("the odds line has no " .. part .. ": " .. line)
+			end
+		end
+		-- The pack line, and the skins start under the strip.
+		expect(preview.Info.Packs.Text).toBe(
+			"x5: at least one Uncommon or better    x10: at least one Rare or better"
+		)
+		expect(preview.Items.Position.Y.Offset).toBeGreaterThan(90)
+		-- x1 sends the level the page shows (no guarantee for one crate).
+		p.press(preview.Side.Buy.OpenCoins)
+		expect(p.asked[1]).toEqual({ "PumpkinCrate", 1, 4, nil })
+	end)
+
+	it("C2: rarity and Deluxe crates have no strip; the Deluxe tab", function()
+		local p = pageWorld({ luck = { PumpkinCrate = 4 } })
+		for _, id in { "CommonCrate", "RareCrate", "PumpkinDeluxeCrate" } do
+			local preview = p.open(id)
+			expect(strip(preview)).toBeNil()
+			expect(preview:FindFirstChild("LuckLine", true)).toBeNil()
+		end
+		local deluxe = p.open("PumpkinDeluxeCrate")
+		expect(deluxe.Info.Packs.Text).toMatch("x10: at least one Rare or better")
+		expect(deluxe.Side.Buy.OpenCoins.Text).toBe("Open 2,000 Coins")
+		expect(deluxe.Side.Buy.OpenCoins5.Text).toMatch("10,000")
+		expect(deluxe.Side.Buy.OpenCoins10.Text).toMatch("20,000")
+		expect(deluxe.Side.Extras.OpenRobux.Text).toBe(p.text.ComingSoon)
+		-- The Deluxe tab: six cards at 2,000 Coins.
+		p.open()
+		local list = p.panel.Body.List
+		for _, tab in list.Categories:GetChildren() do
+			if tab:IsA("TextButton") and tab:GetAttribute("Category") == "Deluxe" then
+				p.press(tab)
+			end
+		end
+		local cards = 0
+		for _, card in p.panel.Body.List.Crates:GetChildren() do
+			if card:IsA("TextButton") then
+				cards += 1
+				expect(card.Price.Text).toBe("2,000 Coins")
+				expect(card:FindFirstChild("NewRibbon")).toBeTruthy()
+			end
+		end
+		expect(cards).toBe(6)
+	end)
+
+	it("C3: Every chance lists every level, your row marked", function()
+		local p = pageWorld({ luck = { PumpkinCrate = 4 } })
+		local preview = p.open("PumpkinCrate")
+		p.press(strip(preview):FindFirstChild("EveryChance", true))
+		local view = preview.LuckTable
+		expect(view.Title.Text).toBe("Pumpkin Crate: every chance at every luck step")
+		expect(view.Help.Text).toMatch("Every crate below Rare adds 2%%")
+		local rows = view.Rows
+		for level = 0, 15 do
+			local row = rows:FindFirstChild("Row" .. level)
+			expect(row).toBeTruthy()
+			expect(row.RichText).toBe(true)
+			expect(row:GetAttribute("You")).toBe(level == 4)
+			expect(row.TextSize).toBeGreaterThanOrEqual(p.Config.UI.MinTextSize)
+		end
+		expect(rows:FindFirstChild("Row16")).toBeNil()
+		expect(plain(rows.Row0.Text)).toBe(
+			"Luck 0  CRAZY 0.02% · Rare 15% (7.5% each) · Uncommon 24% (4.8% each) · Common 60.98% (5.082% each)"
+		)
+		expect(plain(rows.Row4.Text)).toBe(
+			"Luck 4  CRAZY 0.02% · Rare 23% (11.5% each) · Uncommon 24% (4.8% each) · Common 52.98% (4.415% each)  ◀ you"
+		)
+		expect(plain(rows.Row15.Text)).toBe(
+			"Luck 15 (full)  CRAZY 0.04442% · Rare 99.956% (49.978% each) · Uncommon 0% · Common 0%"
+		)
+		-- Every row is the maths the server rolls with.
+		local pumpkin = p.CrateOdds.Get("PumpkinCrate")
+		for level = 0, 15 do
+			local odds = p.CrateOdds.RarityOdds(pumpkin, p.CrateLuck.Boost(pumpkin, level))
+			local text = plain(rows["Row" .. level].Text)
+			for rarity, percent in odds do
+				local words = ("%s %s"):format(
+					p.Config.Rarity.Levels[rarity].Name,
+					p.CrateOdds.Format(percent)
+				)
+				if not text:find(words, 1, true) then
+					error(("Row%d has no %q: %s"):format(level, words, text))
+				end
+			end
+		end
+		p.press(view.Back)
+		expect(preview:FindFirstChild("LuckTable")).toBeNil()
+		expect(preview.Visible).toBe(true)
+		-- Vampire Castle: its one-in-a-million skin has its own row.
+		local vampire = p.open("VampireCastleCrate")
+		p.press(strip(vampire):FindFirstChild("EveryChance", true))
+		expect(vampire.LuckTable.Rows.Fixed1.Text).toBe(
+			"Night Lord Supreme: 0.0001% at every luck step"
+		)
+		expect(plain(vampire.LuckTable.Rows.Row0.Text)).toMatch("CRAZY 0.0001%%")
+	end)
+
+	it("C4: a change on an idle page redraws it and says so; older news never wins", function()
+		local p = pageWorld({ luck = { PumpkinCrate = 4 } })
+		local preview = p.open("PumpkinCrate")
+		-- The pack window is open when the change arrives: it closes with the page.
+		p.press(preview.Side.Buy.OpenCoins10)
+		expect(preview:FindFirstChild("PackConfirm")).toBeTruthy()
+		table.clear(p.saw)
+		p.push({ PumpkinCrate = 6 }, 2)
+		preview = p.panel.Body.Preview
+		expect(preview:FindFirstChild("PackConfirm")).toBeNil()
+		expect(strip(preview):FindFirstChild("Title", true).Text).toBe("Luck 6 / 15")
+		expect(p.panel.Message.Text).toBe(p.text.OddsChanged)
+		-- An older push changes nothing.
+		p.push({ PumpkinCrate = 2 }, 1)
+		expect(strip(preview):FindFirstChild("Title", true).Text).toBe("Luck 6 / 15")
+		-- A refusal with a new level: nothing bought, the page shows the new chances.
+		p.answer = function(crateId)
+			return {
+				Ok = false,
+				Message = p.text.OddsChanged,
+				CrateId = crateId,
+				Luck = 7,
+				LuckVersion = 3,
+			}
+		end
+		p.open("PumpkinCrate")
+		table.clear(p.saw)
+		p.press(p.panel.Body.Preview.Side.Buy.OpenCoins)
+		expect(p.asked[#p.asked]).toEqual({ "PumpkinCrate", 1, 6, nil })
+		expect(strip(p.panel.Body.Preview):FindFirstChild("Title", true).Text).toBe("Luck 7 / 15")
+		expect(p.panel.Message.Text).toBe(p.text.OddsChanged)
+		-- A refusal with the same level shows its own message.
+		local noCoins = p.text.NoCoins:format(100, p.Config.Economy.CurrencyName)
+		p.answer = function(crateId)
+			return { Ok = false, Message = noCoins, CrateId = crateId, Luck = 7, LuckVersion = 4 }
+		end
+		p.rt:advance(1)
+		p.press(p.panel.Body.Preview.Side.Buy.OpenCoins)
+		expect(p.asked[#p.asked]).toEqual({ "PumpkinCrate", 1, 7, nil })
+		expect(p.panel.Message.Text).toBe(noCoins)
+		-- Your own open: the server's push arrives before its answer and is only stored.
+		p.answer = function(crateId)
+			p.state.CrateLuck = { PumpkinCrate = 8 }
+			p.state.LuckVersion = 5
+			p.rt:fire(p.remotes.ShopState, "OnClientEvent", deepCopy(p.state))
+			return p.result(
+				crateId,
+				"Pumpkin_PumpkinSpice",
+				{ Luck = 7, LuckAfter = 8, LuckVersion = 5 }
+			)
+		end
+		table.clear(p.saw)
+		p.press(p.panel.Body.Preview.Side.Buy.OpenCoins)
+		expect(p.panel.Body.Opening.Visible).toBe(true)
+		expect(p.sawText(p.text.OddsChanged)).toBe(false)
+		p.press(p.panel.Body.Opening.Skip)
+		p.press(p.panel.Body.Opening.Reveal.Card.Buttons.OpenAnother)
+		expect(strip(p.panel.Body.Preview):FindFirstChild("Title", true).Text).toBe("Luck 8 / 15")
+		expect(p.sawText(p.text.OddsChanged)).toBe(false)
+	end)
+
+	it(
+		"C5: x5 / x10 ask first, with the price, the rules and the guaranteed crate's chances",
+		function()
+			local p = pageWorld()
+			local preview = p.open("PumpkinCrate")
+			p.press(preview.Side.Buy.OpenCoins10)
+			expect(#p.asked).toBe(0)
+			local window = preview.PackConfirm
+			expect(window.Title.Text).toBe("Open Pumpkin Crate x10?")
+			local words = plain(window.Body.Text.Text)
+			for _, part in
+				{
+					"Price: 6,000 Coins",
+					"The 10 crates open one after another, just like 10 single opens",
+					"Your luck now: 0 / 15 (Rare or better next: 15.02%)",
+					"If crates 1 to 9 give nothing Rare or better, crate 10 can only be Rare or better. Its chances: CRAZY 0.06057% · Rare 99.939% (49.97% each)",
+				}
+			do
+				if not words:find(part, 1, true) then
+					error("the x10 window has no " .. part .. ": " .. words)
+				end
+			end
+			expect(window.Buttons.Confirm.Text).toBe("Open 10 for 6,000 Coins")
+			expect(window.Buttons.EveryChance).toBeTruthy()
+			-- Every chance from the window, then Back to the window.
+			p.press(window.Buttons.EveryChance)
+			expect(preview.LuckTable).toBeTruthy()
+			p.press(preview.LuckTable.Back)
+			expect(preview:FindFirstChild("PackConfirm")).toBeTruthy()
+			-- Cancel buys nothing.
+			p.press(window.Buttons.Cancel)
+			expect(preview:FindFirstChild("PackConfirm")).toBeNil()
+			expect(#p.asked).toBe(0)
+			-- x5 from luck 0.
+			p.press(preview.Side.Buy.OpenCoins5)
+			words = plain(preview.PackConfirm.Body.Text.Text)
+			local x5 =
+				"If crates 1 to 4 give nothing Uncommon or better, crate 5 can only be Uncommon or better. Its chances: CRAZY 0.04254% · Rare 48.915% (24.458% each) · Uncommon 51.042% (10.208% each)"
+			if not words:find(x5, 1, true) then
+				error("the x5 window has no " .. x5 .. ": " .. words)
+			end
+			p.press(preview.PackConfirm.Buttons.Confirm)
+			expect(p.asked[1]).toEqual({ "PumpkinCrate", 5, 0, "Uncommon" })
+			expect(preview:FindFirstChild("PackConfirm")).toBeNil()
+			-- At luck 4, Confirm sends that level and the window's guarantee.
+			p.push({ PumpkinCrate = 4 }, 2)
+			p.rt:advance(1)
+			preview = p.open("PumpkinCrate")
+			p.press(preview.Side.Buy.OpenCoins10)
+			expect(plain(preview.PackConfirm.Body.Text.Text)).toMatch(
+				"Your luck now: 4 / 15 %(Rare or better next: 23.02%%%)"
+			)
+			p.press(preview.PackConfirm.Buttons.Confirm)
+			expect(p.asked[2]).toEqual({ "PumpkinCrate", 10, 4, "Rare" })
+			-- At luck 6 the meter fills up inside an x10 anyway: the window says so.
+			p.push({ PumpkinCrate = 6 }, 3)
+			p.rt:advance(1)
+			preview = p.open("PumpkinCrate")
+			p.press(preview.Side.Buy.OpenCoins10)
+			words = plain(preview.PackConfirm.Body.Text.Text)
+			expect(words).toMatch("your luck meter fills up during this pack")
+			expect(words:find("Its chances", 1, true)).toBeNil()
+			p.press(preview.PackConfirm.Buttons.Cancel)
+			-- A crate without a meter: its window says every crate has the page's chances.
+			local deluxe = p.open("PumpkinDeluxeCrate")
+			p.press(deluxe.Side.Buy.OpenCoins10)
+			words = plain(deluxe.PackConfirm.Body.Text.Text)
+			expect(words).toMatch(p.text.PackHowFixed)
+			expect(words).toMatch("Its chances: CRAZY 2%% · Rare 98%% %(49%% each%)")
+			expect(words:find("Your luck now", 1, true)).toBeNil()
+			expect(deluxe.PackConfirm.Buttons:FindFirstChild("EveryChance")).toBeNil()
+			p.press(deluxe.PackConfirm.Buttons.Confirm)
+			expect(p.asked[3]).toEqual({ "PumpkinDeluxeCrate", 10, 0, "Rare" })
+		end
+	)
+
+	it("C6: Open again shows the page and buys nothing; GUARANTEED crates say so", function()
+		local p = pageWorld({ luck = { PumpkinCrate = 9 } })
+		p.answer = function(crateId, count)
+			local results = {}
+			for k = 1, count do
+				results[k] = p.result(crateId, "Pumpkin_PumpkinSpice", {
+					Luck = 9,
+					LuckAfter = 10,
+					LuckVersion = 2,
+					Guaranteed = if k == count and count > 1 then "Rare" else nil,
+					Rarity = if k == count and count > 1 then "Rare" else "Common",
+				})
+			end
+			local batch = table.clone(results[1])
+			if count > 1 then
+				batch.Results = results
+			end
+			return batch
+		end
+		local preview = p.open("PumpkinCrate")
+		p.press(preview.Side.Buy.OpenCoins)
+		p.press(p.panel.Body.Opening.Skip)
+		local asked = #p.asked
+		local card = p.panel.Body.Opening.Reveal.Card
+		expect(card.News.Text).never.toMatch(p.text.Guaranteed)
+		p.press(card.Buttons.OpenAnother)
+		expect(p.panel.Body.Preview.Visible).toBe(true)
+		expect(#p.asked).toBe(asked)
+		-- A guaranteed crate (x5 here) says so on its reveal...
+		p.rt:advance(1)
+		p.press(p.panel.Body.Preview.Side.Buy.OpenCoins5)
+		p.press(p.panel.Body.Preview.PackConfirm.Buttons.Confirm)
+		for _ = 1, 5 do
+			p.press(p.panel.Body.Opening.Skip)
+			local next = p.panel.Body.Opening.Reveal.Card.Buttons:FindFirstChild("Next")
+			if next then
+				p.press(next)
+			end
+		end
+		card = p.panel.Body.Opening.Reveal.Card
+		expect(card.News.Text:sub(1, #p.text.Guaranteed)).toBe(p.text.Guaranteed)
+		-- ...and on its Quick open card. Open again in the footer buys nothing either.
+		p.press(card.Buttons.OpenAnother)
+		p.press(p.panel.Body.Preview.Side.Extras.QuickOpen)
+		p.rt:advance(1)
+		p.press(p.panel.Body.Preview.Side.Buy.OpenCoins5)
+		p.press(p.panel.Body.Preview.PackConfirm.Buttons.Confirm)
+		local results = p.panel.Body.Results
+		expect(results.Visible).toBe(true)
+		expect(results.Items.Result5:FindFirstChild("Guaranteed").Text).toBe(p.text.Guaranteed)
+		expect(results.Items.Result1:FindFirstChild("Guaranteed")).toBeNil()
+		asked = #p.asked
+		p.press(results.Footer.OpenAnother)
+		expect(p.panel.Body.Preview.Visible).toBe(true)
+		expect(#p.asked).toBe(asked)
+		p.press(p.panel.Body.Preview.Side.Extras.QuickOpen) -- (switch it off again)
+	end)
+
+	it("C7: a restricted player sees the chances but no strip, pack line or buy buttons", function()
+		local p = pageWorld({ luck = { PumpkinCrate = 4 }, restricted = true })
+		local preview = p.open("PumpkinCrate")
+		expect(strip(preview)).toBeNil()
+		expect(preview:FindFirstChild("Packs", true)).toBeNil()
+		expect(preview:FindFirstChild("Info")).toBeNil()
+		expect(preview.Side.Buy.Visible).toBe(false)
+		expect(preview.Side.Extras.Visible).toBe(false)
+		expect(preview.Items.Pumpkin_PumpkinSpice.Chance.Text).toBe("4.415%")
+		expect(p.panel.Message.Text).toBe(p.text.Restricted)
+	end)
+
+	it("C9: after a pack the page shows the luck after its last crate", function()
+		local p = pageWorld({ luck = { PumpkinCrate = 4 } })
+		p.answer = function(crateId, count)
+			local results = {}
+			for k = 1, count do
+				results[k] = p.result(crateId, "Pumpkin_PumpkinSpice", {
+					Luck = 4,
+					LuckAfter = if k == count then 0 else 5,
+					LuckVersion = 1 + k,
+				})
+			end
+			local batch = table.clone(results[1])
+			batch.Results = results
+			batch.LuckAfter = 0
+			batch.LuckVersion = 1 + count
+			return batch
+		end
+		local preview = p.open("PumpkinCrate")
+		p.press(preview.Side.Extras.QuickOpen)
+		p.press(preview.Side.Buy.OpenCoins10)
+		p.press(preview.PackConfirm.Buttons.Confirm)
+		p.press(p.panel.Body.Results.Footer.OpenAnother)
+		expect(strip(p.panel.Body.Preview):FindFirstChild("Title", true).Text).toBe("Luck 0 / 15")
+		p.press(p.panel.Body.Preview.Side.Extras.QuickOpen)
+	end)
+
+	it("C10: a full meter still lists every skin, the ones that can't drop at 0%", function()
+		local p = pageWorld({ luck = { PumpkinCrate = 15 } })
+		local preview = p.open("PumpkinCrate")
+		local luck = strip(preview)
+		expect(luck:FindFirstChild("Title", true).Text).toBe(
+			"Luck full. Your next crate is Rare or better for sure."
+		)
+		expect(luck:FindFirstChild("Chance", true).Text).toBe("Rare or better, next crate: 100%")
+		local cards, zero = 0, 0
+		for _, card in preview.Items:GetChildren() do
+			if card:IsA("Frame") then
+				cards += 1
+				if card.Chance.Text == "0%" then
+					zero += 1
+				end
+			end
+		end
+		expect(cards).toBe(20)
+		expect(zero).toBe(17)
+		local line = plain(preview.Side.Odds.Text)
+		expect(line).toMatch("Common 0%%")
+		expect(line).toMatch("CRAZY 0.04442%%")
+		-- Deluxe Pumpkin: 20 cards, its 12 Commons at 0%.
+		local deluxe = p.open("PumpkinDeluxeCrate")
+		cards, zero = 0, 0
+		for _, card in deluxe.Items:GetChildren() do
+			if card:IsA("Frame") then
+				cards += 1
+				if card.Chance.Text == "0%" then
+					zero += 1
+					expect(card.Rarity.Text).toBe("Common")
+				end
+			end
+		end
+		expect(cards).toBe(20)
+		expect(zero).toBe(12)
+		expect(plain(deluxe.Side.Odds.Text)).toMatch("Common 0%%")
+	end)
+
+	it(
+		"C11: Mount never waits for PrepareCrateRobux, and a missing one only says try again",
+		function()
+			local p = pageWorld({ luck = { PumpkinCrate = 3 }, noPrepare = true })
+			-- CrateResult is connected: a Robux crate's result plays, and says the luck it used.
+			p.rt:fire(
+				p.remotes.CrateResult,
+				"OnClientEvent",
+				p.result("PumpkinCrate", "Pumpkin_PumpkinSpice", {
+					Paid = "Robux",
+					Luck = 3,
+					LuckAfter = 4,
+					LuckVersion = 2,
+				})
+			)
+			p.rt:advance(0.2)
+			expect(p.panel.Visible).toBe(true)
+			p.press(p.panel.Body.Opening.Skip)
+			local card = p.panel.Body.Opening.Reveal.Card
+			expect(card.LuckUsed.Text).toBe("Opened at luck 3 / 15")
+			-- The R$ press: the server's check can't be found, so nothing happens but a message.
+			local preview = p.open("PumpkinCrate")
+			expect(strip(preview):FindFirstChild("Title", true).Text).toBe("Luck 4 / 15")
+			p.press(preview.Side.Extras.OpenRobux)
+			p.rt:advance(p.Config.Crates.RobuxOpen.RemoteWaitSeconds + 0.5)
+			expect(p.panel.Message.Text).toBe(p.text.TryAgain)
+			expect(#p.rt:calls("MarketplaceService", "PromptProductPurchase")).toBe(0)
+			-- The buttons work again.
+			p.press(p.panel.Body.Preview.Side.Buy.OpenCoins)
+			expect(#p.asked).toBe(1)
+			-- A coin crate's reveal never shows the luck line.
+			p.answer = function(crateId)
+				return p.result(
+					crateId,
+					"Pumpkin_PumpkinSpice",
+					{ Luck = 4, LuckAfter = 5, LuckVersion = 3 }
+				)
+			end
+			p.rt:advance(1)
+			p.press(p.panel.Body.Preview.Side.Buy.OpenCoins)
+			p.press(p.panel.Body.Opening.Skip)
+			expect(p.panel.Body.Opening.Reveal.Card:FindFirstChild("LuckUsed")).toBeNil()
+		end
+	)
+
+	it("C11: the R$ button checks the luck first, then waits for Roblox", function()
+		local p = pageWorld({ luck = { PumpkinCrate = 3 } })
+		local preview = p.open("PumpkinCrate")
+		local productId = p.CrateOdds.ProductId(p.CrateOdds.Get("PumpkinCrate"))
+		local Marketplace = p.rt.game:GetService("MarketplaceService")
+		local function finished(purchased: boolean)
+			p.rt:fire(
+				Marketplace,
+				"PromptProductPurchaseFinished",
+				p.me.UserId,
+				productId,
+				purchased
+			)
+			p.rt:advance(0.1)
+		end
+		-- Refused with a new level: the page redraws, no purchase window.
+		p.prepare = function(crateId)
+			return {
+				Ok = false,
+				Message = p.text.OddsChanged,
+				CrateId = crateId,
+				Luck = 5,
+				LuckVersion = 2,
+			}
+		end
+		p.press(preview.Side.Extras.OpenRobux)
+		expect(p.prepared[1]).toEqual({ "PumpkinCrate", 3 })
+		expect(#p.rt:calls("MarketplaceService", "PromptProductPurchase")).toBe(0)
+		expect(p.panel.Message.Text).toBe(p.text.OddsChanged)
+		preview = p.panel.Body.Preview
+		expect(strip(preview):FindFirstChild("Title", true).Text).toBe("Luck 5 / 15")
+		-- Accepted: Roblox's window opens; nothing else opens meanwhile; cancel frees it.
+		p.prepare = nil
+		p.press(preview.Side.Extras.OpenRobux)
+		expect(p.prepared[2]).toEqual({ "PumpkinCrate", 5 })
+		expect(#p.rt:calls("MarketplaceService", "PromptProductPurchase")).toBe(1)
+		expect(p.panel.Message.Text).toBe(p.text.WaitingRobux)
+		p.press(preview.Side.Buy.OpenCoins)
+		expect(#p.asked).toBe(0)
+		finished(false)
+		expect(p.panel.Message.Text).toBe(p.text.Hint)
+		p.press(p.panel.Body.Preview.Side.Buy.OpenCoins)
+		expect(#p.asked).toBe(1)
+		-- Bought, and Roblox is slow: after ClientWaitSeconds the other crates open again, and
+		-- this crate's own luck change isn't "your chances changed".
+		p.rt:advance(1)
+		preview = p.panel.Body.Preview
+		p.press(preview.Side.Extras.OpenRobux)
+		finished(true)
+		table.clear(p.saw)
+		p.push({ PumpkinCrate = 6 }, 5)
+		expect(p.sawText(p.text.OddsChanged)).toBe(false)
+		p.rt:advance(p.Config.Crates.RobuxOpen.ClientWaitSeconds + 1)
+		expect(p.panel.Message.Text).toBe(p.text.RobuxSlow)
+		local candy = p.open("CandyCrate")
+		p.press(candy.Side.Buy.OpenCoins)
+		expect(p.asked[#p.asked][1]).toBe("CandyCrate")
+		-- Roblox will hand it over later: the wait ends and says so.
+		p.open("PumpkinCrate")
+		p.press(p.panel.Body.Preview.Side.Extras.OpenRobux)
+		p.rt:fire(p.remotes.CrateResult, "OnClientEvent", {
+			Ok = false,
+			Message = p.text.RobuxLater,
+			CrateId = "PumpkinCrate",
+			Paid = "Robux",
+			Luck = 6,
+			LuckVersion = 6,
+		})
+		p.rt:advance(0.2)
+		expect(p.panel.Message.Text).toBe(p.text.RobuxLater)
+		local asked = #p.asked
+		p.rt:advance(1)
+		p.press(p.panel.Body.Preview.Side.Buy.OpenCoins)
+		expect(#p.asked).toBe(asked + 1)
+		-- Roblox's window failing to open leaves the buttons working.
+		p.rt.promptFails = true
+		p.rt:advance(1)
+		p.press(p.panel.Body.Preview.Side.Extras.OpenRobux)
+		p.rt.promptFails = nil
+		expect(p.panel.Message.Text).toBe(p.text.RobuxFailed)
+		p.rt:advance(1)
+		p.press(p.panel.Body.Preview.Side.Buy.OpenCoins)
+		expect(#p.asked).toBe(asked + 2)
+	end)
+
+	it("says Checking... on a crate with a meter until the server has told its luck", function()
+		local p = pageWorld({ luck = { PumpkinCrate = 4 }, notReady = true })
+		local preview = p.open("PumpkinCrate")
+		expect(preview.Side.Buy.OpenCoins.Text).toBe(p.text.Checking)
+		expect(preview.Side.Buy.OpenCoins.Active).toBe(false)
+		expect(preview.Side.Extras.OpenRobux.Text).toBe(p.text.Checking)
+		-- A crate without a meter can be opened already.
+		local common = p.open("CommonCrate")
+		expect(common.Side.Buy.OpenCoins.Text).toMatch("Open")
+		-- The first loaded State: the page draws again, quietly, with its buttons.
+		preview = p.open("PumpkinCrate")
+		p.state.Ready = true
+		table.clear(p.saw)
+		p.push({ PumpkinCrate = 4 }, 1)
+		preview = p.panel.Body.Preview
+		expect(preview.Side.Buy.OpenCoins.Text).toBe("Open 600 Coins")
+		expect(strip(preview):FindFirstChild("Title", true).Text).toBe("Luck 4 / 15")
+		expect(p.sawText(p.text.OddsChanged)).toBe(false)
+	end)
+
+	it("follows the switches: CrateLuck, CratePacks and PremiumCrates off", function()
+		local noLuck = pageWorld({ luck = { PumpkinCrate = 4 }, features = { CrateLuck = false } })
+		local preview = noLuck.open("PumpkinCrate")
+		expect(strip(preview)).toBeNil()
+		expect(preview.Items.Pumpkin_PumpkinSpice.Chance.Text).toBe("5.082%")
+		noLuck.press(preview.Side.Buy.OpenCoins)
+		expect(noLuck.asked[1]).toEqual({ "PumpkinCrate", 1, 0, nil })
+		noLuck.rt:advance(1)
+		noLuck.press(noLuck.panel.Body.Preview.Side.Buy.OpenCoins10)
+		local words = plain(noLuck.panel.Body.Preview.PackConfirm.Body.Text.Text)
+		expect(words).toMatch(noLuck.text.PackHowFixed)
+		expect(words).toMatch("Its chances")
+
+		local noPacks =
+			pageWorld({ luck = { PumpkinCrate = 4 }, features = { CratePacks = false } })
+		preview = noPacks.open("PumpkinCrate")
+		expect(strip(preview)).toBeTruthy()
+		expect(preview:FindFirstChild("Packs", true)).toBeNil()
+		noPacks.press(preview.Side.Buy.OpenCoins10)
+		words = plain(preview.PackConfirm.Body.Text.Text)
+		expect(words:find("Its chances", 1, true)).toBeNil()
+		noPacks.press(preview.PackConfirm.Buttons.Confirm)
+		expect(noPacks.asked[1]).toEqual({ "PumpkinCrate", 10, 4, nil })
+
+		local noDeluxe = pageWorld({ features = { PremiumCrates = false } })
+		noDeluxe.open()
+		for _, tab in noDeluxe.panel.Body.List.Categories:GetChildren() do
+			if tab:IsA("TextButton") then
+				expect(tab:GetAttribute("Category")).never.toBe("Deluxe")
+			end
+		end
 	end)
 end)

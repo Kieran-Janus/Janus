@@ -72,9 +72,11 @@
 	Rarity crates cost a bit less than buying one skin of that rarity in the shop (125, 500,
 	1000, 100000), because you don't get to choose which skin you get. They were NOT doubled:
 	doubled they would cost more than the shop.
-	OPEN SEVERAL AT ONCE: Open.Counts (x1, x5, x10). The server rolls them all in one request
-	and takes the coins in one go. QuickOpen skips the spinning strip and shows every result
-	on one page.
+	OPEN SEVERAL AT ONCE: Open.Counts (x1, x5, x10). x5 and x10 always ask first ("Open
+	Pumpkin Crate x10?", with the price, how packs work and the exact chances of a guaranteed
+	crate). The server rolls them all in one request and takes the coins in one go. QuickOpen
+	skips the spinning strip and shows every result on one page.
+	WORDS ON THE CRATE PAGE: Text below (the luck meter, "Every chance", the x5 / x10 window).
 ]]
 
 export type RobuxInfo = { ProductId: number, SuggestedRobux: number }
@@ -506,6 +508,11 @@ local crates = {
 		PackConfirm = "Open %d for %s %s",
 		Cancel = "Cancel",
 		Guaranteed = "GUARANTEED",
+		PackLuckNow = "Your luck now: %d / %d (%s or better next: %s)", -- in the x5 / x10 window
+		-- LuckHelp without its last sentence (used when Luck.FullGuarantee is false)
+		LuckHelpNoFull = "Every crate below %s adds %s to %s (taken from %s). A %s or better starts it again at 0.",
+		TryAgain = "Something went wrong, try again.",
+		RobuxFailed = "Roblox's purchase window didn't open. Try again in a moment.",
 	},
 
 	-- DELUXE CRATES (switch: Config.Features.PremiumCrates). A pricier version of a themed

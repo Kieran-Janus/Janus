@@ -12,9 +12,31 @@
 	            YOUR next crate (your luck level: src/shared/CrateLuck.luau; a skin that
 	            can't drop right now shows 0%; Roblox requires the odds to be shown before
 	            buying), and the Open buttons, labelled "Open 600 Coins" / "R$ 79" so coins
-	            and Robux are never confused. The level the page shows is sent with the open
-	            (and the pack guarantee for x5 / x10); if the server's differs nothing is
-	            bought and the page redraws with OddsChanged
+	            and Robux are never confused.
+	            Luck strip ("Luck"): the meter (one block per step), "Rare or better, next
+	            crate: 23.02%" and an "Every chance" button. On PC it sits above the skins
+	            (Preview.Info, with the pack line under it); on phones it is in the left column
+	            and a one-line summary ("LuckLine") sits right above the pinned buy buttons, so
+	            it is always in view. Crates without a meter (rarity and Deluxe crates) and
+	            players who can't buy get no strip.
+	            Pack line ("Packs"): "x5: at least one Uncommon or better ..." for each count
+	            with a guarantee.
+	            "Every chance" (Preview.LuckTable): one row per luck level with every rarity's
+	            exact chance (your row marked), plus a row for a one-in-a-million skin.
+	            x5 / x10 open the pack window (Preview.PackConfirm) first: the price, how packs
+	            work, your luck now and the exact chances of the guaranteed last crate. Only its
+	            Confirm button buys; Cancel buys nothing.
+	            The level the page shows (and, for a pack, the guarantee its window showed) is
+	            sent with the open; if the server's differs nothing is bought and the page
+	            redraws with "your chances changed". The same happens when your luck changes
+	            while the page just sits there (an F8 button, a Robux crate arriving). Your own
+	            open never says it: a crate whose open or Robux purchase is on its way
+	            (inFlight / robuxWaiting) only stores its new level. Until the server has told
+	            this screen your luck, a crate with a meter says "Checking..." on its buttons.
+	            R$: asks the server first (PrepareCrateRobux, looked up on the first press, at
+	            most RobuxOpen.RemoteWaitSeconds), then Roblox's purchase window. While Roblox
+	            finishes, nothing else opens (at most RobuxOpen.ClientWaitSeconds after buying,
+	            then "Roblox is taking a while" and the other crates open again).
 	  opening   Config.Crates.Opening.Style "Chest": the chest drops in, shakes faster and
 	            faster, the lid bursts open with a beam in the colour of the rarity really won
 	            (rainbow + full-screen confetti for CRAZY), the skin flies onto a spinning
@@ -22,6 +44,8 @@
 	            skin cards spins and slows down on the result. Then the reveal card (rarity
 	            glow), "Equip now", "Open again" (back to the crate's page with your new
 	            chances; it never buys), and "Duplicate! +X coins" when you already had it.
+	            A guaranteed crate (pack guarantee or full meter) says GUARANTEED, and a Robux
+	            crate says which luck it really used ("Opened at luck 3 / 15").
 	            Space or a tap skips to the reveal; Quick open shows them all at once.
 	Nothing is decided here: the server (CrateService) takes the coins, rolls and gives the skin
 	before the chest even drops; the beam, the strip and the reveal only show that result.
@@ -199,6 +223,28 @@ local function asResult(value: unknown): Result?
 	return r :: Result
 end
 
+-- What PrepareCrateRobux answers (CrateService.Prepared), checked the same way.
+type Prepared = {
+	Ok: boolean,
+	Message: string,
+	CrateId: string,
+	Luck: number?,
+	LuckVersion: number?,
+}
+local function asPrepared(value: unknown): Prepared?
+	if typeof(value) ~= "table" then
+		return nil
+	end
+	local r = value :: any
+	if type(r.Ok) ~= "boolean" or type(r.CrateId) ~= "string" or not luckFieldsOk(r) then
+		return nil
+	end
+	if type(r.Message) ~= "string" then
+		r.Message = ""
+	end
+	return r :: Prepared
+end
+
 local function rarityLevel(rarity: string?): any
 	return (Config.Rarity.Levels :: any)[rarity or ""]
 		or (Config.Rarity.Levels :: any)[Config.Rarity.Default]
@@ -230,6 +276,70 @@ local function hex(color: Color3): string
 		math.floor(color.G * 255 + 0.5),
 		math.floor(color.B * 255 + 0.5)
 	)
+end
+
+-- A rarity's name for players ("Rare", "CRAZY").
+local function rarityName(rarity: string): string
+	return rarityLevel(rarity).Name
+end
+
+-- A skin with its own fixed chance in this crate (a one-in-a-million skin, in its own crate
+-- or that crate's Deluxe crate): the same at every luck level.
+local function hasFixedOdds(crate: CrateOdds.Crate, item: any): boolean
+	return type(item.Odds) == "number" and item.Odds > 0 and item.Crate == (crate.Base or crate.Id)
+end
+
+-- The chance (percent) that a crate rolled with `boost` gives Luck.Boost (Rare) or better.
+local function orBetter(crate: CrateOdds.Crate, boost: CrateOdds.Boost?): number
+	local floor = CrateOdds.RarityIndex(Config.Crates.Luck.Boost)
+	local total = 0
+	for rarity, percent in CrateOdds.RarityOdds(crate, boost) do
+		if CrateOdds.RarityIndex(rarity) >= floor then
+			total += percent
+		end
+	end
+	return total
+end
+
+--[[
+	Chances grouped by rarity, highest first, each rarity name in its colour (RichText):
+	  "CRAZY 0.02% · Rare 23% (11.5% each) · Uncommon 24% (4.8% each) · Common 52.98% (...)"
+	`chances` comes from CrateOdds.Shown (every skin, 0 for those that can't drop). keepZero
+	= also list rarities at 0% (their skins can't drop this time).
+]]
+local function rarityGroups(
+	crate: CrateOdds.Crate,
+	chances: { CrateOdds.Chance },
+	keepZero: boolean
+): string
+	local total: { [string]: number } = {}
+	local shared: { [string]: number } = {} -- skins sharing the rarity (not fixed-odds ones)
+	local each: { [string]: number } = {}
+	for _, c in chances do
+		total[c.Rarity] = (total[c.Rarity] or 0) + c.Chance
+		if not hasFixedOdds(crate, c.Item) then
+			shared[c.Rarity] = (shared[c.Rarity] or 0) + 1
+			each[c.Rarity] = c.Chance
+		end
+	end
+	local parts = {}
+	for i = #Config.Rarity.Order, 1, -1 do
+		local rarity = Config.Rarity.Order[i]
+		local share = total[rarity]
+		if share == nil or (share <= 0 and not keepZero) then
+			continue
+		end
+		local level = rarityLevel(rarity)
+		local words = ("%s %s"):format(level.Name, CrateOdds.Format(share))
+		if share > 0 and (shared[rarity] or 0) > 1 then
+			words ..= " (" .. Config.Crates.Text.Each:format(CrateOdds.Format(each[rarity])) .. ")"
+		end
+		table.insert(
+			parts,
+			('<font color="#%s">%s</font>'):format(hex(level.Color), richEscape(words))
+		)
+	end
+	return table.concat(parts, " · ")
 end
 
 local function rainbowSequence(): ColorSequence
@@ -329,7 +439,13 @@ function CrateUI.Mount(gui: ScreenGui)
 	local snapshotVer = 0
 	local luckKnown = false -- a State from a loaded save has arrived
 	local drawnLevel = 0 -- the level the crate page was drawn with (sent as shownLuck)
+	local drawnWaiting = false -- the page was drawn before luckKnown ("Checking..." buttons)
+	-- An OpenCrate or PrepareCrateRobux call for that crate is waiting for its answer.
+	local inFlight: { [string]: boolean } = {}
 	local robuxWaiting: { [string]: boolean } = {} -- a Robux purchase of that crate is on its way
+	local robuxBusy: string? = nil -- the crate whose Robux purchase made `busy` true
+	local robuxToken = 0 -- (a newer Robux purchase cancels the older one's slow timer)
+	local prepareRemote: RemoteFunction? = nil -- PrepareCrateRobux, found on the first R$ press
 	local listCategory: string? = nil -- the tab and page of the crate list
 	local listPage = 1
 	local skipNow: (() -> ())? = nil -- jumps the spinning strip to its result
@@ -597,7 +713,7 @@ function CrateUI.Mount(gui: ScreenGui)
 	-- Forward declarations (the views call each other).
 	local showList: () -> ()
 	local showPreview: (crate: CrateOdds.Crate) -> ()
-	local openWithCoins: (crate: CrateOdds.Crate, count: number?) -> ()
+	local openWithCoins: (crate: CrateOdds.Crate, count: number, guarantee: string?) -> ()
 	local showResults: (all: { Result }) -> ()
 	local playNext: () -> ()
 	local openWithRobux: (crate: CrateOdds.Crate) -> ()
@@ -618,20 +734,27 @@ function CrateUI.Mount(gui: ScreenGui)
 		return luck[crate.Id] or 0
 	end
 
-	-- The crate page is on screen and nothing of this crate is on its way: if its luck changed
-	-- since it was drawn, draw it again and say so (a change the player didn't cause here,
-	-- e.g. an F8 button). A player's own open never gets here (busy / robuxWaiting).
+	-- The crate page (or its pack window or "Every chance") is on screen and nothing of this
+	-- crate is on its way: if its luck changed since it was drawn, draw it again (which closes
+	-- those windows) and say so. That is a change the player didn't make here, e.g. an F8
+	-- button or a Robux crate arriving. A player's own open never gets here: while it is on
+	-- its way (inFlight / robuxWaiting) the new level is only stored.
+	-- Also draws the page again (quietly) once the first luck arrives, so "Checking..." goes.
 	local function luckMoved(quiet: boolean?)
 		local crate = current
 		if not crate or not panel.Visible or not previewView.Visible then
 			return
 		end
-		if busy or robuxWaiting[crate.Id] or luckOf(crate) == drawnLevel then
+		if inFlight[crate.Id] or robuxWaiting[crate.Id] then
 			return
 		end
-		showPreview(crate)
-		if not quiet then
-			setMessage(text.OddsChanged, true)
+		if luckOf(crate) ~= drawnLevel then
+			showPreview(crate)
+			if not quiet then
+				setMessage(text.OddsChanged, true)
+			end
+		elseif drawnWaiting and luckKnown then
+			showPreview(crate)
 		end
 	end
 
@@ -657,6 +780,9 @@ function CrateUI.Mount(gui: ScreenGui)
 	local function applyLuckState(state: any)
 		if typeof(state) ~= "table" then
 			return
+		end
+		if state.Ready ~= true and luckKnown then
+			return -- (an answer from before the save had loaded: no luck in it)
 		end
 		local version = if type(state.LuckVersion) == "number" then state.LuckVersion else 0
 		if version < snapshotVer then
@@ -699,6 +825,34 @@ function CrateUI.Mount(gui: ScreenGui)
 			storeLevel(last.CrateId, last.LuckAfter, last.LuckVersion)
 		elseif result.LuckAfter ~= nil then
 			storeLevel(result.CrateId, result.LuckAfter, result.LuckVersion)
+		end
+	end
+
+	-- A request for `crate` was refused (any message): use the level it carries, then either
+	-- draw the page again with "your chances changed" (the level the page showed was old) or
+	-- show the refusal's own message.
+	local function refused(
+		crate: CrateOdds.Crate,
+		result: { Luck: number?, LuckVersion: number?, Message: string }
+	)
+		storeLevel(crate.Id, result.Luck, result.LuckVersion)
+		local onPage = panel.Visible and previewView.Visible and current == crate
+		if onPage and luckOf(crate) ~= drawnLevel then
+			showPreview(crate)
+			setMessage(text.OddsChanged, true)
+		else
+			setMessage(result.Message, true)
+		end
+	end
+
+	-- A Robux purchase of that crate is over (cancelled, its crate arrived, or Roblox said it
+	-- comes later): the other buttons work again.
+	local function endRobuxWait(crateId: string)
+		robuxWaiting[crateId] = nil
+		if robuxBusy == crateId then
+			robuxBusy = nil
+			robuxToken += 1
+			busy = false
 		end
 	end
 
@@ -1085,6 +1239,424 @@ function CrateUI.Mount(gui: ScreenGui)
 		return nil
 	end
 
+	-- The luck meter's words (Config.Crates.Text; a rarity is its Name from Config.Rarity) ------
+	local luckCfg = cfg.Luck
+	local LUCK_LINE = 36 -- the phone summary line's height: two lines of 14 px text
+	local function boostName(): string
+		return rarityName(luckCfg.Boost)
+	end
+	-- "Every crate below Rare adds 2% to Rare (taken from Common). A Rare or better ..."
+	local function luckHelp(): string
+		local b = boostName()
+		local per = CrateOdds.Format(luckCfg.PerStep)
+		local from = rarityName(luckCfg.TakeFrom)
+		if luckCfg.FullGuarantee == true then
+			return text.LuckHelp:format(b, per, b, from, b, b)
+		end
+		return text.LuckHelpNoFull:format(b, per, b, from, b)
+	end
+	-- Does this level make the next crate Rare or better for sure (a full meter)?
+	local function guaranteedAt(level: number): boolean
+		return luckCfg.FullGuarantee == true and level >= CrateLuck.Steps()
+	end
+	-- "23.02%": the chance of Rare or better for a crate at this level.
+	local function nextChance(crate: CrateOdds.Crate, level: number): string
+		return CrateOdds.Format(orBetter(crate, CrateLuck.Boost(crate, level)))
+	end
+	-- The phone line above the buy buttons: "Luck 4/15 · Rare or better 23.02%".
+	local function luckShort(crate: CrateOdds.Crate, level: number): string
+		local chance = nextChance(crate, level)
+		if guaranteedAt(level) then
+			return text.LuckShortFull:format(boostName(), chance)
+		end
+		return text.LuckShort:format(level, CrateLuck.Steps(), boostName(), chance)
+	end
+	-- "x5: at least one Uncommon or better", one for each count with a guarantee for this crate.
+	local function packLines(crate: CrateOdds.Crate): { string }
+		local out = {}
+		for _, count in cfg.Open.Counts do
+			local guarantee = CrateLuck.Guarantee(crate, count)
+			if guarantee then
+				table.insert(out, text.PackLine:format(count, rarityName(guarantee)))
+			end
+		end
+		return out
+	end
+
+	-- A window over the crate page (the pack window and "Every chance"): clicks don't reach the
+	-- page under it. Escape still closes the whole panel.
+	local function overlay(name: string, zIndex: number): Frame
+		local old = previewView:FindFirstChild(name)
+		if old then
+			old:Destroy()
+		end
+		local sheet = Instance.new("Frame")
+		sheet.Name = name
+		sheet.Active = true
+		sheet.ZIndex = zIndex
+		sheet.BackgroundColor3 = Theme.Background
+		sheet.BackgroundTransparency = 0.02
+		sheet.Size = UDim2.fromScale(1, 1)
+		sheet.Parent = previewView
+		Theme.round(sheet, 10)
+		local heading = label("", 18, sheet)
+		heading.Name = "Title"
+		heading.TextXAlignment = Enum.TextXAlignment.Left
+		heading.Position = UDim2.fromOffset(8, 4)
+		heading.Size = UDim2.new(1, -16, 0, 26)
+		return sheet
+	end
+
+	-- "Every chance" (Preview.LuckTable): the exact chances at every luck level, your row
+	-- marked. It covers the page (or the pack window it was opened from); Back goes back.
+	local function showLuckTable(crate: CrateOdds.Crate)
+		local steps = CrateLuck.Steps()
+		local sheet = overlay("LuckTable", 7)
+		local heading = sheet:FindFirstChild("Title") :: TextLabel
+		heading.Text = text.LuckTableTitle:format(crate.Name)
+		local helpHeight = if compact then 52 else 36
+		local help = label(luckHelp(), 14, sheet)
+		help.Name = "Help"
+		help.Font = Enum.Font.Gotham
+		help.TextColor3 = Theme.Muted
+		help.TextXAlignment = Enum.TextXAlignment.Left
+		help.TextYAlignment = Enum.TextYAlignment.Top
+		help.Position = UDim2.fromOffset(8, 32)
+		help.Size = UDim2.new(1, -16, 0, helpHeight)
+		local rowsTop = 32 + helpHeight + 4
+		local rows = Instance.new("ScrollingFrame")
+		rows.Name = "Rows"
+		rows.BackgroundTransparency = 1
+		rows.BorderSizePixel = 0
+		rows.Position = UDim2.fromOffset(0, rowsTop)
+		rows.Size = UDim2.new(1, 0, 1, -(rowsTop + 44))
+		rows.ScrollBarThickness = 6
+		rows.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		rows.CanvasSize = UDim2.new()
+		rows.Parent = sheet
+		local list = Instance.new("UIListLayout")
+		list.SortOrder = Enum.SortOrder.LayoutOrder
+		list.Padding = UDim.new(0, 4)
+		list.Parent = rows
+		local pad = Instance.new("UIPadding")
+		pad.PaddingLeft = UDim.new(0, 8)
+		pad.PaddingRight = UDim.new(0, 12)
+		pad.Parent = rows
+		local function row(name: string, order: number, rich: string): TextLabel
+			local line = label(rich, 14, rows)
+			line.Name = name
+			line.RichText = true
+			line.LayoutOrder = order
+			line.TextXAlignment = Enum.TextXAlignment.Left
+			line.Size = UDim2.new(1, 0, 0, 0)
+			line.AutomaticSize = Enum.AutomaticSize.Y
+			local inner = Instance.new("UIPadding")
+			inner.PaddingTop = UDim.new(0, 3)
+			inner.PaddingBottom = UDim.new(0, 3)
+			inner.PaddingLeft = UDim.new(0, 4)
+			inner.Parent = line
+			return line
+		end
+		-- A one-in-a-million skin first: its chance is the same at every level.
+		local fixed = 0
+		for _, c in CrateOdds.Shown(crate) do
+			if hasFixedOdds(crate, c.Item) then
+				fixed += 1
+				local words = text.FixedRow:format(c.Item.Name, CrateOdds.Format(c.Chance))
+				row("Fixed" .. fixed, fixed, richEscape(words))
+			end
+		end
+		-- One row per level: what YOUR next crate would be at that level.
+		for level = 0, steps do
+			local name = if level >= steps
+				then text.LuckRowFull:format(level)
+				else text.LuckRow:format(level)
+			local chances = CrateOdds.Shown(crate, CrateLuck.Boost(crate, level))
+			local you = level == drawnLevel
+			local rich = ("<b>%s</b>  %s%s"):format(
+				richEscape(name),
+				rarityGroups(crate, chances, true),
+				if you then richEscape(text.LuckYou) else ""
+			)
+			local line = row("Row" .. level, 100 + level, rich)
+			line:SetAttribute("You", you)
+			if you then
+				line.BackgroundTransparency = 0.55
+				line.BackgroundColor3 = Theme.Selected:Lerp(Color3.new(0, 0, 0), 0.45)
+				Theme.round(line, 6)
+			end
+		end
+		local back = button(text.Back, sheet)
+		back.Name = "Back"
+		back.TextSize = 14
+		back.AnchorPoint = Vector2.new(0, 1)
+		back.Position = UDim2.new(0, 8, 1, -4)
+		back.Size = UDim2.fromOffset(120, 36)
+		back.Activated:Connect(function()
+			sheet:Destroy() -- (the page, or the pack window, is still under it)
+		end)
+	end
+
+	-- The luck strip: "Luck 4 / 15", the meter, "Rare or better, next crate: 23.02%" and an
+	-- "Every chance" button (plus the help line on PC). No flashing, no sound: just the facts.
+	local function luckStrip(parent: Instance, crate: CrateOdds.Crate, level: number, order: number)
+		local steps = CrateLuck.Steps()
+		local strip = Instance.new("Frame")
+		strip.Name = "Luck"
+		strip.LayoutOrder = order
+		strip.BackgroundColor3 = Color3.fromRGB(30, 26, 42)
+		strip.BackgroundTransparency = 0.2
+		strip.Size = UDim2.new(1, if compact then -8 else 0, 0, 0)
+		strip.AutomaticSize = Enum.AutomaticSize.Y
+		strip:SetAttribute("Level", level)
+		strip.Parent = parent
+		Theme.round(strip, 8)
+		local pad = Instance.new("UIPadding")
+		pad.PaddingTop = UDim.new(0, 6)
+		pad.PaddingBottom = UDim.new(0, 6)
+		pad.PaddingLeft = UDim.new(0, 6)
+		pad.PaddingRight = UDim.new(0, 6)
+		pad.Parent = strip
+		local list = Instance.new("UIListLayout")
+		list.SortOrder = Enum.SortOrder.LayoutOrder
+		list.Padding = UDim.new(0, 4)
+		list.Parent = strip
+
+		-- PC: the title and the meter side by side; phones: one under the other.
+		local top: Instance = strip
+		if not compact then
+			local row = Instance.new("Frame")
+			row.Name = "Top"
+			row.BackgroundTransparency = 1
+			row.LayoutOrder = 1
+			row.Size = UDim2.new(1, 0, 0, 0)
+			row.AutomaticSize = Enum.AutomaticSize.Y
+			row.Parent = strip
+			top = row
+		end
+		local heading = label(
+			if guaranteedAt(level)
+				then text.LuckFull:format(boostName())
+				else text.LuckTitle:format(level, steps),
+			15,
+			top
+		)
+		heading.Name = "Title"
+		heading.LayoutOrder = 1
+		heading.TextXAlignment = Enum.TextXAlignment.Left
+		heading.Size = if compact then UDim2.new(1, 0, 0, 18) else UDim2.new(0.5, -6, 0, 20)
+		heading.AutomaticSize = Enum.AutomaticSize.Y
+
+		-- The meter: one block per step (filled ones in the rarity's colour), or one bar that
+		-- fills when there are more than 20 steps.
+		local bar = Instance.new("Frame")
+		bar.Name = "Bar"
+		bar.BackgroundTransparency = 1
+		bar.LayoutOrder = 2
+		if compact then
+			bar.Size = UDim2.new(1, 0, 0, 12)
+		else
+			bar.AnchorPoint = Vector2.new(1, 0)
+			bar.Position = UDim2.new(1, 0, 0, 4)
+			bar.Size = UDim2.new(0.5, 0, 0, 12)
+		end
+		bar.Parent = top
+		local filled = rarityLevel(luckCfg.Boost).Color
+		if steps <= 20 then
+			local gap = 2
+			local blocks = Instance.new("UIListLayout")
+			blocks.FillDirection = Enum.FillDirection.Horizontal
+			blocks.SortOrder = Enum.SortOrder.LayoutOrder
+			blocks.Padding = UDim.new(0, gap)
+			blocks.Parent = bar
+			for i = 1, steps do
+				local block = Instance.new("Frame")
+				block.Name = "Step" .. i
+				block.LayoutOrder = i
+				block.BorderSizePixel = 0
+				block.BackgroundColor3 = if i <= level then filled else Theme.Button
+				block.Size = UDim2.new(1 / steps, -gap * (steps - 1) / steps, 1, 0)
+				block:SetAttribute("Filled", i <= level)
+				block.Parent = bar
+				Theme.round(block, 3)
+			end
+		else
+			bar.BackgroundTransparency = 0
+			bar.BackgroundColor3 = Theme.Button
+			Theme.round(bar, 4)
+			local fill = Instance.new("Frame")
+			fill.Name = "Fill"
+			fill.BorderSizePixel = 0
+			fill.BackgroundColor3 = filled
+			fill.Size = UDim2.fromScale(math.clamp(level / steps, 0, 1), 1)
+			fill.Parent = bar
+			Theme.round(fill, 4)
+		end
+
+		local chance = label(text.LuckNext:format(boostName(), nextChance(crate, level)), 14, strip)
+		chance.Name = "Chance"
+		chance.TextXAlignment = Enum.TextXAlignment.Left
+		chance.TextColor3 = filled:Lerp(Color3.new(1, 1, 1), 0.35)
+		local every = button(text.EveryChance, strip)
+		every.Name = "EveryChance"
+		every.TextSize = 14
+		every.Activated:Connect(function()
+			showLuckTable(crate)
+		end)
+		if compact then
+			chance.LayoutOrder = 3
+			chance.Size = UDim2.new(1, 0, 0, 0)
+			chance.AutomaticSize = Enum.AutomaticSize.Y
+			every.LayoutOrder = 4
+			every.Size = UDim2.new(1, 0, 0, 26)
+		else
+			-- PC: the chance with Every chance beside it, then the help line.
+			local row = Instance.new("Frame")
+			row.Name = "Middle"
+			row.BackgroundTransparency = 1
+			row.LayoutOrder = 2
+			row.Size = UDim2.new(1, 0, 0, 24)
+			row.Parent = strip
+			chance.Parent = row
+			chance.Size = UDim2.new(1, -128, 1, 0)
+			every.Parent = row
+			every.AnchorPoint = Vector2.new(1, 0)
+			every.Position = UDim2.fromScale(1, 0)
+			every.Size = UDim2.new(0, 122, 1, 0)
+			local help = label(luckHelp(), 14, strip)
+			help.Name = "Help"
+			help.LayoutOrder = 3
+			help.Font = Enum.Font.Gotham
+			help.TextColor3 = Theme.Muted
+			help.TextXAlignment = Enum.TextXAlignment.Left
+			help.Size = UDim2.new(1, 0, 0, 0)
+			help.AutomaticSize = Enum.AutomaticSize.Y
+		end
+	end
+
+	-- The pack window (Preview.PackConfirm), before x5 / x10 buys anything: the price, how packs
+	-- work, your luck now and the exact chances of the guaranteed last crate. Confirm sends the
+	-- luck and the guarantee this window showed (the server refuses if its own differ).
+	local function showPackConfirm(crate: CrateOdds.Crate, count: number)
+		local price = CrateOdds.CoinPrice(crate)
+		if not price or busy then
+			return
+		end
+		local meter = CrateLuck.Applies(crate)
+		local level = drawnLevel
+		local steps = CrateLuck.Steps()
+		local guarantee = CrateLuck.Guarantee(crate, count)
+		local sheet = overlay("PackConfirm", 6)
+		sheet:SetAttribute("Count", count)
+		local heading = sheet:FindFirstChild("Title") :: TextLabel
+		heading.Text = text.PackTitle:format(crate.Name, count)
+
+		local paragraphs = {
+			richEscape(text.PackPrice:format(commas(price * count), currency)),
+			richEscape(if meter then text.PackHow:format(count, count) else text.PackHowFixed),
+		}
+		if meter then
+			local now = text.PackLuckNow:format(level, steps, boostName(), nextChance(crate, level))
+			table.insert(paragraphs, richEscape(now))
+		end
+		if meter and guaranteedAt(level + count - 1) then
+			-- The meter fills up inside this pack: it has a Rare or better for sure anyway.
+			local b = boostName()
+			table.insert(paragraphs, richEscape(text.PackFullFirst:format(b, b)))
+		elseif guarantee then
+			-- The guaranteed last crate's exact chances (its level is known in advance).
+			local packLevel = CrateLuck.PackLevel(crate, level, count)
+			local chances = CrateOdds.Shown(crate, CrateLuck.Boost(crate, packLevel, guarantee))
+			local g = rarityName(guarantee)
+			local marker = "\1CHANCES\1"
+			local words = richEscape(text.PackGuarantee:format(count - 1, g, count, g, marker))
+			local at = words:find(marker, 1, true)
+			if at then
+				words = words:sub(1, at - 1)
+					.. rarityGroups(crate, chances, false)
+					.. words:sub(at + #marker)
+			end
+			table.insert(paragraphs, words)
+		end
+		local scroller = Instance.new("ScrollingFrame")
+		scroller.Name = "Body"
+		scroller.BackgroundTransparency = 1
+		scroller.BorderSizePixel = 0
+		scroller.Position = UDim2.fromOffset(0, 34)
+		scroller.Size = UDim2.new(1, 0, 1, -(34 + 44))
+		scroller.ScrollBarThickness = 6
+		scroller.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		scroller.CanvasSize = UDim2.new()
+		scroller.Parent = sheet
+		local words = label(table.concat(paragraphs, "\n\n"), 15, scroller)
+		words.Name = "Text"
+		words.RichText = true
+		words.Font = Enum.Font.Gotham
+		words.TextXAlignment = Enum.TextXAlignment.Left
+		words.TextYAlignment = Enum.TextYAlignment.Top
+		words.Position = UDim2.fromOffset(8, 0)
+		words.Size = UDim2.new(1, -20, 0, 0)
+		words.AutomaticSize = Enum.AutomaticSize.Y
+		sheet:SetAttribute("Guarantee", guarantee)
+
+		-- The buttons in a row at the bottom: nothing is preselected and there is no timer.
+		local row = Instance.new("Frame")
+		row.Name = "Buttons"
+		row.BackgroundTransparency = 1
+		row.AnchorPoint = Vector2.new(0, 1)
+		row.Position = UDim2.new(0, 8, 1, -4)
+		row.Size = UDim2.new(1, -16, 0, 36)
+		row.Parent = sheet
+		local rowList = Instance.new("UIListLayout")
+		rowList.FillDirection = Enum.FillDirection.Horizontal
+		rowList.HorizontalAlignment = Enum.HorizontalAlignment.Right
+		rowList.SortOrder = Enum.SortOrder.LayoutOrder
+		rowList.Padding = UDim.new(0, 6)
+		rowList.Parent = row
+		local cancel = button(text.Cancel, row)
+		cancel.Name = "Cancel"
+		cancel.LayoutOrder = 1
+		cancel.TextSize = 14
+		cancel.Size = UDim2.new(0, 100, 1, 0)
+		cancel.Activated:Connect(function()
+			sheet:Destroy()
+		end)
+		if meter then
+			local every = button(text.EveryChance, row)
+			every.Name = "EveryChance"
+			every.LayoutOrder = 2
+			every.TextSize = 14
+			every.Size = UDim2.new(0, 130, 1, 0)
+			every.Activated:Connect(function()
+				showLuckTable(crate)
+			end)
+		end
+		local confirm = button(
+			text.PackConfirm:format(count, commas(price * count), currency),
+			row,
+			Theme.Selected
+		)
+		confirm.Name = "Confirm"
+		confirm.LayoutOrder = 3
+		confirm.TextSize = 14
+		confirm.Size = UDim2.new(0, 230, 1, 0)
+		confirm.Activated:Connect(function()
+			if busy or not sheet.Parent then
+				return
+			end
+			sheet:Destroy()
+			openWithCoins(crate, count, guarantee)
+		end)
+	end
+
+	-- How many screen pixels one of this panel's UI units is (the screen scale and the
+	-- panel's fit-to-screen scale).
+	local function pixelsPerUnit(): number
+		local fit = panel:FindFirstChild("FitScale")
+		local s = if fit and fit:IsA("UIScale") and fit.Scale > 0 then fit.Scale else 1
+		return math.max(0.01, s * Layout.Scale())
+	end
+
 	showPreview = function(crate: CrateOdds.Crate)
 		current = crate
 		listCategory = categoryOf(crate) -- (Back returns to its tab)
@@ -1094,13 +1666,23 @@ function CrateUI.Mount(gui: ScreenGui)
 		-- Every skin with its exact chance for YOUR next crate (your luck level), the same
 		-- numbers the server rolls with; skins that can't drop right now show 0%.
 		drawnLevel = luckOf(crate)
+		local meter = CrateLuck.Applies(crate)
+		drawnWaiting = meter and not luckKnown
 		local shown = CrateOdds.Shown(crate, CrateLuck.Boost(crate, drawnLevel))
 		local sideWidth = if compact then 168 else 214
 		local closed = restriction()
+		local canBuy = closed ~= true
+		-- The luck strip, the phone luck line and the pack line: only for players who may buy.
+		local showLuck = meter and canBuy
+		local packs = if canBuy then packLines(crate) else {}
+		local luckLine = compact and showLuck
 
 		-- Left: the crate, its odds and the buttons (scrolls on short screens). On phones the
-		-- buttons are pinned under the scrolling part instead, so they are always in view.
-		local buttonsHeight = (if closed ~= true then (40 + 6) + (34 + 6) else 0) + 32
+		-- buttons are pinned under the scrolling part instead, so they are always in view, with
+		-- the one-line luck summary right above them.
+		local buttonsHeight = (if canBuy then (40 + 6) + (34 + 6) else 0)
+			+ 32
+			+ (if luckLine then LUCK_LINE + 6 else 0)
 		local side = Instance.new("ScrollingFrame")
 		side.Name = "Side"
 		side.BackgroundTransparency = 1
@@ -1130,6 +1712,14 @@ function CrateUI.Mount(gui: ScreenGui)
 			pinnedList.Padding = UDim.new(0, 6)
 			pinnedList.Parent = pinned
 			buttonsParent = pinned
+			if luckLine then
+				local line = label(luckShort(crate, drawnLevel), 14, pinned)
+				line.Name = "LuckLine"
+				line.LayoutOrder = 0
+				line.TextXAlignment = Enum.TextXAlignment.Left
+				line.TextColor3 = rarityLevel(luckCfg.Boost).Color:Lerp(Color3.new(1, 1, 1), 0.35)
+				line.Size = UDim2.new(1, -8, 0, LUCK_LINE)
+			end
 		end
 
 		local art = Instance.new("Frame")
@@ -1159,6 +1749,26 @@ function CrateUI.Mount(gui: ScreenGui)
 		odds.Size = UDim2.new(1, -8, 0, 0)
 		odds.AutomaticSize = Enum.AutomaticSize.Y
 
+		-- The pack line ("x5: at least one Uncommon or better ...").
+		local function packLabel(parent: Instance, order: number, joiner: string)
+			local line = label(table.concat(packs, joiner), 14, parent)
+			line.Name = "Packs"
+			line.LayoutOrder = order
+			line.Font = Enum.Font.Gotham
+			line.TextColor3 = Theme.Muted
+			line.TextXAlignment = Enum.TextXAlignment.Left
+			line.Size = UDim2.new(1, if compact then -8 else 0, 0, 0)
+			line.AutomaticSize = Enum.AutomaticSize.Y
+		end
+		if compact then
+			if showLuck then
+				luckStrip(side, crate, drawnLevel, 5)
+			end
+			if #packs > 0 then
+				packLabel(side, 6, "\n")
+			end
+		end
+
 		local function row(order: number, height: number): Frame
 			local f = Instance.new("Frame")
 			f.BackgroundTransparency = 1
@@ -1172,12 +1782,13 @@ function CrateUI.Mount(gui: ScreenGui)
 			return f
 		end
 		-- Open x1 / x5 / x10 for coins (Config.Crates.Open.Counts), then Robux and Quick open.
-		local buyRow = row(5, 40)
+		-- x1 buys straight away; x5 and x10 open the pack window first.
+		local buyRow = row(7, 40)
 		buyRow.Name = "Buy"
-		buyRow.Visible = closed ~= true
-		local extras = row(6, 34)
+		buyRow.Visible = canBuy
+		local extras = row(8, 34)
 		extras.Name = "Extras"
-		extras.Visible = closed ~= true
+		extras.Visible = canBuy
 		local price = CrateOdds.CoinPrice(crate)
 		local robuxOn = Config.Features.RobuxCrates
 		local half = UDim2.new(0.5, -3, 1, 0)
@@ -1186,6 +1797,8 @@ function CrateUI.Mount(gui: ScreenGui)
 		if buyLayout then
 			buyLayout.SortOrder = Enum.SortOrder.LayoutOrder -- x1, x5, x10 in Config order
 		end
+		-- Still asking Roblox about the region, or the server hasn't told us your luck yet.
+		local waiting = closed == nil or drawnWaiting
 		if price then
 			for order, count in counts do
 				-- Always with the currency word ("Open 600 Coins"), never a bare number.
@@ -1197,11 +1810,15 @@ function CrateUI.Mount(gui: ScreenGui)
 				openButton.LayoutOrder = order
 				openButton.TextSize = 13
 				openButton.Size = UDim2.new(1 / #counts, -4, 1, 0)
-				if closed == nil then
+				if waiting then
 					disable(openButton, text.Checking)
 				else
 					openButton.Activated:Connect(function()
-						openWithCoins(crate, count)
+						if count == 1 then
+							openWithCoins(crate, 1, CrateLuck.Guarantee(crate, 1))
+						else
+							showPackConfirm(crate, count)
+						end
 					end)
 				end
 			end
@@ -1219,7 +1836,7 @@ function CrateUI.Mount(gui: ScreenGui)
 			robuxButton.Size = if price then half else UDim2.fromScale(1, 1)
 			if id == 0 then
 				disable(robuxButton, text.ComingSoon)
-			elseif closed == nil then
+			elseif waiting then
 				disable(robuxButton, text.Checking)
 			else
 				realPrice(id, robuxButton)
@@ -1243,7 +1860,7 @@ function CrateUI.Mount(gui: ScreenGui)
 				showSwitch()
 			end)
 		end
-		local navRow = row(7, 32)
+		local navRow = row(9, 32)
 		navRow.Name = "Nav"
 		local back = button(text.Back, navRow)
 		back.Name = "Back"
@@ -1266,17 +1883,51 @@ function CrateUI.Mount(gui: ScreenGui)
 			end)
 		end
 
-		-- Right: every skin in the crate and its chance.
+		-- Right: (PC) the luck strip and the pack line, then every skin in the crate and its
+		-- chance. The skins start under the strip, wherever its wrapped text ends.
+		local left = sideWidth + 8
 		local grid = Instance.new("ScrollingFrame")
 		grid.Name = "Items"
 		grid.BackgroundTransparency = 1
 		grid.BorderSizePixel = 0
-		grid.Position = UDim2.fromOffset(sideWidth + 8, 0)
-		grid.Size = UDim2.new(1, -(sideWidth + 8), 1, 0)
+		grid.Position = UDim2.fromOffset(left, 0)
+		grid.Size = UDim2.new(1, -left, 1, 0)
 		grid.ScrollBarThickness = 6
 		grid.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		grid.CanvasSize = UDim2.new()
 		grid.Parent = previewView
+		if not compact and (showLuck or #packs > 0) then
+			local info = Instance.new("Frame")
+			info.Name = "Info"
+			info.BackgroundTransparency = 1
+			info.Position = UDim2.fromOffset(left, 0)
+			info.Size = UDim2.new(1, -left, 0, 0)
+			info.AutomaticSize = Enum.AutomaticSize.Y
+			info.Parent = previewView
+			local infoList = Instance.new("UIListLayout")
+			infoList.SortOrder = Enum.SortOrder.LayoutOrder
+			infoList.Padding = UDim.new(0, 4)
+			infoList.Parent = info
+			if showLuck then
+				luckStrip(info, crate, drawnLevel, 1)
+			end
+			if #packs > 0 then
+				packLabel(info, 2, "    ")
+			end
+			-- Its height before Roblox has laid it out (the strip with two lines of help).
+			local height = (if showLuck then 98 else 0)
+				+ (if #packs > 0 then 20 + (if showLuck then 4 else 0) else 0)
+			local function placeGrid()
+				local laidOut = info.AbsoluteSize.Y
+				if laidOut > 0 then
+					height = laidOut / pixelsPerUnit()
+				end
+				grid.Position = UDim2.fromOffset(left, height + 6)
+				grid.Size = UDim2.new(1, -left, 1, -(height + 6))
+			end
+			info:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeGrid)
+			placeGrid()
+		end
 		local layout = Instance.new("UIGridLayout")
 		layout.CellSize = if compact then UDim2.fromOffset(92, 132) else UDim2.fromOffset(104, 146)
 		layout.CellPadding = UDim2.fromOffset(8, 8)
@@ -1720,7 +2371,16 @@ function CrateUI.Mount(gui: ScreenGui)
 
 		-- The picture gets the room the lines and buttons below it leave (at most its usual
 		-- size), so the buttons always fit on the card, even on the shortest phones.
+		-- A Robux crate says which luck it really used (Roblox can hand a crate over late).
+		local opened = CrateOdds.Get(result.CrateId)
+		local luckUsed = result.Paid == "Robux"
+			and type(result.Luck) == "number"
+			and opened ~= nil
+			and CrateLuck.Applies(opened)
 		local below = 26 + 20 + 20 + 36 + 4 * gap -- name, rarity, news, buttons and the gaps
+		if luckUsed then
+			below += 18 + gap -- (the "Opened at luck" line)
+		end
 		local art = Instance.new("Frame")
 		art.Name = "Art"
 		art.BackgroundTransparency = 1
@@ -1760,11 +2420,18 @@ function CrateUI.Mount(gui: ScreenGui)
 			then Theme.Selected
 			else Color3.fromRGB(140, 235, 140)
 		newsLabel.Size = UDim2.new(1, 0, 0, 20)
+		if luckUsed then
+			local used = label(text.RobuxLuck:format(result.Luck or 0, CrateLuck.Steps()), 14, card)
+			used.Name = "LuckUsed"
+			used.LayoutOrder = 5
+			used.TextColor3 = Theme.Muted
+			used.Size = UDim2.new(1, 0, 0, 18)
+		end
 
 		local buttons = Instance.new("Frame")
 		buttons.Name = "Buttons"
 		buttons.BackgroundTransparency = 1
-		buttons.LayoutOrder = 5
+		buttons.LayoutOrder = 6
 		buttons.Size = UDim2.new(1, 0, 0, 36)
 		buttons.Parent = card
 		local row = Instance.new("UIListLayout")
@@ -1803,7 +2470,7 @@ function CrateUI.Mount(gui: ScreenGui)
 			end)
 		end)
 
-		local crate = CrateOdds.Get(result.CrateId)
+		local crate = opened
 		if #queue > 0 then
 			-- More crates from the same open are waiting: Next (or Space) plays the next one.
 			local nextButton = button(text.Next:format(#queue), buttons, Theme.Selected)
@@ -1833,6 +2500,11 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 		if result.OneInAMillion then
 			newsLabel.Text = text.OneInAMillion .. "  " .. newsLabel.Text
+		end
+		if result.Guaranteed then
+			-- Honest: this crate could only be that rarity or better (pack guarantee or a full
+			-- luck meter). No "next time..." nudges: the page shows the luck.
+			newsLabel.Text = text.Guaranteed .. "  " .. newsLabel.Text
 		end
 		local back = button(text.Back, buttons)
 		back.Name = "Back"
@@ -1883,6 +2555,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		revealStop()
 		revealStop = function() end
 		busy = true
+		robuxBusy = nil -- (an opening plays: it looks after `busy` now)
 		unseen = result
 		current = crate or current
 		clearLazy(strip)
@@ -2064,6 +2737,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		revealStop()
 		revealStop = function() end
 		busy = true
+		robuxBusy = nil -- (an opening plays: it looks after `busy` now)
 		unseen = result
 		current = crate or current
 		reveal.Visible = false
@@ -2544,7 +3218,10 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 	end
 
-	openWithCoins = function(crate: CrateOdds.Crate, countIn: number?)
+	-- Opens `count` crates for coins. It sends the luck level this page shows and the pack
+	-- guarantee the pack window showed (nil for x1); the server checks them against its own and
+	-- never rolls with them. x5 / x10 only come here from the pack window's Confirm.
+	openWithCoins = function(crate: CrateOdds.Crate, count: number, guarantee: string?)
 		local n = net
 		if busy or not n then
 			return
@@ -2557,40 +3234,36 @@ function CrateUI.Mount(gui: ScreenGui)
 			defaultMessage()
 			return
 		end
-		local count = countIn or 1
+		if CrateLuck.Applies(crate) and not luckKnown then
+			setMessage(text.Checking) -- (the server hasn't told us your luck yet)
+			return
+		end
 		busy = true
+		inFlight[crate.Id] = true -- (its own luck change is not "your chances changed")
 		setMessage(text.Checking)
-		-- The server checks these against its own (it never rolls with them): the luck level
-		-- this page shows and the pack guarantee for this count.
 		local shownLuck = drawnLevel
-		local shownGuarantee = CrateLuck.Guarantee(crate, count)
 		task.spawn(function()
 			local ok, value = pcall(function()
-				return n.Open:InvokeServer(crate.Id, count, shownLuck, shownGuarantee)
+				return n.Open:InvokeServer(crate.Id, count, shownLuck, guarantee)
 			end)
+			inFlight[crate.Id] = nil
 			local result = if ok then asResult(value) else nil
 			if not result then
 				busy = false
-				setMessage("Something went wrong, try again.", true)
+				setMessage(text.TryAgain, true)
 				return
 			end
 			if not result.Ok then
+				-- Nothing was bought: new chances (redrawn), or the server's reason.
 				busy = false
-				storeLevel(result.CrateId, result.Luck, result.LuckVersion)
-				if previewView.Visible and current == crate and luckOf(crate) ~= drawnLevel then
-					-- The chances changed: nothing was bought, here are the new ones.
-					showPreview(crate)
-					setMessage(text.OddsChanged, true)
-				else
-					setMessage(result.Message, true)
-				end
+				refused(crate, result)
 				return
 			end
 			storeResult(result)
 			if not panel.Visible then
 				panel.Visible = true
 			end
-			local all = result.Results or { result }
+			local all: { Result } = result.Results or { result }
 			for _, one in all do
 				if one.ItemId then
 					owned[one.ItemId] = true
@@ -2733,6 +3406,19 @@ function CrateUI.Mount(gui: ScreenGui)
 				tag.Size = UDim2.new(1, -12, 0, 18)
 				tag.TextXAlignment = Enum.TextXAlignment.Left
 			end
+			if r.Guaranteed then
+				-- This crate could only be that rarity or better (the pack's guarantee).
+				local sure = label(text.Guaranteed, 14, card)
+				sure.Name = "Guaranteed"
+				sure.ZIndex = 3
+				sure.TextWrapped = false
+				sure.TextColor3 = Color3.fromRGB(140, 235, 140)
+				sure.TextStrokeTransparency = 0.2
+				sure.TextXAlignment = Enum.TextXAlignment.Right
+				sure.AnchorPoint = Vector2.new(1, 0)
+				sure.Position = UDim2.new(1, -6, 0, 4)
+				sure.Size = UDim2.new(0.6, 0, 0, 18)
+			end
 		end
 
 		local footer = Instance.new("Frame")
@@ -2777,21 +3463,78 @@ function CrateUI.Mount(gui: ScreenGui)
 		setMessage(if coinsBack > 0 then text.CoinsBack:format(coinsBack, currency) else "")
 	end
 
+	-- PrepareCrateRobux, looked up on the first R$ press (never in `net`: the server makes it,
+	-- but the panel must never wait for it). Waits at most RobuxOpen.RemoteWaitSeconds.
+	local function prepareFunction(): RemoteFunction?
+		if prepareRemote and prepareRemote.Parent then
+			return prepareRemote
+		end
+		local folder = ReplicatedStorage:FindFirstChild("Remotes")
+		if not folder then
+			return nil
+		end
+		local found =
+			folder:WaitForChild("PrepareCrateRobux", math.max(0.1, cfg.RobuxOpen.RemoteWaitSeconds))
+		if found and found:IsA("RemoteFunction") then
+			prepareRemote = found
+			return found
+		end
+		return nil
+	end
+
+	-- R$: the server checks the luck this page shows and holds the crate (PrepareCrateRobux),
+	-- then Roblox's purchase window opens. The crate rolls on the server when Roblox hands
+	-- the purchase over (CrateResult). Until then this crate's page doesn't say "your chances
+	-- changed", and nothing else can be opened (at most ClientWaitSeconds after buying).
 	openWithRobux = function(crate: CrateOdds.Crate)
 		local id = CrateOdds.ProductId(crate)
 		if busy or id == 0 or not Config.Features.RobuxCrates or restriction() ~= false then
 			return
 		end
-		current = crate
-		setMessage(text.WaitingRobux)
-		robuxWaiting[crate.Id] = true -- (its own luck change is not "your chances changed")
-		local ok, err = pcall(function()
-			MarketplaceService:PromptProductPurchase(player, id)
-		end)
-		if not ok then
-			robuxWaiting[crate.Id] = nil
-			warn("[CrateUI] " .. tostring(err))
+		if CrateLuck.Applies(crate) and not luckKnown then
+			setMessage(text.Checking)
+			return
 		end
+		current = crate
+		busy = true
+		inFlight[crate.Id] = true
+		setMessage(text.Checking)
+		local shownLuck = drawnLevel
+		task.spawn(function()
+			local remote = prepareFunction()
+			local answer: Prepared? = nil
+			if remote then
+				local ok, value = pcall(function()
+					return remote:InvokeServer(crate.Id, shownLuck)
+				end)
+				answer = if ok then asPrepared(value) else nil
+			end
+			inFlight[crate.Id] = nil
+			if not answer then
+				busy = false
+				setMessage(text.TryAgain, true)
+				return
+			end
+			if not answer.Ok then
+				busy = false
+				refused(crate, answer)
+				return
+			end
+			storeLevel(crate.Id, answer.Luck, answer.LuckVersion)
+			robuxWaiting[crate.Id] = true -- (its own luck change is not "your chances changed")
+			robuxBusy = crate.Id
+			robuxToken += 1
+			setMessage(text.WaitingRobux)
+			local ok, err = pcall(function()
+				MarketplaceService:PromptProductPurchase(player, id)
+			end)
+			if not ok then
+				-- No purchase window: the buttons work again.
+				endRobuxWait(crate.Id)
+				warn("[CrateUI] " .. tostring(err))
+				setMessage(text.RobuxFailed, true)
+			end
+		end)
 	end
 
 	-- Opening and closing ---------------------------------------------------------------------
@@ -2919,13 +3662,31 @@ function CrateUI.Mount(gui: ScreenGui)
 		end
 	end)
 
+	-- Roblox's purchase window closed. Cancelled: everything opens again at once (and if the
+	-- luck changed meanwhile, the page shows it). Bought: the crate opens when Roblox hands it
+	-- to the server; if that takes longer than RobuxOpen.ClientWaitSeconds the other crates
+	-- open again ("Roblox is taking a while") and its opening plays whenever it arrives.
 	MarketplaceService.PromptProductPurchaseFinished:Connect(function(_userId, productId, purchased)
 		local bought = CrateOdds.ByProductId(productId)
-		if bought and not purchased then
-			robuxWaiting[bought.Id] = nil
+		if not bought then
+			return
 		end
+		local id = bought.Id
+		if purchased then
+			local token = robuxToken
+			task.delay(math.max(0, cfg.RobuxOpen.ClientWaitSeconds), function()
+				if robuxToken == token and robuxBusy == id and robuxWaiting[id] then
+					robuxBusy = nil
+					busy = false
+					setMessage(text.RobuxSlow, true)
+				end
+			end)
+			return
+		end
+		local wasBusy = robuxBusy == id
+		endRobuxWait(id)
 		local crate = current
-		if not purchased and crate and productId == CrateOdds.ProductId(crate) and not busy then
+		if wasBusy and crate and crate.Id == id and previewView.Visible then
 			defaultMessage()
 			luckMoved()
 		end
@@ -2996,7 +3757,9 @@ function CrateUI.Mount(gui: ScreenGui)
 			if not result then
 				return
 			end
-			robuxWaiting[result.CrateId] = nil
+			-- Any result for a crate ends its Robux wait (its crate arrived, or Roblox will hand
+			-- it over later: RobuxLater).
+			endRobuxWait(result.CrateId)
 			if result.Ok then
 				storeResult(result)
 			else
@@ -3006,6 +3769,15 @@ function CrateUI.Mount(gui: ScreenGui)
 				panel.Visible = true
 				if not (openView.Visible or previewView.Visible or listView.Visible) then
 					showList()
+				end
+				local crate = current
+				if
+					crate
+					and crate.Id == result.CrateId
+					and previewView.Visible
+					and luckOf(crate) ~= drawnLevel
+				then
+					showPreview(crate) -- (the page shows the luck you have now)
 				end
 				setMessage(result.Message, true)
 				return

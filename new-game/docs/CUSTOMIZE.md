@@ -828,7 +828,9 @@ part each: `CrateLuck` (the luck meter), `CratePacks` (the x5 / x10 guarantees) 
   `CratePrompt` part to the new Id.
 - **Duplicates**: a skin you already own ALWAYS pays back `DuplicateRefund` coins (`Config/Rarity.luau`:
   60, 250, 500 or 50,000, about half the shop price); the reveal says "Duplicate! +X coins back".
-- **Open several**: `Open.Counts` (x1, x5, x10). The server rolls them all in one request and takes
+- **Open several**: `Open.Counts` (x1, x5, x10). x5 and x10 always ask first ("Open Pumpkin
+  Crate x10?": the price, how packs work, your luck now and the exact chances of the guaranteed
+  last crate; Cancel buys nothing). The server rolls them all in one request and takes
   the coins in one go. While a strip spins, Space (`Open.SkipKey`) or the Skip button jumps to the
   result, then on to the next crate. **Quick open** (a switch on the crate page, `QuickOpen`) skips
   the strips: every result on one page, rarity colours, duplicates with their coins back, the best
@@ -878,6 +880,15 @@ part each: `CrateLuck` (the luck meter), `CratePacks` (the x5 / x10 guarantees) 
   (`Boost`) empties it. `Steps` (15) steps is a full meter: with `FullGuarantee = true` the next
   crate is Rare or better for sure, so nobody opens more than 15 of the same crate in a row
   without a Rare. The crate page always shows the exact chances for YOUR next crate. Good to know:
+  - On the crate page the **luck strip** sits above the skins: "Luck 4 / 15", one block per step
+    (in the Rare colour), "Rare or better, next crate: 23.02%", a line saying how it works
+    (`Text.LuckHelp`) and an **Every chance** button (the chances at every step, your row
+    marked). On phones it is in the left column, and a short line ("Luck 4/15 · Rare or better
+    23.02%", `Text.LuckShort`) sits right above the buy buttons so it is always in view. Every
+    word is in `Text` (`LuckTitle`, `LuckFull`, `LuckNext`, `LuckShort`, `EveryChance`,
+    `LuckTableTitle`, `LuckRow`, `LuckYou`...); keep the `%d` / `%s` in them.
+  - A guaranteed crate says `Text.Guaranteed` ("GUARANTEED") when it opens, and a Robux crate
+    says which luck it used (`Text.RobuxLuck`, "Opened at luck 3 / 15").
   - Rarity crates and Deluxe crates have no meter, nor does a crate line with `Luck = false`.
   - A crate whose Rare skins are all hidden (`SkinsOff`) has no meter (so hiding skins can never
     turn the guarantee into a free CRAZY); its saved luck is kept for when they come back.
@@ -890,14 +901,19 @@ part each: `CrateLuck` (the luck meter), `CratePacks` (the x5 / x10 guarantees) 
   better, x10 at least one Rare or better. A pack opens like that many single crates one after
   another (the meter moves after each one); if the ones before the last missed it, the last crate
   can only be that rarity or better. A guarantee is never above `Luck.Boost` (a higher one is
-  ignored), and a crate with no skins of that rarity gets none. Honest summary: packs are never
+  ignored), and a crate with no skins of that rarity gets none. The crate page lists them under
+  the luck strip (`Text.PackLine`), and the x5 / x10 window shows the guaranteed crate's exact
+  chances (`Text.PackTitle`, `PackHow`, `PackGuarantee`, `PackConfirm`...). Honest summary: packs are never
   worse than single opens, but the bonus is small (an x10 from an empty meter gives about 3% more
   Rares than 10 single opens, about 1% over time), and x5 only promises an Uncommon.
 - **Robux opens** (`RobuxOpen`): pressing R$ first checks the luck the player saw, then that crate
   can't be opened with coins until Roblox's window is cancelled or the Robux crate has opened
   (`HoldSeconds` while the window is open, at most `MaxHoldSeconds` after buying), so the Robux
   crate rolls with the luck they saw. Other crates open as normal. `Cooldown` is the R$ button's
-  own spam timer.
+  own spam timer. While Roblox finishes a purchase the other buttons wait, at most
+  `ClientWaitSeconds` after buying (then "Roblox is taking a while", `Text.RobuxSlow`, and the
+  other crates open again); the first R$ press waits at most `RemoteWaitSeconds` for the
+  server's check.
 - **Deluxe crates** (`Premium`, switch `PremiumCrates`): one line in `Premium.Crates` per crate
   (`Id`, `Base` = the themed crate whose skins it gives, `ProductId`). They cost `Price` (2,000),
   use `Premium.Odds` (no Commons: Uncommon 50, Rare 49, CRAZY 1, so in the Deluxe Pumpkin Crate
