@@ -18,6 +18,7 @@ local REMOTE_FUNCTIONS = {
 	"BuyItem",
 	"EquipItem",
 	"OpenCrate",
+	"PrepareCrateRobux",
 	"ParkourRequest",
 	"AdminCommand",
 	"GetAdminCommands",

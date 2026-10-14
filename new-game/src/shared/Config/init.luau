@@ -1680,7 +1680,9 @@ local Config = {
 				WebScourBest = 0,
 				WebScourLastReward = 0,
 			},
-			Crates = { Opened = 0 }, -- crates opened, ever
+			-- Crates opened (ever) and each themed crate's luck meter ([crate Id] = steps, 1 to
+			-- Config.Crates.Luck.Steps; a crate with no line is at 0).
+			Crates = { Opened = 0, Luck = {} :: { [string]: number } },
 			Stats = { HideSeekTags = 0, HideSeekWins = 0, ScareMazeEscapes = 0 },
 		},
 	},

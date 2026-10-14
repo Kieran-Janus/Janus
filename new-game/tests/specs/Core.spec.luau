@@ -30,6 +30,9 @@ describe("Config.Features", function()
 				"EasterEggs",
 				"Crates",
 				"RobuxCrates",
+				"CrateLuck",
+				"CratePacks",
+				"PremiumCrates",
 				"Tutorial",
 			}
 		do
@@ -193,6 +196,7 @@ describe("Config.Data.Template", function()
 		expect(template.Minigames.CandyRushWins).toBe(0)
 		expect(template.Minigames.WebScourBest).toBe(0)
 		expect(template.Crates.Opened).toBe(0)
+		expect(template.Crates.Luck).toEqual({}) -- each themed crate's luck meter
 		expect(template.Stats.HideSeekTags).toBe(0)
 		expect(template.Stats.HideSeekWins).toBe(0)
 		expect(template.Stats.ScareMazeEscapes).toBe(0)

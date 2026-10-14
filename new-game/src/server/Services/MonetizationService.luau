@@ -20,7 +20,14 @@
 	                (CrateResult). If crates aren't allowed for the player (their region, or
 	                Config.Features.Crates / RobuxCrates switched off) they get the crate's coin
 	                Price instead of a random skin (Config.Crates.RobuxFallbackCoins for a crate
-	                with no Price).
+	                with no Price; a Deluxe crate while Config.Features.PremiumCrates is off too).
+	                Luck: the crate rolls at the player's saved luck level when the receipt is
+	                handled (CrateService holds that crate from the R$ press, so it is the level
+	                they saw), moves the meter, and the undo puts it back exactly. Every crate
+	                receipt is paired: CrateService.ReceiptStarted before anything else,
+	                ReceiptFinished on every way out (the hold ends; not granted = the player
+	                hears Roblox will give it again later). One crate receipt per player is
+	                handled at a time, so one receipt's undo can never undo another's luck.
 	King tracker  - TrackKing() -> (direction, distance) of the nearest King, VIP only, for a
 	                living player in the round, with a cooldown (attribute TrackerReadyAt).
 	IDs of 0 mean "not created yet": nothing is checked or granted for them.
@@ -105,7 +112,7 @@ local function processCrateReceipt(
 	crate: CrateOdds.Crate
 ): Enum.ProductPurchaseDecision
 	-- May wait a little for the region check that starts when the player joins.
-	local allowed = CrateService.CanOpenWithRobux(player, Config.Crates.Policy.WaitSeconds)
+	local allowed = CrateService.CanOpenWithRobux(player, Config.Crates.Policy.WaitSeconds, crate)
 	if player.Parent ~= Players or DataService.Get(player) ~= data then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
@@ -203,13 +210,47 @@ local function handleReceipt(receipt: any, receiptId: string): Enum.ProductPurch
 	return processCoinPack(player, data, receiptId, product)
 end
 
+-- The crate receipt each player is handling right now ([player] = receipt id): one at a time.
+local crateTurn: { [Player]: string } = {}
+
 local function processReceipt(receipt: any): Enum.ProductPurchaseDecision
 	local receiptId = tostring(receipt.PurchaseId)
 	if pending[receiptId] then
 		return Enum.ProductPurchaseDecision.NotProcessedYet -- still being handled (see pending)
 	end
 	pending[receiptId] = true
-	local ok, decision = pcall(handleReceipt, receipt, receiptId)
+	-- A crate receipt: CrateService holds that crate from now until ReceiptFinished below, and
+	-- this player's crate receipts take turns.
+	local crate = CrateOdds.ByProductId(receipt.ProductId)
+	local buyer = Players:GetPlayerByUserId(receipt.PlayerId)
+	local myTurn = false
+	if crate and buyer then
+		CrateService.ReceiptStarted(buyer, crate)
+		while crateTurn[buyer] ~= nil and buyer.Parent == Players do
+			task.wait(0.1)
+		end
+		if buyer.Parent == Players then
+			crateTurn[buyer] = receiptId
+			myTurn = true
+		end
+	end
+	local ok: boolean, decision: any
+	if crate and buyer and not myTurn then
+		-- The buyer left while waiting: Roblox asks again when they are back.
+		ok, decision = true, Enum.ProductPurchaseDecision.NotProcessedYet
+	else
+		ok, decision = pcall(handleReceipt, receipt, receiptId)
+	end
+	if crate and buyer then
+		if myTurn and crateTurn[buyer] == receiptId then
+			crateTurn[buyer] = nil
+		end
+		CrateService.ReceiptFinished(
+			buyer,
+			crate,
+			ok and decision == Enum.ProductPurchaseDecision.PurchaseGranted
+		)
+	end
 	pending[receiptId] = nil
 	if not ok then
 		warn("[MonetizationService] Receipt " .. receiptId .. " failed: " .. tostring(decision))

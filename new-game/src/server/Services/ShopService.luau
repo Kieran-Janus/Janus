@@ -10,7 +10,16 @@
 	  GetShopState() -> State
 	  BuyItem(itemId) -> (ok, message, State)
 	  EquipItem(slot, itemId or "") -> State
-	Server -> client: ShopState(State) whenever it changes for another reason (VIP, packs).
+	Server -> client: ShopState(State) whenever it changes for another reason (VIP, packs,
+	crates). Push also refreshes GetShopState's short cache, so a GetShopState right after a
+	push never answers with older data.
+	Crate luck (src/shared/CrateLuck.luau): State.CrateLuck = { [crateId] = level } (only
+	non-zero levels of crates in the game with a meter) and State.LuckVersion, a number for
+	this player that goes up with every luck change (CrateService calls LuckChanged). The
+	client ignores a State or crate result older than the version it already has.
+	  ShopService.LuckChanged(player) -> number   raises the version, returns it
+	  ShopService.LuckVersion(player) -> number   the current version (0 at first; only in
+	                                              memory for this session)
 	Skin Studio (admins in Studio): ShopService.SetSkinOverride(player, item?) wears a draft
 	skin instead of the equipped one; ShopService.SkinOverride(player) reads it. Choosing a
 	skin yourself (buying or equipping one: Shop, Menu > Skins, a crate's Equip) takes the
@@ -22,6 +31,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Cosmetics = require(ReplicatedStorage.Shared.Cosmetics)
+local CrateLuck = require(ReplicatedStorage.Shared.CrateLuck)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local DataService = require(script.Parent.DataService)
@@ -32,6 +42,8 @@ export type State = {
 	Owned: { string },
 	Equipped: { [string]: string },
 	Vip: boolean,
+	CrateLuck: { [string]: number }, -- each themed crate's luck meter (0s left out)
+	LuckVersion: number, -- goes up with every luck change (newer wins on the client)
 }
 
 local ShopService = {}
@@ -39,6 +51,7 @@ local ShopService = {}
 local lastRequest: { [Player]: number } = {}
 local lastState: { [Player]: { At: number, State: State } } = {}
 local skinOverrides: { [Player]: any } = {} -- Skin Studio drafts being worn (SetSkinOverride)
+local luckVersions: { [Player]: number } = {} -- see ShopService.LuckChanged
 local shopState: RemoteEvent
 
 local function isVip(player: Player): boolean
@@ -53,10 +66,31 @@ local function canUse(player: Player, item: any, data: { [string]: any }): boole
 	return data.Owned[item.Id] == true
 end
 
+-- Raises the player's luck version (after any change to their crate luck) and returns it.
+function ShopService.LuckChanged(player: Player): number
+	local version = (luckVersions[player] or 0) + 1
+	if player.Parent == Players then
+		luckVersions[player] = version
+	end
+	return version
+end
+
+function ShopService.LuckVersion(player: Player): number
+	return luckVersions[player] or 0
+end
+
 function ShopService.State(player: Player): State
 	local data = DataService.Get(player)
 	if not data then
-		return { Ready = false, Coins = 0, Owned = {}, Equipped = {}, Vip = isVip(player) }
+		return {
+			Ready = false,
+			Coins = 0,
+			Owned = {},
+			Equipped = {},
+			Vip = isVip(player),
+			CrateLuck = {},
+			LuckVersion = ShopService.LuckVersion(player),
+		}
 	end
 	local owned = {}
 	for id, has in data.Owned do
@@ -70,12 +104,21 @@ function ShopService.State(player: Player): State
 		Owned = owned,
 		Equipped = table.clone(data.Equipped),
 		Vip = isVip(player),
+		CrateLuck = CrateLuck.Snapshot(data),
+		LuckVersion = ShopService.LuckVersion(player),
 	}
 end
 
--- Sends the player their current shop state (after VIP or coin purchases).
+-- Sends the player their current shop state (after VIP, coin or crate purchases). It also
+-- becomes GetShopState's cached answer, so that never sends anything older.
 function ShopService.Push(player: Player)
-	shopState:FireClient(player, ShopService.State(player))
+	local state = ShopService.State(player)
+	if player.Parent == Players then
+		lastState[player] = { At = os.clock(), State = state }
+	end
+	if shopState then
+		shopState:FireClient(player, state)
+	end
 end
 
 -- Skin Studio: wear `item` in the Skin slot instead of the equipped skin (no ownership check:
@@ -235,6 +278,7 @@ function ShopService.Start()
 		lastRequest[player] = nil
 		lastState[player] = nil
 		skinOverrides[player] = nil
+		luckVersions[player] = nil
 	end)
 end
 

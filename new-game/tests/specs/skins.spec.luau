@@ -165,6 +165,12 @@ describe("Skin catalogue", function()
 			end
 			expect(on[theme.Id] == true).toBe(switch)
 			expect(crates[theme.Crate] == true).toBe(switch)
+			-- (and its Deluxe crate, Config.Crates.Premium, only while the theme is on)
+			for _, line in Config.Crates.Premium.Crates do
+				if line.Base == theme.Crate then
+					expect(crates[line.Id] == true).toBe(switch)
+				end
+			end
 			expect(#Items.ByCrate(theme.Crate) > 0).toBe(switch)
 			-- a hidden theme's file still loads, ready to switch back on
 			local file = rt:require("ReplicatedStorage.Shared.Config.Skins." .. theme.Id)

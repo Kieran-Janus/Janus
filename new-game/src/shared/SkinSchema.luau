@@ -192,7 +192,10 @@ end
 local function crateIds(): { string }
 	local out = {}
 	for _, crate in Config.Crates.List :: { any } do
-		table.insert(out, crate.Id)
+		-- (not the Deluxe crates: they give their Base crate's skins)
+		if crate.Base == nil then
+			table.insert(out, crate.Id)
+		end
 	end
 	return out
 end

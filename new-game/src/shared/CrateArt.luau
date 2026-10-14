@@ -22,7 +22,9 @@
 
 	Your own crate model: put a Model named after the crate's Id (e.g. "PumpkinCrate") in
 	ReplicatedStorage.Custom.Props. The stand and the panel use it instead, scaled to the
-	height of the built crate (front = the model's pivot front, -Z).
+	height of the built crate (front = the model's pivot front, -Z). A Deluxe crate uses its
+	Base crate's model (e.g. "PumpkinCrate" for the Deluxe Pumpkin Crate) unless there is one
+	named after its own Id.
 
 	CrateArt.Build(crate, size?) -> Model    the Part-built crate. Pivot: bottom centre of the
 	                                         box, front faces -Z. size = box width in studs
@@ -1128,7 +1130,12 @@ function CrateArt.AddPrompt(holder: BasePart, crate: any): ProximityPrompt
 end
 
 function CrateArt.Preview(crate: any, size: number?): Model
+	-- Your own model named after the crate; a Deluxe crate uses its Base crate's model unless
+	-- it has its own.
 	local custom = CustomAssets.Clone("Props", crate.Id)
+	if not custom and type(crate.Base) == "string" then
+		custom = CustomAssets.Clone("Props", crate.Base)
+	end
 	if custom then
 		-- (by its longest side: a long coffin or a tall sarcophagus still fits the preview)
 		CustomAssets.Fit(custom, CrateArt.Height(size), true)

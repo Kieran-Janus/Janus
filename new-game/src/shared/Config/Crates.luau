@@ -7,18 +7,21 @@
 	before they open it (a Roblox rule for paid random items).
 
 	HOW A CRATE PICKS A SKIN
-	  1. It picks a rarity using the crate's Odds (percent: Common 73.48 means 73.48 in 100 opens).
+	  1. It picks a rarity using the crate's Odds (percent: Common 60.98 means 60.98 in 100 opens).
 	  2. It picks one skin of that rarity from the crate, every skin equally likely.
 	  So one skin's chance = its rarity's odds / how many skins of that rarity the crate has.
-	  Pumpkin Crate: 12 Commons share 73.48% (6.123% each), 5 Uncommons share 24% (4.800%
-	  each), 2 Rares share 2.5% (1.250% each) and its one CRAZY skin has 0.020%.
+	  Pumpkin Crate: 12 Commons share 60.98% (5.082% each), 5 Uncommons share 24% (4.8% each),
+	  2 Rares share 15% (7.5% each) and its one CRAZY skin has 0.02%.
 	  A rarity with no skins in a crate is skipped and the others grow to fill 100% (the newer
 	  crates have no ordinary CRAZY skin, so their 13 Commons, 5 Uncommons and 3 Rares share it).
 	  ONE IN A MILLION: a skin with its own Odds (in its theme file, e.g. Odds = 0.0001) has
 	  exactly that chance (0.0001% = 1 open in a million), and the rest of the crate shares the
 	  other 99.9999%. These skins (OneInAMillion = true) are never in the CRAZY Crate.
-	  Rare and CRAZY were made rarer in the big skin update (Rare 5% -> 2.5%, CRAZY 0.1% ->
-	  0.02%), so they stay special now that there are about 630 skins.
+	  Rare went up to 15% in October 2026 (it was 2.5%); CRAZY stays 0.02%, so it stays
+	  special now that there are about 630 skins.
+
+	LUCK, PACKS AND DELUXE CRATES: see Luck, Open.Guarantee, RobuxOpen and Premium below
+	(docs/CRATE-LUCK-SPEC.md has every detail and number).
 
 	WHICH SKINS ARE IN A CRATE
 	  Themed crates: every skin whose Crate is that crate's Id (the theme files in
@@ -56,12 +59,16 @@
 	  Category   (optional) its tab in Menu > Crates (Categories below)
 	  Look       its shape, emblem, extra colour and how it moves (LookDefaults below)
 	  New        (optional) true = a NEW ribbon on its card in Menu > Crates
+	  Luck       (optional) false = no luck meter for this crate
 	Prices (themed crates): 600 coins, double the old 300, since there are now 30 crates and the
 	best skins are much rarer: a crate is a gamble for the rare and the one-in-a-million skins,
 	not the cheap way to get Commons (buy those in the shop for 125). One open is worth about
-	257 coins at shop prices (0.7348 x 125 + 0.24 x 500 + 0.025 x 1000 + 0.0002 x 100000), and
-	EVERY duplicate pays coins back (Config/Rarity.luau, DuplicateRefund: about half the shop
-	price), so a crate never leaves you empty-handed.
+	366 coins at shop prices (0.6098 x 125 + 0.24 x 500 + 0.15 x 1000 + 0.0002 x 100000), about
+	418 on average with the luck meter. A player who already owns everything gets back about
+	208 in duplicate coins, so a crate never pays for itself. Packs are worth about 1% more per
+	crate over time. Deluxe crates: 2,000 coins, worth about 1,740. EVERY duplicate pays coins
+	back (Config/Rarity.luau, DuplicateRefund: about half the shop price), so a crate never
+	leaves you empty-handed.
 	Rarity crates cost a bit less than buying one skin of that rarity in the shop (125, 500,
 	1000, 100000), because you don't get to choose which skin you get. They were NOT doubled:
 	doubled they would cost more than the shop.
@@ -87,17 +94,52 @@ export type Crate = {
 	Category: string?, -- which tab of Menu > Crates it is on (Categories below)
 	Look: { [string]: any }?, -- its look and movement (LookDefaults below has every field)
 	New: boolean?, -- shows a NEW ribbon in Menu > Crates
+	Luck: boolean?, -- false = no luck meter for this crate
+	Base: string?, -- (Deluxe crates) the crate whose skins it gives
 }
 
 local rgb = Color3.fromRGB
 
 local crates = {
-	-- The chance of each rarity (percent) for every crate without its own Odds. Must add up
-	-- to 100. Rarity names are the ones in Config/Rarity.luau.
-	Odds = { Common = 73.48, Uncommon = 24, Rare = 2.5, Crazy = 0.02 } :: { [string]: number },
-	-- How a chance under 1% is shown on the crate panel ("<1%"; "" = the exact number, e.g.
-	-- "0.0001%"). Larger chances show with one decimal ("6.1%").
-	SmallOdds = "<1%",
+	-- The chance of each rarity (percent) for every themed crate without its own Odds. Must add
+	-- up to 100. Rarity names are the ones in Config/Rarity.luau. (Rare went up from 2.5 to 15
+	-- in October 2026; Common went down to make room.) The luck meter (Luck below) moves some
+	-- of Common to Rare for each player.
+	Odds = { Common = 60.98, Uncommon = 24, Rare = 15, Crazy = 0.02 } :: { [string]: number },
+	-- Chances always show as exact numbers on the crate page ("5.082%", "24%", "0.02%",
+	-- "0.04442%", "0.0001%"): a Roblox rule for paid random items, so there is no setting to
+	-- round them.
+
+	-- LUCK METER (switch: Config.Features.CrateLuck). Each player has a meter for each themed
+	-- crate (saved). Every crate that gives something below Rare fills one step: Rare gets
+	-- PerStep % more and Common PerStep % less, for that player's next crate of that kind.
+	-- A Rare or better empties the meter. A full meter (Steps steps) makes the next crate Rare
+	-- or better for sure (FullGuarantee). The crate page always shows the meter and the exact
+	-- chance of every skin for the next crate, and "Every chance" lists every step.
+	-- Rarity crates and Deluxe crates have no meter (nor does a crate line with Luck = false,
+	-- or a crate whose Rare skins are all hidden).
+	-- Keep Steps x PerStep at or below Odds.Common (the tests check it). Boost must be below
+	-- CRAZY and TakeFrom below Boost, or no crate gets a meter (Output says why).
+	-- Lowering Steps later: a player whose saved luck is above the new Steps simply has a
+	-- full meter.
+	Luck = {
+		PerStep = 2, -- percent moved from Common to Rare per step
+		Steps = 15, -- steps in a full meter
+		FullGuarantee = true, -- true = a full meter makes the next crate Rare or better for sure
+		Boost = "Rare", -- the rarity the meter raises (getting this or better empties it)
+		TakeFrom = "Common", -- the rarity the extra chance is taken from
+	},
+
+	-- ROBUX OPENS. Pressing a crate's R$ button first checks the luck you saw. Then that crate
+	-- can't be opened with coins until Roblox's purchase is cancelled or its crate has opened,
+	-- so the Robux crate rolls with the luck you saw. Other crates open as normal.
+	RobuxOpen = {
+		Cooldown = 1, -- seconds between two R$ presses by one player (its own timer)
+		HoldSeconds = 60, -- how long the hold waits for you to finish Roblox's purchase window
+		MaxHoldSeconds = 600, -- after you buy: the hold lasts until the crate opens, at most this
+		ClientWaitSeconds = 60, -- after you buy: the other buttons wait this long for the opening
+		RemoteWaitSeconds = 5, -- the first R$ press waits this long for the server's check
+	},
 
 	RequestCooldown = 1, -- seconds between two crate opens by the same player
 	-- Open several at once: the buttons on a crate's page (each costs Count x Price, taken in one
@@ -105,6 +147,15 @@ local crates = {
 	Open = {
 		Counts = { 1, 5, 10 },
 		SkipKey = Enum.KeyCode.Space, -- jumps straight to the result while the strip spins
+		-- PACK GUARANTEES (switch: Config.Features.CratePacks). Opening x5 or x10 at once
+		-- promises at least one skin of this rarity or better. The crates open one by one; if
+		-- the ones before the last haven't given it, the last crate can only give that rarity
+		-- or better (picked among those skins with their usual chances, scaled up to 100%).
+		-- Never above Luck.Boost (a higher one is ignored). A crate with no skins of that
+		-- rarity gets no guarantee. (x5 and x10 always ask "Open ... x10?" first, with the
+		-- price, how packs work and every chance: that window is where the guaranteed crate's
+		-- chances are shown.)
+		Guarantee = { [5] = "Uncommon", [10] = "Rare" } :: { [number]: string },
 	},
 	-- Quick open: a switch on the crate page. On = no spinning strip: every result at once on one
 	-- page, in a grid with rarity colours, duplicates marked with their coins back and the best
@@ -118,6 +169,7 @@ local crates = {
 	-- first tab. Crates per page = PageSize (PhonePageSize on phones).
 	Categories = {
 		"Classic",
+		"Deluxe",
 		"Monsters",
 		"Haunted Places",
 		"Creepy Critters",
@@ -334,6 +386,8 @@ local crates = {
 	Admin = {
 		FreeCrate = "PumpkinCrate", -- "Crates: open free ..." opens this one without paying
 		Coins = 100000, -- "Crates: +100k coins"
+		-- "Crates: +5 luck on Pumpkin Crate" (Studio only) adds this many luck steps to FreeCrate.
+		LuckSteps = 5,
 	},
 
 	-- Sounds you hear while opening (any "rbxassetid://..." id; "" = silent).
@@ -407,7 +461,7 @@ local crates = {
 		AnnounceMillion = "%s unboxed %s: a ONE IN A MILLION skin!!!",
 		Equip = "Equip now",
 		Wearing = "Wearing it!",
-		OpenAnother = "Open another",
+		OpenAnother = "Open again", -- after a reveal: back to the crate's page, with your new chances
 		Back = "Back",
 		Skip = "Skip",
 		ShopButton = "Buy in the Shop",
@@ -422,6 +476,64 @@ local crates = {
 		NotLoaded = "Your save is still loading.",
 		StillChecking = "Still checking if crates are allowed for you. Try again in a moment.",
 		RobuxInstead = "Crates aren't available for you, so you got %d %s instead.",
+		OddsChanged = "Your chances for this crate just changed, so nothing was bought. Have a look at the new chances first.",
+		RobuxFirst = "Your Robux crate is still on its way. This crate opens again once it has arrived.",
+		RobuxLater = "Your Robux crate didn't open yet. Don't worry: Roblox will give it to you again soon (sometimes when you next join).",
+		RobuxSlow = "Roblox is taking a while. Your Robux crate opens as soon as it arrives.",
+		RobuxLuck = "Opened at luck %d / %d", -- on a Robux crate's reveal: the luck it really used
+		-- The luck meter (a %s rarity is the rarity's Name from Config.Rarity).
+		LuckTitle = "Luck %d / %d", -- steps now, steps in a full meter
+		LuckFull = "Luck full. Your next crate is %s or better for sure.",
+		LuckNext = "%s or better, next crate: %s",
+		LuckShort = "Luck %d/%d · %s or better %s", -- the phone line above the buy buttons
+		LuckShortFull = "Luck full · %s or better %s",
+		LuckHelp = "Every crate below %s adds %s to %s (taken from %s). A %s or better starts it again at 0. A full meter = %s or better for sure.",
+		EveryChance = "Every chance",
+		LuckTableTitle = "%s: every chance at every luck step",
+		LuckRow = "Luck %d",
+		LuckRowFull = "Luck %d (full)",
+		LuckYou = "  ◀ you",
+		Each = "%s each",
+		FixedRow = "%s: %s at every luck step",
+		-- Packs (x5 / x10) and their window.
+		PackLine = "x%d: at least one %s or better",
+		PackTitle = "Open %s x%d?",
+		PackPrice = "Price: %s %s",
+		PackHow = "The %d crates open one after another, just like %d single opens: each one uses your luck at that moment (Every chance shows them all).",
+		PackHowFixed = "Every crate in the pack has the chances shown on this page.",
+		PackGuarantee = "If crates 1 to %d give nothing %s or better, crate %d can only be %s or better. Its chances: %s",
+		PackFullFirst = "If no %s or better comes first, your luck meter fills up during this pack, and a full meter makes that crate %s or better for sure.",
+		PackConfirm = "Open %d for %s %s",
+		Cancel = "Cancel",
+		Guaranteed = "GUARANTEED",
+	},
+
+	-- DELUXE CRATES (switch: Config.Features.PremiumCrates). A pricier version of a themed
+	-- crate: the same skins, much better odds, no luck meter. Each line in Crates makes one from
+	-- its Base crate (same shape and colours, gold trim), on the Category tab of Menu > Crates
+	-- (not on the lobby stand). Never rename an Id once the game is live. ProductId 0 = its
+	-- Robux button says "Coming soon" (make a Developer Product in Creator Hub to sell it).
+	-- A CRAZY from a Deluxe crate is announced to the whole server like any other
+	-- (AnnounceCrazy), so those messages come more often.
+	Premium = {
+		Price = 2000, -- coins
+		Odds = { Common = 0, Uncommon = 50, Rare = 49, Crazy = 1 } :: { [string]: number },
+		Category = "Deluxe",
+		NameFormat = "Deluxe %s", -- %s = the base crate's name
+		Blurb = "Same skins, no Commons, much better Rare and CRAZY chances.",
+		Trim = rgb(255, 205, 60), -- gold bands and lid edge
+		Look = { Sparkles = 16 } :: { [string]: any }, -- these keys replace the base crate's Look
+		ShakeTimes = 1.25, -- shakes this many times as hard as its base crate (Monster: 1.4 -> 1.75)
+		New = true, -- NEW ribbon on their cards
+		SuggestedRobux = 249, -- only a note: the real price is set in Creator Hub
+		Crates = {
+			{ Id = "PumpkinDeluxeCrate", Base = "PumpkinCrate", ProductId = 0 },
+			{ Id = "CandyDeluxeCrate", Base = "CandyCrate", ProductId = 0 },
+			{ Id = "SpookyDeluxeCrate", Base = "SpookyCrate", ProductId = 0 },
+			{ Id = "GraveyardDeluxeCrate", Base = "GraveyardCrate", ProductId = 0 },
+			{ Id = "MonsterDeluxeCrate", Base = "MonsterCrate", ProductId = 0 },
+			{ Id = "MoonlightDeluxeCrate", Base = "MoonlightCrate", ProductId = 0 },
+		} :: { { Id: string, Base: string, ProductId: number } },
 	},
 
 	List = {
@@ -905,8 +1017,57 @@ local crates = {
 	} :: { Crate },
 }
 
+-- Deluxe crates (Premium.Crates): one crate per line, made from its Base crate (the same
+-- skins and shape, gold trim, Premium's price and odds). Whether they are in the game right
+-- now is checked while it runs (Config.Features.PremiumCrates, CrateOdds.Available), so the
+-- switch can be flipped during a playtest.
+do
+	local premium = crates.Premium
+	local byId: { [string]: Crate } = {}
+	for _, crate in crates.List do
+		byId[crate.Id] = crate
+	end
+	for _, line in premium.Crates do
+		local base = byId[line.Base]
+		if not base or base.Rarity ~= nil or base.Base ~= nil or byId[line.Id] then
+			warn(
+				("[Config.Crates] Premium crate %s: its Base %s isn't a themed crate in List (or the Id is taken), so it was left out."):format(
+					tostring(line.Id),
+					tostring(line.Base)
+				)
+			)
+			continue
+		end
+		local look: { [string]: any } = table.clone(base.Look or {})
+		for key, value in premium.Look do
+			look[key] = value
+		end
+		local baseShake = (base.Look and base.Look.Shake) or crates.LookDefaults.Shake
+		look.Shake = baseShake * premium.ShakeTimes
+		local deluxe: Crate = {
+			Id = line.Id,
+			Base = base.Id,
+			Name = premium.NameFormat:format(base.Name),
+			Blurb = premium.Blurb,
+			Color = base.Color,
+			Trim = premium.Trim,
+			Glow = base.Glow,
+			Topper = base.Topper,
+			Look = look,
+			Category = premium.Category,
+			Price = premium.Price,
+			Odds = table.clone(premium.Odds),
+			Robux = { ProductId = line.ProductId, SuggestedRobux = premium.SuggestedRobux },
+			New = premium.New,
+		}
+		byId[line.Id] = deluxe
+		table.insert(crates.List, deluxe)
+	end
+end
+
 -- A themed crate whose theme is switched off (Config/Skins/InGame.luau) leaves the game with its
--- skins: it isn't in Menu > Crates, and the rarity crates don't draw from it.
+-- skins (and so does its Deluxe crate): it isn't in Menu > Crates, and the rarity crates don't
+-- draw from it.
 local SkinSettings = require(script.Parent.Skins.Settings)
 local off: { [string]: boolean } = {}
 for _, theme in SkinSettings.AllThemes do
@@ -917,7 +1078,7 @@ for _, theme in SkinSettings.Themes do
 end
 local list: { Crate } = {}
 for _, crate in crates.List do
-	if not off[crate.Id] then
+	if not off[crate.Id] and not (crate.Base and off[crate.Base]) then
 		table.insert(list, crate)
 	end
 end

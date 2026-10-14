@@ -11,38 +11,75 @@
 	The player attribute CratesRestricted (true / false; missing = still checking) tells the
 	crate panel to hide its buy buttons.
 
+	LUCK, PACKS AND DELUXE CRATES (docs/CRATE-LUCK-SPEC.md). Each themed crate has a luck meter
+	per player (src/shared/CrateLuck.luau, saved in data.Crates.Luck): every roll reads the
+	saved level, rolls with CrateLuck.Boost (the same maths the crate page shows) and moves the
+	meter. The client sends the level (and pack guarantee) it showed; if that isn't what the
+	server has, nothing is bought and the answer says OddsChanged with the real Luck, so a
+	player always buys with the chances they saw. x5 / x10 open crate by crate; the last one
+	gets the pack guarantee (Config.Crates.Open.Guarantee) if the others missed it.
+
 	Client -> server:
-	  OpenCrate(crateId, count?) -> Result opens `count` crates (one of Config.Crates.Open.Counts,
-	                                      default 1) for count x its coin Price, taken in one go;
-	                                      the server rolls them all. Result.Results lists every
-	                                      result when count > 1 (Result itself is the first).
+	  OpenCrate(crateId, count, shownLuck, shownGuarantee?) -> Result
+	                                      opens `count` crates (one of Config.Crates.Open.Counts;
+	                                      nil counts as 1) for count x its coin Price, taken in
+	                                      one go. shownLuck = the luck level the page showed (0
+	                                      for a crate without a meter); shownGuarantee = the
+	                                      pack guarantee the pack window showed (nil for x1).
+	                                      Result.Results lists every result when count > 1
+	                                      (Result itself is a copy of the first).
+	  PrepareCrateRobux(crateId, shownLuck) -> { Ok, Message, CrateId, Luck?, LuckVersion }
+	                                      before the Roblox purchase window: checks the luck
+	                                      shown, then HOLDS that crate (coin opens of it say
+	                                      RobuxFirst) until the purchase is cancelled, its
+	                                      receipt has been handled, Config.Crates.RobuxOpen
+	                                      HoldSeconds pass (window still open) or MaxHoldSeconds
+	                                      pass (bought, receipt not here yet). Its own cooldown
+	                                      (RobuxOpen.Cooldown), not OpenCrate's.
 	Server -> client:
 	  CrateResult(Result)                 a crate opened some other way (Robux purchase, F8
-	                                      free crate): the panel plays the opening for it
+	                                      free crate), or a Robux crate that didn't open yet
+	                                      (Ok = false, RobuxLater): the panel plays / shows it
 	Result = { Ok, Message, CrateId, ItemId?, ItemName?, Rarity?, Duplicate?, Refund?, Reel?,
-	           WinIndex?, Paid? } (Reel: item ids for the spinning strip, Reel[WinIndex] = ItemId)
+	           WinIndex?, Paid?, OneInAMillion?, Results?,
+	           Luck? (the level this crate rolled at; on a refusal the current level),
+	           LuckAfter? (the level after it; for a pack, after the last crate),
+	           Guaranteed? (the AtLeast rarity used: pack guarantee or full meter),
+	           LuckVersion (ShopService.LuckVersion after this result; on every result) }
+	(Reel: item ids for the spinning strip, Reel[WinIndex] = ItemId.)
 	A CRAZY skin unboxed any way is announced to the whole server (AnnounceService; "Huge" for a
 	ONE IN A MILLION skin) while Config.Crates.AnnounceCrazy is on.
 
-	Robux crates: MonetizationService's ProcessReceipt calls CrateService.Grant for products
-	that are a crate's Robux.ProductId (and undoes it if the save fails).
+	Robux crates: MonetizationService's ProcessReceipt calls ReceiptStarted, then
+	CrateService.Grant for products that are a crate's Robux.ProductId (and undoes it if the
+	save fails), then ReceiptFinished (always, whatever happened).
 
-	CrateService.Grant(player, crate, paid) -> (Result?, undo)  roll and give (no payment)
+	CrateService.Grant(player, crate, paid, atLeast?) -> (Result?, undo)  roll and give (no
+	                                                            payment); undo also puts the
+	                                                            luck back
+	CrateService.Luck(player, crateId) -> number                the player's luck level now
 	CrateService.IsRestricted(player, waitSeconds?) -> boolean  true while crates are closed
 	                                                            for this player
-	CrateService.CanOpenWithRobux(player, waitSeconds?) -> boolean
+	CrateService.CanOpenWithRobux(player, waitSeconds?, crate?) -> boolean
+	CrateService.ReceiptStarted(player, crate)                  a crate receipt is being handled
+	CrateService.ReceiptFinished(player, crate, granted)        ...and is done (granted = false:
+	                                                            sends RobuxLater)
 	CrateService.SendResult(player, result)
 	CrateService.EnsurePrompt(instance) -> ProximityPrompt?     for parts tagged CrateDisplay
+	F8 (Studio only, while Features.CrateLuck is on): CrateLuckUp, CrateLuckQuiet (changes the
+	luck without telling the screen, to test the odds check), CrateLuckReset.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 local PolicyService = game:GetService("PolicyService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local CrateArt = require(ReplicatedStorage.Shared.CrateArt)
+local CrateLuck = require(ReplicatedStorage.Shared.CrateLuck)
 local CrateOdds = require(ReplicatedStorage.Shared.CrateOdds)
 local Items = require(ReplicatedStorage.Shared.Items)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
@@ -66,14 +103,35 @@ export type Result = {
 	Paid: string?, -- "Coins", "Robux" or "Free"
 	OneInAMillion: boolean?,
 	Results: { Result }?, -- every result, when several crates were opened at once
+	Luck: number?, -- the luck level this crate rolled at (on a refusal: the current level)
+	LuckAfter: number?, -- the level after it (a pack: after the last crate)
+	Guaranteed: string?, -- the AtLeast rarity this roll used (pack guarantee or full meter)
+	LuckVersion: number?, -- ShopService.LuckVersion after this result (always set)
 }
+
+-- What PrepareCrateRobux answers.
+export type Prepared = {
+	Ok: boolean,
+	Message: string,
+	CrateId: string,
+	Luck: number?,
+	LuckVersion: number,
+}
+
+-- A Robux purchase window opened after PrepareCrateRobux (see RobuxOpen in Config.Crates).
+type Hold = { Until: number, Bought: boolean }
 
 local CrateService = {}
 
 local rng = Random.new()
 local lastOpen: { [Player]: number } = {}
+local lastPrepare: { [Player]: number } = {} -- PrepareCrateRobux's own cooldown
 -- true = crates closed for this player, false = allowed, nil = still asking Roblox
 local restricted: { [Player]: boolean } = {}
+-- Robux holds: [player][crateId]. prepared = a purchase window opened (timed); receiving =
+-- how many receipts of that crate are being handled right now.
+local prepared: { [Player]: { [string]: Hold } } = {}
+local receiving: { [Player]: { [string]: number } } = {}
 local resultEvent: RemoteEvent? = nil
 local started = false
 
@@ -83,6 +141,22 @@ end
 
 local function fail(crateId: string, message: string): Result
 	return { Ok = false, Message = message, CrateId = crateId }
+end
+
+-- A refusal, with the player's luck version (and their level for `crate`, when known).
+local function refuse(
+	player: Player,
+	crateId: string,
+	message: string,
+	data: { [string]: any }?,
+	crate: CrateOdds.Crate?
+): Result
+	local result = fail(crateId, message)
+	if data and crate then
+		result.Luck = CrateLuck.Get(data, crate)
+	end
+	result.LuckVersion = ShopService.LuckVersion(player)
+	return result
 end
 
 local function noUndo() end
@@ -146,31 +220,139 @@ function CrateService.IsRestricted(player: Player, waitSeconds: number?): boolea
 	return restricted[player] ~= false
 end
 
-function CrateService.CanOpenWithRobux(player: Player, waitSeconds: number?): boolean
+function CrateService.CanOpenWithRobux(
+	player: Player,
+	waitSeconds: number?,
+	crate: CrateOdds.Crate?
+): boolean
 	if not (Config.Features.Crates and Config.Features.RobuxCrates) then
 		return false
 	end
+	-- (a Deluxe crate while PremiumCrates is off: the buyer gets its coins instead)
+	if crate and not CrateOdds.Available(crate) then
+		return false
+	end
 	return not CrateService.IsRestricted(player, waitSeconds)
+end
+
+-- Robux holds ------------------------------------------------------------------------------
+
+-- Is a Robux purchase of this crate on its way for this player (so coins can't open it)?
+local function holding(player: Player, crateId: string): boolean
+	local counts = receiving[player]
+	if counts and (counts[crateId] or 0) > 0 then
+		return true
+	end
+	local holds = prepared[player]
+	local hold = holds and holds[crateId]
+	if holds and hold then
+		if os.clock() < hold.Until then
+			return true
+		end
+		holds[crateId] = nil
+	end
+	return false
+end
+
+-- A bought purchase still waiting for its receipt (or one being handled).
+local function bought(player: Player, crateId: string): boolean
+	local counts = receiving[player]
+	if counts and (counts[crateId] or 0) > 0 then
+		return true
+	end
+	local holds = prepared[player]
+	local hold = holds and holds[crateId]
+	return hold ~= nil and hold.Bought and os.clock() < hold.Until
+end
+
+local function release(player: Player, crateId: string)
+	local holds = prepared[player]
+	if holds then
+		holds[crateId] = nil
+	end
+end
+
+function CrateService.ReceiptStarted(player: Player, crate: CrateOdds.Crate)
+	if player.Parent ~= Players then
+		return
+	end
+	local counts = receiving[player]
+	if not counts then
+		counts = {}
+		receiving[player] = counts
+	end
+	counts[crate.Id] = (counts[crate.Id] or 0) + 1
+end
+
+-- Every ReceiptStarted ends with this, whatever happened. granted = false (the save failed,
+-- the save wasn't loaded, an error...): the hold ends and the player is told Roblox will give
+-- the crate again later, so the crate isn't stuck saying "still on its way".
+function CrateService.ReceiptFinished(player: Player, crate: CrateOdds.Crate, granted: boolean)
+	local counts = receiving[player]
+	if counts then
+		local left = math.max(0, (counts[crate.Id] or 0) - 1)
+		if left > 0 then
+			counts[crate.Id] = left
+		else
+			counts[crate.Id] = nil
+		end
+	end
+	release(player, crate.Id)
+	if not granted and player.Parent == Players then
+		local data = DataService.Get(player)
+		local result = refuse(player, crate.Id, text().RobuxLater, data, crate)
+		result.Paid = "Robux"
+		CrateService.SendResult(player, result)
+	end
+end
+
+-- MarketplaceService.PromptProductPurchaseFinished (server side): the window closed.
+local function onPurchaseFinished(userId: number, productId: number, purchased: boolean)
+	local player = Players:GetPlayerByUserId(userId)
+	local crate = CrateOdds.ByProductId(productId)
+	if not player or not crate then
+		return
+	end
+	local holds = prepared[player]
+	local hold = holds and holds[crate.Id]
+	if not holds or not hold then
+		return -- (e.g. its receipt was already handled)
+	end
+	if purchased then
+		-- Lasts until the receipt has been handled, with a safety limit.
+		hold.Bought = true
+		hold.Until = os.clock() + Config.Crates.RobuxOpen.MaxHoldSeconds
+	else
+		holds[crate.Id] = nil
+	end
 end
 
 -- Rolling and giving ----------------------------------------------------------------------
 
 --[[
 	Rolls `crate` and gives the player the skin, or its duplicate refund if they own it
-	already. Takes no payment (the caller did). Returns the Result for the client and a
-	function that takes it all back (for a Robux purchase whose save failed); nil if the
-	player's data isn't there or the crate is empty.
+	already. Takes no payment (the caller did). The roll uses the player's saved luck level
+	for this crate (CrateLuck) and `atLeast` (a pack guarantee: only that rarity or better),
+	with exactly the chances the crate page shows for that level, then moves the meter.
+	Returns the Result for the client and a function that takes it all back (for a Robux
+	purchase whose save failed), luck included; nil if the player's data isn't there or the
+	crate is empty.
 ]]
 function CrateService.Grant(
 	player: Player,
 	crate: CrateOdds.Crate,
-	paid: string
+	paid: string,
+	atLeast: string?
 ): (Result?, () -> ())
 	local data = DataService.Get(player)
 	if not data then
 		return nil, noUndo
 	end
-	local item = CrateOdds.Roll(crate, rng)
+	-- (with CrateLuck off, or a crate without a meter, the saved level isn't read or written)
+	local applies = CrateLuck.Applies(crate)
+	local level = if applies then CrateLuck.Get(data, crate) else 0
+	local boost = CrateLuck.Boost(crate, level, atLeast)
+	local item = CrateOdds.Pick(CrateOdds.Chances(crate, boost), rng:NextNumber())
 	if not item then
 		return nil, noUndo
 	end
@@ -187,10 +369,16 @@ function CrateService.Grant(
 		owned[item.Id] = true
 	end
 	if type(data.Crates) ~= "table" then
-		data.Crates = { Opened = 0 }
+		data.Crates = { Opened = 0, Luck = {} }
 	end
 	local stats = data.Crates
 	stats.Opened = (tonumber(stats.Opened) or 0) + 1
+	local after = level
+	if applies then
+		after = CrateLuck.After(crate, level, rarity)
+		CrateLuck.Set(data, crate, after)
+		ShopService.LuckChanged(player)
+	end
 
 	local reel = Config.Crates.Reel
 	local winIndex = math.clamp(math.floor(reel.WinIndex), 1, math.max(1, math.floor(reel.Cards)))
@@ -203,10 +391,14 @@ function CrateService.Grant(
 		Rarity = rarity,
 		Duplicate = duplicate,
 		Refund = refund,
-		Reel = CrateOdds.Reel(crate, item.Id, rng, reel.Cards, winIndex),
+		Reel = CrateOdds.Reel(crate, item.Id, rng, reel.Cards, winIndex, boost),
 		WinIndex = winIndex,
 		Paid = paid,
 		OneInAMillion = if item.OneInAMillion then true else nil,
+		Luck = if applies then level else nil,
+		LuckAfter = if applies then after else nil,
+		Guaranteed = if boost then boost.AtLeast else nil,
+		LuckVersion = ShopService.LuckVersion(player),
 	}
 	-- A CRAZY skin: the whole server hears about it (extra big for a one-in-a-million one), once
 	-- the winner's own reveal has played, so the banner doesn't spoil it.
@@ -229,8 +421,23 @@ function CrateService.Grant(
 			owned[item.Id] = nil
 		end
 		stats.Opened = math.max(0, (tonumber(stats.Opened) or 1) - 1)
+		-- The luck goes back exactly (unless something else changed it since).
+		if applies and CrateLuck.Applies(crate) and CrateLuck.Get(data, crate) == after then
+			CrateLuck.Set(data, crate, level)
+			ShopService.LuckChanged(player)
+		end
 	end
 	return result, undo
+end
+
+-- The player's luck level for a crate right now (0 if unknown or without a meter).
+function CrateService.Luck(player: Player, crateId: string): number
+	local data = DataService.Get(player)
+	local crate = CrateOdds.Get(crateId)
+	if not data or not crate then
+		return 0
+	end
+	return CrateLuck.Get(data, crate)
 end
 
 function CrateService.SendResult(player: Player, result: Result)
@@ -245,51 +452,87 @@ local function saveIfRare(player: Player, result: Result)
 	end
 end
 
-local function onOpen(player: Player, crateId: unknown, countIn: unknown): Result
+local function onOpen(
+	player: Player,
+	crateId: unknown,
+	countIn: unknown,
+	shownLuck: unknown,
+	shownGuarantee: unknown
+): Result
 	local t = text()
 	local id = if typeof(crateId) == "string" and #crateId <= 64 then crateId else ""
 	if not Config.Features.Crates then
-		return fail(id, t.Closed)
+		return refuse(player, id, t.Closed)
 	end
 	-- How many at once: only the counts the crate page offers (x1, x5, x10).
 	local count = 1
 	if countIn ~= nil then
 		if typeof(countIn) ~= "number" or not table.find(Config.Crates.Open.Counts, countIn) then
-			return fail(id, t.NoCrate)
+			return refuse(player, id, t.NoCrate)
 		end
 		count = countIn :: number
 	end
 	local now = os.clock()
 	if now - (lastOpen[player] or -math.huge) < Config.Crates.RequestCooldown then
-		return fail(id, t.SlowDown)
+		return refuse(player, id, t.SlowDown)
 	end
 	lastOpen[player] = now
 	local crate = CrateOdds.Get(id)
 	local price = if crate then CrateOdds.CoinPrice(crate) else nil
 	if not crate or not price or #CrateOdds.Items(crate) == 0 then
-		return fail(id, t.NoCrate)
+		return refuse(player, id, t.NoCrate)
 	end
 	local closed = restricted[player]
 	if closed == nil then
-		return fail(id, t.StillChecking)
+		return refuse(player, id, t.StillChecking)
 	elseif closed then
-		return fail(id, t.Restricted)
+		return refuse(player, id, t.Restricted)
 	end
 	local data = DataService.Get(player)
 	if not data then
-		return fail(id, t.NotLoaded)
+		return refuse(player, id, t.NotLoaded)
+	end
+	-- A Robux purchase of this crate is on its way: it rolls with the luck the player saw.
+	if holding(player, crate.Id) then
+		return refuse(player, id, t.RobuxFirst, data, crate)
+	end
+	-- The chances the player saw must be the ones the server has (never used to roll: the
+	-- server only compares). Crates without a meter expect 0; x1 expects no guarantee.
+	local level = CrateLuck.Get(data, crate)
+	local guarantee = CrateLuck.Guarantee(crate, count)
+	local luckOk = typeof(shownLuck) == "number" and shownLuck == level
+	local guaranteeOk = (shownGuarantee == nil or typeof(shownGuarantee) == "string")
+		and shownGuarantee == guarantee
+	if not (luckOk and guaranteeOk) then
+		return refuse(player, id, t.OddsChanged, data, crate)
 	end
 	local total = price * count
 	if not DataService.Spend(player, "Coins", total) then
-		return fail(id, t.NoCoins:format(total - (data.Coins or 0), Config.Economy.CurrencyName))
+		return refuse(
+			player,
+			id,
+			t.NoCoins:format(total - (data.Coins or 0), Config.Economy.CurrencyName),
+			data,
+			crate
+		)
 	end
+	-- One crate after another, exactly like single opens (each reads the level the previous
+	-- one left). The last one gets the pack guarantee if none before it reached it.
 	local results: { Result } = {}
-	for _ = 1, count do
-		local result = CrateService.Grant(player, crate, "Coins")
+	local met = false
+	for k = 1, count do
+		local atLeast = if guarantee and k == count and not met then guarantee else nil
+		local result = CrateService.Grant(player, crate, "Coins", atLeast)
 		if not result then
 			break
 		end
 		table.insert(results, result)
+		if
+			guarantee
+			and CrateOdds.RarityIndex(result.Rarity) >= CrateOdds.RarityIndex(guarantee)
+		then
+			met = true
+		end
 	end
 	if #results < count then
 		-- Some weren't given (an empty crate): give their coins back.
@@ -297,7 +540,7 @@ local function onOpen(player: Player, crateId: unknown, countIn: unknown): Resul
 	end
 	local first = results[1]
 	if not first then
-		return fail(id, t.NoCrate)
+		return refuse(player, id, t.NoCrate, data, crate)
 	end
 	-- One save for the batch if anything in it was Rare or better.
 	for _, result in results do
@@ -311,9 +554,65 @@ local function onOpen(player: Player, crateId: unknown, countIn: unknown): Resul
 		-- (A copy of the first: a table that contains itself can't be sent to the client.)
 		local batch = table.clone(first)
 		batch.Results = results
+		batch.LuckAfter = results[#results].LuckAfter
+		batch.LuckVersion = ShopService.LuckVersion(player)
 		return batch
 	end
 	return first
+end
+
+-- Robux: checks the luck shown before Roblox's purchase window opens, then holds the crate.
+local function onPrepare(player: Player, crateId: unknown, shownLuck: unknown): Prepared
+	local t = text()
+	local id = if typeof(crateId) == "string" and #crateId <= 64 then crateId else ""
+	local function answer(ok: boolean, message: string, luck: number?): Prepared
+		return {
+			Ok = ok,
+			Message = message,
+			CrateId = id,
+			Luck = luck,
+			LuckVersion = ShopService.LuckVersion(player),
+		}
+	end
+	if id == "" then
+		return answer(false, t.NoCrate)
+	end
+	if not (Config.Features.Crates and Config.Features.RobuxCrates) then
+		return answer(false, t.Closed)
+	end
+	local now = os.clock()
+	if now - (lastPrepare[player] or -math.huge) < Config.Crates.RobuxOpen.Cooldown then
+		return answer(false, t.SlowDown)
+	end
+	lastPrepare[player] = now
+	local crate = CrateOdds.Get(id)
+	if not crate or CrateOdds.ProductId(crate) == 0 or #CrateOdds.Items(crate) == 0 then
+		return answer(false, t.NoCrate)
+	end
+	local closed = restricted[player]
+	if closed == nil then
+		return answer(false, t.StillChecking)
+	elseif closed then
+		return answer(false, t.Restricted)
+	end
+	local data = DataService.Get(player)
+	if not data then
+		return answer(false, t.NotLoaded)
+	end
+	local level = CrateLuck.Get(data, crate)
+	if bought(player, crate.Id) then
+		return answer(false, t.RobuxFirst, level)
+	end
+	if typeof(shownLuck) ~= "number" or shownLuck ~= level then
+		return answer(false, t.OddsChanged, level)
+	end
+	local holds = prepared[player]
+	if not holds then
+		holds = {}
+		prepared[player] = holds
+	end
+	holds[crate.Id] = { Until = now + Config.Crates.RobuxOpen.HoldSeconds, Bought = false }
+	return answer(true, "", level)
 end
 
 -- The crate stand -------------------------------------------------------------------------
@@ -407,6 +706,63 @@ local function openFree(player: Player, which: CrateOdds.Crate?): string
 	)
 end
 
+-- Adds `steps` to the player's luck on the F8 free crate (Studio test buttons).
+local function addLuck(
+	player: Player,
+	data: { [string]: any },
+	steps: number,
+	tell: boolean
+): string
+	if not RunService:IsStudio() then
+		return "Studio only."
+	end
+	local crate = freeCrate()
+	if not crate or not CrateLuck.Applies(crate) then
+		return "That crate has no luck meter right now (Config.Features.CrateLuck, Config.Crates.Luck)."
+	end
+	local level = math.min(CrateLuck.Get(data, crate) + steps, CrateLuck.Steps())
+	CrateLuck.Set(data, crate, level)
+	ShopService.LuckChanged(player)
+	if tell then
+		ShopService.Push(player)
+	end
+	return ("%s luck: %d / %d"):format(crate.Name, level, CrateLuck.Steps())
+end
+
+-- Studio only: the luck meter's test buttons (docs/CRATE-LUCK-SPEC.md, Studio test list).
+local function registerLuckAdmin(crate: CrateOdds.Crate?)
+	local name = if crate then crate.Name else "crate"
+	local steps = math.max(1, math.floor(Config.Crates.Admin.LuckSteps))
+	AdminService.Register(
+		"CrateLuckUp",
+		("Crates: +%d luck on %s"):format(steps, name),
+		function(player, data)
+			return addLuck(player, data, steps, true)
+		end
+	)
+	-- Changes the luck without telling the screen: the crate page keeps its old chances, so
+	-- pressing Open there shows the odds check (nothing is bought, the page redraws).
+	AdminService.Register(
+		"CrateLuckQuiet",
+		("Crates: +1 luck on %s, screen not told (tests the odds check)"):format(name),
+		function(player, data)
+			return addLuck(player, data, 1, false)
+		end
+	)
+	AdminService.Register("CrateLuckReset", "Crates: reset my luck", function(player, data)
+		if not RunService:IsStudio() then
+			return "Studio only."
+		end
+		if type(data.Crates) ~= "table" then
+			data.Crates = { Opened = 0, Luck = {} }
+		end
+		data.Crates.Luck = {}
+		ShopService.LuckChanged(player)
+		ShopService.Push(player)
+		return "Every crate's luck is back to 0."
+	end)
+end
+
 local function registerAdmin()
 	local crate = freeCrate()
 	AdminService.Register(
@@ -440,12 +796,16 @@ local function registerAdmin()
 			return ("+%d %s (now %d)"):format(coins, Config.Economy.CurrencyName, data.Coins or 0)
 		end
 	)
+	if Config.Features.CrateLuck and RunService:IsStudio() then
+		registerLuckAdmin(crate)
+	end
 end
 
 function CrateService.Start()
 	-- Remotes first, even when crates are off, so a client never waits for them forever.
 	resultEvent = Remotes.Event("CrateResult")
 	Remotes.Function("OpenCrate").OnServerInvoke = onOpen
+	Remotes.Function("PrepareCrateRobux").OnServerInvoke = onPrepare
 	if not Config.Features.Crates then
 		disablePrompts()
 		return
@@ -464,7 +824,18 @@ function CrateService.Start()
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		lastOpen[player] = nil
+		lastPrepare[player] = nil
 		restricted[player] = nil
+		prepared[player] = nil
+		receiving[player] = nil
+	end)
+	-- The Robux purchase window closed (cancelled: the hold ends; bought: it waits for the
+	-- receipt, see onPurchaseFinished).
+	MarketplaceService.PromptProductPurchaseFinished:Connect(onPurchaseFinished)
+	-- F8 "Reset my save" empties the luck too: tell the screen with a newer version.
+	AdminService.OnSaveReset(function(player)
+		ShopService.LuckChanged(player)
+		ShopService.Push(player)
 	end)
 
 	CollectionService:GetInstanceAddedSignal(Tags.CrateDisplay):Connect(function(instance)

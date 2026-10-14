@@ -39,10 +39,10 @@ describe("Config.Crates and CrateOdds", function()
 
 	it("has the default odds, adding up to 100", function()
 		local odds = Config.Crates.Odds
-		expect(odds.Common).toBe(73.48)
+		expect(odds.Common).toBe(60.98)
 		expect(odds.Uncommon).toBe(24)
-		expect(odds.Rare).toBe(2.5) -- rarer since the big skin update (was 5)
-		expect(odds.Crazy).toBe(0.02) -- (was 0.1)
+		expect(odds.Rare).toBe(15) -- (was 2.5)
+		expect(odds.Crazy).toBe(0.02)
 		local total = 0
 		for _, v in odds do
 			total += v
@@ -128,15 +128,23 @@ describe("Config.Crates and CrateOdds", function()
 		local chances = CrateOdds.Chances(pumpkin)
 		expect(chances[1].Rarity).toBe("Crazy") -- highest rarity first
 		expect(CrateOdds.Exact(chances[1].Chance)).toBe("0.020%")
-		expect(CrateOdds.Format(chances[1].Chance)).toBe("<1%") -- under 1%: Config.Crates.SmallOdds
+		expect(CrateOdds.Format(chances[1].Chance)).toBe("0.02%") -- exact, never "<1%"
 		for _, c in chances do
 			local expected = Config.Crates.Odds[c.Rarity] / seen[c.Rarity]
 			expect(c.Chance).toBeNear(expected, 1e-9)
 		end
-		expect(CrateOdds.Exact(73.48 / 12)).toBe("6.123%")
-		expect(CrateOdds.Format(73.48 / 12)).toBe("6.1%")
+		expect(CrateOdds.Exact(60.98 / 12)).toBe("5.082%")
+		expect(CrateOdds.Format(60.98 / 12)).toBe("5.082%")
 		expect(CrateOdds.Format(24)).toBe("24%")
-		expect(CrateOdds.Format(0.5)).toBe("<1%")
+		expect(CrateOdds.Format(4.8)).toBe("4.8%")
+		expect(CrateOdds.Format(0.5)).toBe("0.5%")
+		expect(CrateOdds.Format(0.02 / 47.02 * 100)).toBe("0.04254%") -- 4 significant figures
+		expect(CrateOdds.Format(0.123456)).toBe("0.1235%")
+		expect(CrateOdds.Format(0.00025)).toBe("0.00025%")
+		expect(CrateOdds.Format(0.0001)).toBe("0.0001%")
+		expect(CrateOdds.Format(99.9999)).toBe("99.9999%") -- never rounded up to 100%
+		expect(CrateOdds.Format(100)).toBe("100%")
+		expect(CrateOdds.Format(0)).toBe("0%")
 		expect(CrateOdds.Exact(24 / 5)).toBe("4.800%")
 		expect(CrateOdds.Exact(0.0001)).toBe("0.0001%") -- tiny chances show every digit
 		expect(CrateOdds.Exact(0.00025)).toBe("0.00025%")
@@ -202,7 +210,7 @@ describe("Config.Crates and CrateOdds", function()
 				expect(found).toBeTruthy()
 				expect(found.Chance).toBe(0.0001)
 				expect(CrateOdds.Exact(found.Chance)).toBe("0.0001%")
-				expect(CrateOdds.Format(found.Chance)).toBe("<1%")
+				expect(CrateOdds.Format(found.Chance)).toBe("0.0001%")
 				expect(total).toBeNear(100, 1e-9)
 				-- Shown first, above the Rares.
 				expect(CrateOdds.Chances(crate)[1].Item).toBe(item)
@@ -390,12 +398,27 @@ local function serverWorld(options: { [string]: any }?)
 		CrateOdds = server:require("ReplicatedStorage.Shared.CrateOdds"),
 		DataService = DataService,
 		CrateService = CrateService,
-		open = function(player, crateId)
+		-- Opens like the crate page does: the count (1 for x1), the luck level the page shows
+		-- (default: the player's real one) and the pack guarantee it shows (default: the real one).
+		open = function(player, crateId, count, luck, guarantee)
 			server:advance(Config.Crates.RequestCooldown + 0.1)
+			local CrateOdds = server:require("ReplicatedStorage.Shared.CrateOdds")
+			local CrateLuck = server:require("ReplicatedStorage.Shared.CrateLuck")
+			local crate = CrateOdds.Get(crateId)
+			local n = count or 1
+			if luck == nil then
+				luck = if type(crateId) == "string" then CrateService.Luck(player, crateId) else 0
+			end
+			if guarantee == nil and crate then
+				guarantee = CrateLuck.Guarantee(crate, n)
+			end
 			return server:invokeServer(
 				server:find("ReplicatedStorage.Remotes.OpenCrate"),
 				player,
-				crateId
+				crateId,
+				n,
+				luck,
+				guarantee
 			)
 		end,
 		join = function(name: string)
@@ -492,10 +515,8 @@ describe("CrateService (coins)", function()
 	it(
 		"opens x5 and x10 in one request: one payment, every result, duplicates paid back",
 		function()
-			local remote = w.rt:find("ReplicatedStorage.Remotes.OpenCrate")
 			local function openMany(crateId: string, count: number): any
-				w.rt:advance(Config.Crates.RequestCooldown + 0.1)
-				return w.rt:invokeServer(remote, player, crateId, count)
+				return w.open(player, crateId, count)
 			end
 			data.Coins = 10 * 600
 			local opened = data.Crates.Opened
@@ -700,7 +721,12 @@ describe("Robux crates (MonetizationService)", function()
 		expect(data.Coins).toBe(coins)
 		expect(data.Crates.Opened).toBe(1)
 		expect(#data.Receipts).toBe(1)
-		expect(#w.results(player)).toBe(1)
+		-- No opening plays: the player is told Roblox will give the crate again later.
+		local sent = w.results(player)
+		expect(#sent).toBe(2)
+		expect(sent[2].Ok).toBe(false)
+		expect(sent[2].Message).toBe(w.Config.Crates.Text.RobuxLater)
+		expect(sent[2].Paid).toBe("Robux")
 	end)
 
 	it("still sells coin packs", function()
@@ -827,6 +853,12 @@ describe("Admin crate commands", function()
 		end
 		expect(labels.CrateFree).toBe("Crates: open free Pumpkin Crate")
 		expect(labels.CrateCoins).toBe("Crates: +100k coins")
+		-- The luck meter's test buttons (Studio only; crates-luck.spec tests what they do).
+		expect(labels.CrateLuckUp).toBe("Crates: +5 luck on Pumpkin Crate")
+		expect(labels.CrateLuckQuiet).toBe(
+			"Crates: +1 luck on Pumpkin Crate, screen not told (tests the odds check)"
+		)
+		expect(labels.CrateLuckReset).toBe("Crates: reset my luck")
 		local coins = data.Coins
 		w.rt:advance(1)
 		local ok, message = w.rt:invokeServer(run, player, "CrateFree")
@@ -984,9 +1016,9 @@ describe("CrateUI (client)", function()
 		end
 	end)
 
-	it("writes every crate's rarity line as valid coloured text, including '<1%'", function()
-		-- The line is RichText: a bare "<" (from "<1%") breaks it and players see the raw
-		-- <font color=...> tags instead of the colours.
+	it("writes every crate's rarity line as valid coloured text, with exact chances", function()
+		-- The line is RichText: a bare "<" breaks it and players see the raw <font color=...>
+		-- tags instead of the colours.
 		local checked = 0
 		for _, crate in CConfig.Crates.List do
 			CrateUI.Open(crate.Id)
@@ -998,13 +1030,33 @@ describe("CrateUI (client)", function()
 				error(crate.Id .. ": unescaped < or > in " .. text)
 			end
 			local plain = bare:gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&")
-			expect(plain).toMatch("%d%%") -- e.g. "Rare 2.5%" (a rarity-only crate has one entry)
+			expect(plain).toMatch("%d%%") -- e.g. "Rare 15%" (a rarity-only crate has one entry)
+			if text:find("&lt;", 1, true) then
+				error(crate.Id .. ": a chance shown as '<...': " .. text)
+			end
 			checked += 1
 		end
 		expect(checked).toBe(#CConfig.Crates.List)
-		-- A crate whose CRAZY chance is under 1% really does show "<1%" (escaped).
+		-- Exact numbers for every rarity (no more "<1%").
 		CrateUI.Open("PumpkinCrate")
-		expect(panel.Body.Preview.Side.Odds.Text).toMatch("&lt;1%%")
+		local line = panel.Body.Preview.Side.Odds.Text
+			:gsub('<font color="#%x%x%x%x%x%x">', "")
+			:gsub("</font>", "")
+		for _, part in { "CRAZY 0.02%", "Rare 15%", "Uncommon 24%", "Common 60.98%" } do
+			if not line:find(part, 1, true) then
+				error("the Pumpkin line has no " .. part .. ": " .. line)
+			end
+		end
+		-- A Deluxe crate lists its Commons at 0% (they can't drop, but they are in it).
+		CrateUI.Open("PumpkinDeluxeCrate")
+		local deluxe = panel.Body.Preview.Side.Odds.Text
+			:gsub('<font color="#%x%x%x%x%x%x">', "")
+			:gsub("</font>", "")
+		for _, part in { "CRAZY 1%", "Rare 49%", "Uncommon 50%", "Common 0%" } do
+			if not deluxe:find(part, 1, true) then
+				error("the Deluxe Pumpkin line has no " .. part .. ": " .. deluxe)
+			end
+		end
 	end)
 
 	it("shows every skin in a crate with its exact chance before buying", function()
@@ -1021,8 +1073,8 @@ describe("CrateUI (client)", function()
 			count += 1
 		end
 		expect(count).toBe(20)
-		expect(preview.Items:FindFirstChild("Pumpkin_PumpkinSpice").Chance.Text).toBe("6.1%")
-		expect(preview.Items:FindFirstChild("Pumpkin_MegaGourdSupreme").Chance.Text).toBe("<1%")
+		expect(preview.Items:FindFirstChild("Pumpkin_PumpkinSpice").Chance.Text).toBe("5.082%")
+		expect(preview.Items:FindFirstChild("Pumpkin_MegaGourdSupreme").Chance.Text).toBe("0.02%")
 		expect(preview.Side.Buy.Visible).toBe(true)
 		expect(preview.Side.Buy.OpenCoins.Text).toMatch("600")
 		expect(preview.Side.Buy.OpenCoins5.Text).toMatch("3,000")
@@ -1050,7 +1102,7 @@ describe("CrateUI (client)", function()
 		expect(preview.Side.Extras.QuickOpen.Text).toMatch(CConfig.Crates.Text.QuickOpen)
 		-- A one-in-a-million skin shows its exact chance.
 		CrateUI.Open("VampireCastleCrate")
-		expect(panel.Body.Preview.Items.VampireCastle_NightLordSupreme.Chance.Text).toBe("<1%")
+		expect(panel.Body.Preview.Items.VampireCastle_NightLordSupreme.Chance.Text).toBe("0.0001%")
 		CrateUI.Open("PumpkinCrate")
 	end)
 
@@ -1149,8 +1201,8 @@ describe("CrateUI (client)", function()
 	end
 	local asked: { any } = {}
 	local openRemote = client:find("ReplicatedStorage.Remotes.OpenCrate")
-	openRemote.OnServerInvoke = function(_player, crateId, count)
-		table.insert(asked, { crateId, count })
+	openRemote.OnServerInvoke = function(_player, crateId, count, shownLuck, shownGuarantee)
+		table.insert(asked, { crateId, count, shownLuck, shownGuarantee })
 		return batchOf10()
 	end
 
@@ -1163,6 +1215,8 @@ describe("CrateUI (client)", function()
 		expect(#asked).toBe(1)
 		expect(asked[1][1]).toBe("PumpkinCrate")
 		expect(asked[1][2]).toBe(10)
+		expect(asked[1][3]).toBe(0) -- the luck level the page shows
+		expect(asked[1][4]).toBe("Rare") -- the x10 pack guarantee
 		local opening = panel.Body.Opening
 		expect(opening.Visible).toBe(true)
 		-- Skip: straight to the result.

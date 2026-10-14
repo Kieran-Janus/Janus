@@ -25,6 +25,9 @@ return {
 	EasterEggs = true, -- hidden pumpkins around the lobby that give coins once each
 	Crates = true, -- crates bought with coins that give a random skin
 	RobuxCrates = true, -- crates can also be bought with Robux (needs Crates on too)
+	CrateLuck = true, -- each themed crate's luck meter (Config.Crates.Luck); off keeps saved luck
+	CratePacks = true, -- x5 / x10 guarantees (Config.Crates.Open.Guarantee); off = packs open without one
+	PremiumCrates = true, -- the Deluxe crates (Config.Crates.Premium), on their own tab
 	SkinEffects = true, -- CRAZY skins' animated rainbow, orbiting pieces and pulsing glow
 	SkinAnimations = true, -- skin pieces that move or change colour (Style.Animate: flapping wings, wagging tails...)
 	WalkStyles = true, -- skins that change how you walk (Style.Motion: Zombie, Ghost, Robot...)
