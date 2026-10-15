@@ -186,6 +186,7 @@ You asked for "better odds the more you spend". Every chance is still shown as a
   7. The Deluxe tab: six crates at 2,000 coins, Commons at 0%, R$ says "Coming soon".
   8. R$ on the Pumpkin Crate (a Studio test purchase is free): Roblox's window, then the crate opens and says "Opened at luck N / 15". Cancelling Roblox's window leaves every button working.
   9. Set `CrateLuck`, `CratePacks` and `PremiumCrates` to `false` and press Play: no strip, no pack line, no Deluxe tab. Set them back to `true`: they come back, with your luck still there.
+- **Checked in Studio on 15 October** (PC): steps 1-5 and 7-9 all as described (a Deluxe x5 gave no Commons; cancelling Roblox's Robux window left every button working). **Fixed:** the last of the 15 luck squares stuck out past the strip; "Duplicates paid back 1230 Coins" now says "1,230". Step 6 (phone) wasn't tried in Studio: the test tool can't switch on the phone emulator. The offline phone test checks the luck line above the buy buttons.
 
 ### Skin Studio: change and animate skins
 No picture yet: it only shows in a Studio playtest. Step by step: [`docs/CUSTOMIZE.md` > Change and animate skins](CUSTOMIZE.md#change-and-animate-skins).

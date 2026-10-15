@@ -1376,7 +1376,7 @@ function CrateUI.Mount(gui: ScreenGui)
 			line.RichText = true
 			line.LayoutOrder = order
 			line.TextXAlignment = Enum.TextXAlignment.Left
-			line.Size = UDim2.new(1, 0, 0, 0)
+			line.Size = UDim2.fromScale(1, 0)
 			line.AutomaticSize = Enum.AutomaticSize.Y
 			local inner = Instance.new("UIPadding")
 			inner.PaddingTop = UDim.new(0, 3)
@@ -1457,7 +1457,7 @@ function CrateUI.Mount(gui: ScreenGui)
 			row.Name = "Top"
 			row.BackgroundTransparency = 1
 			row.LayoutOrder = 1
-			row.Size = UDim2.new(1, 0, 0, 0)
+			row.Size = UDim2.fromScale(1, 0)
 			row.AutomaticSize = Enum.AutomaticSize.Y
 			row.Parent = strip
 			top = row
@@ -1503,7 +1503,9 @@ function CrateUI.Mount(gui: ScreenGui)
 				block.LayoutOrder = i
 				block.BorderSizePixel = 0
 				block.BackgroundColor3 = if i <= level then filled else Theme.Button
-				block.Size = UDim2.new(1 / steps, -gap * (steps - 1) / steps, 1, 0)
+				-- (a whole gap off each block: UDim offsets are whole pixels, so a share of the
+				-- gaps would round down and push the last block past the bar)
+				block.Size = UDim2.new(1 / steps, -gap, 1, 0)
 				block:SetAttribute("Filled", i <= level)
 				block.Parent = bar
 				Theme.round(block, 3)
@@ -1533,7 +1535,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		end)
 		if compact then
 			chance.LayoutOrder = 3
-			chance.Size = UDim2.new(1, 0, 0, 0)
+			chance.Size = UDim2.fromScale(1, 0)
 			chance.AutomaticSize = Enum.AutomaticSize.Y
 			every.LayoutOrder = 4
 			every.Size = UDim2.new(1, 0, 0, 26)
@@ -1557,7 +1559,7 @@ function CrateUI.Mount(gui: ScreenGui)
 			help.Font = Enum.Font.Gotham
 			help.TextColor3 = Theme.Muted
 			help.TextXAlignment = Enum.TextXAlignment.Left
-			help.Size = UDim2.new(1, 0, 0, 0)
+			help.Size = UDim2.fromScale(1, 0)
 			help.AutomaticSize = Enum.AutomaticSize.Y
 		end
 	end
@@ -3479,7 +3481,7 @@ function CrateUI.Mount(gui: ScreenGui)
 		footer.Size = UDim2.new(1, 0, 0, 36)
 		footer.Parent = resultsView
 		local refunds = label(
-			if coinsBack > 0 then text.CoinsBack:format(coinsBack, currency) else "",
+			if coinsBack > 0 then text.CoinsBack:format(commas(coinsBack), currency) else "",
 			14,
 			footer
 		)
@@ -3510,7 +3512,7 @@ function CrateUI.Mount(gui: ScreenGui)
 				showList()
 			end
 		end)
-		setMessage(if coinsBack > 0 then text.CoinsBack:format(coinsBack, currency) else "")
+		setMessage(if coinsBack > 0 then text.CoinsBack:format(commas(coinsBack), currency) else "")
 	end
 
 	-- PrepareCrateRobux, looked up on the first R$ press (never in `net`: the server makes it,
