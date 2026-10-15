@@ -449,6 +449,13 @@ describe("Buy buttons in view on a short phone screen", function()
 		expect(luck:FindFirstChild("Help", true)).toBeNil() -- (the help is in Every chance)
 		expect(preview.Side:FindFirstChild("Packs")).toBeTruthy()
 		expect(preview.Side:FindFirstChild("LuckLine", true)).toBeNil()
+		-- The crate's name and odds come first in the column (no scrolling to see the odds),
+		-- the picture and blurb last.
+		local side = preview.Side
+		expect(side.CrateName.LayoutOrder).toBeLessThan(side.Odds.LayoutOrder)
+		for _, later in { luck, side.Packs, side.Art, side.Blurb } do
+			expect(side.Odds.LayoutOrder).toBeLessThan(later.LayoutOrder)
+		end
 		local line = pinned.LuckLine
 		expect(line.Text).toBe("Luck 4/15 · Rare or better 23.02%")
 		expect(line.LayoutOrder).toBeLessThan(pinned.Buy.LayoutOrder)

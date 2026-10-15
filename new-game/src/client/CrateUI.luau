@@ -1761,7 +1761,9 @@ function CrateUI.Mount(gui: ScreenGui)
 		local art = Instance.new("Frame")
 		art.Name = "Art"
 		art.BackgroundTransparency = 1
-		art.LayoutOrder = 1
+		-- (on phones the name and odds come first, so they are in view without scrolling; the
+		-- picture and the blurb go under the luck strip and the pack line)
+		art.LayoutOrder = if compact then 7 else 1
 		art.Size = UDim2.new(1, -8, 0, if compact then 72 else 120)
 		art.Parent = side
 		lazy(art, function()
@@ -1769,19 +1771,19 @@ function CrateUI.Mount(gui: ScreenGui)
 		end)
 		local name = label(crate.Name, 20, side)
 		name.Name = "CrateName"
-		name.LayoutOrder = 2
+		name.LayoutOrder = if compact then 1 else 2
 		name.Size = UDim2.new(1, -8, 0, 24)
 		local blurb = label(crate.Blurb, 14, side)
 		blurb.Name = "Blurb"
 		blurb.Font = Enum.Font.Gotham
 		blurb.TextColor3 = Theme.Muted
-		blurb.LayoutOrder = 3
+		blurb.LayoutOrder = if compact then 8 else 3
 		blurb.Size = UDim2.new(1, -8, 0, 0)
 		blurb.AutomaticSize = Enum.AutomaticSize.Y
 		local odds = label(oddsLine(shown), 14, side)
 		odds.Name = "Odds"
 		odds.RichText = true
-		odds.LayoutOrder = 4
+		odds.LayoutOrder = if compact then 2 else 4
 		odds.Size = UDim2.new(1, -8, 0, 0)
 		odds.AutomaticSize = Enum.AutomaticSize.Y
 
