@@ -438,7 +438,8 @@ describe("A ScareMaze round", function()
 			server:fireServer(boo, runner) -- not a Haunter: ignored
 			expect(runner:GetAttribute(ATTR.BooReadyAt)).toBeNil()
 
-			-- The Runner walks (straight, at 20 studs/s) to the exit; the Sitter doesn't move.
+			-- The Runner walks (straight, at 10 studs/s) to the exit; the Sitter doesn't move, so
+			-- the Sitter is caught first.
 			local exit = nil
 			for _, d in map.Model:GetDescendants() do
 				if d:HasTag("MazeExit") then
@@ -452,21 +453,24 @@ describe("A ScareMaze round", function()
 				local at = runner.Character:GetPivot().Position
 				local flat = SV3.new(target.X - at.X, 0, target.Z - at.Z)
 				if flat.Magnitude > 1 then
-					local move = flat.Unit * math.min(2, flat.Magnitude)
+					local move = flat.Unit * math.min(1, flat.Magnitude)
 					runner.Character:PivotTo(SCF.new(at + move))
 				end
 				server:advance(0.1)
 				if not sitterOutAfter and sitter:GetAttribute(ATTR.State) == "Out" then
 					sitterOutAfter = step * 0.1
 				end
-				if runner:GetAttribute(ATTR.State) == "Escaped" then
+				if not escapedAfter and runner:GetAttribute(ATTR.State) == "Escaped" then
 					escapedAfter = step * 0.1
+				end
+				-- (the runner can escape before the Sitter's StopSeconds are up: keep going)
+				if escapedAfter and sitterOutAfter then
 					break
 				end
 			end
 			expect(escapedAfter).toBeTruthy()
 			expect(sitterOutAfter).toBeTruthy()
-			-- The BOO's slow + grace pushed the Sitter's 3 seconds back.
+			-- The BOO's slow + grace pushed the Sitter's StopSeconds back.
 			expect(sitterOutAfter).toBeGreaterThan(cfg.StopSeconds + cfg.StartGraceSeconds)
 			expect(haunter:GetAttribute(ATTR.Catches)).toBe(1)
 			T.note(
@@ -694,7 +698,8 @@ describe("ScareMaze screen", function()
 		expect(boo.Visible).toBe(false)
 		expect(root:FindFirstChild("TeamTitle").Text).toBe(text.YouAreSurvivor)
 		expect(root.Info.Text.Text).toMatch("3")
-		client:advance(1.5)
+		-- Standing still until 1.4 s are left (past CountdownAfter): the countdown says 2.
+		client:advance(CConfig.ScareMaze.StopSeconds - 1.5)
 		expect(meter.Label.Text).toBe(text.Move)
 		expect(countdown.Visible).toBe(true)
 		expect(countdown.Text).toBe("2")

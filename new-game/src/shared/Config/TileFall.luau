@@ -35,10 +35,10 @@ return {
 		Easy = {
 			Layers = 3, -- layers of slabs (max 3: the crypt is built for 3)
 			TileSize = 12, -- studs across one slab (bigger = easier)
-			CrumbleSeconds = 1.4, -- seconds from the first crack until the slab drops
-			GraceSeconds = 4, -- after GO! nothing cracks for this long
+			CrumbleSeconds = 1.8, -- seconds from the first crack until the slab drops
+			GraceSeconds = 6, -- after GO! nothing cracks for this long
 			Duration = 120, -- the clock (seconds)
-			SuddenDeathAfter = 70, -- seconds after GO! when random slabs start cracking by themselves
+			SuddenDeathAfter = 85, -- seconds after GO! when random slabs start cracking by themselves
 			RewardMultiplier = 1, -- coins x this
 		},
 		Hard = {
@@ -116,8 +116,8 @@ return {
 		Go = "GO!",
 		PlayersLeft = "Players left: %d",
 		Time = "%d:%02d",
-		SuddenDeath = "SUDDEN DEATH! The crypt is crumbling!",
-		Out = "You fell in!",
+		SuddenDeath = "Hurry! The crypt is crumbling!",
+		Out = "Splash! You fell in the goo!",
 		Watching = "Watching... (you're a ghost now)",
 		Winner = "LAST ONE STANDING!",
 		SoloWinner = "YOU SURVIVED!",

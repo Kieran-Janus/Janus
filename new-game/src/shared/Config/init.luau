@@ -295,6 +295,50 @@ local Config = {
 		-- camera (src/client/PortraitEyes.luau) within Range studs; Reach = how far the pupils move
 		-- (share of the eye, across and down). On = false: they stare straight ahead.
 		PortraitEyes = { On = true, Range = 70, Reach = Vector2.new(0.22, 0.14) },
+		-- Solid maps (src/server/Hub/HubSolid.luau, like the lobby's Config.Lobby.Solid): when a
+		-- round map loads, every decoration you'd expect to bump into (gravestones, scarecrows,
+		-- barrels, carts, stalls, trees, pillars...) is made solid, so players don't walk through
+		-- them. What stays walk-through: tiny pieces (MinSize), low ones you step over
+		-- (StepHeight), see-through ones, parts that DO something (tagged), the names below.
+		-- A map can opt out with `Solid = false` in its file (the Spooky Obby: solid scenery
+		-- could make shortcuts). On = false: maps stay as built.
+		Solid = {
+			On = true,
+			MinSize = 2.5, -- studs: smaller pieces stay walk-through
+			StepHeight = 1.25, -- studs: lower pieces stay walk-through
+			MaxTransparency = 0.6,
+			-- Props (by prop name) that stay walk-through: flat on walls, hanging, glowing, or
+			-- cornfields you're meant to push through (and the ScareMaze's pop-out scarecrows).
+			KeepWalkThrough = {
+				"Cobweb",
+				"Candle",
+				"Bat",
+				"Lantern",
+				"Mushroom",
+				"Portrait",
+				"CornStalk",
+				"ScareScarecrow",
+			},
+			-- Groups (Folders or Models) by name that stay walk-through.
+			KeepAreas = { "Scenery", "Mist", "Fireflies", "ExitGate", "Void" },
+			-- Single pieces by name that stay walk-through (corn leaves sticking out of the maze
+			-- walls, lantern wires overhead, plant stalks, flames, the Spooky Mansion's secret doors
+			-- you walk through on purpose).
+			KeepParts = {
+				"Leaf",
+				"Tassel",
+				"CornTop",
+				"Wire",
+				"Stalk",
+				"Fire",
+				"Flame",
+				"SecretDoor",
+			},
+			-- Props built as decoration only (Kit.prop Visual: field pumpkins, crows, cobwebs...)
+			-- stay walk-through on maps played in these modes: in King Hunt you must never hide
+			-- behind them from the King. On the other maps they are made solid like the rest.
+			KeepVisualFor = { "KingHunt" },
+		},
 		-- Every map's settings are in their own file: src/shared/Config/Maps/<Id>.luau.
 		-- To add a map: copy one of those files, change its Id/Name/Builder, add it here and
 		-- add a playlist for it in Config/Modes.luau.
@@ -349,6 +393,7 @@ local Config = {
 	Rewards = {
 		CoinsPerPumpkin = 5, -- multiplied by the difficulty's RewardMultiplier
 		SurvivorBonus = 25, -- coins for still being alive when the round ends
+		PlayCoins = 5, -- coins for everyone who played, even if the King caught you with no pumpkins
 		TopCollectorWins = 1, -- Wins added to each round's top player(s) (most pumpkins in King Hunt)
 	},
 
@@ -359,10 +404,12 @@ local Config = {
 		Difficulty = {
 			Easy = {
 				Count = 1, -- how many Kings (kept at 1)
-				WalkSpeed = 12, -- while wandering or investigating a noise
-				ChaseSpeed = 18,
-				HearingRange = 90, -- studs; noise farther away is ignored
-				SightRange = 45, -- studs; needs a clear line of sight
+				WalkSpeed = 10, -- while wandering or investigating a noise
+				ChaseSpeed = 15, -- slower than a player's walk (16): kids can always get away
+				HearingRange = 60, -- studs; noise farther away is ignored
+				SightRange = 35, -- studs; needs a clear line of sight
+				-- (optional) his own speed-up instead of King.SpeedUp below: on Easy he barely speeds up
+				SpeedUp = { Every = 60, Add = 0.5, Max = 1 },
 			},
 			Hard = {
 				Count = 1, -- always one King (he speeds up instead: SpeedUp below)
@@ -374,6 +421,7 @@ local Config = {
 		},
 		-- He gets a little faster every Every seconds after he appears: Add to his walk and
 		-- chase speed each time, never more than Max in total (0 = he never speeds up).
+		-- A difficulty above with its own SpeedUp uses that one instead (Easy does).
 		SpeedUp = { Every = 30, Add = 0.75, Max = 6 },
 		SpawnDelay = 15, -- seconds of grace at round start before the King appears
 		MinSpawnDistance = 60, -- studs from every player when it spawns
@@ -466,7 +514,7 @@ local Config = {
 
 		SkeletonPatrol = {
 			Name = "Skeleton Patrol",
-			Count = { Easy = 2, Hard = 4 },
+			Count = { Easy = 1, Hard = 4 },
 			Speed = 6, -- slow: studs per second
 			RouteMin = 30, -- each skeleton walks back and forth on a straight route this long
 			RouteMax = 60,

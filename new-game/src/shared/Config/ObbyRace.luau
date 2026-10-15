@@ -20,7 +20,7 @@ return {
 	IntroSeconds = 5, -- "Get ready" on the start plaza (frozen) before GO!
 	-- After the first player finishes, the rest have this many seconds left (if the clock has
 	-- more). 0 = no hurry: the round runs until everyone finishes or the time is up.
-	EndAfterFirstSeconds = 45,
+	EndAfterFirstSeconds = 60,
 	MinSeconds = 25, -- a finish faster than this doesn't count (stops teleport cheats)
 	SampleSeconds = 0.1, -- how often the server looks where every racer is
 	FallBelowCheckpoint = 8, -- studs below your last checkpoint (or the plaza) that count as fallen
@@ -42,8 +42,8 @@ return {
 	-- Easy and Hard (the vote picks one).
 	Difficulty = {
 		Easy = {
-			TimeLimit = 240, -- seconds to reach the finish
-			SweeperSpeed = 0.6, -- ghost sweepers spin at this share of their Speed (slow)
+			TimeLimit = 300, -- seconds to reach the finish
+			SweeperSpeed = 0.45, -- ghost sweepers spin at this share of their Speed (slow)
 			CoinMultiplier = 1, -- coins x this
 		},
 		Hard = {

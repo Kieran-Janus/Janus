@@ -334,7 +334,7 @@ describe("ScareMaze screen motion", function()
 		local m = c.motion.ScareMaze
 		c.player:SetAttribute("ScareTeam", "Survivors")
 		c.player:SetAttribute("ScareState", "Running")
-		c.rt:advance(1.5) -- standing still
+		c.rt:advance(c.Config.ScareMaze.CountdownAfter + 0.9) -- standing still
 		local countdown = c.gui.ScareMaze.Countdown
 		expect(countdown.Visible).toBe(true)
 		expect(fxScale(countdown)).toBeLessThanOrEqual(m.CountdownPopScale)

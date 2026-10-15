@@ -55,7 +55,7 @@ export type Egg = {
 return {
 	Size = 1.6, -- studs: how big an egg is
 	SnapHeight = 6, -- default for Snap (see above)
-	ReachDistance = 14, -- studs: you must be this close to an egg to collect it (anti-cheat)
+	ReachDistance = 16, -- studs: you must be this close to an egg to collect it (anti-cheat)
 	CooldownSeconds = 0.5, -- per player: grabs closer together than this are ignored
 	-- Anti-teleport: an egg can't be taken by someone who got there faster than anyone can run
 	-- (MaxSpeed studs a second, plus Slack) in the last WindowSeconds. A respawn starts afresh.
@@ -64,10 +64,10 @@ return {
 	MaxCoins = 500, -- an egg never gives more than this, whatever its Coins attribute says
 	Prompt = {
 		ActionText = "Take",
-		HoldDuration = 0.3, -- seconds to hold the button
-		MaxActivationDistance = 8, -- studs
+		HoldDuration = 0, -- seconds to hold the button (0 = just tap it)
+		MaxActivationDistance = 10, -- studs
 	},
-	Sparkles = 3, -- little glints per second around each egg (0 = none)
+	Sparkles = 5, -- little glints per second around each egg (0 = none)
 	GlowRange = 0, -- studs of light around each egg (0 = no light: lights cost performance)
 	Colors = { -- the built looks
 		Gold = Color3.fromRGB(255, 196, 40),

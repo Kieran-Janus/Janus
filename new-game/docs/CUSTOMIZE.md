@@ -38,7 +38,7 @@ Jump to: [Pumpkin Tools](#pumpkin-tools-click-anything-to-change-its-look-or-its
 | Vote panel text and motion (cards popping in, count ticks, winner pop; `Animate = false` = no motion) | `Config.Voting` |
 | Coins per pumpkin, survivor bonus | `Config.Rewards` |
 | Easy/Hard pumpkins, reward multiplier | `Config.Difficulty.Levels` |
-| King speed, hearing, sight | `Config.King.Difficulty` (always one King); how much faster he gets: `Config.King.SpeedUp` |
+| King speed, hearing, sight | `Config.King.Difficulty` (always one King); how much faster he gets: `Config.King.SpeedUp` (a difficulty can have its own `SpeedUp`: Easy does). Coins for just playing: `Config.Rewards.PlayCoins` |
 | King Hunt round length | `RoundSeconds` in `Config.Difficulty.Levels.Easy` and `.Hard` (Easy 180 = 3 minutes, Hard 300) |
 | The Pumpkin King's look and walk (coat, cape, pumpkin, crown, face glow, embers, strides) | `Config.King` (`Stride`, `BodyColor`, `HeadColor`, `CapeColor`, `CrownColor`, `VineColor`, `FaceColor`, `GemColor`, `HeadSize`, `FaceGlow`, `Embers`); built in `src/server/Build/KingBody.luau`. A custom `PumpkinKing` model replaces it (below) |
 | How loud sprinting/shouting/talking is to the King | `Config.King.Noise`, `Config.Voice.Noise` |
@@ -1119,6 +1119,8 @@ Both are Studio-only (never in a live game). Settings: `Config.Admin.Tools`.
 
 **Around every map** (`src/server/Maps/MapScenery.luau`): the ground carries on past the walls, with dark hills and bare trees on the horizon and glowing posts along the wall tops. It is decoration only (walk-through, outside the play area). Change it per map with a `Scenery` block in the map's settings file, e.g. `Scenery = { Trees = 12, Hills = 14, PostSpacing = 34, Glow = Color3.fromRGB(255, 160, 60) }` (also `Ground`, `Hill`, `Tree`, `Post`, `Reach`, `WallPosts = false`), or `Scenery = false` for none.
 
+**Solid maps** (`Config.Maps.Solid` in `init.luau`): when a map loads, every decoration you'd bump into becomes solid. Keep something walk-through by its prop name (`KeepWalkThrough`), its group's name (`KeepAreas`) or its own name (`KeepParts`); `KeepVisualFor` lists the modes whose maps keep decoration-only props walk-through (King Hunt). One map as built: `Solid = false` in its map file. All maps: `On = false`.
+
 **Midnight Market** (Hide & Seek, `src/shared/Config/Maps/MidnightMarket.luau`): a small market whose clutter, decoy pumpkins and hider spawns move to new spots every round (`Layout.Shuffle = false` keeps one layout). More or fewer things: `Stalls`, `Clutter`, `Decoys`, `LanternStrings`.
 
 **Haunted portraits** (Spooky Mansion): painted portraits whose eyes follow you (`Config.Maps.PortraitEyes`: `On`, `Range`, `Reach`). To hang real pictures, put image codes in `Paintings.Images` in `src/shared/Config/Maps/SpookyMansion.luau`, e.g. `Images = { "rbxassetid://123456789" }`. It must be the image id, not the decal id: insert the decal from the Toolbox in Studio, select it and copy the number from its **Texture** property (or send Claude Code the decal codes).
@@ -1188,9 +1190,9 @@ A REALLY hard climb inside the crooked clock tower, for the bravest players. Set
 
 ## Candy Rush
 The candy stand on the west side of the lobby. Settings: `src/shared/Config/CandyRush.luau`.
-- **The race:** `Candies` (10 to win), `MinPlayers` (2), `CountdownSeconds`, `MaxRaceSeconds` (60).
-- **Solo runs:** `Solo.On`, `Solo.AfterSeconds` (6 s alone on a pad).
-- **Coins:** `Rewards.WinCoins` (25), `PlayCoins` (5), `SoloCoins` (5), `CooldownSeconds` (15), `DailyCap` (300 a day; 0 = no limit).
+- **The race:** `Candies` (8 to win), `MinPlayers` (2), `CountdownSeconds`, `MaxRaceSeconds` (75).
+- **Solo runs:** `Solo.On`, `Solo.AfterSeconds` (5 s alone on a pad).
+- **Coins:** `Rewards.WinCoins` (25), `PlayCoins` (10), `SoloCoins` (10), `MinCandies` (2), `CooldownSeconds` (15), `DailyCap` (300 a day; 0 = no limit).
 - **Looks and words:** `Candy`, `Stand`, `Text`, `Sounds`.
 - **In Studio:** the stand is a Model tagged `CandyRushStation`; a copy of it is a second, separate race. The board is tagged `CandyRushBoard`. Each pad is tagged `CandyRushPad` with the attribute `Lane` (1 = the left column of the board as you look at it). Move or resize them freely.
 - Your own candies: models named `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn` in `Custom > Props`.
@@ -1201,8 +1203,8 @@ The candy stand on the west side of the lobby. Settings: `src/shared/Config/Cand
 
 ## Web Scour
 The Spider Grove scavenger hunt. Settings: `src/shared/Config/WebScour.luau`.
-- **The game:** `Critters` (6 to find), `TimeLimit` (45 s), `MaxReach` (how close you must be to click one).
-- **Coins:** `CoinsPerCritter` (2), `FinishCoins` (20), `TimeBonusPerSecond` (0.5), `MaxCoins` (50), `RewardCooldown` (180 s between paid hunts, saved per player).
+- **The game:** `Critters` (6 to find), `TimeLimit` (60 s), `MaxReach` (how close you must be to click one).
+- **Coins:** `CoinsPerCritter` (3), `FinishCoins` (20), `TimeBonusPerSecond` (0.5), `MaxCoins` (50), `RewardCooldown` (180 s between paid hunts, saved per player).
 - **The critters** are cute cartoon spiders, each a random bright colour from `CritterColors` (add, remove or change colours; the names are only labels).
 - **Where they hide:** every web lists its hiding spots as clock hours (`Grove.Webs[...].Spots`, 12 = top, 3 = right; halves like 1.5 work). Each spot snaps to the nearest knot where a ring thread crosses a spoke (`SpotDistance` = how far out), so every spider sits on a strand, never on the floor or a tree. 16 spots in all.
 - **Looks and words:** `Grove` (trees, webs, lantern, spider, colours), `Text`, `Sounds`.

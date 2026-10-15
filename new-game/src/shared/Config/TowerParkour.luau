@@ -156,13 +156,13 @@ return {
 
 	-- Moving pieces (the server moves them, everyone sees the same).
 	Vanish = {
-		Visible = 2.2, -- seconds a Vanish platform is there...
+		Visible = 2.8, -- seconds a Vanish platform is there...
 		Gone = 1.6, -- ...then seconds it is gone (it fades out first)
-		Warn = 0.6, -- seconds it flickers before it goes
+		Warn = 0.9, -- seconds it flickers before it goes
 		Stagger = 0.9, -- seconds between neighbouring platforms (so they don't all vanish at once)
 	},
 	Spinner = {
-		Speed = 2.2, -- how fast the bar turns, in radians per second (2.2 = one turn every 3 seconds)
+		Speed = 1.7, -- how fast the bar turns, in radians per second (1.7 = one turn every 3.7 seconds)
 		Height = 2.4, -- studs above the platform: jump it or duck past at the right moment
 		Length = 6, -- studs long
 		Thickness = 0.8,

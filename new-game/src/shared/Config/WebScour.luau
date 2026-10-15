@@ -27,8 +27,8 @@ type Sound = { SoundId: string, Volume: number?, PitchMin: number?, PitchMax: nu
 return {
 	-- The game ------------------------------------------------------------------------------
 	Critters = 6, -- critters to find in one go (fewer if the grove has fewer hiding spots)
-	TimeLimit = 45, -- seconds to find them all
-	MaxReach = 26, -- studs: you must be this close to a critter for your click to count
+	TimeLimit = 60, -- seconds to find them all
+	MaxReach = 32, -- studs: you must be this close to a critter for your click to count
 	MinSecondsBetweenFinds = 0.3, -- faster clicks than this are ignored (stops auto-clickers)
 	FirstFindAfter = 0.5, -- seconds after the start before the first critter can be caught
 	StartCooldown = 3, -- seconds after a hunt ends before you can start the next one
@@ -38,7 +38,7 @@ return {
 	MaxActionsPerSecond = 8, -- clicks the server listens to per player per second
 
 	-- Coins -----------------------------------------------------------------------------------
-	CoinsPerCritter = 2, -- coins for every critter you find (even if time runs out)
+	CoinsPerCritter = 3, -- coins for every critter you find (even if time runs out)
 	FinishCoins = 20, -- extra coins for finding everything in time
 	TimeBonusPerSecond = 0.5, -- and this many coins for every second left on the clock
 	MaxCoins = 50, -- never more than this from one hunt
@@ -58,7 +58,7 @@ return {
 	-- The critters (only the player hunting sees them) ------------------------------------------
 	-- Every critter is a cute cartoon spider sitting on a web strand. Each one gets a random
 	-- colour from this list: add, remove or change colours (the name is only a label).
-	CritterSize = 1.7, -- studs across
+	CritterSize = 2, -- studs across
 	CritterColors = {
 		Pink = Color3.fromRGB(255, 95, 200),
 		Lime = Color3.fromRGB(120, 255, 70),
@@ -69,8 +69,8 @@ return {
 		Red = Color3.fromRGB(255, 70, 80),
 	} :: { [string]: Color3 },
 	CritterLight = 7, -- studs of glow around each critter (0 = no light)
-	HintLastSeconds = 10, -- in the last seconds the critters glow brighter, to help
-	CatchPromptDistance = 9, -- gamepads: a "Catch!" button shows on critters this close
+	HintLastSeconds = 20, -- in the last seconds the critters glow brighter, to help
+	CatchPromptDistance = 11, -- gamepads: a "Catch!" button shows on critters this close
 
 	-- Sounds (only the hunter hears them) --------------------------------------------------------
 	Sounds = {

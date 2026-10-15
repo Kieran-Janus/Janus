@@ -12,7 +12,8 @@
 	    step's look must not change the jump, the working part already collides
 	Solid pieces are hit by raycasts too (CanQuery) but never fire Touched.
 
-	HubSolid.Apply(hub) -> number      how many parts were made solid
+	HubSolid.Apply(hub, settings?) -> number   how many parts were made solid (settings: a round
+	                                           map's Config.Maps.Solid; nil = Config.Lobby.Solid)
 	HubSolid.ShouldBeSolid(part, hub)  -> boolean   (used by the spec)
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,15 +23,38 @@ local Kit = require(script.Parent.Parent.Build.Kit)
 
 local HubSolid = {}
 
-local function cfg()
+export type Settings = {
+	On: boolean,
+	MinSize: number,
+	StepHeight: number,
+	MaxTransparency: number,
+	KeepWalkThrough: { string },
+	KeepAreas: { string },
+	KeepParts: { string }?,
+	KeepVisualProps: boolean?,
+}
+
+local override: Settings? = nil -- (set while Apply runs with a round map's settings)
+
+local function cfg(): Settings
+	if override then
+		return override
+	end
 	return Config.Lobby.Solid
 end
 
 -- True when `part` is inside something that must stay walk-through or is a look/working part.
 local function excludedByAncestors(part: BasePart, hub: Instance): boolean
 	local settings = cfg()
+	local keepParts = settings.KeepParts
+	if keepParts and table.find(keepParts, part.Name) then
+		return true -- a piece kept walk-through by its own name (a map's corn leaves, wires)
+	end
 	local node: Instance? = part
 	while node and node ~= hub do
+		if settings.KeepVisualProps and node:GetAttribute("PropVisual") == true then
+			return true -- built as decoration only (Kit.prop Visual): never something to hide behind
+		end
 		if node:GetAttribute("PropLook") ~= nil then
 			return true -- the look of a working part
 		end
@@ -86,7 +110,7 @@ function HubSolid.ShouldBeSolid(part: BasePart, hub: Instance, ignore: { Instanc
 	return heightAboveGround(part, ignore or { part }) > settings.StepHeight
 end
 
-function HubSolid.Apply(hub: Instance): number
+local function applyNow(hub: Instance): number
 	if not cfg().On then
 		return 0
 	end
@@ -104,6 +128,17 @@ function HubSolid.Apply(hub: Instance): number
 		part.CanTouch = false
 	end
 	return #chosen
+end
+
+-- `settings`: a round map's rules (Config.Maps.Solid); the lobby's (Config.Lobby.Solid) if nil.
+function HubSolid.Apply(hub: Instance, settings: Settings?): number
+	override = settings
+	local ok, result = pcall(applyNow, hub)
+	override = nil
+	if not ok then
+		error(result, 0)
+	end
+	return result
 end
 
 return HubSolid

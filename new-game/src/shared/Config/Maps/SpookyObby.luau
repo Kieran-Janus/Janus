@@ -117,6 +117,7 @@ return {
 	Spawns = 12,
 	SpawnRadius = 12,
 	Scenery = false, -- no ground under the course: it floats over a misty void
+	Solid = false, -- decorations stay walk-through (solid trees or gravestones could make shortcuts)
 	Course = Course,
 	Colors = {
 		Plaza = Color3.fromRGB(70, 62, 84),

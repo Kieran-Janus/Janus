@@ -83,10 +83,12 @@ local function visit(player: Player, def: any): string
 		map = MapService.Load(def.Id)
 		visitMap = map.Model
 		map.Model.Destroying:Once(function()
+			-- (Only when it was still the map being visited: visiting another map replaces
+			-- this one, and this runs a moment later, after the visitors are on the new one.)
 			if visitMap == map.Model then
 				visitMap = nil
+				endVisits()
 			end
-			endVisits()
 		end)
 	end
 	local character = player.Character

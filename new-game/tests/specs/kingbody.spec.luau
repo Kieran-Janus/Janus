@@ -190,6 +190,20 @@ describe("The Pumpkin King's walk and pace", function()
 		expect(KingService.ExtraSpeed(cfg.SpeedUp.Every)).toBe(cfg.SpeedUp.Add)
 		expect(KingService.ExtraSpeed(cfg.SpeedUp.Every * 2.5)).toBe(cfg.SpeedUp.Add * 2)
 		expect(KingService.ExtraSpeed(100000)).toBe(cfg.SpeedUp.Max)
+		-- Easy has its own, gentler speed-up.
+		local easy = cfg.Difficulty.Easy.SpeedUp
+		expect(easy).toBeTruthy()
+		expect(KingService.ExtraSpeed(cfg.SpeedUp.Every, easy)).toBe(0)
+		expect(KingService.ExtraSpeed(100000, easy)).toBe(easy.Max)
+		expect(easy.Max < cfg.SpeedUp.Max).toBe(true)
+	end)
+
+	it("lets kids outrun the King on Easy, but not on Hard", function()
+		local w = world()
+		local king = w.Config.King.Difficulty
+		local walk = w.Config.Player.WalkSpeed
+		expect(king.Easy.ChaseSpeed + king.Easy.SpeedUp.Max <= walk).toBe(true)
+		expect(king.Hard.ChaseSpeed > walk).toBe(true)
 	end)
 
 	it("plays King Hunt for 3 minutes on Easy", function()

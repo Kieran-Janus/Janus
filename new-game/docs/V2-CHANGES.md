@@ -64,16 +64,16 @@ Players on the Ready pad vote for a **game** (below). The winning mode's map is 
 
 | Mode | How to play | Maps | Players |
 | --- | --- | --- | --- |
-| **King Hunt** (the original) | Grab pumpkins, stay quiet, don't get caught by the Pumpkin King (redesigned on 8 October: a ribbed pumpkin head with an angry glowing grin, a gold crown with gems, a coat, a red cape and clawed vine hands reaching for you; he walks towards you with long strides. One King only, getting a little faster every 30 seconds. Easy rounds last 3 minutes) | Haunted Pumpkin Patch, Spooky Mansion | 1+ |
-| **Pumpkin Hide & Seek** (new) | Hiders turn into pumpkins and hide among the decoys. Seekers count in a hut, then come out with **candy guns**. A candy that hits a hider tags them, and they join the seekers. Hiders giggle every 20 seconds and glow in the last 30 seconds, so they are fairly easy to find. | Pumpkin Farm, Hedge Maze, Midnight Market (small, new spots every round) | 2+ |
-| **ScareMaze** (new) | Survivors run through a cornfield maze to the green exit. Stand still for 3 seconds and you're OUT. Haunters press **BOO** to scare them. Scarecrows, zombies, bats and ghosts jump out of hidden traps. | ScareMaze | 2+ (Haunters from 3 players) |
+| **King Hunt** (the original) | Grab pumpkins, stay quiet, don't get caught by the Pumpkin King (redesigned on 8 October: a ribbed pumpkin head with an angry glowing grin, a gold crown with gems, a coat, a red cape and clawed vine hands reaching for you; he walks towards you with long strides. One King only, getting a little faster every 30 seconds on Hard; on Easy he is slower than you and barely speeds up. Easy rounds last 3 minutes) | Haunted Pumpkin Patch, Spooky Mansion | 1+ |
+| **Pumpkin Hide & Seek** (new) | Hiders turn into pumpkins and hide among the decoys. Seekers count in a hut, then come out with **candy guns**. A candy that hits a hider tags them, and they join the seekers. Hiders giggle every 15 seconds and glow in the last 45 seconds, so they are easy to find. | Pumpkin Farm, Hedge Maze, Midnight Market (small, new spots every round) | 2+ |
+| **ScareMaze** (new) | Survivors run through a cornfield maze to the green exit. Stand still for 5 seconds and the maze catches you. Haunters press **BOO** to scare them. Scarecrows, zombies, bats and ghosts jump out of hidden traps. | ScareMaze | 2+ (Haunters from 3 players) |
 
 **The three new modes (15 October):**
 
 | Mode | How to play | Map | Players |
 | --- | --- | --- | --- |
-| **Prop Hunt** | Hiders turn into any Halloween thing in the Haunted House (a skull, a chair, a cauldron, a jack-o'-lantern...): walk up to it and press **E**, tap **BECOME IT** or tap the thing (gamepad X). **LOCK** (Q / Y) stops the wobble, **TAUNT** (T / L1) giggles for bonus coins. Pumpkin-headed finders count in the Finder Hut, then shoot **Pumpkin Cannons** (click, tap, **FIRE** or right trigger). A hit hider becomes a finder; hitting a real thing makes the finder wait longer. Easy: 40 s head start, 10 prop changes, giggles and a last-45-seconds glow. Hard: 30 s, 4 changes, no hints, double coins. | The Haunted House: six rooms downstairs, an attic and nursery up a ramp, a graveyard, pumpkin patch and dead trees outside, about 185 things to become | 2+ |
-| **Spooky Obby** | An easy race over a floating graveyard course: pumpkin hops, gravestones, a coffin bridge, spinning ghost sweepers, candy cane rails and a haunted tree, to a trophy. Falling, goo or a sweeper only puts you back on your last checkpoint; **Back to checkpoint** (R / Y) helps when stuck. Coins by finishing place, a little per checkpoint for the rest. Easy: bigger platforms, one more checkpoint, slow sweepers, 4 minutes. Hard: goo on the coffins, a second sweeper bar, 3 minutes, coins x1.5. | Spooky Obby | 1+ |
+| **Prop Hunt** | Hiders turn into any Halloween thing in the Haunted House (a skull, a chair, a cauldron, a jack-o'-lantern...): walk up to it and press **E**, tap **BECOME IT** or tap the thing (gamepad X). **LOCK** (Q / Y) stops the wobble, **TAUNT** (T / L1) giggles for bonus coins. Pumpkin-headed finders count in the Finder Hut, then shoot **Pumpkin Cannons** (click, tap, **FIRE** or right trigger). A hit hider becomes a finder; hitting a real thing makes the finder wait longer. Easy: 40 s head start, 10 prop changes, giggles and a last-60-seconds glow. Hard: 30 s, 4 changes, no hints, double coins. | The Haunted House: six rooms downstairs, an attic and nursery up a ramp, a graveyard, pumpkin patch and dead trees outside, about 185 things to become | 2+ |
+| **Spooky Obby** | An easy race over a floating graveyard course: pumpkin hops, gravestones, a coffin bridge, spinning ghost sweepers, candy cane rails and a haunted tree, to a trophy. Falling, goo or a sweeper only puts you back on your last checkpoint; **Back to checkpoint** (R / Y) helps when stuck. Coins by finishing place, a little per checkpoint for the rest. Easy: bigger platforms, one more checkpoint, slow sweepers, 5 minutes. Hard: goo on the coffins, a second sweeper bar, 3 minutes, coins x1.5. | Spooky Obby | 1+ |
 | **Crumbling Crypt** | Stone slabs over a pit of glowing goo crack where you stand and drop for good. Keep moving: fall through every layer into the goo and you watch as a ghost. Last one standing wins (alone: last until the clock runs out). After a while random slabs crack by themselves. Easy: 3 layers, big slabs, slow crumble, a safe start. Hard: 2 layers, small fast slabs, double coins. | Crumbling Crypt | 1+ |
 
 | King Hunt: Haunted Pumpkin Patch | King Hunt: Spooky Mansion |
@@ -94,6 +94,22 @@ Fair-play rules that were added after review:
 - A Hide & Seek hider who resets leaves their pumpkin where it was (it can still be tagged) and comes back to it.
 - Lobby spectators can't watch hiders, and chat bubbles are hidden during a round, so nobody can give hiding spots away.
 - ScareMaze and parkour check for teleporting and flying. A cheater is put back where they were.
+
+### Easier and kid friendly (15 October)
+You asked for the minigames to be easier and friendlier for young players. Only settings and words changed; every game plays the same way. Hard is still a challenge.
+- **No more walking through things on the maps**: gravestones, scarecrows, barrels, carts, market stalls, wells, benches, fountains, crypt pillars, furniture and trees on every round map are now solid, like in the lobby (`Config.Maps.Solid`, the same rules as `Config.Lobby.Solid`). Still walk-through on purpose: the Spooky Mansion's secret doors, cornfields and the maze's corn leaves, flat portraits, cobwebs, lanterns and candles, the ScareMaze's pop-out scarecrows, and on King Hunt maps the decoration-only props (so you can't hide behind them from the King). The Spooky Obby keeps its scenery walk-through (`Solid = false` in its map file) so it can't make shortcuts. Checked on every map: no spawn is blocked and every part of the floor can still be walked to.
+- **Fixed:** F8 > "Visit map" sent you back to the lobby when you went straight from one map to another.
+- **King Hunt on Easy**: the King walks at 10 and chases at 15 (was 12 and 18), so he is a bit slower than you even walking (16). He hears you from 60 studs (was 90), sees you from 35 (was 45) and barely speeds up (+0.5 a minute, at most +1; Hard still gets +0.75 every 30 seconds, up to +6). One skeleton on Easy instead of two. Everyone now gets 5 coins just for playing, even if the King caught you with no pumpkins (`Config.Rewards.PlayCoins`).
+- **ScareMaze**: you can stand still for **5 seconds** (was 3) before you're caught, and the red 3-2-1 only shows after 2 seconds. 3 seconds safe at the start and after a scare (was 2), 4 min 30 s to get out (was 4 min). Gentler scares: a BOO slows you less and for less time, BOOs every 10 seconds (was 8), traps reset after 18 seconds (was 14) and scare the same player at most every 10 seconds (was 6.5). The jumpscare face is shorter (0.4 s, was 0.6), the camera shakes less and the sting is quieter. 10 coins for playing (was 5). "You stopped! The maze got you" is now "Boo! The maze caught you!".
+- **Hide & Seek**: 20 seconds to hide (was 15; still a 3 minute round), hiders giggle every 15 seconds (was 20) and glow for the last 45 seconds (was 30). The candy gun is kinder to small hands: a near miss of 2.5 studs still tags (was 1.5) and a decoy only costs 1 extra second (was 1.5). 10 coins for playing (was 5). "You were found!" is now "Peekaboo, found you!".
+- **Prop Hunt on Easy**: hiders giggle every 20 seconds (was 25) and glow for the last 60 seconds (was 45); a near miss of 3 studs still finds them (was 2.5); hitting a real thing only costs half a second (was 1). 10 coins for playing (was 5).
+- **Spooky Obby on Easy**: 5 minutes (was 4), the ghost sweepers spin slower (0.45, was 0.6), and after the first player finishes the rest have 60 seconds (was 45).
+- **Crumbling Crypt on Easy**: slabs take 1.8 seconds to drop (was 1.4), nothing cracks for the first 6 seconds (was 4), and slabs only start cracking by themselves after 85 seconds (was 70). "SUDDEN DEATH!" is now "Hurry! The crypt is crumbling!"; "You fell in!" is now "Splash! You fell in the goo!".
+- **Candy Rush**: 8 candies to win (was 10), bigger candies that are easier to tap, 75 seconds per race (was 60), 2 seconds to hop back on your pad (was 1), solo runs after 5 seconds alone (was 6). 10 coins for playing or a solo run (was 5), and only 2 candies needed to earn them (was 3). Friendlier words when you hop off your pad or nobody wins.
+- **Web Scour**: 60 seconds to find the spiders (was 45), bigger spiders, you can click them from further away, they glow brighter for the last 20 seconds (was 10), and 3 coins each (was 2; still at most 50 a hunt).
+- **Secret pumpkins**: a quick tap takes one (no holding), the button shows from a little further away and the pumpkins sparkle more so they're easier to spot.
+- **Tormented Tower**: still "only the bravest" (the same jumps), but the vanishing platforms stay longer (2.8 s, was 2.2) and flicker longer before they go (0.9 s, was 0.6), and the spinning bars turn slower (one turn every 3.7 s, was 3).
+- Left as they were: the lobby parkour (it's already super easy: every jump uses at most 85% of a normal jump), the obby course, shop and crate prices, crate odds, Robux products.
 
 ### Lobby redesign
 | Before | After |
@@ -138,16 +154,16 @@ More views: [from the top](screenshots/lobby-top.png).
 ![The Candy Rush stand](screenshots/lobby-candyrush.png)
 
 - A candy stand on the west side of the lobby. Stand on one of the coloured pads in front of the big board.
-- With 2 or more players on pads: 3-2-1, GO! Candies pop up one at a time in your lane. Click (or tap) **your** candy. The first to grab 10 wins.
-- Coins: 25 for the winner, 5 for everyone else who finished. At most once every 15 seconds and 300 a day.
-- Waiting alone for 6 seconds starts a solo "beat your time" run (5 coins).
+- With 2 or more players on pads: 3-2-1, GO! Candies pop up one at a time in your lane. Click (or tap) **your** candy. The first to grab 8 wins.
+- Coins: 25 for the winner, 10 for everyone else who finished (grab at least 2 candies). At most once every 15 seconds and 300 a day.
+- Waiting alone for 5 seconds starts a solo "beat your time" run (10 coins).
 
 ### Web Scour
 ![The Spider Grove](screenshots/lobby-webscour.png)
 
 - The **Spider Grove**: twisted trees full of cobwebs. Walk to the glowing lantern and press **Scour the Web!**
-- 6 cute cartoon spiders in bright colours hide on the web strands (never on the floor or a tree). Only you can see yours. Click or tap them all within 45 seconds.
-- Coins: 2 per critter, 20 more for finding them all, plus a bonus for time left (never more than 50). Coins at most once every 3 minutes. That wait is saved, so changing servers doesn't skip it.
+- 6 cute cartoon spiders in bright colours hide on the web strands (never on the floor or a tree). Only you can see yours. Click or tap them all within 60 seconds.
+- Coins: 3 per critter, 20 more for finding them all, plus a bonus for time left (never more than 50). Coins at most once every 3 minutes. That wait is saved, so changing servers doesn't skip it.
 
 ### Secret pumpkins (Easter eggs)
 No picture: they are hidden on purpose.
@@ -254,7 +270,7 @@ No picture yet: you'll see it the moment you press Play.
 
 ### Fixes and polish (8 October)
 - **Spectating King Hunt looked blurry**: the map was only streamed around its middle, so far-off parts arrived as blurry low-detail versions. It now streams around the player (or King) you watch, and the lobby's soft far focus is off on the round maps.
-- **The Pumpkin King walks**: long strides with bending knees, swinging arms, a dip in each step, a roar (rearing back, arms up, a burst of embers) the moment he spots you, and a lean with reaching claws while he chases you, drawn on each screen (`Config.King.Stride`). Always one King; he gets a little faster every 30 seconds (`Config.King.SpeedUp`). King Hunt on Easy lasts 3 minutes.
+- **The Pumpkin King walks**: long strides with bending knees, swinging arms, a dip in each step, a roar (rearing back, arms up, a burst of embers) the moment he spots you, and a lean with reaching claws while he chases you, drawn on each screen (`Config.King.Stride`). Always one King; he gets a little faster every 30 seconds (`Config.King.SpeedUp`; on Easy only +0.5 a minute, at most +1: `Config.King.Difficulty.Easy.SpeedUp`). King Hunt on Easy lasts 3 minutes.
 - **Crate odds** are exact numbers ("5.082%", "0.02%"; since October 2026 there is no "<1%").
 - **Lighting** toned down a little (lobby and maps), the **floor signs** are gone, the **King statue** is the new King and sways.
 - **New Hide & Seek map: Midnight Market**: a small walled night market packed with stalls, crate stacks, barrels, sacks, hay and handcarts under strings of lanterns, with over 100 decoy pumpkins. The clutter, the decoys and the hider spawns move to new spots every round, so nobody can learn the hiding places (`Config/Maps/MidnightMarket.luau`: `Shuffle`, `Clutter`, `Decoys`). Seekers come out of the hut in the corner with their candy guns.
@@ -446,15 +462,15 @@ Each feature has its own short settings file in `src/shared/Config/`. Every file
 | Ready circle's look and sign | `Config/init.luau` > `Hub.ReadyArea` | `PadSize`, `Banner` ("PLAY!"), `Sign.Title` |
 | Spectating | `Config/Lobby.luau` > `Spectate` | `NextKeys`, `PreviousKeys`, `ShowWatchButton` |
 | Modes and the vote | `Config/Modes.luau` | `VoteChoices` (3), each mode's `MinPlayers`, the `Playlists` list |
-| King Hunt round | `Config/init.luau` > `Difficulty`, `Rewards`, `King` | each level's `RoundSeconds` (Easy 180 s = 3 min, Hard 300 s), `Rewards.CoinsPerPumpkin` (5), `King.SpeedUp` (one King that gets 0.75 faster every 30 s, at most +6) |
+| King Hunt round | `Config/init.luau` > `Difficulty`, `Rewards`, `King` | each level's `RoundSeconds` (Easy 180 s = 3 min, Hard 300 s), `Rewards.CoinsPerPumpkin` (5), `Rewards.PlayCoins` (5 for playing), `King.SpeedUp` (one King that gets 0.75 faster every 30 s, at most +6; Easy has its own gentler `SpeedUp`) |
 | The Pumpkin King's look and walk | `Config/init.luau` > `King` | `HeadColor`, `CapeColor`, `BodyColor`, `FaceGlow`, `Embers` (sparks per second, 0 = none), `Stride` (his striding walk: `Swing`, `KneeBend`, `Sway`, `ChaseLean`; `On = false` = he glides) |
-| Hide & Seek | `Config/HideSeek.luau` | `HeadStart` (15 s), `Duration` (165 s), `SeekerRatio` (0.25), `GiggleInterval` (20 s), `GlowLastSeconds` (30), `Rewards` |
-| ScareMaze | `Config/ScareMaze.luau` | `Duration` (240 s), `StopSeconds` (3), `HaunterRatio` (0.2), `MinPlayersForHaunters` (3), `Boo.Cooldown` (8 s), `Rewards` |
+| Hide & Seek | `Config/HideSeek.luau` | `HeadStart` (20 s), `Duration` (160 s), `SeekerRatio` (0.25), `GiggleInterval` (15 s), `GlowLastSeconds` (45), `Rewards` |
+| ScareMaze | `Config/ScareMaze.luau` | `Duration` (270 s), `StopSeconds` (5), `HaunterRatio` (0.2), `MinPlayersForHaunters` (3), `Boo.Cooldown` (10 s), `Jumpscare` (how long and how shaky), `Rewards` |
 | A map's lighting, size, decorations | `Config/Maps/<MapId>.luau` | `Lighting`, `AmbientSound`, `Layout` |
 | Parkour | `Config/Parkour.luau` | `Reward.Coins` (300), `Reward.CooldownHours` (20), `MinSeconds` (45), the `Course` list |
 | Tormented Tower | `Config/TowerParkour.luau` | the `Course` list, `Jumps`, `MinSeconds`, `Reward.BadgeId` |
-| Candy Rush | `Config/CandyRush.luau` | `Candies` (10), `MinPlayers` (2), `Rewards.WinCoins` (25), `Rewards.DailyCap` (300), `Solo.AfterSeconds` (6) |
-| Web Scour | `Config/WebScour.luau` | `Critters` (6), `TimeLimit` (45 s), `CoinsPerCritter` (2), `FinishCoins` (20), `MaxCoins` (50), `RewardCooldown` (180 s) |
+| Candy Rush | `Config/CandyRush.luau` | `Candies` (8), `MinPlayers` (2), `Rewards.WinCoins` (25), `Rewards.DailyCap` (300), `Solo.AfterSeconds` (5) |
+| Web Scour | `Config/WebScour.luau` | `Critters` (6), `TimeLimit` (60 s), `CoinsPerCritter` (3), `FinishCoins` (20), `MaxCoins` (50), `RewardCooldown` (180 s) |
 | Secret pumpkins | `Config/EasterEggs.luau` | each egg's `Coins` and `Hint` in `List`, `TouchToCollect` |
 | Rarity prices | `Config/Rarity.luau` | each rarity's `Price` (125 / 500 / 1,000 / 100,000) and `DuplicateRefund` |
 | Crates | `Config/Crates.luau` | `Odds` (60.98 / 24 / 15 / 0.02), `Luck` (the luck meter: `PerStep` 2, `Steps` 15, `FullGuarantee`), `Open.Guarantee` (x5 Uncommon / x10 Rare), `Premium` (Deluxe crates: `Price` 2,000, `Odds` 0 / 50 / 49 / 1, one line per crate in `Crates`), `RobuxOpen`, each crate's `Price`, `Robux.ProductId`, `RobuxFallbackCoins`, `LookDefaults` and each crate's `Look`, `Idle` (the stand), `Opening`. Guide: [CUSTOMIZE > Crates](CUSTOMIZE.md#crates) |

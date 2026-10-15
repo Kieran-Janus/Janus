@@ -36,7 +36,10 @@ type Level = {
 	ChaseSpeed: number,
 	HearingRange: number,
 	SightRange: number,
+	SpeedUp: SpeedUp?, -- this difficulty's own speed-up (missing = Config.King.SpeedUp)
 }
+
+type SpeedUp = { Every: number, Add: number, Max: number }
 
 type King = {
 	Model: Model,
@@ -305,10 +308,10 @@ local function walkTo(king: King, goal: Vector3, budget: number): boolean
 	return true
 end
 
--- Extra speed from Config.King.SpeedUp `seconds` after he appeared: a little more every Every
--- seconds, never more than Max.
-function KingService.ExtraSpeed(seconds: number): number
-	local cfg = Config.King.SpeedUp
+-- Extra speed from Config.King.SpeedUp (or the difficulty's own `speedUp`) `seconds` after he
+-- appeared: a little more every Every seconds, never more than Max.
+function KingService.ExtraSpeed(seconds: number, speedUp: SpeedUp?): number
+	local cfg: SpeedUp = speedUp or Config.King.SpeedUp
 	if cfg.Every <= 0 then
 		return 0
 	end
@@ -348,13 +351,13 @@ local function think(
 
 		if chase then
 			king.Humanoid.WalkSpeed = level.ChaseSpeed
-				+ KingService.ExtraSpeed(os.clock() - king.Spawned)
+				+ KingService.ExtraSpeed(os.clock() - king.Spawned, level.SpeedUp)
 			king.Model:SetAttribute("Mode", "Chase")
 			walkTo(king, chase.Position, cfg.RepathSeconds)
 		else
 			-- 2. Investigate the loudest noise, 3. or wander.
 			king.Humanoid.WalkSpeed = level.WalkSpeed
-				+ KingService.ExtraSpeed(os.clock() - king.Spawned)
+				+ KingService.ExtraSpeed(os.clock() - king.Spawned, level.SpeedUp)
 			local noise = NoiseService.Loudest(king.Root.Position, level.HearingRange)
 			local goal: Vector3? = if noise then noise.Position else nil
 			if noise and noise.Player and isTarget(noise.Player) then

@@ -25,6 +25,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local Config = require(game:GetService("ReplicatedStorage").Shared.Config)
 local Tags = require(game:GetService("ReplicatedStorage").Shared.Tags)
 local Kit = require(script.Parent.Parent.Build.Kit)
+local HubSolid = require(script.Parent.Parent.Hub.HubSolid)
 local Builders = script.Parent.Parent.Maps
 
 export type LoadedMap = {
@@ -115,6 +116,23 @@ local function make(def: any, useHandMade: boolean): LoadedMap
 	model.Name = "Map"
 	model:SetAttribute("MapId", id)
 	model.Parent = workspace
+	-- Decorations you'd bump into become solid (Config.Maps.Solid; a map's `Solid = false`
+	-- keeps it as built). In Workspace first: it measures each piece's height off the ground.
+	if def.Solid ~= false then
+		local settings = table.clone(Config.Maps.Solid) :: any
+		-- Decoration-only props stay walk-through on maps played in KeepVisualFor (King Hunt).
+		for _, mode in def.Modes or {} do
+			if table.find(settings.KeepVisualFor or {}, mode) then
+				settings.KeepVisualProps = true
+			end
+		end
+		local ok, err = pcall(HubSolid.Apply, model, settings)
+		if not ok then
+			warn(
+				("[MapService] Couldn't make %s's decorations solid: %s"):format(id, tostring(err))
+			)
+		end
+	end
 	return {
 		Id = id,
 		Name = def.Name,

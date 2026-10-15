@@ -21,15 +21,15 @@
 
 return {
 	-- The race ------------------------------------------------------------------------------
-	Candies = 10, -- candies each player grabs to win
+	Candies = 8, -- candies each player grabs to win
 	MinPlayers = 2, -- players on pads needed to start a race (2 or more)
 	CountdownSeconds = 3, -- the 3-2-1 before GO
-	MaxRaceSeconds = 60, -- a race stops after this long; the player with the most candies wins
+	MaxRaceSeconds = 75, -- a race stops after this long; the player with the most candies wins
 	NextCandyDelay = { Min = 0.1, Max = 0.35 }, -- wait before your next candy pops up
 	MinClickSeconds = 0.12, -- a candy can't be grabbed faster than this after it appears (stops auto-clickers)
-	ClickDistance = 32, -- how far away (studs) you can click a candy from
+	ClickDistance = 40, -- how far away (studs) you can click a candy from
 	ResultsSeconds = 5, -- the winner banner stays up this long, then the next race can start
-	LeaveGraceSeconds = 1, -- stepping off your pad for less than this is fine (wobbles, jumps)
+	LeaveGraceSeconds = 2, -- stepping off your pad for less than this is fine (wobbles, jumps)
 	CheckSeconds = 0.2, -- how often the server checks who is standing on the pads
 	PadHeight = 8, -- studs above a pad that still count as standing on it (jumping is fine)
 	PadEdgeMargin = 0.5, -- studs past a pad's edge that still count
@@ -37,16 +37,16 @@ return {
 	-- Solo practice: one player alone on a pad races the clock ----------------------------------
 	Solo = {
 		On = true, -- false = no solo runs (a race always needs MinPlayers)
-		AfterSeconds = 6, -- waiting alone on a pad this long starts a solo run
+		AfterSeconds = 5, -- waiting alone on a pad this long starts a solo run
 	},
 
 	-- Coins. Only players who grabbed at least MinCandies get any, and never more than DailyCap
 	-- coins a day from Candy Rush (saved, so changing servers doesn't reset it).
 	Rewards = {
 		WinCoins = 25, -- the winner of a race
-		PlayCoins = 5, -- everyone else who finished the race on their pad
-		SoloCoins = 5, -- finishing a solo run
-		MinCandies = 3, -- candies you must grab to earn anything
+		PlayCoins = 10, -- everyone else who finished the race on their pad
+		SoloCoins = 10, -- finishing a solo run
+		MinCandies = 2, -- candies you must grab to earn anything
 		CooldownSeconds = 15, -- race coins at most once per this many seconds
 		SoloCooldownSeconds = 300, -- solo coins at most once per this many seconds
 		DailyCap = 300, -- most Candy Rush coins one player can get per day (0 = no limit)
@@ -57,7 +57,7 @@ return {
 	-- your own model: put a model called CandyRushWrapped / CandyRushLollipop /
 	-- CandyRushCandyCorn in ReplicatedStorage.Custom.Props (assets/Props).
 	Candy = {
-		Size = 2.4, -- how big a candy is (studs)
+		Size = 2.8, -- how big a candy is (studs)
 		Kinds = { "Wrapped", "Lollipop", "CandyCorn" },
 		Colors = { -- wrapped sweets and lollipops pick one of these
 			Color3.fromRGB(255, 105, 180), -- bubblegum pink
@@ -74,7 +74,7 @@ return {
 		},
 		EdgeMargin = 0.4, -- space kept free along the edges of each lane
 		BottomSpace = 1.8, -- space kept free at the bottom of each lane (for the name)
-		HitboxPadding = 0.8, -- the invisible click area is this much bigger (easier to tap)
+		HitboxPadding = 1.2, -- the invisible click area is this much bigger (easier to tap)
 	},
 
 	-- The stand (src/server/Hub/Sections/CandyRush.luau builds it) ---------------------------------
@@ -123,7 +123,7 @@ return {
 		Wins = "%s WINS!",
 		SoloDone = "%s: %.1fs",
 		TimeUp = "Time's up!",
-		NoWinner = "Nobody wins this time",
+		NoWinner = "Great try, everyone!",
 		Record = "Fastest: %s %.1fs",
 		NoRecord = "Fastest: nobody yet!",
 		FreeLane = "Free pad", -- on the board, under a lane nobody stands on
@@ -135,10 +135,10 @@ return {
 		NewBest = "New best time!",
 		Best = "Your best: %.1fs",
 		CoinsGot = "+%d coins",
-		Out = "You left your pad: out of this race",
+		Out = "Oops! You hopped off your pad. Catch the next race!",
 		OutTag = "out",
 		You = "You",
-		TooFew = "Grab more candies to earn coins",
+		TooFew = "Grab a few more candies next time for coins!",
 		Cooldown = "No coins this time (cooldown)",
 		DailyCap = "Daily Candy Rush coins reached",
 		LaneTaken = "Someone is on this pad",

@@ -26,15 +26,15 @@ return {
 	TaggedSeekerDelay = 3, -- seconds before a found pumpkin gets their own candy gun
 
 	-- Times ----------------------------------------------------------------------------------------
-	HeadStart = 15, -- seconds the hiders get to hide while the seekers count in the hut
-	Duration = 165, -- seconds of seeking after that (15 + 165 = a 3 minute round)
+	HeadStart = 20, -- seconds the hiders get to hide while the seekers count in the hut
+	Duration = 160, -- seconds of seeking after that (20 + 160 = a 3 minute round)
 
 	-- Making hiders fairly easy to find ------------------------------------------------------------
-	GiggleInterval = 20, -- every hider giggles and puffs sparkles about this often (seconds)
+	GiggleInterval = 15, -- every hider giggles and puffs sparkles about this often (seconds)
 	GiggleJitter = 4, -- up to this many seconds earlier or later, so they don't all giggle at once
-	FirstGiggleAfter = 10, -- seconds after the seekers come out before the first giggles
+	FirstGiggleAfter = 8, -- seconds after the seekers come out before the first giggles
 	TrailMinSpeed = 3, -- a hider moving faster than this (studs a second) leaves a faint leaf trail
-	GlowLastSeconds = 30, -- hiders glow softly for the last this-many seconds of the round
+	GlowLastSeconds = 45, -- hiders glow softly for the last this-many seconds of the round
 
 	-- Fair play ------------------------------------------------------------------------------------
 	-- A hider who resets (or dies) once the seekers are out leaves their pumpkin where it was
@@ -55,16 +55,16 @@ return {
 		HiderSurvived = 30, -- a pumpkin that was never found
 		PerMinuteHidden = 5, -- a found pumpkin: for every full minute it stayed hidden
 		WinningTeam = 10, -- everyone on the winning side
-		Played = 5, -- everyone who took part
+		Played = 10, -- everyone who took part
 	},
 
 	-- Candy gun (seekers) --------------------------------------------------------------------------
 	Gun = {
 		Name = "Candy Gun", -- the tool's name in the backpack bar
 		FireCooldown = 0.6, -- seconds between candies
-		DecoyPenalty = 1.5, -- extra seconds to wait after hitting a decoy (so spraying doesn't work)
+		DecoyPenalty = 1, -- extra seconds to wait after hitting a decoy (so spraying doesn't work)
 		MaxRange = 160, -- studs
-		HitTolerance = 1.5, -- a candy passing this close to a hider's pumpkin still tags it (lag, phones)
+		HitTolerance = 2.5, -- a candy passing this close to a hider's pumpkin still tags it (lag, phones)
 		ProjectileSpeed = 150, -- studs a second the candy flies (looks only: the hit is decided at once)
 		MaxFlightSeconds = 0.7, -- long shots fly at least this fast
 		SplatSeconds = 4, -- how long candy splats stay before fading
@@ -154,8 +154,8 @@ return {
 		CountingTip = "No peeking! The pumpkins are hiding.",
 		Released = "Ready or not, here they come!", -- hiders, when the seekers come out
 		SeekerGo = "GO! Find the pumpkins!", -- seekers, when they come out
-		FoundYou = "You were found! Now you're a SEEKER!",
-		FoundGhost = "You were found! Watch the rest of the round.",
+		FoundYou = "Peekaboo, found you! Now you're a SEEKER!",
+		FoundGhost = "Peekaboo, found you! Watch the rest of the round.",
 		Tagged = "TAGGED!",
 		TaggedBy = "%s found %s!",
 		Decoy = "Just a pumpkin!",

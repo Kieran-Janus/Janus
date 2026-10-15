@@ -48,10 +48,10 @@ return {
 			-- how many times a hider can turn into something else once the finders are out
 			-- (as many times as you like during the head start)
 			PropChanges = 10,
-			GiggleInterval = 25, -- every hider giggles on their own about this often (0 = never)
-			GlowLastSeconds = 45, -- hiders glow softly for the last this-many seconds (0 = never)
-			PropPenalty = 1, -- extra seconds a finder waits after hitting a thing that isn't a hider
-			HitTolerance = 2.5, -- a pumpkin passing this close to a hider still finds them
+			GiggleInterval = 20, -- every hider giggles on their own about this often (0 = never)
+			GlowLastSeconds = 60, -- hiders glow softly for the last this-many seconds (0 = never)
+			PropPenalty = 0.5, -- extra seconds a finder waits after hitting a thing that isn't a hider
+			HitTolerance = 3, -- a pumpkin passing this close to a hider still finds them
 			RewardMultiplier = 1, -- coins x this
 		},
 		Hard = {
@@ -103,7 +103,7 @@ return {
 		PerMinuteHidden = 5, -- a found hider: for every full minute they stayed hidden
 		PerTaunt = 2, -- for every taunt that counted
 		WinningTeam = 10, -- everyone on the winning side
-		Played = 5, -- everyone who took part
+		Played = 10, -- everyone who took part
 	},
 
 	-- The finders' look: a pumpkin head (a skin head piece, src/shared/HeadPieces.luau). Their own
@@ -196,8 +196,8 @@ return {
 		CountingTip = "The hiders are turning into things. No peeking!",
 		Released = "The finders are coming!", -- hiders, when the finders come out
 		SeekerGo = "GO! Find the hiders!", -- finders, when they come out
-		FoundYou = "You were found! Now you're a FINDER!",
-		FoundGhost = "You were found! Watch the rest of the round.",
+		FoundYou = "Peekaboo, found you! Now you're a FINDER!",
+		FoundGhost = "Peekaboo, found you! Watch the rest of the round.",
 		Found = "FOUND!",
 		FoundBy = "%s found %s!",
 		Decoy = "Just a %s! Wait...",

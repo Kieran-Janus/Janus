@@ -10,7 +10,8 @@
 	players become ghosts (GhostService) for the rest of the round. The round ends at 0:00 or
 	when everyone is caught.
 	Score = pumpkins collected. Coins = pumpkins x Rewards.CoinsPerPumpkin x the difficulty's
-	RewardMultiplier, + Rewards.SurvivorBonus if still alive (GameService adds the friend bonus).
+	RewardMultiplier, + Rewards.PlayCoins for playing, + Rewards.SurvivorBonus if still alive
+	(GameService adds the friend bonus).
 
 	ReplicatedStorage attributes: Alive (survivors left), KingCount (set by KingService).
 ]]
@@ -139,6 +140,7 @@ function KingHunt.Run(ctx: Types.RoundContext): Types.RoundResult
 		local pumpkins = PumpkinService.GetCount(player)
 		local survived = alive[player] == true and ctx.AliveHumanoid(player) ~= nil
 		local coins = pumpkins * Config.Rewards.CoinsPerPumpkin * multiplier
+			+ Config.Rewards.PlayCoins
 		if survived then
 			coins += Config.Rewards.SurvivorBonus
 		end
