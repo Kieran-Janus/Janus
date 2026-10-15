@@ -9,6 +9,8 @@
 
 	Some tags also need attributes on the same part (Properties > Attributes):
 	  ParkourCheckpoint  Index (number: 1, 2, 3... in course order)
+	  ObbyCheckpoint     Index (number: 1, 2, 3... in course order)
+	  ObbyVariant        Only (string: "Easy" or "Hard")
 	  CandyRushPad       Lane (number)
 	  EasterEgg          EggId (string, matches Config.EasterEggs.List) and Coins (number; an
 	                     EggId in the list pays the list's Coins instead)
@@ -24,6 +26,7 @@ local Tags = {
 	-- Lobby
 	ReadyPad = "ReadyPad", -- stand on it to join the next round
 	ReadySign = "ReadySign", -- shows "READY x / y" (a part holding the sign's BillboardGui)
+	VotePad = "VotePad", -- stand on it to vote for a game (attribute VoteSlot = 1, 2, 3...); also a Ready pad
 	HubSpawn = "HubSpawn", -- where players appear in the lobby
 	ShopKeeper = "ShopKeeper", -- the Pumpkin Shop keeper and its prompt (a tagged part with no
 	-- prompt gets one, so tagging any part ShopKeeper makes it open the shop)
@@ -67,6 +70,16 @@ local Tags = {
 	SeekerSpawn = "SeekerSpawn", -- Hide & Seek: where seekers start
 	HiderSpawn = "HiderSpawn", -- Hide & Seek: where hiders start
 	SeekerDoor = "SeekerDoor", -- Hide & Seek: the seeker hut's door, swings open when seekers are let out
+	-- Spooky Obby (Config.ObbyRace, map SpookyObby)
+	ObbyCheckpoint = "ObbyCheckpoint", -- a checkpoint pad (attribute Index = 1, 2, 3... in course order)
+	ObbyFinish = "ObbyFinish", -- the finish pad
+	ObbyHazard = "ObbyHazard", -- green goo: touching it sends you back to your last checkpoint
+	ObbySweeper = "ObbySweeper", -- a ghost sweeper bar (attributes Center, Speed, Phase): jump over it
+	ObbyVariant = "ObbyVariant", -- only there on one difficulty (attribute Only = "Easy" or "Hard")
+	-- (Prop Hunt uses SeekerSpawn, HiderSpawn and SeekerDoor too: the Finder Hut)
+	PropHuntProp = "PropHuntProp", -- Prop Hunt: a thing hiders can turn into (a Model or part)
+	TileFallTile = "TileFallTile", -- Crumbling Crypt: a floor slab that cracks and drops when stepped on (attribute Layer: 1 = top)
+	TileFallGoo = "TileFallGoo", -- Crumbling Crypt: the goo pit; falling below its top + Config.TileFall.OutHeight = out
 	-- Older tags (set by src/server/Build/Kit.luau)
 	HubFloat = "HubFloat", -- bobs up and down (client HubAmbience)
 	ClockHand = "ClockHand", -- the clock tower's minute hand: twitches towards midnight (client HubAmbience; attribute ClockFrame)

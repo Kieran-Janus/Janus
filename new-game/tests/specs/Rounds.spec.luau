@@ -99,12 +99,12 @@ describe("Playlists", function()
 	end)
 
 	it("only offers switched-on modes that fit the ready players", function()
-		withFeatures({ KingHunt = true, HideSeek = false, ScareMaze = false }, function()
+		withFeatures({ KingHunt = true, HideSeek = false, ScareMaze = false, PropHunt = false, ObbyRace = false, TileFall = false }, function()
 			expect(ids(Playlists.Available(1))).toBe("KingHuntPatch,KingHuntMansion")
 			expect(ids(Playlists.Available(8))).toBe("KingHuntPatch,KingHuntMansion")
 			expect(ids(Playlists.Offer(1, 3))).toBe("KingHuntPatch,KingHuntMansion")
 		end)
-		withFeatures({ KingHunt = true, HideSeek = true, ScareMaze = true }, function()
+		withFeatures({ KingHunt = true, HideSeek = true, ScareMaze = true, PropHunt = false, ObbyRace = false, TileFall = false }, function()
 			-- 1 player: King Hunt only; 2 players: everything.
 			expect(ids(Playlists.Available(1))).toBe("KingHuntPatch,KingHuntMansion")
 			expect(#Playlists.Available(2)).toBe(6)
@@ -120,21 +120,34 @@ describe("Playlists", function()
 				end
 			end
 		end)
-		withFeatures({ KingHunt = false, HideSeek = true, ScareMaze = false }, function()
+		withFeatures({ KingHunt = false, HideSeek = true, ScareMaze = false, PropHunt = false, ObbyRace = false, TileFall = false }, function()
 			-- Not enough players for Hide & Seek and King Hunt is off: King Hunt is never
 			-- offered; the round waits for 2 ready players instead.
 			expect(#Playlists.Offer(1, 3)).toBe(0)
 			expect(Playlists.FewestPlayers()).toBe(2)
 			expect(ids(Playlists.Offer(2, 3))).toBe("HideSeekFarm,HideSeekHedgeMaze,HideSeekMarket")
 		end)
-		withFeatures({ KingHunt = true, HideSeek = true, ScareMaze = true }, function()
+		withFeatures({ KingHunt = true, HideSeek = true, ScareMaze = true, PropHunt = false, ObbyRace = false, TileFall = false }, function()
 			expect(Playlists.FewestPlayers()).toBe(1)
 		end)
-		withFeatures({ KingHunt = false, HideSeek = false, ScareMaze = false }, function()
+		withFeatures({ KingHunt = false, HideSeek = false, ScareMaze = false, PropHunt = false, ObbyRace = false, TileFall = false }, function()
 			-- Everything off: the fallback, with anyone.
 			expect(#Playlists.Enabled()).toBe(0)
 			expect(Playlists.FewestPlayers()).toBe(1)
 			expect(ids(Playlists.Offer(10, 3))).toBe("KingHuntPatch")
+		end)
+		-- Every mode on: 1 player gets King Hunt, the Spooky Obby and the Crumbling Crypt; 2
+		-- players get everything (Prop Hunt, Hide & Seek and ScareMaze need 2).
+		withFeatures({
+			KingHunt = true,
+			HideSeek = true,
+			ScareMaze = true,
+			PropHunt = true,
+			ObbyRace = true,
+			TileFall = true,
+		}, function()
+			expect(ids(Playlists.Available(1))).toBe("KingHuntPatch,KingHuntMansion,ObbyRace,TileFall")
+			expect(#Playlists.Available(2)).toBe(#Config.Modes.Playlists)
 		end)
 	end)
 end)
@@ -178,9 +191,19 @@ describe("Ready pad", function()
 		local HubBuilder = rt:require("ServerScriptService.Server.Hub.HubBuilder")
 		local hub = HubBuilder.Build()
 		local CollectionService = rt.game:GetService("CollectionService")
-		local pads = CollectionService:GetTagged("ReadyPad")
-		expect(#pads).toBe(1)
-		local pad = pads[1]
+		-- The Ready circle, plus the vote pads (each also a Ready pad: standing on one = ready).
+		local circles, votePads = {}, 0
+		for _, tagged in CollectionService:GetTagged("ReadyPad") do
+			if CollectionService:HasTag(tagged, "VotePad") then
+				votePads += 1
+			else
+				table.insert(circles, tagged)
+			end
+		end
+		expect(#circles).toBe(1)
+		expect(votePads).toBe(if Config.Features.VotePads then Config.VotePads.Pads else 0)
+		expect(#CollectionService:GetTagged("VotePad")).toBe(votePads)
+		local pad = circles[1]
 		expect(pad:IsDescendantOf(hub)).toBe(true)
 		local cfg = Config.Lobby.Ready
 		-- A square pad (Block) or a round one (a Cylinder stood up: its X axis points up).
@@ -210,7 +233,7 @@ describe("Ready pad", function()
 	end)
 
 	it("waits for enough ready players for the modes that are on", function()
-		withFeatures({ KingHunt = false, HideSeek = true, ScareMaze = false }, function()
+		withFeatures({ KingHunt = false, HideSeek = true, ScareMaze = false, PropHunt = false, ObbyRace = false, TileFall = false }, function()
 			expect(ReadyService.Needed()).toBe(2)
 			-- Too few ready players for Hide & Seek: no vote (and no King Hunt instead).
 			local VotingService = rt:require("ServerScriptService.Server.Services.VotingService")

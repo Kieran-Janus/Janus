@@ -7,7 +7,8 @@
 	A target is a Player in the round who isn't out (InRound and not Out), or a Pumpkin King
 	(a Model named "PumpkinKing" in Workspace.Map, King Hunt only). In Hide & Seek the hidden
 	pumpkins (HideSeekRole "Hider") can't be watched, so nobody can tell the seekers where they
-	are (Config.HideSeek.SpectateHiders = true allows it).
+	are (Config.HideSeek.SpectateHiders = true allows it). Prop Hunt hiders (disguised as things)
+	are hidden too (Config.PropHunt.SpectateHiders).
 
 	SpectateTargets.Kings() -> { Model }
 	SpectateTargets.List() -> { Instance }          Kings first, then the players still in
@@ -51,9 +52,13 @@ local function watchablePlayer(other: Player): boolean
 	if other:GetAttribute("InRound") ~= true or other:GetAttribute("Out") == true then
 		return false
 	end
-	return Config.HideSeek.SpectateHiders
-		or ReplicatedStorage:GetAttribute("Mode") ~= "HideSeek"
-		or other:GetAttribute("HideSeekRole") ~= "Hider"
+	-- (Prop Hunt hiders, disguised as things, are hidden the same way: Config.PropHunt.SpectateHiders)
+	local mode = ReplicatedStorage:GetAttribute("Mode")
+	local allowed = if mode == "HideSeek"
+		then Config.HideSeek.SpectateHiders
+		elseif mode == "PropHunt" then Config.PropHunt.SpectateHiders
+		else true
+	return allowed or other:GetAttribute("HideSeekRole") ~= "Hider"
 end
 
 -- Everything you can watch: the Kings first, then the players still in the round.

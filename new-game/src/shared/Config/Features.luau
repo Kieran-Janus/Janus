@@ -17,6 +17,10 @@ return {
 	KingHunt = true, -- the classic mode: grab pumpkins and hide from the Pumpkin King
 	HideSeek = true, -- Pumpkin Hide & Seek: seekers with candy guns vs pumpkin hiders
 	ScareMaze = true, -- ScareMaze: Survivors run the maze, Haunters scare them
+	PropHunt = true, -- Prop Hunt: hiders turn into props in the Haunted House, pumpkin-headed finders cannon them
+	ObbyRace = true, -- Spooky Obby: an easy race over a Halloween obstacle course
+	TileFall = true, -- Crumbling Crypt: tiles crumble under your feet, the last one standing wins
+	VotePads = true, -- vote by standing on a pad at the Ready area (game, then difficulty); off = the old on-screen vote
 	Parkour = true, -- the parkour course in the lobby
 	CandyRush = true, -- lobby minigame: click your candies, first to clear them all wins
 	WebScour = true, -- lobby minigame: a quick scavenger hunt in the spider webs

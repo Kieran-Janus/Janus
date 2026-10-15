@@ -75,8 +75,8 @@ describe("Config.Maps", function()
 		end
 	end)
 
-	it("has six playlists", function()
-		expect(#Config.Modes.Playlists).toBe(6)
+	it("has nine playlists", function()
+		expect(#Config.Modes.Playlists).toBe(9)
 		local ids = {}
 		for _, playlist in Config.Modes.Playlists do
 			if ids[playlist.Id] then

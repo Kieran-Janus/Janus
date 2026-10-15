@@ -29,6 +29,7 @@ type VoteState = {
 	Maps: { Option },
 	Difficulties: { Option },
 	ReadyOnly: boolean?,
+	Pads: boolean?, -- true = votes are cast on the vote pads (no panel)
 }
 -- One button and what it shows right now (Shown steps towards Target).
 type Card = {
@@ -453,6 +454,13 @@ function VoteUI.Mount(gui: ScreenGui)
 
 	voteUpdate.OnClientEvent:Connect(function(state: VoteState)
 		if typeof(state) ~= "table" then
+			return
+		end
+		if state.Pads then
+			-- Players vote on the vote pads in the lobby (VotePadsUI): no panel on the screen.
+			voteOpen = false
+			current = nil
+			panel.Visible = false
 			return
 		end
 		local wasOpen = voteOpen

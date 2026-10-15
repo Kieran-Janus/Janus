@@ -33,7 +33,8 @@ Jump to: [Pumpkin Tools](#pumpkin-tools-click-anything-to-change-its-look-or-its
 | Intermission, results time (and the default round length) | `Config.Round` |
 | Results screen timings, text, colours, motion (row pops, shine, "You got X coins!"; `Animate = false` = no motion) | `Config.Results` |
 | 3-2-1 countdown, "GO!", "RUN!", heartbeat warning, +1 pop-ups, last-30-seconds, survivors-left (`Animate = false` = no motion) | `Config.Juice` |
-| Vote panel text and motion (cards popping in, count ticks, winner pop; `Animate = false` = no motion) | `Config.Voting` |
+| Vote pads: seconds, EASY / HARD pads, each game's colour and picture, the words | `Config.VotePads` (`src/shared/Config/VotePads.luau`) |
+| Vote panel text and motion (only with vote pads off; cards popping in, count ticks, winner pop; `Animate = false` = no motion) | `Config.Voting` |
 | Coins per pumpkin, survivor bonus | `Config.Rewards` |
 | Easy/Hard pumpkins, reward multiplier | `Config.Difficulty.Levels` |
 | King speed, hearing, sight | `Config.King.Difficulty` (always one King); how much faster he gets: `Config.King.SpeedUp` |
@@ -234,8 +235,8 @@ Sizes are studs tall (each copy is scaled to its own size, so this is just a gui
 | `JackOLantern` | a carved, glowing pumpkin | lobby (ring round the plaza, arches, stalls, scarecrow head, parkour, crate stand), Pumpkin Patch, Spooky Mansion, ScareMaze | 1.6-4.3 |
 | `CollectPumpkin` | the pumpkins you pick up in King Hunt (look only: the glowing pickup still works) | every King Hunt round | 2.5 (`Config.Pumpkins.Size`) |
 | `HidingPumpkin` | Hide & Seek decoys **and** the pumpkins hiders turn into, so they always match (look only: a hidden hitbox is what candy hits) | Pumpkin Farm, Hedge Maze | 2.7-3.9 |
-| `ParkourPumpkin` | the pumpkins you jump on (look only: the flat lid you land on stays, invisible) | lobby parkour | 4.5-5.5 |
-| `ParkourTrophy` | the golden trophy pumpkin at the top | lobby parkour | 12 |
+| `ParkourPumpkin` | the pumpkins you jump on (look only: the flat lid you land on stays, invisible) | lobby parkour, Spooky Obby | 4.5-5.5 |
+| `ParkourTrophy` | the golden trophy pumpkin at the top | lobby parkour, Spooky Obby (the finish) | 12 |
 | `EggGoldenPumpkin`, `EggCandy`, `EggLollipop`, `EggSkull`, `EggGhost` | the secret pumpkins (Easter eggs) | lobby | 1.6 (`Config.EasterEggs.Size`) |
 | `Lantern` | a small glass lantern | lobby (clock tower, shop, dead trees), ScareMaze corn walls (the bracket stays) | 1.3-1.7 |
 | `Lamppost` | a lamp on a post | lobby and every map | 9-14 |
@@ -265,16 +266,19 @@ Sizes are studs tall (each copy is scaled to its own size, so this is just a gui
 | `Signpost` | a signpost (yours has no arrow words) | lobby | 7-13.5 |
 | `Wheelbarrow`, `HarvestCart`, `Well`, `Tractor`, `RockingChair` | farm things | Pumpkin Farm | 3-9 |
 | `MarketStall`, `Sack`, `Handcart`, `PumpkinPyramid` | the market stalls, grain sacks, handcarts and the pumpkin pyramid | Midnight Market | 3-8.5 |
+| `Chair`, `Table`, `Skull`, `Broom`, `Potion`, `Books`, `Bookshelf` | haunted-house things: a spiky chair, a round side table, a skull, a witch's broom, a potion bottle, a pile of books, a tall bookshelf (all but the bookshelf are things Prop Hunt hiders can turn into: a hidden hitbox does the colliding, and hiders copy your model) | The Haunted House (also its `Coffin`, `Cauldron`, pumpkins, crates, barrels, candles, lanterns, gravestones and hay bales) | 1.2-9 |
 | `Portrait` | the haunted portraits whose eyes follow you (look only) | Spooky Mansion | 5.6-6 |
 | `Fountain` | the fountain | Hedge Maze | 9 |
 | `ClockTower`, `KingStatue` | the big lobby centrepieces (the clock tower is hollow: the Tormented Tower climbs inside, see below) | lobby | 81.5, 18 |
 | `VendorStall` | the Pumpkin Shop stall (the shopkeeper is `PumpkinVendor` in `Custom > Characters`) | lobby | 21 |
 | `ReadyPadArch`, `ParkourArch` | the arch over the Ready circle, the parkour start arch | lobby | 15.4, 13 |
+| `ObbyArch` | the glowing arches over the Spooky Obby start and finish (the jack-o'-lanterns on top are `JackOLantern`) | Spooky Obby | 13-14 |
 | `CandyCane`, `GiantLollipop`, `CandyBucket`, `Gumdrop`, `SignCandyCorn` | the Candy Rush stand's decorations | lobby | 1.2-24 |
 | `CandyRushWrapped`, `CandyRushLollipop`, `CandyRushCandyCorn` | the candies you click in Candy Rush | lobby, during a race | 2.4 (`Config.CandyRush`) |
 | `GroveSpider` | the friendly spider in the Spider Grove | lobby | 8 |
 | a crate's Id, e.g. `PumpkinCrate` | that crate on the crate stand and in the crate panel | lobby, Menu > Crates | 3-3.6 (its longest side) |
 | `ScareScarecrow`, `ScareZombie`, `ScareBat`, `ScareGhost` | the ScareMaze scares | ScareMaze | 9, 6, 1.4, 6 |
+| `CryptPillar`, `Skull` | the stone pillars round the slabs (walk-through) and the skulls on them and on the ledges (Crumbling Crypt also uses `Candle`, `Gravestone`, `Bat`) | Crumbling Crypt | 54, 1.2-2.2 |
 
 Can't be swapped this way: things that come in every length (the long hedge and corn walls, fence rails, bunting, paths), and anything with words drawn on it by the game (the boards). Characters (the King, minions, the shopkeeper) go in `Custom > Characters` and hats, pets and skins in `Custom > Cosmetics` ([Builder mode](#builder-mode-give-a-character-your-own-look)).
 
@@ -1083,14 +1087,18 @@ them, like the tables above).
 ---
 
 ## Modes and playlists
-A **mode** is a way to play: King Hunt, Pumpkin Hide & Seek or ScareMaze. A **playlist** is one mode on one map ("Hide & Seek: Hedge Maze"). The vote before each round offers playlists, never bare maps. Everything is in `src/shared/Config/Modes.luau`:
-- `VoteChoices`: how many playlists the vote offers (3), picked at random from the ones that fit.
+A **mode** is a way to play: King Hunt, Pumpkin Hide & Seek, ScareMaze, Prop Hunt, Spooky Obby or Crumbling Crypt. A **playlist** is one mode on one map ("Hide & Seek: Hedge Maze"). Players vote for a mode on the [vote pads](#vote-pads-pick-the-game-by-standing-on-it); the map is then one of that mode's playlists, at random. Everything is in `src/shared/Config/Modes.luau`:
+- `Order`: the modes, in the order the vote pads show them (left to right).
+- `VoteChoices`: only with the vote pads off: how many playlists the old on-screen vote offers (3), picked at random from the ones that fit.
 - `List`: one block per mode. `Name` and `Description` are what players see, `MinPlayers` is the fewest ready players it works with, `Feature` is its switch in `Features.luau`.
 - `Playlists`: one block per mode + map pair. `Id` (never rename once live), `Mode`, `Map` (an Id from `Config.Maps.List`), `Name` (the vote button) and an optional `MinPlayers` if that map needs more players.
 - **Take a playlist out of the vote:** delete its block. **Take a whole mode out:** switch it off in `Features.luau` (`HideSeek = false`).
 - **Put a map in another mode:** add a playlist with that `Mode` and `Map`, and add the mode to the `Modes` list in the map's file (`src/shared/Config/Maps/<Id>.luau`). The map needs that mode's tagged parts (see "Maps" below). Or ask Claude Code: `/new-playlist Hide & Seek on the Spooky Mansion`.
 - **Test one mode alone:** in a Studio playtest, F8 > "<mode>: force next round" (works with any number of players), then step on the Ready pad.
 - Each mode's rules have their own file: `Config/HideSeek.luau` (head start, seeker share, giggles, glow, candy gun, coins) and `Config/ScareMaze.luau` (time, stop rule, Haunter share, BOO, scares, coins). King Hunt uses `Config.Round`, `Config.King`, `Config.Monsters` and `Config.Rewards` in `init.luau`.
+- **Prop Hunt** (`src/shared/Config/PropHunt.luau`, map `Config/Maps/HauntedHouse.luau`): `Difficulty.Easy` / `.Hard` (`HeadStart`, `Duration`, `PropChanges`, `GiggleInterval`, `GlowLastSeconds`, `PropPenalty`, `HitTolerance`, `RewardMultiplier`), `FinderRatio`, `FoundBecomeFinders`, `Disguise.Range`, `Taunt.Cooldown`, `Rewards`, `FinderHead` (face and colours), `Cannon.FireCooldown`, `Keys`, `Text`. More or fewer things to become: `Layout.Props` in the map file; a different layout: change its `Seed`. Make anything hideable on any map: tag a Model `PropHuntProp` in Studio. A Model named `PropHuntFinder` in `ReplicatedStorage > Custom > Cosmetics` replaces the finders' pumpkin head.
+- **Spooky Obby** (`src/shared/Config/ObbyRace.luau`): `Difficulty.Easy` / `.Hard` (`TimeLimit`, `SweeperSpeed`, `CoinMultiplier`), `Rewards`, `EndAfterFirstSeconds`, `MinSeconds` (the fastest finish that counts), `BackCooldown`, `Text`. The course itself (every pumpkin, gravestone, coffin, rail and branch) is the `Course` list in `src/shared/Config/Maps/SpookyObby.luau`, one line per piece; `Only = "Easy"` or `"Hard"` keeps a piece on one difficulty. After changing it, run `lune run tests/run -- obbyrace`: it checks every jump can be made.
+- **Crumbling Crypt** (`src/shared/Config/TileFall.luau`, map `Config/Maps/CrumblingCrypt.luau`): `Difficulty.Easy` / `.Hard` (`Layers` up to 3, `TileSize` bigger = easier, `CrumbleSeconds`, `GraceSeconds`, `Duration`, `SuddenDeathAfter`), `EndWhenOneLeft`, `SuddenDeath`, `Rewards`, `Effects` (`ShakeStuds = 0` = no shake), `Text`. The slabs are parts tagged `TileFallTile` (attribute `Layer`, 1 = top): in a baked map you can move, resize or copy them.
 - A brand new mode needs code (`src/server/Modes/<Id>.luau`): ask Claude Code.
 
 ---
@@ -1141,6 +1149,14 @@ Players stand on the Ready pad (the glowing rune circle in front of the spawn) t
 - **A second pad:** select the pad and press Ctrl+D. Any part tagged `ReadyPad` counts, square or round, and a tagged Model counts as its whole box.
 - **Switch it off** (`ReadyPad = false` in `Features.luau`) and everyone in the lobby plays every round, like before v2.
 - If there is no part tagged `ReadyPad` at all, everyone counts as ready (the Output window says so) and the game puts a pad back the next time it starts.
+
+## Vote pads (pick the game by standing on it)
+In front of the Ready circle is a row of round pads, one per game, each with a floating sign (its picture, name and how many players stand on it). There are no vote buttons on the screen any more.
+- **How the vote works:** stand on the pad of the game you want (that also makes you ready). After `ModeSeconds` (15) the game with the most players on its pad wins; a tie is picked at random. A game that needs more ready players than there are says "Needs 2 players" and its votes don't count. If the winner has a difficulty, the same pads turn into **EASY** (left three) and **HARD** (right three) for `DifficultySeconds` (8). The map is picked at random from that game's playlists. Standing on the Ready circle itself makes you ready without voting.
+- **Settings:** `src/shared/Config/VotePads.luau`: the seconds, which pads are EASY / HARD (`DifficultySlots`), each game's colour and picture (`Looks`), the words (`Text`), and the pads' size and gap.
+- **Which games and in what order:** `Config.Modes.Order` in `Modes.luau`, one pad each from the left (a game that is switched off in `Features.luau` gets no pad). More games than pads: raise `Pads`.
+- **Move or copy a pad in Studio:** each pad is a Model `Hub > VotePads > VotePad1`... The part that counts is the one tagged `VotePad` with the attribute `VoteSlot` (1, 2, 3...); move it anywhere. Your saved (Locked) lobby gets the pads added when the game starts. To keep them in the place so you can move them: Play, then in the Explorer copy `Workspace > Hub > VotePads`, press Stop and paste it into `Workspace > Hub`.
+- **Switch it off** (`VotePads = false` in `Features.luau`): the old vote panel on the screen comes back.
 
 ---
 

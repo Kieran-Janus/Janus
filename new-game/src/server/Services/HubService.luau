@@ -272,13 +272,32 @@ local function ensureReadyPad(hub: Instance, notes: { string })
 		return
 	end
 	-- A tagged part or Model (ReadyService uses a Model's bounding box) anywhere in Workspace.
+	-- (The vote pads are Ready pads too, but they don't stand in for the Ready circle.)
 	for _, instance in taggedInGame(Tags.ReadyPad) do
+		if CollectionService:HasTag(instance, Tags.VotePad) then
+			continue
+		end
 		if instance:IsA("BasePart") or instance:IsA("Model") then
 			return
 		end
 	end
 	HubBuilder.RepairSection(hub, "ReadyArea")
 	table.insert(notes, "the Ready pad (tag ReadyPad)")
+end
+
+-- The vote pads came after many lobbies were saved: a saved lobby without them gets them
+-- built in their zone when the game starts (quietly: nothing was lost). Bake.Repair() or
+-- F8 > Rebuild hub keeps them in the place.
+local function ensureVotePads(hub: Instance)
+	if not (Config.Features.VotePads and Config.Features.ReadyPad) then
+		return
+	end
+	for _, instance in taggedInGame(Tags.VotePad) do
+		if instance:IsA("BasePart") then
+			return
+		end
+	end
+	HubBuilder.BuildSection(hub, "VotePads")
 end
 
 --[[
@@ -292,6 +311,10 @@ function HubService.EnsureRequired(hub: Instance): { string }
 		if not ok then
 			warn("[HubService] Couldn't check the hub: " .. tostring(err))
 		end
+	end
+	local padsOk, padsErr = pcall(ensureVotePads, hub)
+	if not padsOk then
+		warn("[HubService] Couldn't add the vote pads: " .. tostring(padsErr))
 	end
 	if #notes > 0 then
 		warn(

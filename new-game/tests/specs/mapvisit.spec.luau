@@ -140,6 +140,12 @@ describe("MapScenery", function()
 		for _, def in Config.Maps.List do
 			local model = rt:require(maps:FindFirstChild(def.Builder)).Build(def)
 			local scenery = model:FindFirstChild("Scenery")
+			if def.Scenery == false then
+				-- (maps floating over a void or a pit, like the Spooky Obby: none on purpose)
+				expect(scenery).toBeNil()
+				model:Destroy()
+				continue
+			end
 			expect(scenery).toBeTruthy()
 			local floor = model:FindFirstChild("Floor")
 			local count = 0

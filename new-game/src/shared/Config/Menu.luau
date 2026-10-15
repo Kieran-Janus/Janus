@@ -84,6 +84,7 @@ return {
 		KeyHint = "Keys: %s opens this menu, %s opens the shop.", -- the two key names
 		NoVote = "Voting starts when enough players stand on the Ready pad.",
 		NoVoteNoPad = "Voting starts when enough players have joined.", -- when the Ready pad is off
+		UsePads = "Vote by standing on a game's pad next to the Ready circle!", -- with vote pads on (Config.VotePads)
 		RoundRunning = "A round is on right now. Voting starts after it ends.",
 	},
 

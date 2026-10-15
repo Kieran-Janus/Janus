@@ -33,7 +33,9 @@ local function world()
 	function w.tagged(tag: string, root: any): { any }
 		local list = {}
 		for _, instance in w.CollectionService:GetTagged(tag) do
-			if instance:IsDescendantOf(root) then
+			-- (ReadyPad = the Ready circle: the vote pads are Ready pads too, see votepads.spec)
+			local votePad = tag == "ReadyPad" and w.CollectionService:HasTag(instance, "VotePad")
+			if instance:IsDescendantOf(root) and not votePad then
 				table.insert(list, instance)
 			end
 		end

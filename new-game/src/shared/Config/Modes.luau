@@ -24,7 +24,7 @@
 
 return {
 	-- Modes, in the order the vote shows them.
-	Order = { "KingHunt", "HideSeek", "ScareMaze" },
+	Order = { "KingHunt", "HideSeek", "ScareMaze", "PropHunt", "ObbyRace", "TileFall" },
 	VoteChoices = 3, -- how many playlists the vote offers (picked at random from the ones that fit)
 	-- Played when every mode is switched off in Config.Features (or a map is broken), so a
 	-- round can still start. A mode that is switched off is never offered otherwise: with too
@@ -55,6 +55,27 @@ return {
 			Description = "Survivors run the maze, Haunters scare them. Don't stand still!",
 			MinPlayers = 2,
 			UsesDifficulty = false,
+		},
+		PropHunt = {
+			Name = "Prop Hunt",
+			Feature = "PropHunt",
+			Description = "Hiders turn into props. Pumpkin-headed finders blast them with pumpkin cannons!",
+			MinPlayers = 2,
+			UsesDifficulty = true,
+		},
+		ObbyRace = {
+			Name = "Spooky Obby",
+			Feature = "ObbyRace",
+			Description = "Race over the spooky obstacle course. Fall? Back to your last checkpoint!",
+			MinPlayers = 1,
+			UsesDifficulty = true,
+		},
+		TileFall = {
+			Name = "Crumbling Crypt",
+			Feature = "TileFall",
+			Description = "The floor crumbles where you step. Keep moving, last one standing wins!",
+			MinPlayers = 1,
+			UsesDifficulty = true,
 		},
 	} :: {
 		[string]: {
@@ -108,6 +129,27 @@ return {
 			Map = "ScareMaze",
 			Name = "ScareMaze",
 			MinPlayers = 2,
+		},
+		{
+			Id = "PropHuntHouse",
+			Mode = "PropHunt",
+			Map = "HauntedHouse",
+			Name = "Prop Hunt: The Haunted House",
+			MinPlayers = 2,
+		},
+		{
+			Id = "ObbyRace",
+			Mode = "ObbyRace",
+			Map = "SpookyObby",
+			Name = "Spooky Obby",
+			MinPlayers = 1,
+		},
+		{
+			Id = "TileFall",
+			Mode = "TileFall",
+			Map = "CrumblingCrypt",
+			Name = "Crumbling Crypt",
+			MinPlayers = 1,
 		},
 	} :: { { Id: string, Mode: string, Map: string, Name: string, MinPlayers: number? } },
 }

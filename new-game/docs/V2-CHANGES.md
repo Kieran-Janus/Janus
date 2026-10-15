@@ -59,14 +59,22 @@ Words used on this page:
 - Everyone else stays in the lobby: shop, crates, parkour, minigames. They can watch the round with **Menu > Spectate** (or the "Watch the round" button).
 - After a round, everyone comes back to the lobby spawn. To play again, step on the pad again.
 
-### Three game modes and six maps
-The vote offers three random **playlists**. A playlist is one mode on one map. Only playlists that fit the number of ready players are offered.
+### Six game modes and nine maps
+Players vote by standing on the **vote pads** (below). The winning mode's map is picked at random from its **playlists**; a playlist is one mode on one map. Three modes were added on 15 October: Prop Hunt, Spooky Obby and Crumbling Crypt (the table after this one).
 
 | Mode | How to play | Maps | Players |
 | --- | --- | --- | --- |
 | **King Hunt** (the original) | Grab pumpkins, stay quiet, don't get caught by the Pumpkin King (redesigned on 8 October: a ribbed pumpkin head with an angry glowing grin, a gold crown with gems, a coat, a red cape and clawed vine hands reaching for you; he walks towards you with long strides. One King only, getting a little faster every 30 seconds. Easy rounds last 3 minutes) | Haunted Pumpkin Patch, Spooky Mansion | 1+ |
 | **Pumpkin Hide & Seek** (new) | Hiders turn into pumpkins and hide among the decoys. Seekers count in a hut, then come out with **candy guns**. A candy that hits a hider tags them, and they join the seekers. Hiders giggle every 20 seconds and glow in the last 30 seconds, so they are fairly easy to find. | Pumpkin Farm, Hedge Maze, Midnight Market (small, new spots every round) | 2+ |
 | **ScareMaze** (new) | Survivors run through a cornfield maze to the green exit. Stand still for 3 seconds and you're OUT. Haunters press **BOO** to scare them. Scarecrows, zombies, bats and ghosts jump out of hidden traps. | ScareMaze | 2+ (Haunters from 3 players) |
+
+**The three new modes (15 October):**
+
+| Mode | How to play | Map | Players |
+| --- | --- | --- | --- |
+| **Prop Hunt** | Hiders turn into any Halloween thing in the Haunted House (a skull, a chair, a cauldron, a jack-o'-lantern...): walk up to it and press **E**, tap **BECOME IT** or tap the thing (gamepad X). **LOCK** (Q / Y) stops the wobble, **TAUNT** (T / L1) giggles for bonus coins. Pumpkin-headed finders count in the Finder Hut, then shoot **Pumpkin Cannons** (click, tap, **FIRE** or right trigger). A hit hider becomes a finder; hitting a real thing makes the finder wait longer. Easy: 40 s head start, 10 prop changes, giggles and a last-45-seconds glow. Hard: 30 s, 4 changes, no hints, double coins. | The Haunted House: six rooms downstairs, an attic and nursery up a ramp, a graveyard, pumpkin patch and dead trees outside, about 185 things to become | 2+ |
+| **Spooky Obby** | An easy race over a floating graveyard course: pumpkin hops, gravestones, a coffin bridge, spinning ghost sweepers, candy cane rails and a haunted tree, to a trophy. Falling, goo or a sweeper only puts you back on your last checkpoint; **Back to checkpoint** (R / Y) helps when stuck. Coins by finishing place, a little per checkpoint for the rest. Easy: bigger platforms, one more checkpoint, slow sweepers, 4 minutes. Hard: goo on the coffins, a second sweeper bar, 3 minutes, coins x1.5. | Spooky Obby | 1+ |
+| **Crumbling Crypt** | Stone slabs over a pit of glowing goo crack where you stand and drop for good. Keep moving: fall through every layer into the goo and you watch as a ghost. Last one standing wins (alone: last until the clock runs out). After a while random slabs crack by themselves. Easy: 3 layers, big slabs, slow crumble, a safe start. Hard: 2 layers, small fast slabs, double coins. | Crumbling Crypt | 1+ |
 
 | King Hunt: Haunted Pumpkin Patch | King Hunt: Spooky Mansion |
 | --- | --- |
@@ -75,6 +83,13 @@ The vote offers three random **playlists**. A playlist is one mode on one map. O
 | ![Pumpkin Farm](screenshots/map-PumpkinFarm.png) | ![Hedge Maze](screenshots/map-HedgeMaze.png) |
 | **ScareMaze** | **ScareMaze, from the ground** |
 | ![ScareMaze](screenshots/map-ScareMaze.png) | ![ScareMaze ground view](screenshots/map-ScareMaze-ground.png) |
+
+### Vote pads instead of the vote panel (15 October)
+- The vote panel on the screen is gone. In front of the Ready circle is a row of six round pads, one per mode, each with a floating sign (picture, name, how many players stand on it). Standing on a pad makes you ready **and** votes for that mode. A mode that needs more ready players says "Needs 2 players" and its votes don't count.
+- After 15 seconds the mode with the most players wins (a tie is picked at random). If it has a difficulty, the same pads turn into **EASY** (left three) and **HARD** (right three) for 8 seconds. A line under the top bar says what to do. The map is picked at random from that mode's maps.
+- The Voting Board still shows the counts, the Menu's Vote tile says where to vote, and the owner's "force next round" still works with any number of players.
+- Your saved (Locked) lobby gets the pads added when the game starts; to move them in Studio, see [`docs/CUSTOMIZE.md` > Vote pads](CUSTOMIZE.md#vote-pads-pick-the-game-by-standing-on-it). Settings: `src/shared/Config/VotePads.luau`. Switch: `VotePads` ([Turn a feature off](#turn-a-feature-off): off = the old vote panel).
+- **Checked in Studio on 15 October** (one player, phone screen 750 x 323 and PC): the pads appeared on the Locked lobby, every sign showed its mode, "Needs 2 players" and "Your vote"; the EASY / HARD step; then a Spooky Obby round (falling off puts you back at the start, a teleport is put back), a Crumbling Crypt round (slabs crack, you drop through all three layers into the goo and are out), and a forced Prop Hunt round (turning into a jack-o'-lantern with E, LOCK; your character hidden). **Fixed:** on a short phone screen the Prop Hunt TAUNT button was off the top of the screen; the owner's forced Prop Hunt never started with one player. Not tried live: Prop Hunt with two real players (the offline tests play whole 4-player rounds), the cannon in a playtest, gamepads.
 
 Fair-play rules that were added after review:
 - A Hide & Seek hider who resets leaves their pumpkin where it was (it can still be tagged) and comes back to it.
@@ -330,6 +345,10 @@ Something broken, or you just don't want it? Open `src/shared/Config/Features.lu
 | King Hunt mode | `KingHunt = true,` |
 | Pumpkin Hide & Seek mode | `HideSeek = true,` |
 | ScareMaze mode | `ScareMaze = true,` |
+| Prop Hunt mode (the Haunted House) | `PropHunt = true,` |
+| Spooky Obby race | `ObbyRace = true,` |
+| Crumbling Crypt (last one standing) | `TileFall = true,` |
+| Vote pads at the Ready area (off = the old on-screen vote panel comes back) | `VotePads = true,` |
 | Parkour course | `Parkour = true,` |
 | Candy Rush | `CandyRush = true,` |
 | Web Scour | `WebScour = true,` |

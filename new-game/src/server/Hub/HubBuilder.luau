@@ -1623,6 +1623,7 @@ end
 ]]
 local SWITCHED_AREAS: { { Feature: string, Section: string, Tags: { string } } } = {
 	{ Feature = "ReadyPad", Section = "ReadyArea", Tags = { Tags.ReadyPad, Tags.ReadySign } },
+	{ Feature = "VotePads", Section = "VotePads", Tags = { Tags.VotePad } },
 	{
 		Feature = "Parkour",
 		Section = "Parkour",

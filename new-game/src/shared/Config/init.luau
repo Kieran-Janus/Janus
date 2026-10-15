@@ -89,6 +89,10 @@ local Config = {
 	ScreenMotion = require(script.ScreenMotion),
 	SkinStudio = require(script.SkinStudio),
 	TextOverrides = require(script.TextOverrides),
+	PropHunt = require(script.PropHunt),
+	ObbyRace = require(script.ObbyRace),
+	TileFall = require(script.TileFall),
+	VotePads = require(script.VotePads),
 
 	Game = {
 		Name = "Pumpkin Panic", -- working title, see docs/DESIGN.md
@@ -296,6 +300,9 @@ local Config = {
 			require(script.Maps.HedgeMaze) :: any, -- Hide & Seek
 			require(script.Maps.MidnightMarket) :: any, -- Hide & Seek (small, shuffled every round)
 			require(script.Maps.ScareMaze) :: any, -- ScareMaze
+			require(script.Maps.HauntedHouse) :: any, -- Prop Hunt
+			require(script.Maps.SpookyObby) :: any, -- Spooky Obby
+			require(script.Maps.CrumblingCrypt) :: any, -- Crumbling Crypt
 		} :: { any }, -- maps differ in shape (each Builder reads its own Layout)
 	},
 
@@ -752,7 +759,7 @@ local Config = {
 		Name = "Spooky Town Square",
 		-- Bump this number (11 -> 12) whenever the hub code or these settings change in a way the
 		-- saved hub should pick up: a saved hub with a lower number is rebuilt on the next start.
-		BuildVersion = 11,
+		BuildVersion = 12,
 		Center = Vector3.new(0, 0, 0), -- top of the baseplate
 		Seed = 31, -- random variation in decorations (change it for a different scatter)
 		Radius = 105, -- cobblestone plaza (room for 32 players)

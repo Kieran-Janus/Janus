@@ -28,6 +28,7 @@ type VoteState = {
 	Maps: { Option },
 	Difficulties: { Option },
 	ReadyOnly: boolean?,
+	Pads: boolean?, -- votes are cast on the vote pads: the board only shows the counts
 }
 
 local VoteBoardUI = {}
@@ -146,9 +147,13 @@ function VoteBoardUI.Mount()
 			b.Size = UDim2.new(1 / #options, -8, 1, 0)
 			b.Parent = frame
 			Theme.round(b, 12)
-			b.Activated:Connect(function()
-				castVote:FireServer(kind, option.Id)
-			end)
+			if current and current.Pads then
+				b.AutoButtonColor = false -- (the vote pads decide: the board only shows counts)
+			else
+				b.Activated:Connect(function()
+					castVote:FireServer(kind, option.Id)
+				end)
+			end
 			local key = kind .. ":" .. option.Id
 			buttons[key] = b
 			counts[key] = option.Votes
@@ -205,7 +210,9 @@ function VoteBoardUI.Mount()
 		text(words.Title, 0, 0.16, Config.Hub.Colors.Orange)
 		if state and state.Open then
 			-- Only Ready players can vote (when the server says so): the others get a hint.
-			if state.ReadyOnly and player:GetAttribute("Ready") ~= true then
+			if state.Pads then
+				text(Config.VotePads.Text.Board, 1, 0.1, Theme.Selected)
+			elseif state.ReadyOnly and player:GetAttribute("Ready") ~= true then
 				text(Config.Lobby.Ready.Text.VoteHint, 1, 0.1, Theme.Selected)
 			else
 				text(words.Pick, 1, 0.1, Theme.Muted)

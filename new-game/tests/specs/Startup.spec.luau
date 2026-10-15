@@ -112,6 +112,10 @@ describe("Main.client.luau", function()
 		EasterEggUI = "EasterEggs",
 		HideSeekUI = "HideSeek",
 		ScareMazeUI = "ScareMaze",
+		PropHuntUI = "PropHunt",
+		ObbyRaceUI = "ObbyRace",
+		TileFallUI = "TileFall",
+		VotePadsUI = "VotePads",
 	}
 	for name, feature in stubs do
 		it(("mounts %s with %s off and on"):format(name, feature), function()

@@ -62,7 +62,14 @@ function MenuTiles.Mount(_gui: ScreenGui)
 		Order = 4,
 		KeepOpen = true,
 		OnClick = function()
-			if VoteUI.Open() then
+			if Config.Features.VotePads and Config.Features.ReadyPad then
+				-- (votes are cast by standing on a pad: there is nothing to open)
+				MenuUI.ShowMessage(
+					if stateIsOneOf(Config.Menu.RoundStates)
+						then text.RoundRunning
+						else text.UsePads
+				)
+			elseif VoteUI.Open() then
 				MenuUI.Close()
 			elseif stateIsOneOf(Config.Menu.RoundStates) then
 				MenuUI.ShowMessage(text.RoundRunning)
