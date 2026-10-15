@@ -33,8 +33,9 @@ Jump to: [Pumpkin Tools](#pumpkin-tools-click-anything-to-change-its-look-or-its
 | Intermission, results time (and the default round length) | `Config.Round` |
 | Results screen timings, text, colours, motion (row pops, shine, "You got X coins!"; `Animate = false` = no motion) | `Config.Results` |
 | 3-2-1 countdown, "GO!", "RUN!", heartbeat warning, +1 pop-ups, last-30-seconds, survivors-left (`Animate = false` = no motion) | `Config.Juice` |
-| Vote pads: seconds, EASY / HARD pads, each game's colour and picture, the words | `Config.VotePads` (`src/shared/Config/VotePads.luau`) |
-| Vote panel text and motion (only with vote pads off; cards popping in, count ticks, winner pop; `Animate = false` = no motion) | `Config.Voting` |
+| The vote (stand on the Ready pad): seconds, one card per game, cards per row | `Config.Voting` (`ByMode`, `MaxPerRow`, `Seconds`) |
+| The optional vote pads (off): seconds, EASY / HARD pads, each game's colour and picture | `Config.VotePads` (`src/shared/Config/VotePads.luau`) |
+| Vote panel text and motion (cards popping in, count ticks, winner pop; `Animate = false` = no motion) | `Config.Voting` |
 | Coins per pumpkin, survivor bonus | `Config.Rewards` |
 | Easy/Hard pumpkins, reward multiplier | `Config.Difficulty.Levels` |
 | King speed, hearing, sight | `Config.King.Difficulty` (always one King); how much faster he gets: `Config.King.SpeedUp` |
@@ -1087,9 +1088,9 @@ them, like the tables above).
 ---
 
 ## Modes and playlists
-A **mode** is a way to play: King Hunt, Pumpkin Hide & Seek, ScareMaze, Prop Hunt, Spooky Obby or Crumbling Crypt. A **playlist** is one mode on one map ("Hide & Seek: Hedge Maze"). Players vote for a mode on the [vote pads](#vote-pads-pick-the-game-by-standing-on-it); the map is then one of that mode's playlists, at random. Everything is in `src/shared/Config/Modes.luau`:
+A **mode** is a way to play: King Hunt, Pumpkin Hide & Seek, ScareMaze, Prop Hunt, Spooky Obby or Crumbling Crypt. A **playlist** is one mode on one map ("Hide & Seek: Hedge Maze"). Players on the Ready pad [vote for a mode](#voting-stand-on-the-ready-pad-and-pick-a-game); the map is then one of that mode's playlists, at random. Everything is in `src/shared/Config/Modes.luau`:
 - `Order`: the modes, in the order the vote pads show them (left to right).
-- `VoteChoices`: only with the vote pads off: how many playlists the old on-screen vote offers (3), picked at random from the ones that fit.
+- `VoteChoices`: only with `Config.Voting.ByMode = false`: how many playlists the vote offers (3), picked at random from the ones that fit.
 - `List`: one block per mode. `Name` and `Description` are what players see, `MinPlayers` is the fewest ready players it works with, `Feature` is its switch in `Features.luau`.
 - `Playlists`: one block per mode + map pair. `Id` (never rename once live), `Mode`, `Map` (an Id from `Config.Maps.List`), `Name` (the vote button) and an optional `MinPlayers` if that map needs more players.
 - **Take a playlist out of the vote:** delete its block. **Take a whole mode out:** switch it off in `Features.luau` (`HideSeek = false`).
@@ -1150,13 +1151,11 @@ Players stand on the Ready pad (the glowing rune circle in front of the spawn) t
 - **Switch it off** (`ReadyPad = false` in `Features.luau`) and everyone in the lobby plays every round, like before v2.
 - If there is no part tagged `ReadyPad` at all, everyone counts as ready (the Output window says so) and the game puts a pad back the next time it starts.
 
-## Vote pads (pick the game by standing on it)
-In front of the Ready circle is a row of round pads, one per game, each with a floating sign (its picture, name and how many players stand on it). There are no vote buttons on the screen any more.
-- **How the vote works:** stand on the pad of the game you want (that also makes you ready). After `ModeSeconds` (15) the game with the most players on its pad wins; a tie is picked at random. A game that needs more ready players than there are says "Needs 2 players" and its votes don't count. If the winner has a difficulty, the same pads turn into **EASY** (left three) and **HARD** (right three) for `DifficultySeconds` (8). The map is picked at random from that game's playlists. Standing on the Ready circle itself makes you ready without voting.
-- **Settings:** `src/shared/Config/VotePads.luau`: the seconds, which pads are EASY / HARD (`DifficultySlots`), each game's colour and picture (`Looks`), the words (`Text`), and the pads' size and gap.
-- **Which games and in what order:** `Config.Modes.Order` in `Modes.luau`, one pad each from the left (a game that is switched off in `Features.luau` gets no pad). More games than pads: raise `Pads`.
-- **Move or copy a pad in Studio:** each pad is a Model `Hub > VotePads > VotePad1`... The part that counts is the one tagged `VotePad` with the attribute `VoteSlot` (1, 2, 3...); move it anywhere. Your saved (Locked) lobby gets the pads added when the game starts. To keep them in the place so you can move them: Play, then in the Explorer copy `Workspace > Hub > VotePads`, press Stop and paste it into `Workspace > Hub`.
-- **Switch it off** (`VotePads = false` in `Features.luau`): the old vote panel on the screen comes back.
+## Voting: stand on the Ready pad and pick a game
+Stand on the Ready pad (the glowing circle in front of the spawn) and the vote comes up on your screen: one card per game that fits the number of ready players (two lines of up to `MaxPerRow` = 3), and **Easy / Hard** underneath. Players who aren't on the pad only see "Stand on the Ready pad to vote". The game with the most votes wins (a tie is picked at random) and its map is picked at random from that game's playlists.
+- **Settings:** `Config.Voting` in `src/shared/Config/init.luau`: `Seconds` (how long the vote lasts), `ByMode = true` (one card per game; `false` = the older vote with three random "game on a map" playlists), `MaxPerRow`, `Text` (the headings) and `Motion`. The words players see on the pad and the panel's hint: `Config.Lobby.Ready.Text`.
+- **Which games and in what order:** `Config.Modes.Order` in `Modes.luau` (a game switched off in `Features.luau` isn't offered).
+- **Vote pads instead (switched off):** `VotePads = true` in `Features.luau` builds a row of six pads in front of the Ready circle, one per game, each with a floating sign; standing on one votes for it, then the pads turn into EASY and HARD. Their settings are in `src/shared/Config/VotePads.luau` (seconds, `DifficultySlots`, each game's colour and picture in `Looks`, `Text`, size and gap). A saved (Locked) lobby gets them added when the game starts.
 
 ---
 

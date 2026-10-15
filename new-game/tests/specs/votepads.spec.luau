@@ -1,4 +1,4 @@
--- The vote pads (Config.VotePads, Features.VotePads): the lobby section that builds them, the
+-- The vote pads (Config.VotePads, Features.VotePads, off in the game but kept as an option): the lobby section that builds them, the
 -- pad vote on the real server (game, then difficulty, by standing on pads; games that need more
 -- players; the on-screen vote buttons ignored) and the floating signs' words on the client.
 
@@ -10,6 +10,7 @@ local describe, it, expect = T.describe, T.it, T.expect
 describe("The vote pads section", function()
 	local rt = Runtime.new()
 	local Config = rt:require("ReplicatedStorage.Shared.Config")
+	Config.Features.VotePads = true -- (switched off in the game: these tests switch it on)
 	local Lobby = rt:require("ReplicatedStorage.Shared.Lobby")
 	local HubBuilder = rt:require("ServerScriptService.Server.Hub.HubBuilder")
 	local CS = rt.game:GetService("CollectionService")
@@ -84,6 +85,7 @@ end)
 describe("Voting on the pads (the real server)", function()
 	local server = Runtime.new()
 	local Config = server:require("ReplicatedStorage.Shared.Config")
+	Config.Features.VotePads = true
 	local RS = server.game:GetService("ReplicatedStorage")
 	local CS = server.game:GetService("CollectionService")
 	local Vector3 = server.env.Vector3

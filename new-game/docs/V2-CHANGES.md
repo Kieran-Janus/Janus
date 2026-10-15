@@ -60,7 +60,7 @@ Words used on this page:
 - After a round, everyone comes back to the lobby spawn. To play again, step on the pad again.
 
 ### Six game modes and nine maps
-Players vote by standing on the **vote pads** (below). The winning mode's map is picked at random from its **playlists**; a playlist is one mode on one map. Three modes were added on 15 October: Prop Hunt, Spooky Obby and Crumbling Crypt (the table after this one).
+Players on the Ready pad vote for a **game** (below). The winning mode's map is picked at random from its **playlists**; a playlist is one mode on one map. Three modes were added on 15 October: Prop Hunt, Spooky Obby and Crumbling Crypt (the table after this one).
 
 | Mode | How to play | Maps | Players |
 | --- | --- | --- | --- |
@@ -84,12 +84,11 @@ Players vote by standing on the **vote pads** (below). The winning mode's map is
 | **ScareMaze** | **ScareMaze, from the ground** |
 | ![ScareMaze](screenshots/map-ScareMaze.png) | ![ScareMaze ground view](screenshots/map-ScareMaze-ground.png) |
 
-### Vote pads instead of the vote panel (15 October)
-- The vote panel on the screen is gone. In front of the Ready circle is a row of six round pads, one per mode, each with a floating sign (picture, name, how many players stand on it). Standing on a pad makes you ready **and** votes for that mode. A mode that needs more ready players says "Needs 2 players" and its votes don't count.
-- After 15 seconds the mode with the most players wins (a tie is picked at random). If it has a difficulty, the same pads turn into **EASY** (left three) and **HARD** (right three) for 8 seconds. A line under the top bar says what to do. The map is picked at random from that mode's maps.
-- The Voting Board still shows the counts, the Menu's Vote tile says where to vote, and the owner's "force next round" still works with any number of players.
-- Your saved (Locked) lobby gets the pads added when the game starts; to move them in Studio, see [`docs/CUSTOMIZE.md` > Vote pads](CUSTOMIZE.md#vote-pads-pick-the-game-by-standing-on-it). Settings: `src/shared/Config/VotePads.luau`. Switch: `VotePads` ([Turn a feature off](#turn-a-feature-off): off = the old vote panel).
-- **Checked in Studio on 15 October** (one player, phone screen 750 x 323 and PC): the pads appeared on the Locked lobby, every sign showed its mode, "Needs 2 players" and "Your vote"; the EASY / HARD step; then a Spooky Obby round (falling off puts you back at the start, a teleport is put back), a Crumbling Crypt round (slabs crack, you drop through all three layers into the goo and are out), and a forced Prop Hunt round (turning into a jack-o'-lantern with E, LOCK; your character hidden). **Fixed:** on a short phone screen the Prop Hunt TAUNT button was off the top of the screen; the owner's forced Prop Hunt never started with one player. Not tried live: Prop Hunt with two real players (the offline tests play whole 4-player rounds), the cannon in a playtest, gamepads.
+### Voting: stand on the Ready pad, pick a game (15 October)
+- Stand on the Ready pad and the vote comes up on your screen: **one card per game** that fits the number of ready players (up to two lines of three), and **Easy / Hard** underneath. Players not on the pad only see "Stand on the Ready pad to vote". There are no map choices any more: the map is picked at random from the winning game's maps.
+- The game with the most votes wins (a tie is picked at random). The Voting Board shows the same choices. Settings: `Config.Voting` (`ByMode`, `MaxPerRow`, `Seconds`); see [`docs/CUSTOMIZE.md` > Voting](CUSTOMIZE.md#voting-stand-on-the-ready-pad-and-pick-a-game).
+- Tried first and kept as a switch: a row of six **vote pads**, one per game (`VotePads = true` in `Features.luau`, settings in `Config/VotePads.luau`). You asked for one pad with the choices on the screen instead, so they're off.
+- **Checked in Studio on 15 October** (one player, phone screen 750 x 323 and PC): voting on the pads, then a Spooky Obby round (falling off puts you back at the start, a teleport is put back), a Crumbling Crypt round (slabs crack, you drop through all three layers into the goo and are out), and a forced Prop Hunt round (turning into a jack-o'-lantern with E, LOCK; your character hidden). **Fixed:** on a short phone screen the Prop Hunt TAUNT button was off the top of the screen; the owner's forced Prop Hunt never started with one player. Not tried live: Prop Hunt with two real players (the offline tests play whole 4-player rounds), the cannon in a playtest, gamepads.
 
 Fair-play rules that were added after review:
 - A Hide & Seek hider who resets leaves their pumpkin where it was (it can still be tagged) and comes back to it.
@@ -348,7 +347,7 @@ Something broken, or you just don't want it? Open `src/shared/Config/Features.lu
 | Prop Hunt mode (the Haunted House) | `PropHunt = true,` |
 | Spooky Obby race | `ObbyRace = true,` |
 | Crumbling Crypt (last one standing) | `TileFall = true,` |
-| Vote pads at the Ready area (off = the old on-screen vote panel comes back) | `VotePads = true,` |
+| A row of vote pads, one per game (already off: stand on the Ready pad and the vote panel comes up; `true` brings the pads back) | `VotePads = false,` |
 | Parkour course | `Parkour = true,` |
 | Candy Rush | `CandyRush = true,` |
 | Web Scour | `WebScour = true,` |

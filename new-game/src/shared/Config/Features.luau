@@ -20,7 +20,7 @@ return {
 	PropHunt = true, -- Prop Hunt: hiders turn into props in the Haunted House, pumpkin-headed finders cannon them
 	ObbyRace = true, -- Spooky Obby: an easy race over a Halloween obstacle course
 	TileFall = true, -- Crumbling Crypt: tiles crumble under your feet, the last one standing wins
-	VotePads = true, -- vote by standing on a pad at the Ready area (game, then difficulty); off = the old on-screen vote
+	VotePads = false, -- a row of vote pads (stand on a game's pad to vote); off = stand on the Ready pad and the vote panel comes up
 	Parkour = true, -- the parkour course in the lobby
 	CandyRush = true, -- lobby minigame: click your candies, first to clear them all wins
 	WebScour = true, -- lobby minigame: a quick scavenger hunt in the spider webs

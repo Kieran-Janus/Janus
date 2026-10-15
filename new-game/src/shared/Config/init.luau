@@ -245,6 +245,11 @@ local Config = {
 	-- playlist (a mode on a map, Config.Modes.Playlists) and, for King Hunt, the difficulty.
 	Voting = {
 		Seconds = 20,
+		-- true = the vote shows one card per game (every mode that fits the ready players, in
+		-- Config.Modes.Order) and the map is picked at random from the winner's playlists;
+		-- false = it offers Config.Modes.VoteChoices random playlists (a mode on a map)
+		ByMode = true,
+		MaxPerRow = 3, -- game cards per row on the vote panel (more games = a second row)
 		-- How many choices the vote offers: Config.Modes.VoteChoices (Config/Modes.luau).
 		MinSecondsBetweenVotes = 0.5, -- per-player spam guard on the vote remote
 		-- The vote panel (src/client/VoteUI.luau).

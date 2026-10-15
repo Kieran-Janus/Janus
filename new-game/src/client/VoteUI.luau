@@ -53,6 +53,7 @@ local PADDING = 8
 local WIDTH = 560
 local MIN_WIDTH = 340
 local NARROW = 500 -- narrower than this uses TALL_ROW_HEIGHT
+local ROW_GAP = 6 -- between two lines of game cards (Config.Voting.MaxPerRow)
 local BUTTON_TEXT = 17
 
 local votePanel: Frame? = nil
@@ -108,7 +109,9 @@ function VoteUI.Mount(gui: ScreenGui)
 	hint.TextColor3 = Theme.Selected
 	hint.Visible = false
 
-	local function section(title: string, order: number): (TextLabel, Frame)
+	-- A heading and the row of cards under it. `grid` = the cards are placed by `build` in
+	-- lines of Config.Voting.MaxPerRow (the games); otherwise they sit side by side.
+	local function section(title: string, order: number, grid: boolean): (TextLabel, Frame)
 		local heading = Theme.label(title, 18, panel)
 		heading.LayoutOrder = order
 		heading.Size = UDim2.new(1, 0, 0, HEADING_HEIGHT)
@@ -118,16 +121,32 @@ function VoteUI.Mount(gui: ScreenGui)
 		row.LayoutOrder = order + 1
 		row.Size = UDim2.new(1, -24, 0, ROW_HEIGHT)
 		row.Parent = panel
-		local rowLayout = Instance.new("UIListLayout")
-		rowLayout.FillDirection = Enum.FillDirection.Horizontal
-		rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-		rowLayout.Padding = UDim.new(0, 8)
-		rowLayout.Parent = row
+		if not grid then
+			local rowLayout = Instance.new("UIListLayout")
+			rowLayout.FillDirection = Enum.FillDirection.Horizontal
+			rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			rowLayout.Padding = UDim.new(0, 8)
+			rowLayout.Parent = row
+		end
 		return heading, row
 	end
 
-	local mapHeading, mapRow = section(cfg.Text.Heading, 1)
-	local difficultyHeading, difficultyRow = section(cfg.Text.Difficulty, 3)
+	local mapHeading, mapRow = section(cfg.Text.Heading, 1, true)
+	local difficultyHeading, difficultyRow = section(cfg.Text.Difficulty, 3, false)
+
+	-- Where card `i` of `count` goes in the game grid: lines of MaxPerRow, the last line centred.
+	local function gridPlace(button: TextButton, i: number, count: number)
+		local perRow = math.max(1, math.min(cfg.MaxPerRow, count))
+		local lines = math.ceil(count / perRow)
+		local line = math.floor((i - 1) / perRow)
+		local column = (i - 1) % perRow
+		local inLine = math.min(perRow, count - line * perRow)
+		local shift = (perRow - inLine) / (2 * perRow) -- centres a shorter last line
+		button.Size =
+			UDim2.new(1 / perRow, -8, 1 / lines, -math.ceil(ROW_GAP * (lines - 1) / lines))
+		button.Position =
+			UDim2.new(column / perRow + shift, 4, line / lines, math.floor(line * ROW_GAP / lines))
+	end
 
 	-- The seconds left, small and quiet at the right of the heading (the real timer only).
 	local timer = Theme.label("", 16, mapHeading)
@@ -239,7 +258,11 @@ function VoteUI.Mount(gui: ScreenGui)
 		for i, option in options do
 			local button = Instance.new("TextButton")
 			button.Name = "Card_" .. option.Id
-			button.Size = UDim2.new(1 / #options, -8, 1, 0)
+			if kind == "Map" then
+				gridPlace(button, i, #options)
+			else
+				button.Size = UDim2.new(1 / #options, -8, 1, 0)
+			end
 			button.BackgroundColor3 = Theme.Button
 			button.Font = Theme.Font
 			button.TextSize = BUTTON_TEXT
@@ -335,11 +358,15 @@ function VoteUI.Mount(gui: ScreenGui)
 			return
 		end
 		local enabled = canVote()
-		-- Phones: someone who can't vote yet only sees the hint.
-		local hintOnly = not enabled and Layout.IsPhone()
+		-- Someone who can't vote yet (not on the Ready pad) only sees the hint: the choices
+		-- come up once they stand on the pad.
+		local hintOnly = not enabled
 		local hasDifficulty = #state.Difficulties > 0 and not hintOnly
 		local width = placePanel()
-		local mapHeight = if width < NARROW then TALL_ROW_HEIGHT else ROW_HEIGHT
+		local lines = math.ceil(#state.Maps / math.max(1, cfg.MaxPerRow))
+		local mapHeight = (if width < NARROW then TALL_ROW_HEIGHT else ROW_HEIGHT)
+				* math.max(lines, 1)
+			+ ROW_GAP * math.max(lines - 1, 0)
 		hint.Visible = not enabled
 		mapHeading.Visible = not hintOnly
 		mapRow.Visible = not hintOnly

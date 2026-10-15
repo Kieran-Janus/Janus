@@ -8,7 +8,11 @@
 	With Config.Lobby.Ready.VoteOnlyReady, only players on the Ready pad can vote (and only
 	their votes count); everyone else sees the vote greyed out.
 
-	Vote pads (Config.VotePads, switch Config.Features.VotePads): when the lobby has parts
+	By game (Config.Voting.ByMode, on): instead of playlists the options are the games (one per
+	mode in Config.Modes.Order that fits the ready players; Option.Id = the mode id) and the
+	map is picked at random from the winner's playlists after the vote.
+
+	Vote pads (Config.VotePads, switch Config.Features.VotePads, off): when the lobby has parts
 	tagged VotePad, players vote by standing on them instead: first the game (one pad per mode
 	in Config.Modes.Order; a game needing more ready players than there are says so on its pad
 	and gets no votes), then, if the winner uses difficulty, EASY or HARD on the same pads. The
@@ -186,6 +190,24 @@ function VotingService.Close()
 	end
 end
 
+-- The games on offer from `candidates` (playlists), in Config.Modes.Order, and the fewest
+-- ready players each needs.
+local function offeredModes(candidates: { Playlists.Playlist }): ({ string }, { [string]: number })
+	local modes: { string } = {}
+	local needs: { [string]: number } = {}
+	for _, id in Config.Modes.Order do
+		for _, playlist in candidates do
+			if playlist.Mode == id then
+				needs[id] = math.min(needs[id] or math.huge, Playlists.MinPlayers(playlist))
+				if not table.find(modes, id) then
+					table.insert(modes, id)
+				end
+			end
+		end
+	end
+	return modes, needs
+end
+
 --[[
 	Runs one vote. Yields for Config.Voting.Seconds (publishing the countdown through
 	options.SetState) and returns the winning playlist id and difficulty id (the difficulty is
@@ -196,20 +218,40 @@ function VotingService.Run(options: RunOptions): (string?, string?)
 	if VotingService.PadsActive() then
 		return runPads(options)
 	end
+	local byMode = Config.Voting.ByMode == true
 	local offered: { Playlists.Playlist } = if options.Forced
 		then { options.Forced }
+		elseif byMode then Playlists.Available(ReadyService.Count())
 		else Playlists.Offer(ReadyService.Count(), Config.Modes.VoteChoices)
+	if #offered == 0 and not options.Forced then
+		-- Every mode is off: Playlists.Offer plays the fallback.
+		offered = Playlists.Offer(ReadyService.Count(), Config.Modes.VoteChoices)
+	end
 	if #offered == 0 then
 		return nil, nil -- too few ready players for every switched-on mode: no vote
 	end
 	mapOptions = {}
 	local usesDifficulty = false
-	for _, playlist in offered do
-		table.insert(
-			mapOptions,
-			{ Id = playlist.Id, Name = playlist.Name, Votes = 0, Mode = playlist.Mode }
-		)
-		usesDifficulty = usesDifficulty or Playlists.UsesDifficulty(playlist)
+	if byMode then
+		-- One card per game (Config.Modes.Order) that fits the ready players; the map is
+		-- picked at random from the winner's playlists after the vote.
+		local modes = offeredModes(offered)
+		for _, id in modes do
+			table.insert(
+				mapOptions,
+				{ Id = id, Name = Playlists.ModeName(id), Votes = 0, Mode = id }
+			)
+			local def = Config.Modes.List[id]
+			usesDifficulty = usesDifficulty or (def ~= nil and def.UsesDifficulty)
+		end
+	else
+		for _, playlist in offered do
+			table.insert(
+				mapOptions,
+				{ Id = playlist.Id, Name = playlist.Name, Votes = 0, Mode = playlist.Mode }
+			)
+			usesDifficulty = usesDifficulty or Playlists.UsesDifficulty(playlist)
+		end
 	end
 	difficultyOptions = {}
 	if usesDifficulty then
@@ -254,7 +296,19 @@ function VotingService.Run(options: RunOptions): (string?, string?)
 	if anyDifficultyVotes then
 		difficulty = winner(difficultyOptions)
 	end
-	return winner(mapOptions), difficulty
+	local won = winner(mapOptions)
+	if not byMode then
+		return won, difficulty
+	end
+	-- A game won: one of its maps (playlists) that fits, at random.
+	local maps: { Playlists.Playlist } = {}
+	for _, playlist in offered do
+		if playlist.Mode == won then
+			table.insert(maps, playlist)
+		end
+	end
+	local chosen = if #maps > 0 then maps[math.random(1, #maps)] else Playlists.Fallback()
+	return chosen.Id, difficulty
 end
 
 -- Vote pads (Config.VotePads) -------------------------------------------------------------
@@ -344,24 +398,6 @@ local function dressPad(pad: VotePad, option: Option?, look: string, needs: numb
 	if rim and rim:IsA("BasePart") then
 		rim.Color = style.Color
 	end
-end
-
--- The games on offer from `candidates` (playlists), in Config.Modes.Order, and the fewest
--- ready players each needs.
-local function offeredModes(candidates: { Playlists.Playlist }): ({ string }, { [string]: number })
-	local modes: { string } = {}
-	local needs: { [string]: number } = {}
-	for _, id in Config.Modes.Order do
-		for _, playlist in candidates do
-			if playlist.Mode == id then
-				needs[id] = math.min(needs[id] or math.huge, Playlists.MinPlayers(playlist))
-				if not table.find(modes, id) then
-					table.insert(modes, id)
-				end
-			end
-		end
-	end
-	return modes, needs
 end
 
 -- Between votes every pad shows its game (no counts), so players can see what's on offer.
