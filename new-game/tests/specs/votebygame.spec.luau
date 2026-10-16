@@ -85,6 +85,30 @@ describe("The vote panel by game", function()
 		expect(#c.rt.errors).toBe(0)
 	end)
 
+	it("greys out a game that needs more players: no vote, and it says why", function()
+		local c = client()
+		c.player:SetAttribute("Ready", true)
+		local s = state(c.Config, 6)
+		s.Maps[4].Needs = 2 -- Prop Hunt
+		c.rt:fire(c.remotes.VoteUpdate, "OnClientEvent", s)
+		c.rt:advance(1)
+		local card = c.gui.Vote:FindFirstChild("Card_PropHunt", true)
+		expect(card.Text).toBe(
+			c.Config.Modes.List.PropHunt.Name .. "\n" .. c.Config.Voting.Text.NeedsPlayers:format(2)
+		)
+		expect(card.Active).toBe(false)
+		c.rt:fire(card, "Activated")
+		for _, call in c.rt:calls("RemoteEvent", "FireServer") do
+			expect(call.instance.Name).never.toBe("CastVote")
+		end
+		-- A second player steps on the pad: it unlocks.
+		local open = state(c.Config, 6)
+		c.rt:fire(c.remotes.VoteUpdate, "OnClientEvent", open)
+		c.rt:advance(0.5)
+		expect(card.Text).toBe(c.Config.Modes.List.PropHunt.Name .. "\n0 votes")
+		expect(card.Active).toBe(true)
+	end)
+
 	it("centres a shorter last line", function()
 		local c = client()
 		c.player:SetAttribute("Ready", true)
@@ -134,13 +158,26 @@ describe("A vote by game on the real server", function()
 				captured = call.args[1]
 			end
 		end
-		-- One card per game a single player can play (Prop Hunt, Hide & Seek and ScareMaze
-		-- need 2), in Config.Modes.Order.
-		local ids = {}
+		-- One card per game in Config.Modes.Order, every one of them: the ones a single player
+		-- can't play (Prop Hunt, Hide & Seek, ScareMaze need 2) are locked, "Needs 2 players".
+		local ids, locked = {}, {}
 		for _, option in captured.Maps do
 			table.insert(ids, option.Id)
+			if option.Needs then
+				expect(option.Needs).toBe(2)
+				table.insert(locked, option.Id)
+			end
 		end
-		expect(table.concat(ids, ",")).toBe("KingHunt,ObbyRace,TileFall")
+		expect(table.concat(ids, ",")).toBe(table.concat(Config.Modes.Order, ","))
+		expect(table.concat(locked, ",")).toBe("HideSeek,ScareMaze,PropHunt")
+		-- A vote for a locked game doesn't count.
+		server:fireServer(
+			server:find("ReplicatedStorage.Remotes.CastVote"),
+			solo,
+			"Map",
+			"PropHunt"
+		)
+		server:advance(1.2)
 		expect(#captured.Difficulties).toBe(#Config.Difficulty.Order)
 		local cast = server:find("ReplicatedStorage.Remotes.CastVote")
 		server:fireServer(cast, solo, "Map", "TileFall")

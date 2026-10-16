@@ -23,7 +23,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Layout = require(script.Parent.Layout)
 local Theme = require(script.Parent.Theme)
 
-type Option = { Id: string, Name: string, Votes: number, Mode: string? }
+type Option = { Id: string, Name: string, Votes: number, Mode: string?, Needs: number? }
 type VoteState = {
 	Open: boolean,
 	Maps: { Option },
@@ -67,7 +67,11 @@ function VoteUI.Open(): boolean
 	return false
 end
 
+-- A card's words: the name and the votes, or "Needs 2 players" for a game that needs more.
 local function cardText(option: Option, votes: number): string
+	if option.Needs then
+		return ("%s\n%s"):format(option.Name, Config.Voting.Text.NeedsPlayers:format(option.Needs))
+	end
 	return ("%s\n%d vote%s"):format(option.Name, votes, if votes == 1 then "" else "s")
 end
 
@@ -295,7 +299,7 @@ function VoteUI.Mount(gui: ScreenGui)
 			}
 			table.insert(list, card)
 			button.Activated:Connect(function()
-				if not canVote() or not voteOpen then
+				if not canVote() or not voteOpen or card.Option.Needs then
 					return
 				end
 				-- The vote goes first; the bounce is only for show.
@@ -335,16 +339,26 @@ function VoteUI.Mount(gui: ScreenGui)
 			build(row, kind, options)
 		else
 			for i, card in cards[kind] do
+				local wasLocked = card.Option.Needs
 				card.Option = options[i]
-				countTo(card, options[i].Votes)
+				if options[i].Needs or wasLocked then
+					-- (locked or just unlocked: "Needs 2 players" <-> the votes, at once)
+					card.Shown = options[i].Votes
+					card.Target = options[i].Votes
+					card.Button.Text = cardText(options[i], options[i].Votes)
+				else
+					countTo(card, options[i].Votes)
+				end
 			end
 		end
 		for _, card in cards[kind] do
 			local button = card.Button
-			button.TextColor3 = if enabled then Theme.Text else Theme.Muted
-			button.BackgroundTransparency = if enabled then 0 else 0.4
-			button.AutoButtonColor = enabled
-			button.Active = enabled
+			-- A game needing more ready players is greyed out and can't be picked.
+			local on = enabled and not card.Option.Needs
+			button.TextColor3 = if on then Theme.Text else Theme.Muted
+			button.BackgroundTransparency = if on then 0 else 0.4
+			button.AutoButtonColor = on
+			button.Active = on
 		end
 		paint(kind)
 	end

@@ -38,7 +38,9 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local Tags = require(ReplicatedStorage.Shared.Tags)
 local ReadyService = require(script.Parent.ReadyService)
 
-export type Option = { Id: string, Name: string, Votes: number, Mode: string? }
+-- Needs: (games, Config.Voting.ByMode) more ready players than there are now: shown greyed
+-- out with "Needs N players", and votes for it don't count.
+export type Option = { Id: string, Name: string, Votes: number, Mode: string?, Needs: number? }
 export type VoteState = {
 	Open: boolean,
 	Maps: { Option }, -- playlists
@@ -63,6 +65,8 @@ local difficultyOptions: { Option } = {}
 local choices: { [Player]: { Map: string?, Difficulty: string? } } = {}
 local lastVote: { [Player]: number } = {}
 local lastSent = ""
+-- The fewest ready players each game on offer needs (the vote by game; empty otherwise).
+local gameNeeds: { [string]: number } = {}
 -- Studs past a vote pad's edge that still count as on it (small: the pads stand close together).
 local PAD_MARGIN = 0.3
 -- The pad vote (below), used by Run when Config.VotePads is on.
@@ -94,7 +98,7 @@ local function signature(): string
 	local parts = { tostring(open), tostring(readyOnly()) }
 	for _, list in { mapOptions, difficultyOptions } do
 		for _, option in list do
-			table.insert(parts, option.Id .. "=" .. option.Votes)
+			table.insert(parts, option.Id .. "=" .. option.Votes .. "/" .. tostring(option.Needs))
 		end
 	end
 	return table.concat(parts, ",")
@@ -107,12 +111,18 @@ local function recount(force: boolean?)
 			option.Votes = 0
 		end
 	end
+	-- Games needing more ready players than there are right now are locked (greyed out).
+	local readyCount = ReadyService.Count()
+	for _, option in mapOptions do
+		local need = gameNeeds[option.Id]
+		option.Needs = if need and need > readyCount then need else nil
+	end
 	for player, choice in choices do
 		if not canVote(player) then
 			continue
 		end
 		for _, option in mapOptions do
-			if option.Id == choice.Map then
+			if option.Id == choice.Map and not option.Needs then
 				option.Votes += 1
 			end
 		end
@@ -170,7 +180,13 @@ local function onCastVote(player: Player, kind: unknown, choice: unknown)
 	end
 
 	local entry = choices[player] or {}
-	if kind == "Map" and hasOption(mapOptions, choice) then
+	local locked = false
+	for _, option in mapOptions do
+		if option.Id == choice and option.Needs then
+			locked = true -- (a game needing more players: greyed out, no vote)
+		end
+	end
+	if kind == "Map" and hasOption(mapOptions, choice) and not locked then
 		entry.Map = choice
 	elseif kind == "Difficulty" and hasOption(difficultyOptions, choice) then
 		entry.Difficulty = choice
@@ -231,11 +247,17 @@ function VotingService.Run(options: RunOptions): (string?, string?)
 		return nil, nil -- too few ready players for every switched-on mode: no vote
 	end
 	mapOptions = {}
+	gameNeeds = {}
 	local usesDifficulty = false
 	if byMode then
-		-- One card per game (Config.Modes.Order) that fits the ready players; the map is
-		-- picked at random from the winner's playlists after the vote.
-		local modes = offeredModes(offered)
+		-- One card per switched-on game (Config.Modes.Order); games needing more ready players
+		-- show greyed out ("Needs 2 players") so everyone sees every game. The map is picked
+		-- at random from the winner's playlists after the vote.
+		local modes, needs = offeredModes(if options.Forced then offered else Playlists.Enabled())
+		if #modes == 0 then
+			modes, needs = offeredModes(offered) -- (every mode off: the fallback)
+		end
+		gameNeeds = if options.Forced then {} else needs
 		for _, id in modes do
 			table.insert(
 				mapOptions,
@@ -296,15 +318,35 @@ function VotingService.Run(options: RunOptions): (string?, string?)
 	if anyDifficultyVotes then
 		difficulty = winner(difficultyOptions)
 	end
-	local won = winner(mapOptions)
 	if not byMode then
-		return won, difficulty
+		return winner(mapOptions), difficulty
 	end
-	-- A game won: one of its maps (playlists) that fits, at random.
+	-- The winning game: the most votes among the ones enough players are ready for.
+	local playable: { Option } = {}
+	for _, option in mapOptions do
+		if not option.Needs then
+			table.insert(playable, option)
+		end
+	end
+	if #playable == 0 then
+		return nil, nil -- (players left during the vote: back to waiting)
+	end
+	local won = winner(playable)
+	-- One of its maps (playlists) that fits, at random.
 	local maps: { Playlists.Playlist } = {}
-	for _, playlist in offered do
+	local fitting = if options.Forced
+		then offered
+		else Playlists.Available(math.max(ReadyService.Count(), 1))
+	for _, playlist in fitting do
 		if playlist.Mode == won then
 			table.insert(maps, playlist)
+		end
+	end
+	if #maps == 0 then
+		for _, playlist in offered do
+			if playlist.Mode == won then
+				table.insert(maps, playlist)
+			end
 		end
 	end
 	local chosen = if #maps > 0 then maps[math.random(1, #maps)] else Playlists.Fallback()
@@ -513,6 +555,7 @@ runPads = function(options: RunOptions): (string?, string?)
 	end
 
 	mapOptions = {}
+	gameNeeds = {} -- (the pads show "Needs 2 players" themselves)
 	difficultyOptions = {}
 	local slots: { [number]: Option } = {}
 	local looks: { [number]: string } = {}

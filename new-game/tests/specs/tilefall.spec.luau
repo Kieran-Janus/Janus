@@ -56,8 +56,8 @@ describe("Crumbling Crypt settings", function()
 				expect(level[key]).toBeA("number")
 			end
 		end
-		expect(easy.Layers).toBe(3)
-		expect(hard.Layers).toBe(2)
+		expect(easy.Layers).toBe(5)
+		expect(hard.Layers).toBe(4)
 		expect(easy.TileSize).toBeGreaterThan(hard.TileSize)
 		expect(easy.CrumbleSeconds).toBeGreaterThan(hard.CrumbleSeconds)
 		expect(easy.GraceSeconds).toBeGreaterThan(hard.GraceSeconds)
@@ -165,7 +165,7 @@ describe("Crumbling Crypt map", function()
 		again:Destroy()
 	end)
 
-	it("builds Hard's board: 2 layers of smaller slabs at the same heights", function()
+	it("builds Hard's board: fewer floors of smaller slabs at the same heights", function()
 		local folder = rt:create("Folder", { Name = "Holder" })
 		local hard = Config.TileFall.Difficulty.Hard
 		local tiles = Board.Build(
@@ -177,8 +177,8 @@ describe("Crumbling Crypt map", function()
 			def.Colors
 		)
 		local count = Board.Count(def.Board, hard.TileSize)
-		expect(#slabs(rt, tiles)).toBe(count * count * 2)
-		expect(tiles:GetAttribute("Layers")).toBe(2)
+		expect(#slabs(rt, tiles)).toBe(count * count * hard.Layers)
+		expect(tiles:GetAttribute("Layers")).toBe(4)
 		expect(count).toBeGreaterThan(
 			Board.Count(def.Board, Config.TileFall.Difficulty.Easy.TileSize)
 		)
@@ -509,9 +509,11 @@ describe("A Hard Crumbling Crypt round with a leaver and a cheat", function()
 		w.server:advance(0.15)
 		expect(w.at(cheat).Y).toBeLessThan(start.Y + 1)
 		-- Hovering with no slab underneath is out after MaxAirSeconds.
-		local layer3 = start.Y - 2 * mapDef(w.Config).Board.LayerSpacing
-		expect(w.slabAt(start.X, start.Z, 3)).toBeNil() -- Hard has no third layer
-		w.dropTo(cheat, layer3 + 9)
+		-- (below Hard's lowest floor: nothing underneath, still above the goo)
+		local floors = w.Config.TileFall.Difficulty.Hard.Layers
+		local below = start.Y - floors * mapDef(w.Config).Board.LayerSpacing
+		expect(w.slabAt(start.X, start.Z, 5)).toBeNil() -- Hard has no fifth floor
+		w.dropTo(cheat, below + 5)
 		w.server:advance(cfg.MaxAirSeconds + 0.3)
 		expect(cheat:GetAttribute("TileFallState")).toBe("Out")
 	end)

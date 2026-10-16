@@ -42,13 +42,13 @@ return {
 	-- Easy and Hard (the vote picks one).
 	Difficulty = {
 		Easy = {
-			TimeLimit = 300, -- seconds to reach the finish
+			TimeLimit = 360, -- seconds to reach the finish (nine stages)
 			SweeperSpeed = 0.45, -- ghost sweepers spin at this share of their Speed (slow)
 			CoinMultiplier = 1, -- coins x this
 		},
 		Hard = {
-			TimeLimit = 180,
-			SweeperSpeed = 1.25,
+			TimeLimit = 240,
+			SweeperSpeed = 1.45,
 			CoinMultiplier = 1.5,
 		},
 	},

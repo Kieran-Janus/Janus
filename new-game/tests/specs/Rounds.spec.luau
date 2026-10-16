@@ -331,10 +331,18 @@ describe("A round with two players, one on the Ready pad", function()
 
 	it("sends the player back to the lobby, not ready, and stops the streaming", function()
 		local r = ServerConfig.Round
+		-- (the vote picks any game one player can play: wait for the longest one, the Spooky
+		-- Obby on Easy, plus its countdown)
+		local obby = ServerConfig.ObbyRace
+		local longest = math.max(
+			r.Duration,
+			obby.Difficulty.Easy.TimeLimit + obby.IntroSeconds + 10,
+			ServerConfig.TileFall.Difficulty.Hard.Duration + 20
+		)
 		local waited = 0
 		while
 			RS:GetAttribute("State") ~= "Waiting for players"
-			and waited < r.Duration + r.ResultsSeconds + 30
+			and waited < longest + r.ResultsSeconds + 30
 		do
 			server:advance(1)
 			waited += 1

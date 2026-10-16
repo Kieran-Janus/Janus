@@ -33,21 +33,21 @@ return {
 	-- Easy and Hard (the vote picks one; Config.Modes.List.TileFall.UsesDifficulty = true).
 	Difficulty = {
 		Easy = {
-			Layers = 3, -- layers of slabs (max 3: the crypt is built for 3)
+			Layers = 5, -- floors of slabs (max 5: the crypt is built for 5, Board in its map file)
 			TileSize = 12, -- studs across one slab (bigger = easier)
 			CrumbleSeconds = 1.8, -- seconds from the first crack until the slab drops
 			GraceSeconds = 6, -- after GO! nothing cracks for this long
-			Duration = 120, -- the clock (seconds)
-			SuddenDeathAfter = 85, -- seconds after GO! when random slabs start cracking by themselves
+			Duration = 150, -- the clock (seconds)
+			SuddenDeathAfter = 100, -- seconds after GO! when random slabs start cracking by themselves
 			RewardMultiplier = 1, -- coins x this
 		},
 		Hard = {
-			Layers = 2,
+			Layers = 4,
 			TileSize = 8,
 			CrumbleSeconds = 0.7,
 			GraceSeconds = 1.5,
-			Duration = 150,
-			SuddenDeathAfter = 60,
+			Duration = 180,
+			SuddenDeathAfter = 75,
 			RewardMultiplier = 2,
 		},
 	},
@@ -64,7 +64,7 @@ return {
 
 	-- Falling out -----------------------------------------------------------------------------------
 	-- You're out when your body is lower than this many studs above the goo (the lowest layer is
-	-- Board.TopHeight - 2 x Board.LayerSpacing above it in Config/Maps/CrumblingCrypt.luau).
+	-- Board.TopHeight - (Layers - 1) x Board.LayerSpacing above it in Config/Maps/CrumblingCrypt.luau).
 	OutHeight = 6,
 	-- Resetting or dying also counts as falling: you're out (no free respawn back on the slabs).
 

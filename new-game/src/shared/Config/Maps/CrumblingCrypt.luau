@@ -31,8 +31,8 @@ return {
 	-- The slab floor (all layers are the same square, one above the other).
 	Board = {
 		Size = 84, -- studs across (the slabs fill it: Size / TileSize slabs a side)
-		TopHeight = 46, -- studs from the goo to the top of the top layer
-		LayerSpacing = 16, -- studs between layers (too high to jump back up)
+		TopHeight = 68, -- studs from the goo to the top of the top floor (5 floors: the lowest is 12 up)
+		LayerSpacing = 14, -- studs between floors (too high to jump back up)
 		Thickness = 1.6, -- how thick a slab is
 		Gap = 0.35, -- the seam between two slabs
 	},
@@ -46,6 +46,8 @@ return {
 			Color3.fromRGB(128, 120, 132),
 			Color3.fromRGB(108, 100, 118),
 			Color3.fromRGB(92, 84, 104),
+			Color3.fromRGB(84, 92, 104),
+			Color3.fromRGB(78, 70, 92),
 		},
 		SlabEdge = Color3.fromRGB(70, 64, 78), -- the rim round the edge of each layer
 		Wall = Color3.fromRGB(58, 52, 66), -- crypt walls
@@ -64,7 +66,7 @@ return {
 	Decor = {
 		PillarsPerSide = 3, -- stone pillars along each side of the slabs
 		PillarGap = 9, -- studs between the slabs' edge and the pillars
-		PillarHeight = 54, -- from the goo up
+		PillarHeight = 76, -- from the goo up
 		LitCandles = 6, -- pillars whose candle gives light (phones: keep the lights low)
 		Skulls = 14, -- skulls on the ledges (plus one on every pillar)
 		Gravestones = 12, -- along the ledges

@@ -257,6 +257,7 @@ local Config = {
 			Heading = "Vote for the next game",
 			Difficulty = "Vote for the difficulty",
 			TimeLeft = "%ds", -- the seconds left, small and quiet beside the heading
+			NeedsPlayers = "Needs %d players", -- a game needing more ready players (greyed out)
 		},
 		-- Extra motion on the vote panel. A vote is always sent the moment you tap.
 		-- false = no motion: cards and counts change at once, the panel closes right away.

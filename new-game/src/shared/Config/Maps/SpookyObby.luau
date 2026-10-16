@@ -3,9 +3,10 @@
 	MAP: Spooky Obby (one entry of Config.Maps.List), the course of the Spooky Obby mode
 	(Config.ObbyRace). Built by src/server/Maps/SpookyObby.luau from these settings.
 
-	A misty graveyard in the sky: the start plaza (the Floor, with the spawns), then six
+	A misty graveyard in the sky: the start plaza (the Floor, with the spawns), then nine
 	stages over the void: Pumpkin Hop, Gravestone Hops, Coffin Bridge, Ghost Sweepers (spinning
-	bars to jump over), Candy Cane Rails and the Haunted Tree climb, up to the glowing finish
+	bars to jump over), Candy Cane Rails, the Haunted Tree climb, Bat Wing Leaps, the Spin Cycle
+	and the Tightrope Twist, up to the glowing finish
 	with the golden trophy pumpkin. Glowing checkpoints sit between the stages.
 
 	THE COURSE: one line per piece, in the order you jump on them (the same way of writing as
@@ -46,15 +47,15 @@ local Course: { Step } = {
 	{ Kind = "Start", Look = "Plaza", Offset = Vector3.new(0, 0, 0), Size = Vector3.new(48, 1, 48) },
 	-- Stage 1: Pumpkin Hop (Easy: big pumpkins; Hard: smaller ones in the same spots)
 	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(0, 1, 31), Size = Vector3.new(8, 5, 8), Only = "Easy" },
-	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(0, 1, 31), Size = Vector3.new(6.5, 4.5, 6.5), Only = "Hard" },
+	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(0, 1, 31), Size = Vector3.new(5.5, 4.5, 5.5), Only = "Hard" },
 	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(5, 1.5, 39), Size = Vector3.new(8, 5, 8), Only = "Easy" },
-	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(5, 1.5, 39), Size = Vector3.new(6.5, 4.5, 6.5), Only = "Hard" },
+	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(5, 1.5, 39), Size = Vector3.new(5.5, 4.5, 5.5), Only = "Hard" },
 	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(0, 2, 47), Size = Vector3.new(8, 5, 8), Only = "Easy" },
-	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(0, 2, 47), Size = Vector3.new(6.5, 4.5, 6.5), Only = "Hard" },
+	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(0, 2, 47), Size = Vector3.new(5.5, 4.5, 5.5), Only = "Hard" },
 	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(-5, 2.5, 55), Size = Vector3.new(8, 5, 8), Only = "Easy" },
-	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(-5, 2.5, 55), Size = Vector3.new(6.5, 4.5, 6.5), Only = "Hard" },
+	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(-5, 2.5, 55), Size = Vector3.new(5.5, 4.5, 5.5), Only = "Hard" },
 	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(0, 3, 63), Size = Vector3.new(8, 5, 8), Only = "Easy" },
-	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(0, 3, 63), Size = Vector3.new(6.5, 4.5, 6.5), Only = "Hard" },
+	{ Kind = "Pumpkin", Look = "Pumpkin", Offset = Vector3.new(0, 3, 63), Size = Vector3.new(5.5, 4.5, 5.5), Only = "Hard" },
 	-- Stage 2: Gravestone Hops
 	{ Kind = "Checkpoint", Look = "Checkpoint", Offset = Vector3.new(0, 3, 74), Size = Vector3.new(12, 1.4, 12), Label = "Gravestone Hops" },
 	{ Kind = "Grave", Look = "Grave", Offset = Vector3.new(0, 4, 85), Size = Vector3.new(6.5, 6, 4.5) },
@@ -79,29 +80,58 @@ local Course: { Step } = {
 	-- Stage 5: Candy Cane Rails (Easy: 4 studs wide; Hard: 2.5)
 	{ Kind = "Checkpoint", Look = "Checkpoint", Offset = Vector3.new(0, 10.5, 240), Size = Vector3.new(12, 1.4, 12), Label = "Candy Cane Rails" },
 	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(0, 11, 258), Size = Vector3.new(4, 1, 18), Only = "Easy" },
-	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(0, 11, 258), Size = Vector3.new(2.5, 1, 18), Only = "Hard" },
+	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(0, 11, 258), Size = Vector3.new(2, 1, 18), Only = "Hard" },
 	{ Kind = "Candy", Look = "CandyDrop", Offset = Vector3.new(0, 11.5, 273.5), Size = Vector3.new(7, 1.4, 7) },
 	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(15.5, 12, 273.5), Size = Vector3.new(4, 1, 18), Rotation = 90, Only = "Easy" },
-	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(15.5, 12, 273.5), Size = Vector3.new(2.5, 1, 18), Rotation = 90, Only = "Hard" },
+	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(15.5, 12, 273.5), Size = Vector3.new(2, 1, 18), Rotation = 90, Only = "Hard" },
 	{ Kind = "Candy", Look = "CandyDrop", Offset = Vector3.new(31, 12.5, 273.5), Size = Vector3.new(7, 1.4, 7) },
 	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(31, 13, 289.5), Size = Vector3.new(4, 1, 18), Only = "Easy" },
-	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(31, 13, 289.5), Size = Vector3.new(2.5, 1, 18), Only = "Hard" },
+	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(31, 13, 289.5), Size = Vector3.new(2, 1, 18), Only = "Hard" },
 	-- Stage 6: the Haunted Tree (climb its branches; Hard: thinner branches)
 	{ Kind = "Checkpoint", Look = "Checkpoint", Offset = Vector3.new(31, 13.5, 307.5), Size = Vector3.new(12, 1.4, 12), Label = "The Haunted Tree" },
 	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(31, 15.5, 319), Size = Vector3.new(7, 1.2, 5), Only = "Easy" },
-	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(31, 15.5, 319), Size = Vector3.new(5.5, 1.2, 4), Only = "Hard" },
+	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(31, 15.5, 319), Size = Vector3.new(4.5, 1.2, 3.5), Only = "Hard" },
 	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(25, 17.5, 326), Size = Vector3.new(7, 1.2, 5), Only = "Easy" },
-	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(25, 17.5, 326), Size = Vector3.new(5.5, 1.2, 4), Only = "Hard" },
+	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(25, 17.5, 326), Size = Vector3.new(4.5, 1.2, 3.5), Only = "Hard" },
 	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(31, 19.5, 333), Size = Vector3.new(7, 1.2, 5), Only = "Easy" },
-	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(31, 19.5, 333), Size = Vector3.new(5.5, 1.2, 4), Only = "Hard" },
+	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(31, 19.5, 333), Size = Vector3.new(4.5, 1.2, 3.5), Only = "Hard" },
 	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(25, 21.5, 340), Size = Vector3.new(7, 1.2, 5), Only = "Easy" },
-	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(25, 21.5, 340), Size = Vector3.new(5.5, 1.2, 4), Only = "Hard" },
+	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(25, 21.5, 340), Size = Vector3.new(4.5, 1.2, 3.5), Only = "Hard" },
 	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(31, 23.5, 347), Size = Vector3.new(7, 1.2, 5), Only = "Easy" },
-	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(31, 23.5, 347), Size = Vector3.new(5.5, 1.2, 4), Only = "Hard" },
+	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(31, 23.5, 347), Size = Vector3.new(4.5, 1.2, 3.5), Only = "Hard" },
 	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(25, 25.5, 354), Size = Vector3.new(7, 1.2, 5), Only = "Easy" },
-	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(25, 25.5, 354), Size = Vector3.new(5.5, 1.2, 4), Only = "Hard" },
+	{ Kind = "Platform", Look = "Branch", Offset = Vector3.new(25, 25.5, 354), Size = Vector3.new(4.5, 1.2, 3.5), Only = "Hard" },
+	-- Stage 7: Bat Wing Leaps (pads zigzagging up; Easy: 6 studs across, Hard: 4)
+	{ Kind = "Checkpoint", Look = "Checkpoint", Offset = Vector3.new(25, 26.5, 366), Size = Vector3.new(12, 1.4, 12), Label = "Bat Wing Leaps" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(29, 27.5, 378), Size = Vector3.new(6, 1.2, 6), Only = "Easy" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(29, 27.5, 378), Size = Vector3.new(4, 1.2, 4), Only = "Hard" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(23, 28.5, 387), Size = Vector3.new(6, 1.2, 6), Only = "Easy" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(23, 28.5, 387), Size = Vector3.new(4, 1.2, 4), Only = "Hard" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(29, 29.5, 396), Size = Vector3.new(6, 1.2, 6), Only = "Easy" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(29, 29.5, 396), Size = Vector3.new(4, 1.2, 4), Only = "Hard" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(23, 30.5, 405), Size = Vector3.new(6, 1.2, 6), Only = "Easy" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(23, 30.5, 405), Size = Vector3.new(4, 1.2, 4), Only = "Hard" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(27, 31.5, 414), Size = Vector3.new(6, 1.2, 6), Only = "Easy" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(27, 31.5, 414), Size = Vector3.new(4, 1.2, 4), Only = "Hard" },
+	-- Stage 8: Spin Cycle (a sweeper with two bars; Hard: faster, with goo on the floor)
+	{ Kind = "Platform", Look = "Sweeper", Offset = Vector3.new(27, 32, 433), Size = Vector3.new(24, 1.5, 24), Sweeper = { Speed = 95, Length = 21, Cross = true } },
+	{ Kind = "Hazard", Look = "Goo", Offset = Vector3.new(19.5, 32, 427), Size = Vector3.new(6, 0.4, 5), Only = "Hard" },
+	{ Kind = "Hazard", Look = "Goo", Offset = Vector3.new(34.5, 32, 439), Size = Vector3.new(6, 0.4, 5), Only = "Hard" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(27, 32.5, 454), Size = Vector3.new(10, 1.5, 10), Only = "Easy" },
+	{ Kind = "Platform", Look = "Pad", Offset = Vector3.new(27, 32.5, 454), Size = Vector3.new(8, 1.5, 8), Only = "Hard" },
+	-- Stage 9: Tightrope Twist (candy rails with a turn; Easy: 4 wide, Hard: 2 with goo to hop over)
+	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(27, 33, 469), Size = Vector3.new(4, 1, 20), Only = "Easy" },
+	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(27, 33, 469), Size = Vector3.new(2, 1, 20), Only = "Hard" },
+	{ Kind = "Hazard", Look = "Goo", Offset = Vector3.new(27, 33, 469), Size = Vector3.new(2, 0.4, 2), Only = "Hard" },
+	{ Kind = "Candy", Look = "CandyDrop", Offset = Vector3.new(27, 33.5, 485), Size = Vector3.new(6, 1.4, 6) },
+	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(41, 34, 485), Size = Vector3.new(4, 1, 18), Rotation = 90, Only = "Easy" },
+	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(41, 34, 485), Size = Vector3.new(2, 1, 18), Rotation = 90, Only = "Hard" },
+	{ Kind = "Candy", Look = "CandyDrop", Offset = Vector3.new(55, 34.5, 485), Size = Vector3.new(6, 1.4, 6) },
+	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(55, 35, 501), Size = Vector3.new(4, 1, 20), Only = "Easy" },
+	{ Kind = "Platform", Look = "CandyRail", Offset = Vector3.new(55, 35, 501), Size = Vector3.new(2, 1, 20), Only = "Hard" },
+	{ Kind = "Hazard", Look = "Goo", Offset = Vector3.new(55, 35, 501), Size = Vector3.new(2, 0.4, 2), Only = "Hard" },
 	-- The finish
-	{ Kind = "Finish", Look = "Finish", Offset = Vector3.new(25, 26.5, 367), Size = Vector3.new(14, 1.6, 14) },
+	{ Kind = "Finish", Look = "Finish", Offset = Vector3.new(55, 36, 520), Size = Vector3.new(14, 1.6, 14) },
 }
 
 return {

@@ -439,8 +439,8 @@ describe("A Spooky Obby round (Easy, three racers)", function()
 			expect(p:GetAttribute(s.ATTR.Checkpoint)).toBe(0)
 		end
 		checkpoints, finish = s.pads()
-		expect(#checkpoints).toBe(5) -- Easy keeps its extra checkpoint
-		expect(winner:GetAttribute(s.ATTR.Total)).toBe(5)
+		expect(#checkpoints).toBe(6) -- Easy keeps its extra checkpoint
+		expect(winner:GetAttribute(s.ATTR.Total)).toBe(6)
 		for _, d in s.map.Model:GetDescendants() do
 			if d:GetAttribute("Only") == "Hard" then
 				error("a Hard-only piece is still there: " .. d:GetFullName())
@@ -568,7 +568,7 @@ describe("A Spooky Obby round (Easy, three racers)", function()
 		for _, pad in checkpoints do
 			expect(s.walk(winner, s.topOf(pad))).toBe(true)
 		end
-		expect(winner:GetAttribute(s.ATTR.Checkpoint)).toBe(5)
+		expect(winner:GetAttribute(s.ATTR.Checkpoint)).toBe(6)
 		expect(winner:GetAttribute(s.ATTR.Rank)).toBe(1)
 		local before = s.backs(winner)
 		s.walk(winner, s.topOf(finish))
@@ -636,8 +636,8 @@ describe("A solo Spooky Obby round (Hard)", function()
 		solo = server:addPlayer({ Name = "Solo" })
 		s.start({ solo })
 		local checkpoints, finish = s.pads()
-		expect(#checkpoints).toBe(4) -- no Easy-only checkpoint
-		expect(solo:GetAttribute(s.ATTR.Total)).toBe(4)
+		expect(#checkpoints).toBe(5) -- no Easy-only checkpoint
+		expect(solo:GetAttribute(s.ATTR.Total)).toBe(5)
 		local crossBars = 0
 		for _, bar in taggedIn(server, s.map.Model, s.Tags.ObbySweeper) do
 			if bar.Name == "CrossBar" then

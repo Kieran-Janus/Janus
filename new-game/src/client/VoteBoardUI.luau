@@ -22,7 +22,15 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local ScreenFx = require(script.Parent.ScreenFx)
 local Theme = require(script.Parent.Theme)
 
-type Option = { Id: string, Name: string, Votes: number }
+type Option = { Id: string, Name: string, Votes: number, Needs: number? }
+
+-- A button's words: the name and votes, or "Needs 2 players" for a game that needs more.
+local function optionText(option: Option): string
+	if option.Needs then
+		return option.Name .. "\n" .. Config.Voting.Text.NeedsPlayers:format(option.Needs)
+	end
+	return ("%s\n%d"):format(option.Name, option.Votes)
+end
 type VoteState = {
 	Open: boolean,
 	Maps: { Option },
@@ -143,12 +151,17 @@ function VoteBoardUI.Mount()
 			b.TextColor3 = Theme.Text
 			b.Font = Theme.Font
 			b.TextScaled = true
-			b.Text = ("%s\n%d"):format(option.Name, option.Votes)
+			b.Text = optionText(option)
 			b.Size = UDim2.new(1 / #options, -8, 1, 0)
 			b.Parent = frame
 			Theme.round(b, 12)
 			if current and current.Pads then
 				b.AutoButtonColor = false -- (the vote pads decide: the board only shows counts)
+			elseif option.Needs then
+				-- A game needing more ready players: greyed out, can't be picked.
+				b.AutoButtonColor = false
+				b.TextColor3 = Theme.Muted
+				b.BackgroundTransparency = 0.4
 			else
 				b.Activated:Connect(function()
 					castVote:FireServer(kind, option.Id)
@@ -171,7 +184,11 @@ function VoteBoardUI.Mount()
 		}
 		for _, list in { state.Maps, state.Difficulties } do
 			for _, option in list do
-				table.insert(parts, option.Id .. "=" .. option.Name)
+				-- (a game locking or unlocking redraws its button: greyed out or not)
+				table.insert(
+					parts,
+					option.Id .. "=" .. option.Name .. "/" .. tostring(option.Needs)
+				)
 			end
 			table.insert(parts, "|")
 		end
@@ -186,7 +203,7 @@ function VoteBoardUI.Mount()
 				local b = buttons[key]
 				if b and counts[key] ~= option.Votes then
 					counts[key] = option.Votes
-					b.Text = ("%s\n%d"):format(option.Name, option.Votes)
+					b.Text = optionText(option)
 					pulse(b)
 				end
 			end
